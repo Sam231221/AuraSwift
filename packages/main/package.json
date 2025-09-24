@@ -1,0 +1,33 @@
+{
+  "name": "@app/main",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@app/preload": "*",
+    "@app/renderer": "*",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^12.2.0",
+    "electron-store": "^10.1.0",
+    "electron-updater": "6.6.2",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@app/electron-versions": "*",
+    "@electron/rebuild": "^4.0.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/uuid": "^10.0.0",
+    "electron-devtools-installer": "4.0.0",
+    "typescript": "5.9.2",
+    "vite": "7.1.6"
+  }
+}
