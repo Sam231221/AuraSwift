@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, Bell, Settings } from "lucide-react";
+import { Store, LogOut, User, Bell, Settings } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
-import { getRoleDisplayName, getUserDisplayName } from "@/shared/utils/auth";
-import { UserAvatar, BusinessAvatar } from "@/shared/components/user-avatar";
+import { getRoleDisplayName, getUserDisplayName } from "@/lib/auth";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -28,12 +27,11 @@ export function DashboardLayout({
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <BusinessAvatar
-                business={{ name: user.businessName }}
-                size="lg"
-              />
+              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                <Store className="w-5 h-5 text-primary-foreground" />
+              </div>
               <div>
-                <h1 className="text-xl font-bold">{user.businessName}</h1>
+                <h1 className="text-xl font-bold">AuraSwift</h1>
                 <p className="text-xs text-muted-foreground">
                   Point of Sale System
                 </p>
@@ -57,14 +55,9 @@ export function DashboardLayout({
             </Button>
             <div className="flex items-center gap-3 pl-3 border-l">
               <div className="flex items-center gap-2">
-                <UserAvatar
-                  user={{
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    avatar: user.avatar,
-                  }}
-                  size="md"
-                />
+                <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4" />
+                </div>
                 <div className="hidden sm:block">
                   <p className="text-sm font-medium">
                     {getUserDisplayName(user)}

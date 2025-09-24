@@ -1,23 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Package,
-  MenuSquare,
-  AlertTriangle,
+  Trash2,
   Plus,
   Search,
   Filter,
+  Edit,
+  Package,
+  X,
+  Settings,
+  AlertTriangle,
+  MenuSquare,
+  DollarSign,
   ChevronLeft,
   ChevronRight,
+  ImageIcon,
   Upload,
-  X,
-  Edit,
-  Trash2,
-  TrendingDown,
-  DollarSign,
-  Image as ImageIcon,
-  Settings,
   Minus,
+  TrendingDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,6 @@ import {
   DrawerDescription,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
   DrawerClose,
 } from "@/components/ui/drawer";
 import {
@@ -42,52 +41,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
-
+import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
+import type { Product, Modifier } from "@/types/product.types";
 
-// Types
-interface Modifier {
-  id: string;
-  name: string;
-  type: "single" | "multiple";
-  options: ModifierOption[];
-  required: boolean;
-}
-
-interface ModifierOption {
-  id: string;
-  name: string;
-  price: number;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  costPrice: number;
-  taxRate: number;
-  sku: string;
-  plu?: string;
-  image?: string;
-  category: string;
-  stockLevel: number;
-  minStockLevel: number;
-  modifiers: Modifier[];
-  isActive: boolean;
-  createdAt: string;
-}
-
-interface StockAdjustment {
-  id: string;
-  productId: string;
-  type: "add" | "remove" | "sale";
-  quantity: number;
-  reason: string;
-  timestamp: string;
-}
-
-// Sample data
+// Categories for products
 const categories = [
   "Starters",
   "Mains",
@@ -97,86 +55,6 @@ const categories = [
   "Coffee & Tea",
 ];
 
-const sampleModifiers: Modifier[] = [
-  {
-    id: "1",
-    name: "Cooking Level",
-    type: "single",
-    required: false,
-    options: [
-      { id: "1a", name: "Rare", price: 0 },
-      { id: "1b", name: "Medium Rare", price: 0 },
-      { id: "1c", name: "Medium", price: 0 },
-      { id: "1d", name: "Well Done", price: 0 },
-    ],
-  },
-  {
-    id: "2",
-    name: "Add Extras",
-    type: "multiple",
-    required: false,
-    options: [
-      { id: "2a", name: "Extra Cheese", price: 2.5 },
-      { id: "2b", name: "Bacon", price: 3.0 },
-      { id: "2c", name: "Avocado", price: 2.0 },
-    ],
-  },
-];
-
-const initialProducts: Product[] = [
-  {
-    id: "1",
-    name: "Grilled Salmon",
-    description: "Fresh Atlantic salmon with lemon herb seasoning",
-    price: 24.99,
-    costPrice: 12.5,
-    taxRate: 10,
-    sku: "SALMON001",
-    plu: "101",
-    image: "",
-    category: "Mains",
-    stockLevel: 15,
-    minStockLevel: 5,
-    modifiers: [sampleModifiers[0]],
-    isActive: true,
-    createdAt: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "Classic Burger",
-    description: "Beef patty with lettuce, tomato, and special sauce",
-    price: 16.99,
-    costPrice: 7.5,
-    taxRate: 10,
-    sku: "BURGER001",
-    plu: "102",
-    image: "",
-    category: "Mains",
-    stockLevel: 3,
-    minStockLevel: 10,
-    modifiers: [sampleModifiers[1]],
-    isActive: true,
-    createdAt: "2024-01-16",
-  },
-  {
-    id: "3",
-    name: "Caesar Salad",
-    description: "Crisp romaine lettuce with caesar dressing and croutons",
-    price: 12.99,
-    costPrice: 4.5,
-    taxRate: 10,
-    sku: "CAESAR001",
-    plu: "103",
-    image: "",
-    category: "Starters",
-    stockLevel: 25,
-    minStockLevel: 8,
-    modifiers: [],
-    isActive: true,
-    createdAt: "2024-01-17",
-  },
-];
-
 interface ProductManagementViewProps {
   onBack: () => void;
 }
@@ -184,11 +62,17 @@ interface ProductManagementViewProps {
 const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   onBack,
 }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // State management
   const [currentView, setCurrentView] = useState<
     "productDashboard" | "productManagement"
   >("productDashboard");
 
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterStock, setFilterStock] = useState<string>("all");
@@ -205,9 +89,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [stockAdjustmentProduct, setStockAdjustmentProduct] =
     useState<Product | null>(null);
-  const [stockAdjustments, setStockAdjustments] = useState<StockAdjustment[]>(
-    []
-  );
 
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -223,6 +104,41 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     minStockLevel: 5,
     modifiers: [] as Modifier[],
   });
+
+  // API functions
+  const loadProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await window.productAPI.getByBusiness(user!.businessId);
+      if (response.success && response.products) {
+        console.log("Loaded products:", response.products);
+        console.log(
+          "First product modifiers:",
+          response.products[0]?.modifiers
+        );
+        setProducts(response.products);
+      } else {
+        toast.error("Failed to load products");
+      }
+    } catch (error) {
+      console.error("Error loading products:", error);
+      toast.error("Failed to load products");
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Load products on component mount
+  useEffect(() => {
+    if (user?.businessId) {
+      loadProducts();
+    }
+  }, [user, loadProducts]);
+
+  // Close drawer when view changes
+  useEffect(() => {
+    setIsDrawerOpen(false);
+  }, [currentView]);
 
   const productsPerPage = 10;
 
@@ -255,7 +171,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     startIndex + productsPerPage
   );
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setNewProduct({
       name: "",
       description: "",
@@ -271,35 +187,63 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       modifiers: [],
     });
     setEditingProduct(null);
-  };
+  }, []);
 
-  const handleAddProduct = () => {
-    if (newProduct.name && newProduct.sku) {
-      const product: Product = {
-        id: Date.now().toString(),
+  const handleAddProduct = async () => {
+    if (!newProduct.name || !newProduct.sku || !user?.businessId) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const productData = {
         ...newProduct,
-        isActive: true,
-        createdAt: new Date().toISOString().split("T")[0],
+        businessId: user.businessId,
       };
 
       if (editingProduct) {
-        setProducts(
-          products.map((p) =>
-            p.id === editingProduct.id
-              ? { ...product, id: editingProduct.id }
-              : p
-          )
+        // Update existing product
+        const response = await window.productAPI.update(
+          editingProduct.id,
+          productData
         );
+        if (response.success && response.product) {
+          setProducts(
+            products.map((p) =>
+              p.id === editingProduct.id ? response.product! : p
+            )
+          );
+          toast.success("Product updated successfully");
+        } else {
+          toast.error(response.message || "Failed to update product");
+        }
       } else {
-        setProducts([...products, product]);
+        // Create new product
+        const response = await window.productAPI.create(productData);
+        if (response.success && response.product) {
+          setProducts([...products, response.product]);
+          toast.success("Product created successfully");
+        } else {
+          toast.error(response.message || "Failed to create product");
+        }
       }
 
       resetForm();
       setIsDrawerOpen(false);
+    } catch (error) {
+      console.error("Error saving product:", error);
+      toast.error("Failed to save product");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleEditProduct = (product: Product) => {
+    console.log("Editing product:", product);
+    console.log("Product modifiers:", product.modifiers);
+
     setEditingProduct(product);
     setNewProduct({
       name: product.name,
@@ -313,66 +257,107 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       category: product.category,
       stockLevel: product.stockLevel,
       minStockLevel: product.minStockLevel,
-      modifiers: product.modifiers,
+      modifiers: product.modifiers || [], // Ensure it's always an array
     });
     setIsDrawerOpen(true);
   };
 
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter((p) => p.id !== id));
+  const handleDeleteProduct = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this product?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await window.productAPI.delete(id);
+      if (response.success) {
+        setProducts(products.filter((p) => p.id !== id));
+        toast.success("Product deleted successfully");
+      } else {
+        toast.error(response.message || "Failed to delete product");
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to delete product");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleStockAdjustment = (
+  const handleStockAdjustment = async (
     productId: string,
     type: "add" | "remove",
     quantity: number,
     reason: string
   ) => {
-    const adjustment: StockAdjustment = {
-      id: Date.now().toString(),
-      productId,
-      type,
-      quantity,
-      reason,
-      timestamp: new Date().toISOString(),
-    };
+    if (!user?.businessId || !user.id) {
+      toast.error("User information not available");
+      return;
+    }
 
-    setStockAdjustments([...stockAdjustments, adjustment]);
-
-    setProducts(
-      products.map((product) => {
-        if (product.id === productId) {
-          const newStock =
-            type === "add"
-              ? product.stockLevel + quantity
-              : Math.max(0, product.stockLevel - quantity);
-          return { ...product, stockLevel: newStock };
-        }
-        return product;
-      })
-    );
-
-    setStockAdjustmentProduct(null);
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setNewProduct({ ...newProduct, image: e.target?.result as string });
+    try {
+      setLoading(true);
+      const adjustmentData = {
+        productId,
+        type: type as "add" | "remove" | "sale" | "waste" | "adjustment",
+        quantity,
+        reason,
+        userId: user.id,
+        businessId: user.businessId,
       };
-      reader.readAsDataURL(file);
+
+      const response = await window.productAPI.adjustStock(adjustmentData);
+      if (response.success) {
+        // Reload products to get updated stock levels
+        await loadProducts();
+        toast.success("Stock adjustment completed successfully");
+        setStockAdjustmentProduct(null);
+      } else {
+        toast.error(response.message || "Failed to adjust stock");
+      }
+    } catch (error) {
+      console.error("Error adjusting stock:", error);
+      toast.error("Failed to adjust stock");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleImageUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setNewProduct((prev) => ({
+            ...prev,
+            image: e.target?.result as string,
+          }));
+        };
+        reader.readAsDataURL(file);
+      }
+    },
+    []
+  );
+
   const addModifier = () => {
+    const now = new Date().toISOString();
     const newModifier: Modifier = {
       id: Date.now().toString(),
       name: "",
       type: "single",
       required: false,
-      options: [{ id: Date.now().toString() + "_opt", name: "", price: 0 }],
+      businessId: user?.businessId || "",
+      createdAt: now,
+      updatedAt: now,
+      options: [
+        {
+          id: Date.now().toString() + "_opt",
+          name: "",
+          price: 0,
+          createdAt: now,
+        },
+      ],
     };
     setNewProduct({
       ...newProduct,
@@ -386,14 +371,22 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     setNewProduct({ ...newProduct, modifiers: updatedModifiers });
   };
 
-  const removeModifier = (index: number) => {
-    setNewProduct({
-      ...newProduct,
-      modifiers: newProduct.modifiers.filter((_, i) => i !== index),
-    });
-  };
+  const removeModifier = useCallback((index: number) => {
+    setNewProduct((prev) => ({
+      ...prev,
+      modifiers: prev.modifiers.filter((_, i) => i !== index),
+    }));
+  }, []);
 
-  const ProductDashboardView = () => (
+  const handleInputChange = useCallback(
+    (field: string, value: string | number) => {
+      console.log("handleInputChange called:", field, value);
+      setNewProduct((prev) => ({ ...prev, [field]: value }));
+    },
+    []
+  );
+
+  const ProductDashboardView = React.memo(() => (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -507,7 +500,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
             <Button
               variant="outline"
               className="w-full justify-start"
-              onClick={() => setCurrentView("products")}
+              onClick={() => {
+                setCurrentView("productManagement");
+              }}
             >
               <Package className="w-4 h-4 mr-3" />
               Manage Products
@@ -517,8 +512,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               variant="outline"
               className="w-full justify-start"
               onClick={() => {
-                setIsDrawerOpen(true);
                 resetForm();
+                setIsDrawerOpen(true);
               }}
             >
               <Plus className="w-4 h-4 mr-3" />
@@ -567,9 +562,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         </div>
       </div>
     </div>
-  );
+  ));
 
-  const ProductsDetailsView = () => (
+  const ProductsDetailsView = React.memo(() => (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -577,7 +572,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentView("productDashboard")}
+            onClick={() => {
+              setCurrentView("productDashboard");
+            }}
           >
             <ChevronLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
@@ -592,411 +589,15 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           </div>
         </div>
 
-        <Drawer
-          open={isDrawerOpen}
-          onOpenChange={setIsDrawerOpen}
-          direction="right"
+        <Button
+          onClick={() => {
+            resetForm();
+            setIsDrawerOpen(true);
+          }}
         >
-          <DrawerTrigger asChild>
-            <Button onClick={() => resetForm()}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Product
-            </Button>
-          </DrawerTrigger>
-          <DrawerContent className="h-full w-[800px] mt-0 rounded-none fixed right-0 top-0">
-            <DrawerHeader className="border-b">
-              <DrawerTitle>
-                {editingProduct ? "Edit Product" : "Add New Product"}
-              </DrawerTitle>
-              <DrawerDescription>
-                {editingProduct
-                  ? "Update the product information below."
-                  : "Fill in the details to create a new menu item."}
-              </DrawerDescription>
-            </DrawerHeader>
-
-            <div className="p-6 overflow-y-auto flex-1">
-              <Tabs defaultValue="basic" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                  <TabsTrigger value="pricing">Pricing & Stock</TabsTrigger>
-                  <TabsTrigger value="modifiers">Modifiers</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="basic" className="space-y-4 mt-6">
-                  {/* Image Upload */}
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                      {newProduct.image ? (
-                        <img
-                          src={newProduct.image}
-                          alt="Product"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <ImageIcon className="w-12 h-12 text-gray-400" />
-                      )}
-                    </div>
-                    <div>
-                      <Label htmlFor="image" className="cursor-pointer">
-                        <div className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-md transition-colors">
-                          <Upload className="w-4 h-4" />
-                          <span className="text-sm">Upload Image</span>
-                        </div>
-                      </Label>
-                      <Input
-                        id="image"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleImageUpload}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <Label htmlFor="name">Product Name *</Label>
-                      <Input
-                        id="name"
-                        value={newProduct.name}
-                        onChange={(e) =>
-                          setNewProduct({ ...newProduct, name: e.target.value })
-                        }
-                        placeholder="Enter product name"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        value={newProduct.description}
-                        onChange={(e) =>
-                          setNewProduct({
-                            ...newProduct,
-                            description: e.target.value,
-                          })
-                        }
-                        placeholder="Enter product description"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="category">Category</Label>
-                      <Select
-                        value={newProduct.category}
-                        onValueChange={(value) =>
-                          setNewProduct({ ...newProduct, category: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="sku">SKU *</Label>
-                      <Input
-                        id="sku"
-                        value={newProduct.sku}
-                        onChange={(e) =>
-                          setNewProduct({ ...newProduct, sku: e.target.value })
-                        }
-                        placeholder="Enter SKU"
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <Label htmlFor="plu">PLU Code (Optional)</Label>
-                      <Input
-                        id="plu"
-                        value={newProduct.plu}
-                        onChange={(e) =>
-                          setNewProduct({ ...newProduct, plu: e.target.value })
-                        }
-                        placeholder="Enter PLU code"
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="pricing" className="space-y-4 mt-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="price">Sale Price *</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        step="0.01"
-                        value={newProduct.price}
-                        onChange={(e) =>
-                          setNewProduct({
-                            ...newProduct,
-                            price: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="0.00"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="costPrice">Cost Price *</Label>
-                      <Input
-                        id="costPrice"
-                        type="number"
-                        step="0.01"
-                        value={newProduct.costPrice}
-                        onChange={(e) =>
-                          setNewProduct({
-                            ...newProduct,
-                            costPrice: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="0.00"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="taxRate">Tax Rate (%)</Label>
-                      <Input
-                        id="taxRate"
-                        type="number"
-                        step="0.1"
-                        value={newProduct.taxRate}
-                        onChange={(e) =>
-                          setNewProduct({
-                            ...newProduct,
-                            taxRate: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="10"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Profit Margin</Label>
-                      <div className="mt-1 p-2 bg-gray-50 rounded text-sm">
-                        {newProduct.price > 0 && newProduct.costPrice > 0
-                          ? `${(
-                              ((newProduct.price - newProduct.costPrice) /
-                                newProduct.price) *
-                              100
-                            ).toFixed(1)}%`
-                          : "N/A"}
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="stockLevel">Current Stock</Label>
-                      <Input
-                        id="stockLevel"
-                        type="number"
-                        value={newProduct.stockLevel}
-                        onChange={(e) =>
-                          setNewProduct({
-                            ...newProduct,
-                            stockLevel: parseInt(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="0"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="minStockLevel">Minimum Stock Level</Label>
-                      <Input
-                        id="minStockLevel"
-                        type="number"
-                        value={newProduct.minStockLevel}
-                        onChange={(e) =>
-                          setNewProduct({
-                            ...newProduct,
-                            minStockLevel: parseInt(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="5"
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="modifiers" className="space-y-4 mt-6">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Product Modifiers</h4>
-                    <Button onClick={addModifier} size="sm">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Modifier
-                    </Button>
-                  </div>
-
-                  {newProduct.modifiers.map((modifier, index) => (
-                    <div
-                      key={modifier.id}
-                      className="border rounded-lg p-4 space-y-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <h5 className="font-medium">Modifier {index + 1}</h5>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeModifier(index)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label>Modifier Name</Label>
-                          <Input
-                            value={modifier.name}
-                            onChange={(e) =>
-                              updateModifier(index, {
-                                ...modifier,
-                                name: e.target.value,
-                              })
-                            }
-                            placeholder="e.g. Cooking Level"
-                          />
-                        </div>
-
-                        <div>
-                          <Label>Type</Label>
-                          <Select
-                            value={modifier.type}
-                            onValueChange={(value: "single" | "multiple") =>
-                              updateModifier(index, {
-                                ...modifier,
-                                type: value,
-                              })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="single">
-                                Single Choice
-                              </SelectItem>
-                              <SelectItem value="multiple">
-                                Multiple Choice
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <Label>Options</Label>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const newOption: ModifierOption = {
-                                id: Date.now().toString(),
-                                name: "",
-                                price: 0,
-                              };
-                              updateModifier(index, {
-                                ...modifier,
-                                options: [...modifier.options, newOption],
-                              });
-                            }}
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Add Option
-                          </Button>
-                        </div>
-
-                        {modifier.options.map((option, optionIndex) => (
-                          <div
-                            key={option.id}
-                            className="flex items-center space-x-2 mb-2"
-                          >
-                            <Input
-                              placeholder="Option name"
-                              value={option.name}
-                              onChange={(e) => {
-                                const updatedOptions = [...modifier.options];
-                                updatedOptions[optionIndex] = {
-                                  ...option,
-                                  name: e.target.value,
-                                };
-                                updateModifier(index, {
-                                  ...modifier,
-                                  options: updatedOptions,
-                                });
-                              }}
-                            />
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="Price"
-                              value={option.price}
-                              onChange={(e) => {
-                                const updatedOptions = [...modifier.options];
-                                updatedOptions[optionIndex] = {
-                                  ...option,
-                                  price: parseFloat(e.target.value) || 0,
-                                };
-                                updateModifier(index, {
-                                  ...modifier,
-                                  options: updatedOptions,
-                                });
-                              }}
-                              className="w-24"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const updatedOptions = modifier.options.filter(
-                                  (_, i) => i !== optionIndex
-                                );
-                                updateModifier(index, {
-                                  ...modifier,
-                                  options: updatedOptions,
-                                });
-                              }}
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </TabsContent>
-              </Tabs>
-
-              <div className="flex space-x-2 pt-6 border-t mt-6">
-                <Button onClick={handleAddProduct} className="flex-1">
-                  {editingProduct ? "Update Product" : "Add Product"}
-                </Button>
-                <DrawerClose asChild>
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={resetForm}
-                  >
-                    Cancel
-                  </Button>
-                </DrawerClose>
-              </div>
-            </div>
-          </DrawerContent>
-        </Drawer>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Product
+        </Button>
       </div>
 
       {/* Filters and Search */}
@@ -1072,8 +673,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
             </p>
             <Button
               onClick={() => {
-                setIsDrawerOpen(true);
                 resetForm();
+                setIsDrawerOpen(true);
               }}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -1125,118 +726,139 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {currentProducts.map((product) => (
-                    <tr key={product.id} className="hover:bg-gray-50">
-                      <td className="p-4">
-                        <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                          {product.image ? (
-                            <img
-                              src={product.image}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <ImageIcon className="w-6 h-6 text-gray-400" />
-                          )}
-                        </div>
-                      </td>
-                      {showFields.name && (
-                        <td className="p-4">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {product.name}
-                            </div>
-                            <div className="text-sm text-gray-500 truncate max-w-xs">
-                              {product.description}
-                            </div>
-                          </div>
-                        </td>
-                      )}
-                      {showFields.category && (
-                        <td className="p-4">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                            {product.category}
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center">
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                          <span className="ml-2 text-gray-600">
+                            Loading products...
                           </span>
-                        </td>
-                      )}
-                      {showFields.price && (
-                        <td className="p-4">
-                          <div className="text-gray-900 font-medium">
-                            ${product.price.toFixed(2)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Cost: ${product.costPrice.toFixed(2)}
-                          </div>
-                        </td>
-                      )}
-                      {showFields.stock && (
-                        <td className="p-4">
-                          <div className="flex items-center space-x-2">
-                            <span
-                              className={`font-medium ${
-                                product.stockLevel <= product.minStockLevel
-                                  ? "text-red-600"
-                                  : product.stockLevel <=
-                                    product.minStockLevel * 2
-                                  ? "text-orange-600"
-                                  : "text-green-600"
-                              }`}
-                            >
-                              {product.stockLevel}
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setStockAdjustmentProduct(product)}
-                            >
-                              Adjust
-                            </Button>
-                          </div>
-                          {product.stockLevel <= product.minStockLevel && (
-                            <div className="text-xs text-red-600 mt-1">
-                              Low Stock!
-                            </div>
-                          )}
-                        </td>
-                      )}
-                      {showFields.sku && (
-                        <td className="p-4 text-gray-600 font-mono text-sm">
-                          {product.sku}
-                        </td>
-                      )}
-                      {showFields.status && (
-                        <td className="p-4">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              product.isActive
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {product.isActive ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                      )}
-                      <td className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditProduct(product)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteProduct(product.id)}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </Button>
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : currentProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-gray-500">
+                        No products found
+                      </td>
+                    </tr>
+                  ) : (
+                    currentProducts.map((product) => (
+                      <tr key={product.id} className="hover:bg-gray-50">
+                        <td className="p-4">
+                          <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                            {product.image ? (
+                              <img
+                                src={product.image}
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <ImageIcon className="w-6 h-6 text-gray-400" />
+                            )}
+                          </div>
+                        </td>
+                        {showFields.name && (
+                          <td className="p-4">
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {product.name}
+                              </div>
+                              <div className="text-sm text-gray-500 truncate max-w-xs">
+                                {product.description}
+                              </div>
+                            </div>
+                          </td>
+                        )}
+                        {showFields.category && (
+                          <td className="p-4">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                              {product.category}
+                            </span>
+                          </td>
+                        )}
+                        {showFields.price && (
+                          <td className="p-4">
+                            <div className="text-gray-900 font-medium">
+                              ${product.price.toFixed(2)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Cost: ${product.costPrice.toFixed(2)}
+                            </div>
+                          </td>
+                        )}
+                        {showFields.stock && (
+                          <td className="p-4">
+                            <div className="flex items-center space-x-2">
+                              <span
+                                className={`font-medium ${
+                                  product.stockLevel <= product.minStockLevel
+                                    ? "text-red-600"
+                                    : product.stockLevel <=
+                                      product.minStockLevel * 2
+                                    ? "text-orange-600"
+                                    : "text-green-600"
+                                }`}
+                              >
+                                {product.stockLevel}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setStockAdjustmentProduct(product)
+                                }
+                              >
+                                Adjust
+                              </Button>
+                            </div>
+                            {product.stockLevel <= product.minStockLevel && (
+                              <div className="text-xs text-red-600 mt-1">
+                                Low Stock!
+                              </div>
+                            )}
+                          </td>
+                        )}
+                        {showFields.sku && (
+                          <td className="p-4 text-gray-600 font-mono text-sm">
+                            {product.sku}
+                          </td>
+                        )}
+                        {showFields.status && (
+                          <td className="p-4">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                product.isActive
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {product.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                        )}
+                        <td className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditProduct(product)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteProduct(product.id)}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1382,13 +1004,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         </div>
       )}
     </div>
-  );
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  ));
 
   if (!user) {
     navigate("/");
-    return;
+    return null;
   }
 
   return (
@@ -1417,17 +1037,26 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         </motion.div>
       </AnimatePresence>
 
-      {/* Add/Edit Product Drawer - Duplicate for dashboard quick access */}
+      {/* Single Drawer for both views */}
       <Drawer
-        open={isDrawerOpen && currentView === "productDashboard"}
-        onOpenChange={setIsDrawerOpen}
+        open={isDrawerOpen}
+        onOpenChange={(open) => {
+          setIsDrawerOpen(open);
+          if (!open) {
+            resetForm();
+          }
+        }}
         direction="right"
       >
         <DrawerContent className="h-full w-[800px] mt-0 rounded-none fixed right-0 top-0">
           <DrawerHeader className="border-b">
-            <DrawerTitle>Add New Product</DrawerTitle>
+            <DrawerTitle>
+              {editingProduct ? "Edit Product" : "Add New Product"}
+            </DrawerTitle>
             <DrawerDescription>
-              Fill in the details to create a new menu item.
+              {editingProduct
+                ? "Update the product information below."
+                : "Fill in the details to create a new menu item."}
             </DrawerDescription>
           </DrawerHeader>
 
@@ -1439,20 +1068,380 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                 <TabsTrigger value="modifiers">Modifiers</TabsTrigger>
               </TabsList>
 
-              {/* Same content as above - abbreviated for space */}
               <TabsContent value="basic" className="space-y-4 mt-6">
-                <div className="text-center py-8">
-                  <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600">
-                    Product form content goes here...
-                  </p>
+                {/* Image Upload */}
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                    {newProduct.image ? (
+                      <img
+                        src={newProduct.image}
+                        alt="Product"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="w-12 h-12 text-gray-400" />
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="image" className="cursor-pointer">
+                      <div className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-md transition-colors">
+                        <Upload className="w-4 h-4" />
+                        <span className="text-sm">Upload Image</span>
+                      </div>
+                    </Label>
+                    <Input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageUpload}
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label htmlFor="name">Product Name *</Label>
+                    <Input
+                      id="name"
+                      value={newProduct.name}
+                      onChange={(e) =>
+                        handleInputChange("name", e.target.value)
+                      }
+                      placeholder="Enter product name"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={newProduct.description}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Enter product description"
+                      rows={3}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Select
+                      value={newProduct.category}
+                      onValueChange={(value) =>
+                        setNewProduct({ ...newProduct, category: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="sku">SKU *</Label>
+                    <Input
+                      id="sku"
+                      value={newProduct.sku}
+                      onChange={(e) =>
+                        setNewProduct({ ...newProduct, sku: e.target.value })
+                      }
+                      placeholder="Enter SKU"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <Label htmlFor="plu">PLU Code (Optional)</Label>
+                    <Input
+                      id="plu"
+                      value={newProduct.plu}
+                      onChange={(e) =>
+                        setNewProduct({ ...newProduct, plu: e.target.value })
+                      }
+                      placeholder="Enter PLU code"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="pricing" className="space-y-4 mt-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="price">Sale Price *</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      step="0.01"
+                      value={newProduct.price}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          price: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="costPrice">Cost Price *</Label>
+                    <Input
+                      id="costPrice"
+                      type="number"
+                      step="0.01"
+                      value={newProduct.costPrice}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          costPrice: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="taxRate">Tax Rate (%)</Label>
+                    <Input
+                      id="taxRate"
+                      type="number"
+                      step="0.1"
+                      value={newProduct.taxRate}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          taxRate: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      placeholder="10"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Profit Margin</Label>
+                    <div className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                      {newProduct.price > 0 && newProduct.costPrice > 0
+                        ? `${(
+                            ((newProduct.price - newProduct.costPrice) /
+                              newProduct.price) *
+                            100
+                          ).toFixed(1)}%`
+                        : "N/A"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="stockLevel">Current Stock</Label>
+                    <Input
+                      id="stockLevel"
+                      type="number"
+                      value={newProduct.stockLevel}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          stockLevel: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="minStockLevel">Minimum Stock Level</Label>
+                    <Input
+                      id="minStockLevel"
+                      type="number"
+                      value={newProduct.minStockLevel}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          minStockLevel: parseInt(e.target.value) || 0,
+                        })
+                      }
+                      placeholder="5"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="modifiers" className="space-y-4 mt-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Product Modifiers</h4>
+                  <Button onClick={addModifier} size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Modifier
+                  </Button>
+                </div>
+
+                {/* Debug info */}
+                <div className="text-xs text-gray-500">
+                  Debug: {newProduct.modifiers?.length || 0} modifiers found
+                  {editingProduct && <span> (editing mode)</span>}
+                </div>
+
+                {newProduct.modifiers && newProduct.modifiers.length > 0 ? (
+                  newProduct.modifiers.map((modifier, index) => (
+                    <div
+                      key={modifier.id}
+                      className="border rounded-lg p-4 space-y-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-medium">Modifier {index + 1}</h5>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeModifier(index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Modifier Name</Label>
+                          <Input
+                            value={modifier.name}
+                            onChange={(e) =>
+                              updateModifier(index, {
+                                ...modifier,
+                                name: e.target.value,
+                              })
+                            }
+                            placeholder="e.g. Cooking Level"
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Type</Label>
+                          <Select
+                            value={modifier.type}
+                            onValueChange={(value: "single" | "multiple") =>
+                              updateModifier(index, {
+                                ...modifier,
+                                type: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="single">
+                                Single Choice
+                              </SelectItem>
+                              <SelectItem value="multiple">
+                                Multiple Choice
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <Label>Options</Label>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const now = new Date().toISOString();
+                              const newOption = {
+                                id: Date.now().toString() + "_opt",
+                                name: "",
+                                price: 0,
+                                createdAt: now,
+                              };
+                              updateModifier(index, {
+                                ...modifier,
+                                options: [...modifier.options, newOption],
+                              });
+                            }}
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add Option
+                          </Button>
+                        </div>
+
+                        {modifier.options.map((option, optionIndex) => (
+                          <div
+                            key={option.id}
+                            className="flex items-center space-x-2 mb-2"
+                          >
+                            <Input
+                              placeholder="Option name"
+                              value={option.name}
+                              onChange={(e) => {
+                                const updatedOptions = [...modifier.options];
+                                updatedOptions[optionIndex] = {
+                                  ...option,
+                                  name: e.target.value,
+                                };
+                                updateModifier(index, {
+                                  ...modifier,
+                                  options: updatedOptions,
+                                });
+                              }}
+                            />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Price"
+                              value={option.price}
+                              onChange={(e) => {
+                                const updatedOptions = [...modifier.options];
+                                updatedOptions[optionIndex] = {
+                                  ...option,
+                                  price: parseFloat(e.target.value) || 0,
+                                };
+                                updateModifier(index, {
+                                  ...modifier,
+                                  options: updatedOptions,
+                                });
+                              }}
+                              className="w-24"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const updatedOptions = modifier.options.filter(
+                                  (_, i) => i !== optionIndex
+                                );
+                                updateModifier(index, {
+                                  ...modifier,
+                                  options: updatedOptions,
+                                });
+                              }}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    No modifiers added yet.
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
 
             <div className="flex space-x-2 pt-6 border-t mt-6">
               <Button onClick={handleAddProduct} className="flex-1">
-                Add Product
+                {editingProduct ? "Update Product" : "Add Product"}
               </Button>
               <DrawerClose asChild>
                 <Button

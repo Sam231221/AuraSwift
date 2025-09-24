@@ -16,9 +16,11 @@ import {
 } from "lucide-react";
 
 export const ManagerDashboardView = ({
+  onStaffSchedules,
   onManageProducts,
   onManageCashiers,
 }: {
+  onStaffSchedules: () => void;
   onManageProducts: () => void;
   onManageCashiers: () => void;
 }) => {
@@ -115,6 +117,7 @@ export const ManagerDashboardView = ({
               Manage Cashiers
             </Button>
             <Button
+              onClick={onStaffSchedules}
               className="w-full justify-start bg-transparent"
               variant="outline"
             >

@@ -5,6 +5,7 @@ import { useAuth } from "@/shared/hooks";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  console.log("Current User:", user);
   if (!user) {
     return <div>Loading...</div>;
   }

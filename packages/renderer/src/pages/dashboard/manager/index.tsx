@@ -8,10 +8,15 @@ import { ManagerDashboardView } from "./features/manager-dashboard-view";
 import ProductManagementView from "./features/manage-product-view";
 import CashierManagementView from "./features/manage-cashier-view";
 import { useAuth } from "@/shared/hooks";
+import StaffSchedulesView from "./features/staff-schedules-view";
 
 const ManagerDashboard = () => {
   const [currentView, setCurrentView] = useState<
-    "dashboard" | "cashierManagement" | "productDashboard"
+    | "dashboard"
+    | "cashierManagement"
+    | "productDashboard"
+    | "productManagement"
+    | "staffSchedules"
   >("dashboard");
 
   const { user } = useAuth();
@@ -44,6 +49,7 @@ const ManagerDashboard = () => {
           >
             {currentView === "dashboard" ? (
               <ManagerDashboardView
+                onStaffSchedules={() => setCurrentView("staffSchedules")}
                 onManageCashiers={() => setCurrentView("cashierManagement")}
                 onManageProducts={() => setCurrentView("productDashboard")}
               />
@@ -55,6 +61,8 @@ const ManagerDashboard = () => {
               <CashierManagementView
                 onBack={() => setCurrentView("dashboard")}
               />
+            ) : currentView === "staffSchedules" ? (
+              <StaffSchedulesView onBack={() => setCurrentView("dashboard")} />
             ) : null}
           </motion.div>
         </AnimatePresence>

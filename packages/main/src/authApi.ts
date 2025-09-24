@@ -1,30 +1,17 @@
-import { getDatabase, type User, type Business } from "./database.js";
+import {
+  getDatabase,
+  type User,
+  type Business,
+  type Product,
+  type Modifier,
+  type StockAdjustment,
+} from "./database.js";
 import {
   validatePassword,
   validateEmail,
   validateName,
   validateBusinessName,
 } from "./passwordUtils.js";
-
-export interface RegisterBusinessRequest {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  businessName: string;
-  avatar?: string;
-  businessAvatar?: string;
-}
-
-export interface CreateUserRequest {
-  businessId: string;
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  role: "cashier" | "manager";
-  avatar?: string;
-}
 
 export interface RegisterRequest {
   email: string;
@@ -45,12 +32,56 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   user?: User;
-  users?: User[];
-  business?: Business;
   token?: string;
   errors?: string[];
 }
+export interface CreateProductRequest {
+  name: string;
+  description: string;
+  price: number;
+  costPrice: number;
+  taxRate: number;
+  sku: string;
+  plu?: string;
+  image?: string;
+  category: string;
+  stockLevel: number;
+  minStockLevel: number;
+  businessId: string;
+}
 
+export interface UpdateProductRequest extends Partial<CreateProductRequest> {
+  id: string;
+}
+
+export interface CreateModifierRequest {
+  name: string;
+  type: "single" | "multiple";
+  required: boolean;
+  businessId: string;
+  options: { name: string; price: number }[];
+}
+
+export interface StockAdjustmentRequest {
+  productId: string;
+  type: "add" | "remove" | "sale" | "waste" | "adjustment";
+  quantity: number;
+  reason: string;
+  userId: string;
+  businessId: string;
+}
+
+export interface ProductResponse {
+  success: boolean;
+  message: string;
+  product?: Product;
+  products?: Product[];
+  modifier?: Modifier;
+  modifiers?: Modifier[];
+  adjustment?: StockAdjustment;
+  adjustments?: StockAdjustment[];
+  errors?: string[];
+}
 export class AuthAPI {
   private db: any = null;
 
@@ -128,147 +159,6 @@ export class AuthAPI {
       return {
         success: false,
         message: "Registration failed due to server error",
-      };
-    }
-  }
-
-  async registerBusiness(data: RegisterBusinessRequest): Promise<AuthResponse> {
-    try {
-      // Validate input data
-      const validationErrors: string[] = [];
-
-      if (!validateEmail(data.email)) {
-        validationErrors.push("Invalid email format");
-      }
-
-      if (!validateName(data.firstName)) {
-        validationErrors.push("First name must be between 2 and 50 characters");
-      }
-
-      if (!validateName(data.lastName)) {
-        validationErrors.push("Last name must be between 2 and 50 characters");
-      }
-
-      if (!validateBusinessName(data.businessName)) {
-        validationErrors.push(
-          "Business name must be between 2 and 100 characters"
-        );
-      }
-
-      const passwordValidation = validatePassword(data.password);
-      if (!passwordValidation.isValid) {
-        validationErrors.push(...passwordValidation.errors);
-      }
-
-      if (validationErrors.length > 0) {
-        return {
-          success: false,
-          message: "Validation failed",
-          errors: validationErrors,
-        };
-      }
-
-      const db = await this.getDb();
-
-      // Check if user already exists
-      const existingUser = db.getUserByEmail(data.email);
-      if (existingUser) {
-        return {
-          success: false,
-          message: "User with this email already exists",
-        };
-      }
-
-      // Register business and admin user
-      const result = await db.registerBusiness(data);
-
-      // Create session for the admin user
-      const session = db.createSession(result.admin.id);
-
-      // Return user without password
-      const { password: _, ...userWithoutPassword } = result.admin;
-
-      return {
-        success: true,
-        message: "Business registered successfully",
-        user: userWithoutPassword as User,
-        business: result.business,
-        token: session.token,
-      };
-    } catch (error) {
-      console.error("Business registration error:", error);
-      return {
-        success: false,
-        message: "Business registration failed due to server error",
-      };
-    }
-  }
-
-  async createUser(data: CreateUserRequest): Promise<AuthResponse> {
-    try {
-      // Validate input data
-      const validationErrors: string[] = [];
-
-      if (!validateEmail(data.email)) {
-        validationErrors.push("Invalid email format");
-      }
-
-      if (!validateName(data.firstName)) {
-        validationErrors.push("First name must be between 2 and 50 characters");
-      }
-
-      if (!validateName(data.lastName)) {
-        validationErrors.push("Last name must be between 2 and 50 characters");
-      }
-
-      if (!data.businessId) {
-        validationErrors.push("Business ID is required");
-      }
-
-      if (!["cashier", "manager"].includes(data.role)) {
-        validationErrors.push("Role must be either cashier or manager");
-      }
-
-      const passwordValidation = validatePassword(data.password);
-      if (!passwordValidation.isValid) {
-        validationErrors.push(...passwordValidation.errors);
-      }
-
-      if (validationErrors.length > 0) {
-        return {
-          success: false,
-          message: "Validation failed",
-          errors: validationErrors,
-        };
-      }
-
-      const db = await this.getDb();
-
-      // Check if user already exists
-      const existingUser = db.getUserByEmail(data.email);
-      if (existingUser) {
-        return {
-          success: false,
-          message: "User with this email already exists",
-        };
-      }
-
-      // Create user
-      const user = await db.createUser(data);
-
-      // Return user without password
-      const { password: _, ...userWithoutPassword } = user;
-
-      return {
-        success: true,
-        message: "User created successfully",
-        user: userWithoutPassword as User,
-      };
-    } catch (error) {
-      console.error("User creation error:", error);
-      return {
-        success: false,
-        message: "User creation failed due to server error",
       };
     }
   }
@@ -449,60 +339,254 @@ export class AuthAPI {
     }
   }
 
-  async getUsersByBusiness(businessId: string): Promise<AuthResponse> {
+  // Cleanup expired sessions (call this periodically)
+  async cleanupExpiredSessions(): Promise<void> {
+    const db = await this.getDb();
+    db.cleanupExpiredSessions();
+  }
+
+  // Product Management Methods
+
+  /**
+   * Create a new product
+   */
+  async createProduct(
+    productData: CreateProductRequest
+  ): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
-      const users = db.getUsersByBusiness(businessId);
 
-      // Remove passwords from all users
-      const usersWithoutPasswords = users.map((user: any) => {
-        const { password: _, ...userWithoutPassword } = user;
-        return userWithoutPassword as User;
+      // Check if SKU already exists
+      try {
+        const existingProduct = db.getProductById(productData.sku);
+        if (existingProduct) {
+          return {
+            success: false,
+            message: "A product with this SKU already exists",
+          };
+        }
+      } catch (error) {
+        // SKU doesn't exist, which is good
+      }
+
+      const product = await db.createProduct({
+        ...productData,
+        isActive: true,
       });
 
       return {
         success: true,
-        message: "Users retrieved successfully",
-        users: usersWithoutPasswords,
+        message: "Product created successfully",
+        product,
       };
-    } catch (error) {
-      console.error("Get users by business error:", error);
+    } catch (error: any) {
+      console.error("Product creation error:", error);
       return {
         success: false,
-        message: "Failed to retrieve users",
+        message: error.message || "Failed to create product",
       };
     }
   }
 
-  async deleteUser(userId: string): Promise<AuthResponse> {
+  /**
+   * Get all products for a business
+   */
+  async getProductsByBusiness(businessId: string): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
-      const success = db.deleteUser(userId);
+      const products = db.getProductsByBusiness(businessId);
 
-      if (!success) {
+      return {
+        success: true,
+        message: "Products retrieved successfully",
+        products,
+      };
+    } catch (error: any) {
+      console.error("Get products error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get products",
+      };
+    }
+  }
+
+  /**
+   * Get product by ID
+   */
+  async getProductById(id: string): Promise<ProductResponse> {
+    try {
+      const db = await this.getDb();
+      const product = db.getProductById(id);
+
+      return {
+        success: true,
+        message: "Product retrieved successfully",
+        product,
+      };
+    } catch (error: any) {
+      console.error("Get product error:", error);
+      return {
+        success: false,
+        message: error.message || "Product not found",
+      };
+    }
+  }
+
+  /**
+   * Update product
+   */
+  async updateProduct(
+    id: string,
+    updates: Partial<CreateProductRequest>
+  ): Promise<ProductResponse> {
+    try {
+      const db = await this.getDb();
+
+      // If updating SKU, check it doesn't already exist
+      if (updates.sku) {
+        try {
+          const existingProduct = db.getProductById(updates.sku);
+          if (existingProduct && existingProduct.id !== id) {
+            return {
+              success: false,
+              message: "A product with this SKU already exists",
+            };
+          }
+        } catch (error) {
+          // SKU doesn't exist, which is good
+        }
+      }
+
+      const product = await db.updateProduct(id, updates);
+
+      return {
+        success: true,
+        message: "Product updated successfully",
+        product,
+      };
+    } catch (error: any) {
+      console.error("Product update error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to update product",
+      };
+    }
+  }
+
+  /**
+   * Delete product
+   */
+  async deleteProduct(id: string): Promise<ProductResponse> {
+    try {
+      const db = await this.getDb();
+      const deleted = db.deleteProduct(id);
+
+      if (!deleted) {
         return {
           success: false,
-          message: "User not found or could not be deleted",
+          message: "Product not found",
         };
       }
 
       return {
         success: true,
-        message: "User deleted successfully",
+        message: "Product deleted successfully",
       };
-    } catch (error) {
-      console.error("Delete user error:", error);
+    } catch (error: any) {
+      console.error("Product deletion error:", error);
       return {
         success: false,
-        message: "Delete failed due to server error",
+        message: error.message || "Failed to delete product",
       };
     }
   }
 
-  // Cleanup expired sessions (call this periodically)
-  async cleanupExpiredSessions(): Promise<void> {
-    const db = await this.getDb();
-    db.cleanupExpiredSessions();
+  /**
+   * Create modifier with options
+   */
+  async createModifier(
+    modifierData: CreateModifierRequest
+  ): Promise<ProductResponse> {
+    try {
+      const db = await this.getDb();
+
+      const modifier = await db.createModifier({
+        name: modifierData.name,
+        type: modifierData.type,
+        required: modifierData.required,
+        businessId: modifierData.businessId,
+      });
+
+      // Add options
+      for (const option of modifierData.options) {
+        db.createModifierOption(modifier.id, {
+          name: option.name,
+          price: option.price,
+        });
+      }
+
+      // Get the complete modifier with options
+      const completeModifier = db.getModifierById(modifier.id);
+
+      return {
+        success: true,
+        message: "Modifier created successfully",
+        modifier: completeModifier,
+      };
+    } catch (error: any) {
+      console.error("Modifier creation error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to create modifier",
+      };
+    }
+  }
+
+  /**
+   * Create stock adjustment
+   */
+  async createStockAdjustment(
+    adjustmentData: StockAdjustmentRequest
+  ): Promise<ProductResponse> {
+    try {
+      const db = await this.getDb();
+
+      const adjustment = db.createStockAdjustment(adjustmentData);
+
+      return {
+        success: true,
+        message: "Stock adjustment created successfully",
+        adjustment,
+      };
+    } catch (error: any) {
+      console.error("Stock adjustment error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to create stock adjustment",
+      };
+    }
+  }
+
+  /**
+   * Get stock adjustments for a product
+   */
+  async getStockAdjustments(productId: string): Promise<ProductResponse> {
+    try {
+      const db = await this.getDb();
+      const adjustments = db.getStockAdjustments(productId);
+
+      return {
+        success: true,
+        message: "Stock adjustments retrieved successfully",
+        adjustments,
+      };
+    } catch (error: any) {
+      console.error("Get stock adjustments error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get stock adjustments",
+      };
+    }
   }
 }
 
