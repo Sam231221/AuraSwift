@@ -15,7 +15,7 @@
     "@app/preload": "*",
     "@app/renderer": "*",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^12.2.0",
+    "better-sqlite3": "^12.4.1",
     "electron-store": "^10.1.0",
     "electron-updater": "6.6.2",
     "uuid": "^10.0.0"
