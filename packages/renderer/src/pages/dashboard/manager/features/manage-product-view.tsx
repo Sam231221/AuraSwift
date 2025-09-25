@@ -18,11 +18,14 @@ import {
   Upload,
   Minus,
   TrendingDown,
+  Scale,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Drawer,
   DrawerContent,
@@ -103,6 +106,10 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     stockLevel: 0,
     minStockLevel: 5,
     modifiers: [] as Modifier[],
+    // Weight-based product fields
+    requiresWeight: false,
+    unit: "each" as "lb" | "kg" | "oz" | "g" | "each",
+    pricePerUnit: 0,
   });
 
   // API functions
@@ -185,6 +192,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       stockLevel: 0,
       minStockLevel: 5,
       modifiers: [],
+      requiresWeight: false,
+      unit: "each" as "lb" | "kg" | "oz" | "g" | "each",
+      pricePerUnit: 0,
     });
     setEditingProduct(null);
   }, []);
@@ -258,6 +268,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       stockLevel: product.stockLevel,
       minStockLevel: product.minStockLevel,
       modifiers: product.modifiers || [], // Ensure it's always an array
+      requiresWeight: product.requiresWeight || false,
+      unit: product.unit || "each",
+      pricePerUnit: product.pricePerUnit || 0,
     });
     setIsDrawerOpen(true);
   };
@@ -780,11 +793,23 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         )}
                         {showFields.price && (
                           <td className="p-4">
-                            <div className="text-gray-900 font-medium">
-                              ${product.price.toFixed(2)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Cost: ${product.costPrice.toFixed(2)}
+                            <div className="flex items-center space-x-2">
+                              <div>
+                                <div className="text-gray-900 font-medium">
+                                  ${product.requiresWeight ? product.pricePerUnit?.toFixed(2) || product.price.toFixed(2) : product.price.toFixed(2)}
+                                  {product.requiresWeight && (
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      /{product.unit}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Cost: ${product.costPrice.toFixed(2)}
+                                </div>
+                              </div>
+                              {product.requiresWeight && (
+                                <Scale className="w-4 h-4 text-blue-500" />
+                              )}
                             </div>
                           </td>
                         )}
@@ -1240,7 +1265,79 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         : "N/A"}
                     </div>
                   </div>
+                </div>
 
+                {/* Weight-based Product Configuration */}
+                <div className="border-t pt-4">
+                  <h4 className="text-lg font-medium mb-4">Weight Configuration</h4>
+                  
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Switch
+                      id="requiresWeight"
+                      checked={newProduct.requiresWeight}
+                      onCheckedChange={(checked) =>
+                        setNewProduct({
+                          ...newProduct,
+                          requiresWeight: checked,
+                          // Reset pricing when switching modes
+                          pricePerUnit: checked ? newProduct.price : 0,
+                        })
+                      }
+                    />
+                    <Label htmlFor="requiresWeight">Sold by Weight</Label>
+                  </div>
+
+                  {newProduct.requiresWeight && (
+                    <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+                      <div>
+                        <Label htmlFor="unit">Unit</Label>
+                        <Select
+                          value={newProduct.unit}
+                          onValueChange={(value: "lb" | "kg" | "oz" | "g" | "each") =>
+                            setNewProduct({
+                              ...newProduct,
+                              unit: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="lb">Pounds (lb)</SelectItem>
+                            <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                            <SelectItem value="oz">Ounces (oz)</SelectItem>
+                            <SelectItem value="g">Grams (g)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="pricePerUnit">Price per {newProduct.unit}</Label>
+                        <Input
+                          id="pricePerUnit"
+                          type="number"
+                          step="0.01"
+                          value={newProduct.pricePerUnit}
+                          onChange={(e) =>
+                            setNewProduct({
+                              ...newProduct,
+                              pricePerUnit: parseFloat(e.target.value) || 0,
+                              // Update main price for display purposes
+                              price: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          placeholder="0.00"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          This will be multiplied by the weight during checkout
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="stockLevel">Current Stock</Label>
                     <Input

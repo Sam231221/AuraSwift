@@ -79,6 +79,10 @@ contextBridge.exposeInMainWorld("productAPI", {
     stockLevel: number;
     minStockLevel: number;
     businessId: string;
+    // Weight-based product fields
+    requiresWeight?: boolean;
+    unit?: "lb" | "kg" | "oz" | "g" | "each";
+    pricePerUnit?: number;
   }) => ipcRenderer.invoke("products:create", productData),
 
   getByBusiness: (businessId: string) =>

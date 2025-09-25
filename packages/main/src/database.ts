@@ -55,6 +55,10 @@ export interface Product {
   businessId: string;
   modifiers: Modifier[];
   isActive: boolean;
+  // Weight-based product fields
+  requiresWeight?: boolean;
+  unit?: "lb" | "kg" | "oz" | "g" | "each";
+  pricePerUnit?: number; // Price per weight unit (e.g., $1.99/lb)
   createdAt: string;
   updatedAt: string;
 }
@@ -521,6 +525,31 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_countType ON cash_drawer_counts(countType);
     `);
 
+    // Add weight-related fields to products table if they don't exist
+    try {
+      this.db.exec(`
+        ALTER TABLE products ADD COLUMN requiresWeight BOOLEAN DEFAULT 0;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    try {
+      this.db.exec(`
+        ALTER TABLE products ADD COLUMN unit TEXT DEFAULT 'each';
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    try {
+      this.db.exec(`
+        ALTER TABLE products ADD COLUMN pricePerUnit REAL;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
     // Insert default admin user if no users exist
     this.createDefaultAdmin();
   }
@@ -918,8 +947,8 @@ export class DatabaseManager {
       INSERT INTO products (
         id, name, description, price, costPrice, taxRate, sku, plu, 
         image, category, stockLevel, minStockLevel, businessId, isActive, 
-        createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        requiresWeight, unit, pricePerUnit, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
       )
       .run(
@@ -937,6 +966,9 @@ export class DatabaseManager {
         productData.minStockLevel,
         productData.businessId,
         productData.isActive ? 1 : 0,
+        productData.requiresWeight ? 1 : 0,
+        productData.unit || "each",
+        productData.pricePerUnit || null,
         now,
         now
       );
@@ -970,6 +1002,7 @@ export class DatabaseManager {
     return {
       ...product,
       isActive: Boolean(product.isActive),
+      requiresWeight: Boolean(product.requiresWeight),
       modifiers,
     };
   }
@@ -991,6 +1024,7 @@ export class DatabaseManager {
     return products.map((product) => ({
       ...product,
       isActive: Boolean(product.isActive),
+      requiresWeight: Boolean(product.requiresWeight),
       modifiers: this.getProductModifiers(product.id),
     }));
   }

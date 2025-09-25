@@ -32,6 +32,10 @@ export interface Product {
   businessId: string;
   modifiers: Modifier[];
   isActive: boolean;
+  // Weight-based product fields
+  requiresWeight?: boolean;
+  unit?: "lb" | "kg" | "oz" | "g" | "each";
+  pricePerUnit?: number; // Price per weight unit (e.g., $1.99/lb)
   createdAt: string;
   updatedAt: string;
 }
@@ -60,6 +64,10 @@ export interface CreateProductRequest {
   stockLevel: number;
   minStockLevel: number;
   businessId: string;
+  // Weight-based product fields
+  requiresWeight?: boolean;
+  unit?: "lb" | "kg" | "oz" | "g" | "each";
+  pricePerUnit?: number;
 }
 
 export interface ProductResponse {

@@ -4,6 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 import {
   DollarSign,
@@ -86,6 +96,12 @@ const CashierDashboardView = ({
     totalVoids: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [showStartShiftDialog, setShowStartShiftDialog] = useState(false);
+  const [showEndShiftDialog, setShowEndShiftDialog] = useState(false);
+  const [showLateStartConfirm, setShowLateStartConfirm] = useState(false);
+  const [startingCash, setStartingCash] = useState("");
+  const [finalCash, setFinalCash] = useState("");
+  const [lateStartMinutes, setLateStartMinutes] = useState(0);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -211,54 +227,56 @@ const CashierDashboardView = ({
         })()
       : 0;
 
-  const startShift = async () => {
+  const handleStartShiftClick = () => {
+    if (!user) {
+      alert("User not authenticated");
+      return;
+    }
+
+    if (!todaySchedule) {
+      alert("No schedule found for today. Please contact your manager.");
+      return;
+    }
+
+    // Validate shift timing
+    const now = new Date();
+    const scheduledStart = new Date(todaySchedule.startTime);
+    const timeDifference = now.getTime() - scheduledStart.getTime();
+    const minutesDifference = timeDifference / (1000 * 60);
+
+    // Allow starting 15 minutes early or up to 30 minutes late
+    const EARLY_START_MINUTES = 15;
+    const LATE_START_MINUTES = 30;
+
+    if (minutesDifference < -EARLY_START_MINUTES) {
+      const minutesUntilStart = Math.ceil(-minutesDifference);
+      alert(
+        `Cannot start shift yet. Your shift is scheduled to start at ${scheduledStart.toLocaleTimeString(
+          [],
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }
+        )}. Please wait ${minutesUntilStart} more minutes.`
+      );
+      return;
+    }
+
+    if (minutesDifference > LATE_START_MINUTES) {
+      const minutesLate = Math.floor(minutesDifference);
+      setLateStartMinutes(minutesLate);
+      setShowLateStartConfirm(true);
+      return;
+    }
+
+    // Show start shift dialog
+    setStartingCash("");
+    setShowStartShiftDialog(true);
+  };
+
+  const confirmStartShift = async () => {
     try {
-      if (!user) {
-        alert("User not authenticated");
-        return;
-      }
-
-      if (!todaySchedule) {
-        alert("No schedule found for today. Please contact your manager.");
-        return;
-      }
-
-      // Validate shift timing
-      const now = new Date();
-      const scheduledStart = new Date(todaySchedule.startTime);
-      const timeDifference = now.getTime() - scheduledStart.getTime();
-      const minutesDifference = timeDifference / (1000 * 60);
-
-      // Allow starting 15 minutes early or up to 30 minutes late
-      const EARLY_START_MINUTES = 15;
-      const LATE_START_MINUTES = 30;
-
-      if (minutesDifference < -EARLY_START_MINUTES) {
-        const minutesUntilStart = Math.ceil(-minutesDifference);
-        alert(
-          `Cannot start shift yet. Your shift is scheduled to start at ${scheduledStart.toLocaleTimeString(
-            [],
-            {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            }
-          )}. Please wait ${minutesUntilStart} more minutes.`
-        );
-        return;
-      }
-
-      if (minutesDifference > LATE_START_MINUTES) {
-        const minutesLate = Math.floor(minutesDifference);
-        const confirmLateStart = confirm(
-          `You are ${minutesLate} minutes late for your scheduled shift. Do you want to start your shift now and mark it as a late start?`
-        );
-        if (!confirmLateStart) {
-          return;
-        }
-      }
-
-      const startingCash = prompt("Enter starting cash amount:");
       if (!startingCash || isNaN(Number(startingCash))) {
         alert("Please enter a valid cash amount");
         return;
@@ -266,8 +284,8 @@ const CashierDashboardView = ({
 
       const response = await window.shiftAPI.start({
         scheduleId: todaySchedule?.id,
-        cashierId: user.id,
-        businessId: user.businessId,
+        cashierId: user!.id,
+        businessId: user!.businessId,
         startingCash: Number(startingCash),
       });
 
@@ -280,6 +298,8 @@ const CashierDashboardView = ({
           totalRefunds: 0,
           totalVoids: 0,
         });
+        setShowStartShiftDialog(false);
+        setShowLateStartConfirm(false);
       } else {
         alert(response.message || "Failed to start shift");
       }
@@ -289,23 +309,33 @@ const CashierDashboardView = ({
     }
   };
 
-  const endShift = async () => {
-    try {
-      if (!activeShift) {
-        alert("No active shift to end");
-        return;
-      }
+  const confirmLateStart = () => {
+    setShowLateStartConfirm(false);
+    setStartingCash("");
+    setShowStartShiftDialog(true);
+  };
 
-      const finalCash = prompt("Enter final cash drawer amount:");
+  const handleEndShiftClick = () => {
+    if (!activeShift) {
+      alert("No active shift to end");
+      return;
+    }
+
+    setFinalCash("");
+    setShowEndShiftDialog(true);
+  };
+
+  const confirmEndShift = async () => {
+    try {
       if (!finalCash || isNaN(Number(finalCash))) {
         alert("Please enter a valid cash amount");
         return;
       }
 
-      const response = await window.shiftAPI.end(activeShift.id, {
+      const response = await window.shiftAPI.end(activeShift!.id, {
         finalCashDrawer: Number(finalCash),
         expectedCashDrawer:
-          activeShift.startingCash + (shiftStats.totalSales || 0),
+          activeShift!.startingCash + (shiftStats.totalSales || 0),
         totalSales: shiftStats.totalSales || 0,
         totalTransactions: shiftStats.totalTransactions || 0,
         totalRefunds: shiftStats.totalRefunds || 0,
@@ -320,6 +350,7 @@ const CashierDashboardView = ({
           totalRefunds: 0,
           totalVoids: 0,
         });
+        setShowEndShiftDialog(false);
       } else {
         alert(response.message || "Failed to end shift");
       }
@@ -436,7 +467,7 @@ const CashierDashboardView = ({
             {!activeShift ? (
               <Button
                 variant="outline"
-                onClick={startShift}
+                onClick={handleStartShiftClick}
                 className={`border-slate-300 ${
                   !shiftTimingInfo.canStart ? "opacity-50" : ""
                 }`}
@@ -447,7 +478,7 @@ const CashierDashboardView = ({
               </Button>
             ) : (
               <Button
-                onClick={endShift}
+                onClick={handleEndShiftClick}
                 className="bg-green-600 hover:bg-green-700"
               >
                 End Shift
@@ -824,6 +855,124 @@ const CashierDashboardView = ({
           </CardContent>
         </Card>
       </div>
+
+      {/* Start Shift Dialog */}
+      <Dialog
+        open={showStartShiftDialog}
+        onOpenChange={setShowStartShiftDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start Shift</DialogTitle>
+            <DialogDescription>
+              Enter the starting cash amount for your shift.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="starting-cash" className="text-right">
+                Starting Cash
+              </Label>
+              <Input
+                id="starting-cash"
+                type="number"
+                step="0.01"
+                value={startingCash}
+                onChange={(e) => setStartingCash(e.target.value)}
+                className="col-span-3"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowStartShiftDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmStartShift}>Start Shift</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* End Shift Dialog */}
+      <Dialog open={showEndShiftDialog} onOpenChange={setShowEndShiftDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>End Shift</DialogTitle>
+            <DialogDescription>
+              Enter the final cash drawer amount to end your shift.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="final-cash" className="text-right">
+                Final Cash
+              </Label>
+              <Input
+                id="final-cash"
+                type="number"
+                step="0.01"
+                value={finalCash}
+                onChange={(e) => setFinalCash(e.target.value)}
+                className="col-span-3"
+                placeholder="0.00"
+              />
+            </div>
+            {activeShift && (
+              <div className="text-sm text-muted-foreground">
+                <p>
+                  Expected: $
+                  {(
+                    activeShift.startingCash + (shiftStats.totalSales || 0)
+                  ).toFixed(2)}
+                </p>
+                <p>Starting Cash: ${activeShift.startingCash.toFixed(2)}</p>
+                <p>Sales Total: ${(shiftStats.totalSales || 0).toFixed(2)}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEndShiftDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmEndShift}>End Shift</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Late Start Confirmation Dialog */}
+      <Dialog
+        open={showLateStartConfirm}
+        onOpenChange={setShowLateStartConfirm}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Late Shift Start</DialogTitle>
+            <DialogDescription>
+              You are {lateStartMinutes} minutes late for your scheduled shift.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p>
+              Do you want to start your shift now and mark it as a late start?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowLateStartConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmLateStart}>Start Late</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

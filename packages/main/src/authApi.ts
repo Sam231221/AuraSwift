@@ -49,6 +49,10 @@ export interface CreateProductRequest {
   stockLevel: number;
   minStockLevel: number;
   businessId: string;
+  // Weight-based product fields
+  requiresWeight?: boolean;
+  unit?: "lb" | "kg" | "oz" | "g" | "each";
+  pricePerUnit?: number;
 }
 
 export interface UpdateProductRequest extends Partial<CreateProductRequest> {
@@ -390,6 +394,27 @@ export class AuthAPI {
   ): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
+
+      // Validate weight-based product data
+      if (productData.requiresWeight) {
+        if (!productData.unit || productData.unit === "each") {
+          return {
+            success: false,
+            message:
+              "Weight-based products must have a valid unit (lb, kg, oz, g)",
+          };
+        }
+
+        if (!productData.pricePerUnit || productData.pricePerUnit <= 0) {
+          return {
+            success: false,
+            message: "Weight-based products must have a valid price per unit",
+          };
+        }
+
+        // Set the display price to pricePerUnit for consistency
+        productData.price = productData.pricePerUnit;
+      }
 
       // Check if SKU already exists
       try {
