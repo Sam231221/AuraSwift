@@ -386,6 +386,164 @@ ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
   }
 });
 
+// Shift management IPC handlers
+ipcMain.handle("shift:start", async (event, shiftData) => {
+  try {
+    console.log("Starting shift for cashier:", shiftData.cashierId);
+    if (!db) db = await getDatabase();
+
+    // Check if cashier already has an active shift
+    const existingShift = db.getActiveShiftByCashier(shiftData.cashierId);
+    if (existingShift) {
+      return {
+        success: false,
+        message: "You already have an active shift running",
+        data: existingShift,
+      };
+    }
+
+    const shift = db.createShift({
+      scheduleId: shiftData.scheduleId,
+      cashierId: shiftData.cashierId,
+      businessId: shiftData.businessId,
+      startTime: new Date().toISOString(),
+      status: "active",
+      startingCash: shiftData.startingCash,
+      notes: shiftData.notes,
+    });
+
+    // Update schedule status if linked
+    if (shiftData.scheduleId) {
+      try {
+        db.updateScheduleStatus(shiftData.scheduleId, "active");
+      } catch (error) {
+        console.warn("Could not update schedule status:", error);
+      }
+    }
+
+    console.log("Shift started successfully:", shift);
+    return {
+      success: true,
+      message: "Shift started successfully",
+      data: shift,
+    };
+  } catch (error) {
+    console.error("Start shift IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to start shift",
+    };
+  }
+});
+
+ipcMain.handle("shift:end", async (event, shiftId, endData) => {
+  try {
+    console.log("Ending shift:", shiftId);
+    if (!db) db = await getDatabase();
+
+    db.endShift(shiftId, {
+      endTime: new Date().toISOString(),
+      finalCashDrawer: endData.finalCashDrawer,
+      expectedCashDrawer: endData.expectedCashDrawer,
+      totalSales: endData.totalSales,
+      totalTransactions: endData.totalTransactions,
+      totalRefunds: endData.totalRefunds,
+      totalVoids: endData.totalVoids,
+      notes: endData.notes,
+    });
+
+    // Note: Schedule status will need to be updated separately if needed
+
+    return {
+      success: true,
+      message: "Shift ended successfully",
+    };
+  } catch (error) {
+    console.error("End shift IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to end shift",
+    };
+  }
+});
+
+ipcMain.handle("shift:getActive", async (event, cashierId) => {
+  try {
+    console.log("Getting active shift for cashier:", cashierId);
+    if (!db) db = await getDatabase();
+
+    const shift = db.getActiveShiftByCashier(cashierId);
+    return {
+      success: true,
+      data: shift,
+    };
+  } catch (error) {
+    console.error("Get active shift IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get active shift",
+    };
+  }
+});
+
+ipcMain.handle("shift:getTodaySchedule", async (event, cashierId) => {
+  try {
+    console.log("Getting today's schedule for cashier:", cashierId);
+    if (!db) db = await getDatabase();
+
+    const today = new Date();
+    const dateString = today.toISOString().split("T")[0];
+
+    // Get schedules for this cashier today
+    const schedules = db.getSchedulesByStaffId(cashierId);
+    const todaySchedule = schedules.find(
+      (schedule) => schedule.startTime.split("T")[0] === dateString
+    );
+
+    return {
+      success: true,
+      data: todaySchedule || null,
+    };
+  } catch (error) {
+    console.error("Get today's schedule IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get today's schedule",
+    };
+  }
+});
+
+ipcMain.handle("shift:getStats", async (event, shiftId) => {
+  try {
+    console.log("Getting shift stats:", shiftId);
+    if (!db) db = await getDatabase();
+
+    const transactions = db.getTransactionsByShiftId(shiftId);
+
+    const stats = {
+      totalTransactions: transactions.length,
+      totalSales: transactions
+        .filter((t) => t.status === "completed")
+        .reduce((sum, t) => sum + t.total, 0),
+      totalRefunds: transactions
+        .filter((t) => t.type === "refund")
+        .reduce((sum, t) => sum + t.total, 0),
+      totalVoids: transactions.filter((t) => t.status === "voided").length,
+    };
+
+    return {
+      success: true,
+      data: stats,
+    };
+  } catch (error) {
+    console.error("Get shift stats IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get shift stats",
+    };
+  }
+});
+
 // Cleanup expired sessions every hour
 setInterval(async () => {
   await authAPI.cleanupExpiredSessions();

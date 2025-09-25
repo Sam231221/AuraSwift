@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+
 import {
   DollarSign,
   ShoppingCart,
@@ -28,15 +29,45 @@ interface Transaction {
   status: "completed" | "refunded" | "voided";
 }
 
-interface ShiftInfo {
+interface Shift {
+  id: string;
+  scheduleId?: string;
+  cashierId: string;
+  businessId: string;
   startTime: string;
-  expectedEnd: string;
-  cashDrawerStart: number;
-  cashDrawerCurrent: number;
-  transactionCount: number;
+  endTime?: string;
+  status: "active" | "ended";
+  startingCash: number;
+  finalCashDrawer?: number;
+  expectedCashDrawer?: number;
+  cashVariance?: number;
+  totalSales?: number;
+  totalTransactions?: number;
+  totalRefunds?: number;
+  totalVoids?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+interface Schedule {
+  id: string;
+  staffId: string;
+  businessId: string;
+  startTime: string;
+  endTime: string;
+  status: "upcoming" | "active" | "completed" | "missed";
+  assignedRegister?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ShiftStats {
+  totalTransactions: number;
   totalSales: number;
-  refundAmount: number;
-  voidedTransactions: number;
+  totalRefunds: number;
+  totalVoids: number;
 }
 interface CashierDashboardViewProps {
   onNewTransaction: () => void;
@@ -44,96 +75,273 @@ interface CashierDashboardViewProps {
 const CashierDashboardView = ({
   onNewTransaction,
 }: CashierDashboardViewProps) => {
-  const [shiftInfo, setShiftInfo] = useState<ShiftInfo>({
-    startTime: "08:00 AM",
-    expectedEnd: "04:00 PM",
-    cashDrawerStart: 200.0,
-    cashDrawerCurrent: 1543.75,
-    transactionCount: 47,
-    totalSales: 1343.75,
-    refundAmount: 45.5,
-    voidedTransactions: 2,
+  // State management
+  const [transactions] = useState<Transaction[]>([]);
+  const [activeShift, setActiveShift] = useState<Shift | null>(null);
+  const [todaySchedule, setTodaySchedule] = useState<Schedule | null>(null);
+  const [shiftStats, setShiftStats] = useState<ShiftStats>({
+    totalTransactions: 0,
+    totalSales: 0,
+    totalRefunds: 0,
+    totalVoids: 0,
   });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([
-    {
-      id: "1001",
-      amount: 45.32,
-      time: "10:15 AM",
-      items: 8,
-      paymentMethod: "card",
-      status: "completed",
-    },
-    {
-      id: "1002",
-      amount: 23.17,
-      time: "10:22 AM",
-      items: 3,
-      paymentMethod: "cash",
-      status: "completed",
-    },
-    {
-      id: "1003",
-      amount: 67.89,
-      time: "10:35 AM",
-      items: 12,
-      paymentMethod: "mobile",
-      status: "completed",
-    },
-    {
-      id: "1004",
-      amount: 12.5,
-      time: "10:40 AM",
-      items: 2,
-      paymentMethod: "card",
-      status: "refunded",
-    },
-    {
-      id: "1005",
-      amount: 89.43,
-      time: "10:55 AM",
-      items: 15,
-      paymentMethod: "cash",
-      status: "completed",
-    },
-  ]);
-
-  // Calculate metrics
-  const cashVariance =
-    shiftInfo.cashDrawerCurrent -
-    (shiftInfo.cashDrawerStart + shiftInfo.totalSales);
-  const averageTransaction =
-    shiftInfo.transactionCount > 0
-      ? shiftInfo.totalSales / shiftInfo.transactionCount
-      : 0;
-  const shiftProgress = 65; // Example progress percentage
-
-  const startShift = () => {
-    setShiftInfo((prev) => ({
-      ...prev,
-      startTime: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      cashDrawerCurrent: prev.cashDrawerStart,
-      transactionCount: 0,
-      totalSales: 0,
-      refundAmount: 0,
-      voidedTransactions: 0,
-    }));
-    setRecentTransactions([]);
-  };
-
-  const endShift = () => {
-    // In a real app, this would trigger shift closing procedures
-    alert("Shift ending procedure initiated. Please count cash drawer.");
-  };
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Load shift data on component mount
+  useEffect(() => {
+    const loadShiftData = async () => {
+      try {
+        setIsLoading(true);
+
+        if (!user?.id) return;
+
+        // Load active shift
+        const activeShiftResponse = await window.shiftAPI.getActive(user.id);
+        if (activeShiftResponse.success && activeShiftResponse.data) {
+          const shiftData = activeShiftResponse.data as Shift;
+          setActiveShift(shiftData);
+
+          // Load shift stats if shift is active
+          const statsResponse = await window.shiftAPI.getStats(shiftData.id);
+          if (statsResponse.success && statsResponse.data) {
+            setShiftStats(statsResponse.data as ShiftStats);
+          }
+        } else {
+          setActiveShift(null);
+        }
+
+        // Load today's schedule
+        const scheduleResponse = await window.shiftAPI.getTodaySchedule(
+          user.id
+        );
+        if (scheduleResponse.success && scheduleResponse.data) {
+          setTodaySchedule(scheduleResponse.data as Schedule);
+        } else {
+          setTodaySchedule(null);
+        }
+      } catch (error) {
+        console.error("Failed to load shift data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadShiftData();
+
+    // Refresh data every 30 seconds
+    const interval = setInterval(loadShiftData, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  console.log("Debug schedule data:", {
+    activeShift,
+    todaySchedule,
+    todayScheduleStartTime: todaySchedule?.startTime,
+    todayScheduleEndTime: todaySchedule?.endTime,
+    parsedStartTime: todaySchedule
+      ? new Date(todaySchedule.startTime).toString()
+      : null,
+    parsedEndTime: todaySchedule
+      ? new Date(todaySchedule.endTime).toString()
+      : null,
+  });
+
+  // Calculate shift timing validation
+  const shiftTimingInfo = todaySchedule
+    ? (() => {
+        const now = new Date();
+        const scheduledStart = new Date(todaySchedule.startTime);
+        const timeDifference = now.getTime() - scheduledStart.getTime();
+        const minutesDifference = timeDifference / (1000 * 60);
+
+        const EARLY_START_MINUTES = 15;
+        const LATE_START_MINUTES = 30;
+
+        if (minutesDifference < -EARLY_START_MINUTES) {
+          const minutesUntilStart = Math.ceil(-minutesDifference);
+          return {
+            canStart: false,
+            buttonText: `Start in ${minutesUntilStart}m`,
+            reason: `Too early - wait ${minutesUntilStart} minutes`,
+          };
+        } else if (minutesDifference > LATE_START_MINUTES) {
+          const minutesLate = Math.floor(minutesDifference);
+          return {
+            canStart: true,
+            buttonText: `Start Shift (Late)`,
+            reason: `${minutesLate} minutes late`,
+          };
+        } else {
+          return {
+            canStart: true,
+            buttonText: "Start Shift",
+            reason: "Ready to start",
+          };
+        }
+      })()
+    : {
+        canStart: false,
+        buttonText: "No Schedule",
+        reason: "No schedule found",
+      };
+
+  // Calculate derived values
+  const cashVariance = activeShift
+    ? (activeShift.finalCashDrawer || 0) -
+      (activeShift.startingCash + (shiftStats.totalSales || 0))
+    : 0;
+
+  const averageTransaction =
+    shiftStats.totalTransactions > 0
+      ? shiftStats.totalSales / shiftStats.totalTransactions
+      : 0;
+
+  const shiftProgress =
+    activeShift && todaySchedule
+      ? (() => {
+          const now = new Date();
+          const shiftStart = new Date(activeShift.startTime);
+          const scheduleEnd = new Date(todaySchedule.endTime);
+          const totalDuration = scheduleEnd.getTime() - shiftStart.getTime();
+          const elapsed = now.getTime() - shiftStart.getTime();
+          return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
+        })()
+      : 0;
+
+  const startShift = async () => {
+    try {
+      if (!user) {
+        alert("User not authenticated");
+        return;
+      }
+
+      if (!todaySchedule) {
+        alert("No schedule found for today. Please contact your manager.");
+        return;
+      }
+
+      // Validate shift timing
+      const now = new Date();
+      const scheduledStart = new Date(todaySchedule.startTime);
+      const timeDifference = now.getTime() - scheduledStart.getTime();
+      const minutesDifference = timeDifference / (1000 * 60);
+
+      // Allow starting 15 minutes early or up to 30 minutes late
+      const EARLY_START_MINUTES = 15;
+      const LATE_START_MINUTES = 30;
+
+      if (minutesDifference < -EARLY_START_MINUTES) {
+        const minutesUntilStart = Math.ceil(-minutesDifference);
+        alert(
+          `Cannot start shift yet. Your shift is scheduled to start at ${scheduledStart.toLocaleTimeString(
+            [],
+            {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+            }
+          )}. Please wait ${minutesUntilStart} more minutes.`
+        );
+        return;
+      }
+
+      if (minutesDifference > LATE_START_MINUTES) {
+        const minutesLate = Math.floor(minutesDifference);
+        const confirmLateStart = confirm(
+          `You are ${minutesLate} minutes late for your scheduled shift. Do you want to start your shift now and mark it as a late start?`
+        );
+        if (!confirmLateStart) {
+          return;
+        }
+      }
+
+      const startingCash = prompt("Enter starting cash amount:");
+      if (!startingCash || isNaN(Number(startingCash))) {
+        alert("Please enter a valid cash amount");
+        return;
+      }
+
+      const response = await window.shiftAPI.start({
+        scheduleId: todaySchedule?.id,
+        cashierId: user.id,
+        businessId: user.businessId,
+        startingCash: Number(startingCash),
+      });
+
+      if (response.success && response.data) {
+        const shiftData = response.data as Shift;
+        setActiveShift(shiftData);
+        setShiftStats({
+          totalTransactions: 0,
+          totalSales: 0,
+          totalRefunds: 0,
+          totalVoids: 0,
+        });
+      } else {
+        alert(response.message || "Failed to start shift");
+      }
+    } catch (error) {
+      console.error("Failed to start shift:", error);
+      alert("Failed to start shift. Please try again.");
+    }
+  };
+
+  const endShift = async () => {
+    try {
+      if (!activeShift) {
+        alert("No active shift to end");
+        return;
+      }
+
+      const finalCash = prompt("Enter final cash drawer amount:");
+      if (!finalCash || isNaN(Number(finalCash))) {
+        alert("Please enter a valid cash amount");
+        return;
+      }
+
+      const response = await window.shiftAPI.end(activeShift.id, {
+        finalCashDrawer: Number(finalCash),
+        expectedCashDrawer:
+          activeShift.startingCash + (shiftStats.totalSales || 0),
+        totalSales: shiftStats.totalSales || 0,
+        totalTransactions: shiftStats.totalTransactions || 0,
+        totalRefunds: shiftStats.totalRefunds || 0,
+        totalVoids: shiftStats.totalVoids || 0,
+      });
+
+      if (response.success) {
+        setActiveShift(null);
+        setShiftStats({
+          totalTransactions: 0,
+          totalSales: 0,
+          totalRefunds: 0,
+          totalVoids: 0,
+        });
+      } else {
+        alert(response.message || "Failed to end shift");
+      }
+    } catch (error) {
+      console.error("Failed to end shift:", error);
+      alert("Failed to end shift. Please try again.");
+    }
+  };
+
   if (!user) {
     navigate("/");
-    return;
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-600">Loading shift data...</div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -142,29 +350,109 @@ const CashierDashboardView = ({
       <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="font-semibold text-lg">Current Shift</h2>
+            <h2 className="font-semibold text-lg">
+              {activeShift ? "Current Shift" : "No Active Shift"}
+            </h2>
             <p className="text-slate-600">
-              Started at {shiftInfo.startTime} • Ends at {shiftInfo.expectedEnd}
+              {activeShift ? (
+                <>
+                  Started at{" "}
+                  {new Date(activeShift.startTime).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  })}{" "}
+                  • Ends at{" "}
+                  {todaySchedule
+                    ? new Date(todaySchedule.endTime).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : "--:--"}
+                </>
+              ) : todaySchedule ? (
+                (() => {
+                  const startDate = new Date(todaySchedule.startTime);
+                  const endDate = new Date(todaySchedule.endTime);
+
+                  const formatOptions = {
+                    hour: "2-digit" as const,
+                    minute: "2-digit" as const,
+                    hour12: true,
+                  };
+
+                  const startTimeStr = startDate.toLocaleTimeString(
+                    [],
+                    formatOptions
+                  );
+                  const endTimeStr = endDate.toLocaleTimeString(
+                    [],
+                    formatOptions
+                  );
+
+                  // Check if shift goes into the next day
+                  const isOvernightShift =
+                    endDate.getDate() !== startDate.getDate();
+
+                  if (isOvernightShift) {
+                    const endDayName = endDate.toLocaleDateString([], {
+                      weekday: "short",
+                    });
+                    return `Scheduled: ${startTimeStr} - ${endTimeStr} (${endDayName})`;
+                  } else {
+                    return `Scheduled: ${startTimeStr} - ${endTimeStr}`;
+                  }
+                })()
+              ) : (
+                "No schedule found for today"
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-slate-500" />
-            <span className="font-medium">4h 22m remaining</span>
+            <span className="font-medium">
+              {activeShift && todaySchedule
+                ? (() => {
+                    const now = new Date();
+                    const scheduleEnd = new Date(todaySchedule.endTime);
+                    const timeRemaining = scheduleEnd.getTime() - now.getTime();
+                    const hoursRemaining = Math.floor(
+                      timeRemaining / (1000 * 60 * 60)
+                    );
+                    const minutesRemaining = Math.floor(
+                      (timeRemaining % (1000 * 60 * 60)) / (1000 * 60)
+                    );
+                    return timeRemaining > 0
+                      ? `${hoursRemaining}h ${minutesRemaining}m remaining`
+                      : "Shift overtime";
+                  })()
+                : todaySchedule
+                ? shiftTimingInfo.reason
+                : "No active shift"}
+            </span>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={startShift}
-              className="border-slate-300"
-            >
-              Start Shift
-            </Button>
-            <Button
-              onClick={endShift}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              End Shift
-            </Button>
+            {!activeShift ? (
+              <Button
+                variant="outline"
+                onClick={startShift}
+                className={`border-slate-300 ${
+                  !shiftTimingInfo.canStart ? "opacity-50" : ""
+                }`}
+                disabled={!todaySchedule || !shiftTimingInfo.canStart}
+                title={shiftTimingInfo.reason}
+              >
+                {shiftTimingInfo.buttonText}
+              </Button>
+            ) : (
+              <Button
+                onClick={endShift}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                End Shift
+              </Button>
+            )}
           </div>
         </div>
         <Progress value={shiftProgress} className="mt-3 bg-slate-200" />
@@ -186,11 +474,11 @@ const CashierDashboardView = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-700">
-                ${shiftInfo.totalSales.toFixed(2)}
+                ${(shiftStats.totalSales || 0).toFixed(2)}
               </div>
               <div className="flex items-center mt-2 text-sm text-slate-600">
                 <TrendingUp className="h-4 w-4 mr-1 text-green-500" />
-                <span>{shiftInfo.transactionCount} transactions</span>
+                <span>{shiftStats.totalTransactions || 0} transactions</span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
                 Average: ${averageTransaction.toFixed(2)}
@@ -214,7 +502,7 @@ const CashierDashboardView = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-700">
-                {shiftInfo.transactionCount}
+                {shiftStats.totalTransactions || 0}
               </div>
               <div className="flex items-center mt-2 text-sm text-slate-600">
                 <Clock className="h-4 w-4 mr-1 text-blue-500" />
@@ -242,7 +530,12 @@ const CashierDashboardView = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-amber-700">
-                ${shiftInfo.cashDrawerCurrent.toFixed(2)}
+                $
+                {(
+                  (activeShift?.finalCashDrawer ||
+                    activeShift?.startingCash ||
+                    0) + (shiftStats.totalSales || 0)
+                ).toFixed(2)}
               </div>
               <div
                 className={`flex items-center mt-2 text-sm ${
@@ -257,7 +550,7 @@ const CashierDashboardView = ({
                 <span>Variance: ${Math.abs(cashVariance).toFixed(2)}</span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                Starting: ${shiftInfo.cashDrawerStart.toFixed(2)}
+                Starting: ${(activeShift?.startingCash || 0).toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -280,19 +573,19 @@ const CashierDashboardView = ({
               <div className="flex justify-between items-center mb-2">
                 <span className="text-slate-600">Refunds:</span>
                 <span className="font-semibold text-red-700">
-                  -${shiftInfo.refundAmount.toFixed(2)}
+                  -${(shiftStats.totalRefunds || 0).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-600">Voided Transactions:</span>
                 <span className="font-semibold text-red-700">
-                  {shiftInfo.voidedTransactions}
+                  {shiftStats.totalVoids || 0}
                 </span>
               </div>
               <div className="text-xs text-slate-500 mt-2">
                 Total adjustments:{" "}
-                {shiftInfo.voidedTransactions +
-                  (shiftInfo.refundAmount > 0 ? 1 : 0)}
+                {(shiftStats.totalVoids || 0) +
+                  ((shiftStats.totalRefunds || 0) > 0 ? 1 : 0)}
               </div>
             </CardContent>
           </Card>
@@ -309,7 +602,7 @@ const CashierDashboardView = ({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentTransactions.map((transaction) => (
+              {transactions.map((transaction: Transaction) => (
                 <motion.div
                   key={transaction.id}
                   initial={{ opacity: 0 }}
@@ -406,32 +699,68 @@ const CashierDashboardView = ({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {!activeShift && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm text-amber-800 font-medium">
+                      Start your shift to access quick actions
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   variant="outline"
-                  className="h-16 flex flex-col border-slate-300"
+                  className={`h-16 flex flex-col border-slate-300 ${
+                    !activeShift ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  disabled={!activeShift}
+                  title={
+                    !activeShift ? "Start your shift to process refunds" : ""
+                  }
                 >
                   <RefreshCw className="h-5 w-5 mb-1" />
                   <span className="text-xs">Process Refund</span>
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-16 flex flex-col border-slate-300"
+                  className={`h-16 flex flex-col border-slate-300 ${
+                    !activeShift ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  disabled={!activeShift}
+                  title={
+                    !activeShift ? "Start your shift to void transactions" : ""
+                  }
                 >
                   <XCircle className="h-5 w-5 mb-1" />
                   <span className="text-xs">Void Transaction</span>
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-16 flex flex-col border-slate-300"
+                  className={`h-16 flex flex-col border-slate-300 ${
+                    !activeShift ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  disabled={!activeShift}
+                  title={
+                    !activeShift ? "Start your shift to access cash drawer" : ""
+                  }
                 >
                   <DollarSign className="h-5 w-5 mb-1" />
                   <span className="text-xs">Cash Drawer Count</span>
                 </Button>
                 <Button
-                  onClick={onNewTransaction}
+                  onClick={activeShift ? onNewTransaction : undefined}
                   variant="outline"
-                  className="h-16 flex flex-col border-slate-300"
+                  className={`h-16 flex flex-col border-slate-300 ${
+                    !activeShift ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  disabled={!activeShift}
+                  title={
+                    !activeShift
+                      ? "Start your shift to process transactions"
+                      : ""
+                  }
                 >
                   <ShoppingCart className="h-5 w-5 mb-1" />
                   <span className="text-xs">New Transaction</span>
@@ -443,15 +772,51 @@ const CashierDashboardView = ({
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Transactions per hour:</span>
-                    <span className="font-medium">10.7</span>
+                    <span
+                      className={`font-medium ${
+                        !activeShift ? "text-slate-400" : ""
+                      }`}
+                    >
+                      {activeShift
+                        ? (() => {
+                            if (
+                              !activeShift.startTime ||
+                              shiftStats.totalTransactions === 0
+                            )
+                              return "0.0";
+                            const shiftStart = new Date(activeShift.startTime);
+                            const now = new Date();
+                            const hoursWorked =
+                              (now.getTime() - shiftStart.getTime()) /
+                              (1000 * 60 * 60);
+                            return hoursWorked > 0
+                              ? (
+                                  shiftStats.totalTransactions / hoursWorked
+                                ).toFixed(1)
+                              : "0.0";
+                          })()
+                        : "--"}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Average basket size:</span>
-                    <span className="font-medium">$28.59</span>
+                    <span
+                      className={`font-medium ${
+                        !activeShift ? "text-slate-400" : ""
+                      }`}
+                    >
+                      {activeShift ? `$${averageTransaction.toFixed(2)}` : "--"}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Cash vs Card ratio:</span>
-                    <span className="font-medium">42% / 58%</span>
+                    <span
+                      className={`font-medium ${
+                        !activeShift ? "text-slate-400" : ""
+                      }`}
+                    >
+                      {activeShift ? "-- / --" : "--"}
+                    </span>
                   </div>
                 </div>
               </div>

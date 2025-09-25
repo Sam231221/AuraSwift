@@ -105,6 +105,30 @@ declare global {
       getByBusiness: (businessId: string) => Promise<APIResponse>;
       getCashierUsers: (businessId: string) => Promise<APIResponse>;
     };
+    shiftAPI: {
+      start: (shiftData: {
+        scheduleId?: string;
+        cashierId: string;
+        businessId: string;
+        startingCash: number;
+        notes?: string;
+      }) => Promise<APIResponse>;
+      end: (
+        shiftId: string,
+        endData: {
+          finalCashDrawer: number;
+          expectedCashDrawer: number;
+          totalSales: number;
+          totalTransactions: number;
+          totalRefunds: number;
+          totalVoids: number;
+          notes?: string;
+        }
+      ) => Promise<APIResponse>;
+      getActive: (cashierId: string) => Promise<APIResponse>;
+      getTodaySchedule: (cashierId: string) => Promise<APIResponse>;
+      getStats: (shiftId: string) => Promise<APIResponse>;
+    };
   }
 }
 

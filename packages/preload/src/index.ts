@@ -152,4 +152,36 @@ contextBridge.exposeInMainWorld("scheduleAPI", {
     ipcRenderer.invoke("schedules:getCashierUsers", businessId),
 });
 
+// Shift management API
+contextBridge.exposeInMainWorld("shiftAPI", {
+  start: (shiftData: {
+    scheduleId?: string;
+    cashierId: string;
+    businessId: string;
+    startingCash: number;
+    notes?: string;
+  }) => ipcRenderer.invoke("shift:start", shiftData),
+
+  end: (
+    shiftId: string,
+    endData: {
+      finalCashDrawer: number;
+      expectedCashDrawer: number;
+      totalSales: number;
+      totalTransactions: number;
+      totalRefunds: number;
+      totalVoids: number;
+      notes?: string;
+    }
+  ) => ipcRenderer.invoke("shift:end", shiftId, endData),
+
+  getActive: (cashierId: string) =>
+    ipcRenderer.invoke("shift:getActive", cashierId),
+
+  getTodaySchedule: (cashierId: string) =>
+    ipcRenderer.invoke("shift:getTodaySchedule", cashierId),
+
+  getStats: (shiftId: string) => ipcRenderer.invoke("shift:getStats", shiftId),
+});
+
 export { sha256sum, versions };
