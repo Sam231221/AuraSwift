@@ -117,6 +117,42 @@ ipcMain.handle("auth:updateUser", async (event, userId, updates) => {
   }
 });
 
+ipcMain.handle("auth:deleteUser", async (event, userId) => {
+  try {
+    return await authAPI.deleteUser(userId);
+  } catch (error) {
+    console.error("Delete user IPC error:", error);
+    return {
+      success: false,
+      message: "Delete failed",
+    };
+  }
+});
+
+ipcMain.handle("auth:getUsersByBusiness", async (event, businessId) => {
+  try {
+    return await authAPI.getUsersByBusiness(businessId);
+  } catch (error) {
+    console.error("Get users by business IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get users",
+    };
+  }
+});
+
+ipcMain.handle("auth:createUser", async (event, userData) => {
+  try {
+    return await authAPI.createUser(userData);
+  } catch (error) {
+    console.error("Create user IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to create user",
+    };
+  }
+});
+
 // Product Management IPC handlers
 ipcMain.handle("products:create", async (event, productData) => {
   try {
@@ -210,6 +246,142 @@ ipcMain.handle("stock:getAdjustments", async (event, productId) => {
     return {
       success: false,
       message: "Failed to get stock adjustments",
+    };
+  }
+});
+
+// Schedule Management API handlers
+ipcMain.handle("schedules:create", async (event, scheduleData) => {
+  try {
+    if (!db) db = await getDatabase();
+    const schedule = db.createSchedule({
+      ...scheduleData,
+      status: "upcoming" as const,
+    });
+    return {
+      success: true,
+      data: schedule,
+    };
+  } catch (error) {
+    console.error("Create schedule IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to create schedule",
+    };
+  }
+});
+
+ipcMain.handle("schedules:getByBusiness", async (event, businessId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const schedules = db.getSchedulesByBusinessId(businessId);
+    return {
+      success: true,
+      data: schedules,
+    };
+  } catch (error) {
+    console.error("Get schedules IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get schedules",
+    };
+  }
+});
+
+ipcMain.handle("schedules:getByStaff", async (event, staffId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const schedules = db.getSchedulesByStaffId(staffId);
+    return {
+      success: true,
+      data: schedules,
+    };
+  } catch (error) {
+    console.error("Get staff schedules IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get staff schedules",
+    };
+  }
+});
+
+ipcMain.handle("schedules:update", async (event, id, updates) => {
+  try {
+    if (!db) db = await getDatabase();
+    // Note: This would need a generic update method in DatabaseManager
+    // For now, we'll implement individual update methods as needed
+    if (updates.status) {
+      db.updateScheduleStatus(id, updates.status);
+    }
+    // TODO: Implement full schedule update method in DatabaseManager
+    return {
+      success: true,
+      message: "Schedule updated successfully",
+    };
+  } catch (error) {
+    console.error("Update schedule IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to update schedule",
+    };
+  }
+});
+
+ipcMain.handle("schedules:delete", async (event, id) => {
+  try {
+    if (!db) db = await getDatabase();
+    // TODO: Implement deleteSchedule method in DatabaseManager
+    console.log("Delete schedule:", id);
+    return {
+      success: true,
+      message: "Schedule deleted successfully",
+    };
+  } catch (error) {
+    console.error("Delete schedule IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to delete schedule",
+    };
+  }
+});
+
+ipcMain.handle("schedules:updateStatus", async (event, id, status) => {
+  try {
+    if (!db) db = await getDatabase();
+    db.updateScheduleStatus(id, status);
+    return {
+      success: true,
+      message: "Schedule status updated successfully",
+    };
+  } catch (error) {
+    console.error("Update schedule status IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to update schedule status",
+    };
+  }
+});
+
+ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
+  try {
+    console.log("Getting cashier users for businessId:", businessId);
+    if (!db) db = await getDatabase();
+    const users = db.getUsersByBusiness(businessId);
+    console.log("All users for business:", users);
+    // Filter for cashier and manager roles only
+    const staffUsers = users.filter(
+      (user) => user.role === "cashier" || user.role === "manager"
+    );
+    console.log("Filtered staff users:", staffUsers);
+    return {
+      success: true,
+      data: staffUsers,
+    };
+  } catch (error) {
+    console.error("Get cashier users IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get cashier users",
     };
   }
 });

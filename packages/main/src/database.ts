@@ -88,6 +88,111 @@ export interface StockAdjustment {
   timestamp: string;
 }
 
+export interface Schedule {
+  id: string;
+  staffId: string;
+  businessId: string;
+  startTime: string; // ISO datetime
+  endTime: string; // ISO datetime
+  status: "upcoming" | "active" | "completed" | "missed";
+  assignedRegister?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Shift {
+  id: string;
+  scheduleId?: string; // Optional - may be unscheduled
+  cashierId: string;
+  businessId: string;
+  startTime: string;
+  endTime?: string;
+  status: "active" | "ended";
+  startingCash: number;
+  finalCashDrawer?: number;
+  expectedCashDrawer?: number;
+  cashVariance?: number;
+  totalSales?: number;
+  totalTransactions?: number;
+  totalRefunds?: number;
+  totalVoids?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Transaction {
+  id: string;
+  shiftId: string;
+  businessId: string;
+  type: "sale" | "refund" | "void";
+  subtotal: number;
+  tax: number;
+  total: number;
+  paymentMethod: "cash" | "card" | "mixed";
+  cashAmount?: number;
+  cardAmount?: number;
+  items: TransactionItem[];
+  status: "completed" | "voided" | "pending";
+  voidReason?: string;
+  customerId?: string;
+  receiptNumber: string;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface TransactionItem {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  appliedModifiers?: AppliedModifier[];
+}
+
+export interface AppliedModifier {
+  modifierId: string;
+  modifierName: string;
+  optionId: string;
+  optionName: string;
+  price: number;
+}
+
+export interface CashDrawerCount {
+  id: string;
+  shiftId: string;
+  businessId: string;
+  countType: "mid-shift" | "end-shift";
+  expectedAmount: number;
+  countedAmount: number;
+  variance: number;
+  notes?: string;
+  countedBy: string; // userId
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface ShiftReport {
+  shift: Shift;
+  schedule?: Schedule;
+  transactions: Transaction[];
+  cashDrawerCounts: CashDrawerCount[];
+  totalSales: number;
+  totalRefunds: number;
+  totalVoids: number;
+  cashVariance: number;
+  attendanceVariance?: {
+    plannedStart?: string;
+    actualStart: string;
+    plannedEnd?: string;
+    actualEnd?: string;
+    earlyMinutes?: number;
+    lateMinutes?: number;
+  };
+}
+
 export class DatabaseManager {
   private db: any;
   private bcrypt: any;
@@ -253,6 +358,127 @@ export class DatabaseManager {
       )
     `);
 
+    // Schedules table for planned staff work schedules
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS schedules (
+        id TEXT PRIMARY KEY,
+        staffId TEXT NOT NULL,
+        businessId TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('upcoming', 'active', 'completed', 'missed')),
+        assignedRegister TEXT,
+        notes TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (staffId) REFERENCES users (id),
+        FOREIGN KEY (businessId) REFERENCES businesses (id)
+      )
+    `);
+
+    // Shifts table for actual work sessions
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS shifts (
+        id TEXT PRIMARY KEY,
+        scheduleId TEXT,
+        cashierId TEXT NOT NULL,
+        businessId TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT,
+        status TEXT NOT NULL CHECK (status IN ('active', 'ended')),
+        startingCash REAL NOT NULL,
+        finalCashDrawer REAL,
+        expectedCashDrawer REAL,
+        cashVariance REAL,
+        totalSales REAL DEFAULT 0,
+        totalTransactions INTEGER DEFAULT 0,
+        totalRefunds REAL DEFAULT 0,
+        totalVoids REAL DEFAULT 0,
+        notes TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (scheduleId) REFERENCES schedules (id),
+        FOREIGN KEY (cashierId) REFERENCES users (id),
+        FOREIGN KEY (businessId) REFERENCES businesses (id)
+      )
+    `);
+
+    // Transactions table for sales, refunds, voids
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id TEXT PRIMARY KEY,
+        shiftId TEXT NOT NULL,
+        businessId TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('sale', 'refund', 'void')),
+        subtotal REAL NOT NULL,
+        tax REAL NOT NULL,
+        total REAL NOT NULL,
+        paymentMethod TEXT NOT NULL CHECK (paymentMethod IN ('cash', 'card', 'mixed')),
+        cashAmount REAL,
+        cardAmount REAL,
+        status TEXT NOT NULL CHECK (status IN ('completed', 'voided', 'pending')),
+        voidReason TEXT,
+        customerId TEXT,
+        receiptNumber TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (shiftId) REFERENCES shifts (id),
+        FOREIGN KEY (businessId) REFERENCES businesses (id)
+      )
+    `);
+
+    // Transaction items table for individual line items
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS transaction_items (
+        id TEXT PRIMARY KEY,
+        transactionId TEXT NOT NULL,
+        productId TEXT NOT NULL,
+        productName TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unitPrice REAL NOT NULL,
+        totalPrice REAL NOT NULL,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (transactionId) REFERENCES transactions (id),
+        FOREIGN KEY (productId) REFERENCES products (id)
+      )
+    `);
+
+    // Applied modifiers table for transaction item modifiers
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS applied_modifiers (
+        id TEXT PRIMARY KEY,
+        transactionItemId TEXT NOT NULL,
+        modifierId TEXT NOT NULL,
+        modifierName TEXT NOT NULL,
+        optionId TEXT NOT NULL,
+        optionName TEXT NOT NULL,
+        price REAL NOT NULL,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (transactionItemId) REFERENCES transaction_items (id),
+        FOREIGN KEY (modifierId) REFERENCES modifiers (id)
+      )
+    `);
+
+    // Cash drawer counts table for reconciliation
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS cash_drawer_counts (
+        id TEXT PRIMARY KEY,
+        shiftId TEXT NOT NULL,
+        businessId TEXT NOT NULL,
+        countType TEXT NOT NULL CHECK (countType IN ('mid-shift', 'end-shift')),
+        expectedAmount REAL NOT NULL,
+        countedAmount REAL NOT NULL,
+        variance REAL NOT NULL,
+        notes TEXT,
+        countedBy TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (shiftId) REFERENCES shifts (id),
+        FOREIGN KEY (businessId) REFERENCES businesses (id),
+        FOREIGN KEY (countedBy) REFERENCES users (id)
+      )
+    `);
+
     // Create indexes for better performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -265,6 +491,34 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_modifiers_businessId ON modifiers(businessId);
       CREATE INDEX IF NOT EXISTS idx_stock_adjustments_productId ON stock_adjustments(productId);
       CREATE INDEX IF NOT EXISTS idx_stock_adjustments_businessId ON stock_adjustments(businessId);
+
+      -- Indexes for shift management tables
+      CREATE INDEX IF NOT EXISTS idx_schedules_staffId ON schedules(staffId);
+      CREATE INDEX IF NOT EXISTS idx_schedules_businessId ON schedules(businessId);
+      CREATE INDEX IF NOT EXISTS idx_schedules_startTime ON schedules(startTime);
+      CREATE INDEX IF NOT EXISTS idx_schedules_status ON schedules(status);
+
+      CREATE INDEX IF NOT EXISTS idx_shifts_cashierId ON shifts(cashierId);
+      CREATE INDEX IF NOT EXISTS idx_shifts_businessId ON shifts(businessId);
+      CREATE INDEX IF NOT EXISTS idx_shifts_scheduleId ON shifts(scheduleId);
+      CREATE INDEX IF NOT EXISTS idx_shifts_status ON shifts(status);
+      CREATE INDEX IF NOT EXISTS idx_shifts_startTime ON shifts(startTime);
+
+      CREATE INDEX IF NOT EXISTS idx_transactions_shiftId ON transactions(shiftId);
+      CREATE INDEX IF NOT EXISTS idx_transactions_businessId ON transactions(businessId);
+      CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type);
+      CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
+      CREATE INDEX IF NOT EXISTS idx_transactions_timestamp ON transactions(timestamp);
+
+      CREATE INDEX IF NOT EXISTS idx_transaction_items_transactionId ON transaction_items(transactionId);
+      CREATE INDEX IF NOT EXISTS idx_transaction_items_productId ON transaction_items(productId);
+
+      CREATE INDEX IF NOT EXISTS idx_applied_modifiers_transactionItemId ON applied_modifiers(transactionItemId);
+      CREATE INDEX IF NOT EXISTS idx_applied_modifiers_modifierId ON applied_modifiers(modifierId);
+
+      CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_shiftId ON cash_drawer_counts(shiftId);
+      CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_businessId ON cash_drawer_counts(businessId);
+      CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_countType ON cash_drawer_counts(countType);
     `);
 
     // Insert default admin user if no users exist
@@ -1056,6 +1310,430 @@ export class DatabaseManager {
    */
   clearAllSettings(): void {
     this.db.prepare("DELETE FROM app_settings").run();
+  }
+
+  // Schedule Management Methods
+  createSchedule(
+    schedule: Omit<Schedule, "id" | "createdAt" | "updatedAt">
+  ): Schedule {
+    const id = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    const stmt = this.db.prepare(`
+      INSERT INTO schedules (id, staffId, businessId, startTime, endTime, status, assignedRegister, notes, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      id,
+      schedule.staffId,
+      schedule.businessId,
+      schedule.startTime,
+      schedule.endTime,
+      schedule.status,
+      schedule.assignedRegister || null,
+      schedule.notes || null,
+      now,
+      now
+    );
+
+    return {
+      ...schedule,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  getSchedulesByBusinessId(businessId: string): Schedule[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM schedules WHERE businessId = ? ORDER BY startTime ASC
+    `);
+    return stmt.all(businessId) as Schedule[];
+  }
+
+  getSchedulesByStaffId(staffId: string): Schedule[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM schedules WHERE staffId = ? ORDER BY startTime ASC
+    `);
+    return stmt.all(staffId) as Schedule[];
+  }
+
+  updateScheduleStatus(scheduleId: string, status: Schedule["status"]): void {
+    const stmt = this.db.prepare(`
+      UPDATE schedules SET status = ?, updatedAt = ? WHERE id = ?
+    `);
+    stmt.run(status, new Date().toISOString(), scheduleId);
+  }
+
+  // Shift Management Methods
+  createShift(shift: Omit<Shift, "id" | "createdAt" | "updatedAt">): Shift {
+    const id = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    const stmt = this.db.prepare(`
+      INSERT INTO shifts (
+        id, scheduleId, cashierId, businessId, startTime, endTime, status, 
+        startingCash, finalCashDrawer, expectedCashDrawer, cashVariance, 
+        totalSales, totalTransactions, totalRefunds, totalVoids, notes, 
+        createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      id,
+      shift.scheduleId || null,
+      shift.cashierId,
+      shift.businessId,
+      shift.startTime,
+      shift.endTime || null,
+      shift.status,
+      shift.startingCash,
+      shift.finalCashDrawer || null,
+      shift.expectedCashDrawer || null,
+      shift.cashVariance || null,
+      shift.totalSales || 0,
+      shift.totalTransactions || 0,
+      shift.totalRefunds || 0,
+      shift.totalVoids || 0,
+      shift.notes || null,
+      now,
+      now
+    );
+
+    return {
+      ...shift,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  getActiveShiftByCashier(cashierId: string): Shift | null {
+    const stmt = this.db.prepare(`
+      SELECT * FROM shifts WHERE cashierId = ? AND status = 'active' ORDER BY startTime DESC LIMIT 1
+    `);
+    return (stmt.get(cashierId) as Shift) || null;
+  }
+
+  endShift(
+    shiftId: string,
+    endData: {
+      endTime: string;
+      finalCashDrawer: number;
+      expectedCashDrawer: number;
+      totalSales: number;
+      totalTransactions: number;
+      totalRefunds: number;
+      totalVoids: number;
+      notes?: string;
+    }
+  ): void {
+    const cashVariance = endData.finalCashDrawer - endData.expectedCashDrawer;
+
+    const stmt = this.db.prepare(`
+      UPDATE shifts SET 
+        endTime = ?, 
+        status = 'ended',
+        finalCashDrawer = ?,
+        expectedCashDrawer = ?,
+        cashVariance = ?,
+        totalSales = ?,
+        totalTransactions = ?,
+        totalRefunds = ?,
+        totalVoids = ?,
+        notes = ?,
+        updatedAt = ?
+      WHERE id = ?
+    `);
+
+    stmt.run(
+      endData.endTime,
+      endData.finalCashDrawer,
+      endData.expectedCashDrawer,
+      cashVariance,
+      endData.totalSales,
+      endData.totalTransactions,
+      endData.totalRefunds,
+      endData.totalVoids,
+      endData.notes || null,
+      new Date().toISOString(),
+      shiftId
+    );
+  }
+
+  getShiftsByBusinessId(businessId: string): Shift[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM shifts WHERE businessId = ? ORDER BY startTime DESC
+    `);
+    return stmt.all(businessId) as Shift[];
+  }
+
+  // Transaction Management Methods
+  createTransaction(
+    transaction: Omit<Transaction, "id" | "createdAt">
+  ): Transaction {
+    const id = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    const stmt = this.db.prepare(`
+      INSERT INTO transactions (
+        id, shiftId, businessId, type, subtotal, tax, total, 
+        paymentMethod, cashAmount, cardAmount, status, voidReason, 
+        customerId, receiptNumber, timestamp, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      id,
+      transaction.shiftId,
+      transaction.businessId,
+      transaction.type,
+      transaction.subtotal,
+      transaction.tax,
+      transaction.total,
+      transaction.paymentMethod,
+      transaction.cashAmount || null,
+      transaction.cardAmount || null,
+      transaction.status,
+      transaction.voidReason || null,
+      transaction.customerId || null,
+      transaction.receiptNumber,
+      transaction.timestamp,
+      now
+    );
+
+    // Create transaction items
+    if (transaction.items && transaction.items.length > 0) {
+      for (const item of transaction.items) {
+        this.createTransactionItem(id, item);
+      }
+    }
+
+    return {
+      ...transaction,
+      id,
+      createdAt: now,
+    };
+  }
+
+  createTransactionItem(
+    transactionId: string,
+    item: Omit<TransactionItem, "id">
+  ): void {
+    const itemId = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    const stmt = this.db.prepare(`
+      INSERT INTO transaction_items (
+        id, transactionId, productId, productName, quantity, unitPrice, totalPrice, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      itemId,
+      transactionId,
+      item.productId,
+      item.productName,
+      item.quantity,
+      item.unitPrice,
+      item.totalPrice,
+      now
+    );
+
+    // Create applied modifiers if any
+    if (item.appliedModifiers && item.appliedModifiers.length > 0) {
+      for (const modifier of item.appliedModifiers) {
+        this.createAppliedModifier(itemId, modifier);
+      }
+    }
+  }
+
+  createAppliedModifier(
+    transactionItemId: string,
+    modifier: AppliedModifier
+  ): void {
+    const id = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    const stmt = this.db.prepare(`
+      INSERT INTO applied_modifiers (
+        id, transactionItemId, modifierId, modifierName, optionId, optionName, price, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      id,
+      transactionItemId,
+      modifier.modifierId,
+      modifier.modifierName,
+      modifier.optionId,
+      modifier.optionName,
+      modifier.price,
+      now
+    );
+  }
+
+  getTransactionsByShiftId(shiftId: string): Transaction[] {
+    // Get transactions
+    const transactionStmt = this.db.prepare(`
+      SELECT * FROM transactions WHERE shiftId = ? ORDER BY timestamp DESC
+    `);
+    const transactions = transactionStmt.all(shiftId) as Transaction[];
+
+    // Get items and modifiers for each transaction
+    for (const transaction of transactions) {
+      transaction.items = this.getTransactionItems(transaction.id);
+    }
+
+    return transactions;
+  }
+
+  getTransactionItems(transactionId: string): TransactionItem[] {
+    const itemsStmt = this.db.prepare(`
+      SELECT * FROM transaction_items WHERE transactionId = ?
+    `);
+    const items = itemsStmt.all(transactionId) as TransactionItem[];
+
+    // Get applied modifiers for each item
+    for (const item of items) {
+      const modifiersStmt = this.db.prepare(`
+        SELECT * FROM applied_modifiers WHERE transactionItemId = ?
+      `);
+      item.appliedModifiers = modifiersStmt.all(item.id) as AppliedModifier[];
+    }
+
+    return items;
+  }
+
+  voidTransaction(transactionId: string, voidReason: string): void {
+    const stmt = this.db.prepare(`
+      UPDATE transactions SET status = 'voided', voidReason = ?, updatedAt = ? WHERE id = ?
+    `);
+    stmt.run(voidReason, new Date().toISOString(), transactionId);
+  }
+
+  // Cash Drawer Count Methods
+  createCashDrawerCount(
+    count: Omit<CashDrawerCount, "id" | "createdAt">
+  ): CashDrawerCount {
+    const id = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    const stmt = this.db.prepare(`
+      INSERT INTO cash_drawer_counts (
+        id, shiftId, businessId, countType, expectedAmount, countedAmount, 
+        variance, notes, countedBy, timestamp, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const variance = count.countedAmount - count.expectedAmount;
+
+    stmt.run(
+      id,
+      count.shiftId,
+      count.businessId,
+      count.countType,
+      count.expectedAmount,
+      count.countedAmount,
+      variance,
+      count.notes || null,
+      count.countedBy,
+      count.timestamp,
+      now
+    );
+
+    return {
+      ...count,
+      id,
+      variance,
+      createdAt: now,
+    };
+  }
+
+  getCashDrawerCountsByShiftId(shiftId: string): CashDrawerCount[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM cash_drawer_counts WHERE shiftId = ? ORDER BY timestamp ASC
+    `);
+    return stmt.all(shiftId) as CashDrawerCount[];
+  }
+
+  // Reporting Methods
+  generateShiftReport(shiftId: string): ShiftReport | null {
+    // Get shift data
+    const shiftStmt = this.db.prepare(`SELECT * FROM shifts WHERE id = ?`);
+    const shift = shiftStmt.get(shiftId) as Shift;
+
+    if (!shift) return null;
+
+    // Get linked schedule if exists
+    let schedule: Schedule | undefined;
+    if (shift.scheduleId) {
+      const scheduleStmt = this.db.prepare(
+        `SELECT * FROM schedules WHERE id = ?`
+      );
+      schedule = scheduleStmt.get(shift.scheduleId) as Schedule;
+    }
+
+    // Get transactions
+    const transactions = this.getTransactionsByShiftId(shiftId);
+
+    // Get cash drawer counts
+    const cashDrawerCounts = this.getCashDrawerCountsByShiftId(shiftId);
+
+    // Calculate totals
+    const totalSales = transactions
+      .filter((t) => t.type === "sale" && t.status === "completed")
+      .reduce((sum, t) => sum + t.total, 0);
+
+    const totalRefunds = transactions
+      .filter((t) => t.type === "refund" && t.status === "completed")
+      .reduce((sum, t) => sum + t.total, 0);
+
+    const totalVoids = transactions
+      .filter((t) => t.status === "voided")
+      .reduce((sum, t) => sum + t.total, 0);
+
+    const cashVariance = shift.cashVariance || 0;
+
+    // Calculate attendance variance if schedule exists
+    let attendanceVariance;
+    if (schedule) {
+      const plannedStart = new Date(schedule.startTime);
+      const actualStart = new Date(shift.startTime);
+      const plannedEnd = schedule.endTime ? new Date(schedule.endTime) : null;
+      const actualEnd = shift.endTime ? new Date(shift.endTime) : null;
+
+      const earlyMinutes = Math.max(
+        0,
+        (plannedStart.getTime() - actualStart.getTime()) / (1000 * 60)
+      );
+      const lateMinutes = Math.max(
+        0,
+        (actualStart.getTime() - plannedStart.getTime()) / (1000 * 60)
+      );
+
+      attendanceVariance = {
+        plannedStart: schedule.startTime,
+        actualStart: shift.startTime,
+        plannedEnd: schedule.endTime,
+        actualEnd: shift.endTime,
+        earlyMinutes: earlyMinutes > 0 ? Math.round(earlyMinutes) : undefined,
+        lateMinutes: lateMinutes > 0 ? Math.round(lateMinutes) : undefined,
+      };
+    }
+
+    return {
+      shift,
+      schedule,
+      transactions,
+      cashDrawerCounts,
+      totalSales,
+      totalRefunds,
+      totalVoids,
+      cashVariance,
+      attendanceVariance,
+    };
   }
 
   close(): void {

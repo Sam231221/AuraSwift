@@ -32,6 +32,7 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   user?: User;
+  users?: User[];
   token?: string;
   errors?: string[];
 }
@@ -339,6 +340,40 @@ export class AuthAPI {
     }
   }
 
+  async deleteUser(userId: string): Promise<AuthResponse> {
+    try {
+      const db = await this.getDb();
+
+      // Check if user exists first
+      const user = db.getUserById(userId);
+      if (!user) {
+        return {
+          success: false,
+          message: "User not found",
+        };
+      }
+
+      const success = db.deleteUser(userId);
+      if (!success) {
+        return {
+          success: false,
+          message: "Failed to delete user",
+        };
+      }
+
+      return {
+        success: true,
+        message: "User deleted successfully",
+      };
+    } catch (error) {
+      console.error("Delete user error:", error);
+      return {
+        success: false,
+        message: "Delete failed due to server error",
+      };
+    }
+  }
+
   // Cleanup expired sessions (call this periodically)
   async cleanupExpiredSessions(): Promise<void> {
     const db = await this.getDb();
@@ -585,6 +620,66 @@ export class AuthAPI {
       return {
         success: false,
         message: error.message || "Failed to get stock adjustments",
+      };
+    }
+  }
+
+  // User management methods
+  async getUsersByBusiness(businessId: string): Promise<AuthResponse> {
+    try {
+      const db = await this.getDb();
+      const users = db.getUsersByBusiness(businessId);
+
+      return {
+        success: true,
+        message: "Users retrieved successfully",
+        users,
+      };
+    } catch (error: any) {
+      console.error("Get users by business error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get users",
+      };
+    }
+  }
+
+  async createUser(userData: {
+    businessId: string;
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    role: "cashier" | "manager";
+    avatar?: string;
+  }): Promise<AuthResponse> {
+    try {
+      const db = await this.getDb();
+
+      // Create user with business name from business ID
+      const business = db.getBusinessById(userData.businessId);
+      if (!business) {
+        return {
+          success: false,
+          message: "Business not found",
+        };
+      }
+
+      const user = await db.createUser({
+        ...userData,
+        businessName: business.name,
+      });
+
+      return {
+        success: true,
+        message: "User created successfully",
+        user,
+      };
+    } catch (error: any) {
+      console.error("Create user error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to create user",
       };
     }
   }

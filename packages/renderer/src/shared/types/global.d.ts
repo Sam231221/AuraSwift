@@ -82,6 +82,29 @@ declare global {
       getUsersByBusiness: (businessId: string) => Promise<APIResponse>;
       deleteUser: (userId: string) => Promise<APIResponse>;
     };
+    scheduleAPI: {
+      create: (scheduleData: {
+        businessId: string;
+        staffId: string;
+        startTime: string;
+        endTime: string;
+        assignedRegister?: string;
+        notes?: string;
+      }) => Promise<APIResponse>;
+      update: (
+        scheduleId: string,
+        updates: {
+          staffId?: string;
+          startTime?: string;
+          endTime?: string;
+          assignedRegister?: string;
+          notes?: string;
+        }
+      ) => Promise<APIResponse>;
+      delete: (scheduleId: string) => Promise<APIResponse>;
+      getByBusiness: (businessId: string) => Promise<APIResponse>;
+      getCashierUsers: (businessId: string) => Promise<APIResponse>;
+    };
   }
 }
 
