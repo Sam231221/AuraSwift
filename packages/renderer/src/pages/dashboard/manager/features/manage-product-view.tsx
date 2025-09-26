@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Switch } from "@/components/ui/switch";
 import {
   Drawer,
@@ -213,6 +213,10 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         businessId: user.businessId,
       };
 
+      console.log("Saving product data:", productData);
+      console.log("requiresWeight value:", productData.requiresWeight);
+      console.log("requiresWeight type:", typeof productData.requiresWeight);
+
       if (editingProduct) {
         // Update existing product
         const response = await window.productAPI.update(
@@ -253,6 +257,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const handleEditProduct = (product: Product) => {
     console.log("Editing product:", product);
     console.log("Product modifiers:", product.modifiers);
+    console.log("Product requiresWeight value:", product.requiresWeight);
+    console.log("Product requiresWeight type:", typeof product.requiresWeight);
 
     setEditingProduct(product);
     setNewProduct({
@@ -268,7 +274,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       stockLevel: product.stockLevel,
       minStockLevel: product.minStockLevel,
       modifiers: product.modifiers || [], // Ensure it's always an array
-      requiresWeight: product.requiresWeight || false,
+      requiresWeight: Boolean(product.requiresWeight), // Ensure it's a proper boolean
       unit: product.unit || "each",
       pricePerUnit: product.pricePerUnit || 0,
     });
@@ -486,7 +492,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
             <div>
               <p className="text-sm text-gray-600">Average Price</p>
               <p className="text-2xl font-bold text-gray-900">
-                $
+                £
                 {products.length > 0
                   ? (
                       products.reduce((sum, p) => sum + p.price, 0) /
@@ -796,7 +802,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                             <div className="flex items-center space-x-2">
                               <div>
                                 <div className="text-gray-900 font-medium">
-                                  ${product.requiresWeight ? product.pricePerUnit?.toFixed(2) || product.price.toFixed(2) : product.price.toFixed(2)}
+                                  £
+                                  {product.requiresWeight
+                                    ? product.pricePerUnit?.toFixed(2) ||
+                                      product.price.toFixed(2)
+                                    : product.price.toFixed(2)}
                                   {product.requiresWeight && (
                                     <span className="text-xs text-gray-500 ml-1">
                                       /{product.unit}
@@ -804,7 +814,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                                   )}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  Cost: ${product.costPrice.toFixed(2)}
+                                  Cost: £{product.costPrice.toFixed(2)}
                                 </div>
                               </div>
                               {product.requiresWeight && (
@@ -1269,16 +1279,18 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
                 {/* Weight-based Product Configuration */}
                 <div className="border-t pt-4">
-                  <h4 className="text-lg font-medium mb-4">Weight Configuration</h4>
-                  
+                  <h4 className="text-lg font-medium mb-4">
+                    Weight Configuration
+                  </h4>
+
                   <div className="flex items-center space-x-2 mb-4">
                     <Switch
                       id="requiresWeight"
-                      checked={newProduct.requiresWeight}
+                      checked={Boolean(newProduct.requiresWeight)}
                       onCheckedChange={(checked) =>
                         setNewProduct({
                           ...newProduct,
-                          requiresWeight: checked,
+                          requiresWeight: Boolean(checked),
                           // Reset pricing when switching modes
                           pricePerUnit: checked ? newProduct.price : 0,
                         })
@@ -1293,7 +1305,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         <Label htmlFor="unit">Unit</Label>
                         <Select
                           value={newProduct.unit}
-                          onValueChange={(value: "lb" | "kg" | "oz" | "g" | "each") =>
+                          onValueChange={(
+                            value: "lb" | "kg" | "oz" | "g" | "each"
+                          ) =>
                             setNewProduct({
                               ...newProduct,
                               unit: value,
@@ -1313,7 +1327,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                       </div>
 
                       <div>
-                        <Label htmlFor="pricePerUnit">Price per {newProduct.unit}</Label>
+                        <Label htmlFor="pricePerUnit">
+                          Price per {newProduct.unit}
+                        </Label>
                         <Input
                           id="pricePerUnit"
                           type="number"

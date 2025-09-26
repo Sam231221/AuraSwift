@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import {
 
 import { useAuth } from "@/shared/hooks";
 import { useNavigate } from "react-router-dom";
+import RefundTransactionView from "./refund-transaction-view";
 
 // TypeScript interfaces
 interface Transaction {
@@ -102,9 +103,89 @@ const CashierDashboardView = ({
   const [startingCash, setStartingCash] = useState("");
   const [finalCash, setFinalCash] = useState("");
   const [lateStartMinutes, setLateStartMinutes] = useState(0);
+  const [showOvertimeWarning, setShowOvertimeWarning] = useState(false);
+  const [overtimeMinutes, setOvertimeMinutes] = useState(0);
+  const [showRefundView, setShowRefundView] = useState(false);
 
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Handle automatic shift ending when overtime exceeds threshold
+  const handleAutoEndShift = useCallback(
+    async (minutesOvertime: number) => {
+      if (!activeShift) return;
+
+      try {
+        // Auto-end with current cash drawer balance (estimated)
+        const estimatedCashDrawer =
+          activeShift.startingCash + (shiftStats.totalSales || 0);
+
+        const response = await window.shiftAPI.end(activeShift.id, {
+          finalCashDrawer: estimatedCashDrawer,
+          expectedCashDrawer: estimatedCashDrawer,
+          totalSales: shiftStats.totalSales || 0,
+          totalTransactions: shiftStats.totalTransactions || 0,
+          totalRefunds: shiftStats.totalRefunds || 0,
+          totalVoids: shiftStats.totalVoids || 0,
+          notes: `Auto-ended after ${minutesOvertime} minutes overtime. Cash drawer amount estimated. Requires manager approval.`,
+        });
+
+        if (response.success) {
+          setActiveShift(null);
+          setShiftStats({
+            totalTransactions: 0,
+            totalSales: 0,
+            totalRefunds: 0,
+            totalVoids: 0,
+          });
+          setShowOvertimeWarning(false);
+          setOvertimeMinutes(0);
+
+          alert(
+            `Your shift has been automatically ended due to excessive overtime (${minutesOvertime} minutes). ` +
+              `The cash drawer amount has been estimated. Please contact your manager for shift reconciliation.`
+          );
+        }
+      } catch (error) {
+        console.error("Failed to auto-end shift:", error);
+      }
+    },
+    [activeShift, shiftStats]
+  );
+
+  // Check for overtime and handle automatic shift ending
+  useEffect(() => {
+    if (!activeShift || !todaySchedule) return;
+
+    const checkOvertime = () => {
+      const now = new Date();
+      const scheduledEnd = new Date(todaySchedule.endTime);
+      const timeDifference = now.getTime() - scheduledEnd.getTime();
+      const minutesOvertime = Math.floor(timeDifference / (1000 * 60));
+
+      if (minutesOvertime > 0) {
+        setOvertimeMinutes(minutesOvertime);
+
+        // Show warning after 15 minutes of overtime
+        if (minutesOvertime >= 15 && !showOvertimeWarning) {
+          setShowOvertimeWarning(true);
+        }
+
+        // Auto-end shift after 2 hours of overtime (configurable)
+        if (minutesOvertime >= 120) {
+          handleAutoEndShift(minutesOvertime);
+        }
+      } else {
+        setOvertimeMinutes(0);
+        setShowOvertimeWarning(false);
+      }
+    };
+
+    checkOvertime(); // Check immediately
+    const overtimeInterval = setInterval(checkOvertime, 60000); // Check every minute
+
+    return () => clearInterval(overtimeInterval);
+  }, [activeShift, todaySchedule, showOvertimeWarning, handleAutoEndShift]);
 
   // Load shift data on component mount
   useEffect(() => {
@@ -340,6 +421,10 @@ const CashierDashboardView = ({
         totalTransactions: shiftStats.totalTransactions || 0,
         totalRefunds: shiftStats.totalRefunds || 0,
         totalVoids: shiftStats.totalVoids || 0,
+        notes:
+          overtimeMinutes > 0
+            ? `Overtime: ${overtimeMinutes} minutes`
+            : undefined,
       });
 
       if (response.success) {
@@ -351,6 +436,8 @@ const CashierDashboardView = ({
           totalVoids: 0,
         });
         setShowEndShiftDialog(false);
+        setShowOvertimeWarning(false);
+        setOvertimeMinutes(0);
       } else {
         alert(response.message || "Failed to end shift");
       }
@@ -377,6 +464,43 @@ const CashierDashboardView = ({
 
   return (
     <>
+      {/* Overtime Warning Banner */}
+      {showOvertimeWarning && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-100 border border-red-300 p-4 rounded-lg mb-4"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div>
+                <h3 className="font-semibold text-red-800">
+                  Shift Overtime Warning
+                </h3>
+                <p className="text-sm text-red-700">
+                  Your shift is {overtimeMinutes} minutes past the scheduled end
+                  time. Please end your shift as soon as possible.
+                  {overtimeMinutes >= 60 && (
+                    <span className="font-medium">
+                      {" "}
+                      Shifts exceeding 2 hours overtime will be automatically
+                      ended.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleEndShiftClick}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              End Shift Now
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Shift Status Bar */}
       <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
         <div className="flex justify-between items-center">
@@ -442,7 +566,11 @@ const CashierDashboardView = ({
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-slate-500" />
-            <span className="font-medium">
+            <span
+              className={`font-medium ${
+                overtimeMinutes > 0 ? "text-red-600" : ""
+              }`}
+            >
               {activeShift && todaySchedule
                 ? (() => {
                     const now = new Date();
@@ -454,6 +582,15 @@ const CashierDashboardView = ({
                     const minutesRemaining = Math.floor(
                       (timeRemaining % (1000 * 60 * 60)) / (1000 * 60)
                     );
+
+                    if (overtimeMinutes > 0) {
+                      const overtimeHours = Math.floor(overtimeMinutes / 60);
+                      const overtimeMinutesDisplay = overtimeMinutes % 60;
+                      return overtimeHours > 0
+                        ? `${overtimeHours}h ${overtimeMinutesDisplay}m overtime`
+                        : `${overtimeMinutesDisplay}m overtime`;
+                    }
+
                     return timeRemaining > 0
                       ? `${hoursRemaining}h ${minutesRemaining}m remaining`
                       : "Shift overtime";
@@ -479,14 +616,31 @@ const CashierDashboardView = ({
             ) : (
               <Button
                 onClick={handleEndShiftClick}
-                className="bg-green-600 hover:bg-green-700"
+                className={
+                  overtimeMinutes > 0
+                    ? "bg-red-600 hover:bg-red-700 animate-pulse"
+                    : "bg-green-600 hover:bg-green-700"
+                }
               >
-                End Shift
+                {overtimeMinutes > 0 ? "End Shift (Overtime)" : "End Shift"}
               </Button>
             )}
           </div>
         </div>
-        <Progress value={shiftProgress} className="mt-3 bg-slate-200" />
+        <div className="mt-3">
+          <Progress
+            value={overtimeMinutes > 0 ? 100 : shiftProgress}
+            className={`bg-slate-200 ${
+              overtimeMinutes > 0 ? "[&>div]:bg-red-500" : ""
+            }`}
+          />
+          {overtimeMinutes > 0 && (
+            <div className="flex justify-between text-xs text-red-600 mt-1">
+              <span>Overtime: {overtimeMinutes} minutes</span>
+              <span>Auto-end in {120 - overtimeMinutes} minutes</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
@@ -505,14 +659,14 @@ const CashierDashboardView = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-700">
-                ${(shiftStats.totalSales || 0).toFixed(2)}
+                £{(shiftStats.totalSales || 0).toFixed(2)}
               </div>
               <div className="flex items-center mt-2 text-sm text-slate-600">
                 <TrendingUp className="h-4 w-4 mr-1 text-green-500" />
                 <span>{shiftStats.totalTransactions || 0} transactions</span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                Average: ${averageTransaction.toFixed(2)}
+                Average: £{averageTransaction.toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -561,7 +715,7 @@ const CashierDashboardView = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-amber-700">
-                $
+                £
                 {(
                   (activeShift?.finalCashDrawer ||
                     activeShift?.startingCash ||
@@ -578,10 +732,10 @@ const CashierDashboardView = ({
                 ) : (
                   <AlertTriangle className="h-4 w-4 mr-1" />
                 )}
-                <span>Variance: ${Math.abs(cashVariance).toFixed(2)}</span>
+                <span>Variance: £{Math.abs(cashVariance).toFixed(2)}</span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                Starting: ${(activeShift?.startingCash || 0).toFixed(2)}
+                Starting: £{(activeShift?.startingCash || 0).toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -604,7 +758,7 @@ const CashierDashboardView = ({
               <div className="flex justify-between items-center mb-2">
                 <span className="text-slate-600">Refunds:</span>
                 <span className="font-semibold text-red-700">
-                  -${(shiftStats.totalRefunds || 0).toFixed(2)}
+                  -£{(shiftStats.totalRefunds || 0).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -742,6 +896,7 @@ const CashierDashboardView = ({
               )}
               <div className="grid grid-cols-2 gap-3">
                 <Button
+                  onClick={() => activeShift && setShowRefundView(true)}
                   variant="outline"
                   className={`h-16 flex flex-col border-slate-300 ${
                     !activeShift ? "opacity-50 cursor-not-allowed" : ""
@@ -836,7 +991,7 @@ const CashierDashboardView = ({
                         !activeShift ? "text-slate-400" : ""
                       }`}
                     >
-                      {activeShift ? `$${averageTransaction.toFixed(2)}` : "--"}
+                      {activeShift ? `£${averageTransaction.toFixed(2)}` : "--"}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -923,13 +1078,13 @@ const CashierDashboardView = ({
             {activeShift && (
               <div className="text-sm text-muted-foreground">
                 <p>
-                  Expected: $
+                  Expected: £
                   {(
                     activeShift.startingCash + (shiftStats.totalSales || 0)
                   ).toFixed(2)}
                 </p>
-                <p>Starting Cash: ${activeShift.startingCash.toFixed(2)}</p>
-                <p>Sales Total: ${(shiftStats.totalSales || 0).toFixed(2)}</p>
+                <p>Starting Cash: £{activeShift.startingCash.toFixed(2)}</p>
+                <p>Sales Total: £{(shiftStats.totalSales || 0).toFixed(2)}</p>
               </div>
             )}
           </div>
@@ -973,6 +1128,11 @@ const CashierDashboardView = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Refund Transaction View */}
+      {showRefundView && (
+        <RefundTransactionView onClose={() => setShowRefundView(false)} />
+      )}
     </>
   );
 };

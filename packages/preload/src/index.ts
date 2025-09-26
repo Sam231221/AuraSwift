@@ -186,6 +186,100 @@ contextBridge.exposeInMainWorld("shiftAPI", {
     ipcRenderer.invoke("shift:getTodaySchedule", cashierId),
 
   getStats: (shiftId: string) => ipcRenderer.invoke("shift:getStats", shiftId),
+
+  reconcile: (
+    shiftId: string,
+    reconciliationData: {
+      actualCashDrawer: number;
+      managerNotes: string;
+      managerId: string;
+    }
+  ) => ipcRenderer.invoke("shift:reconcile", shiftId, reconciliationData),
+
+  getPendingReconciliation: (businessId: string) =>
+    ipcRenderer.invoke("shift:getPendingReconciliation", businessId),
+});
+
+// Transaction Management API
+contextBridge.exposeInMainWorld("transactionAPI", {
+  create: (transactionData: {
+    shiftId: string;
+    businessId: string;
+    type: "sale" | "refund" | "void";
+    subtotal: number;
+    tax: number;
+    total: number;
+    paymentMethod: "cash" | "card" | "mixed";
+    cashAmount?: number;
+    cardAmount?: number;
+    items: Array<{
+      productId: string;
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }>;
+    status: "completed" | "voided" | "pending";
+    customerId?: string;
+    receiptNumber: string;
+    timestamp: string;
+  }) => ipcRenderer.invoke("transactions:create", transactionData),
+
+  getByShift: (shiftId: string) =>
+    ipcRenderer.invoke("transactions:getByShift", shiftId),
+});
+
+// Refund Management API
+contextBridge.exposeInMainWorld("refundAPI", {
+  getTransactionById: (transactionId: string) =>
+    ipcRenderer.invoke("refunds:getTransactionById", transactionId),
+
+  getTransactionByReceipt: (receiptNumber: string) =>
+    ipcRenderer.invoke("refunds:getTransactionByReceipt", receiptNumber),
+
+  getRecentTransactions: (businessId: string, limit?: number) =>
+    ipcRenderer.invoke("refunds:getRecentTransactions", businessId, limit),
+
+  validateEligibility: (
+    transactionId: string,
+    refundItems: Array<{
+      originalItemId: string;
+      productId: string;
+      productName: string;
+      originalQuantity: number;
+      refundQuantity: number;
+      unitPrice: number;
+      refundAmount: number;
+      reason: string;
+      restockable: boolean;
+    }>
+  ) =>
+    ipcRenderer.invoke(
+      "refunds:validateEligibility",
+      transactionId,
+      refundItems
+    ),
+
+  createRefund: (refundData: {
+    originalTransactionId: string;
+    shiftId: string;
+    businessId: string;
+    refundItems: Array<{
+      originalItemId: string;
+      productId: string;
+      productName: string;
+      originalQuantity: number;
+      refundQuantity: number;
+      unitPrice: number;
+      refundAmount: number;
+      reason: string;
+      restockable: boolean;
+    }>;
+    refundReason: string;
+    refundMethod: "original" | "store_credit" | "cash" | "card";
+    managerApprovalId?: string;
+    cashierId: string;
+  }) => ipcRenderer.invoke("refunds:create", refundData),
 });
 
 export { sha256sum, versions };

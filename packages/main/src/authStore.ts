@@ -544,7 +544,205 @@ ipcMain.handle("shift:getStats", async (event, shiftId) => {
   }
 });
 
-// Cleanup expired sessions every hour
+// Transaction API endpoints
+ipcMain.handle("transactions:create", async (event, transactionData) => {
+  try {
+    const db = await getDatabase();
+    const transaction = db.createTransaction(transactionData);
+
+    return {
+      success: true,
+      transaction,
+    };
+  } catch (error) {
+    console.error("Create transaction IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to create transaction",
+    };
+  }
+});
+
+ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
+  try {
+    const db = await getDatabase();
+    const transactions = db.getTransactionsByShiftId(shiftId);
+
+    return {
+      success: true,
+      transactions,
+    };
+  } catch (error) {
+    console.error("Get transactions by shift IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get transactions",
+    };
+  }
+});
+
+// Shift reconciliation endpoints for auto-ended shifts
+ipcMain.handle(
+  "shift:reconcile",
+  async (event, shiftId, reconciliationData) => {
+    try {
+      const db = await getDatabase();
+
+      // Update shift with actual cash drawer amount and manager approval
+      const updatedShift = db.reconcileShift(shiftId, reconciliationData);
+
+      return {
+        success: true,
+        shift: updatedShift,
+      };
+    } catch (error) {
+      console.error("Reconcile shift IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to reconcile shift",
+      };
+    }
+  }
+);
+
+ipcMain.handle("shift:getPendingReconciliation", async (event, businessId) => {
+  try {
+    const db = await getDatabase();
+    const pendingShifts = db.getPendingReconciliationShifts(businessId);
+
+    return {
+      success: true,
+      shifts: pendingShifts,
+    };
+  } catch (error) {
+    console.error("Get pending reconciliation shifts IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get pending reconciliation shifts",
+    };
+  }
+});
+
+// Refund Transaction API endpoints
+ipcMain.handle("refunds:getTransactionById", async (event, transactionId) => {
+  try {
+    const db = await getDatabase();
+    const transaction = db.getTransactionById(transactionId);
+
+    return {
+      success: !!transaction,
+      transaction,
+      message: transaction ? undefined : "Transaction not found",
+    };
+  } catch (error) {
+    console.error("Get transaction by ID IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get transaction",
+    };
+  }
+});
+
+ipcMain.handle(
+  "refunds:getTransactionByReceipt",
+  async (event, receiptNumber) => {
+    try {
+      const db = await getDatabase();
+      const transaction = db.getTransactionByReceiptNumber(receiptNumber);
+
+      return {
+        success: !!transaction,
+        transaction,
+        message: transaction ? undefined : "Transaction not found",
+      };
+    } catch (error) {
+      console.error("Get transaction by receipt IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to get transaction",
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  "refunds:getRecentTransactions",
+  async (event, businessId, limit = 50) => {
+    try {
+      const db = await getDatabase();
+      const transactions = db.getRecentTransactions(businessId, limit);
+
+      return {
+        success: true,
+        transactions,
+      };
+    } catch (error) {
+      console.error("Get recent transactions IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to get recent transactions",
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  "refunds:validateEligibility",
+  async (event, transactionId, refundItems) => {
+    try {
+      const db = await getDatabase();
+      const validation = db.validateRefundEligibility(
+        transactionId,
+        refundItems
+      );
+
+      return {
+        success: true,
+        validation,
+      };
+    } catch (error) {
+      console.error("Validate refund eligibility IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to validate refund eligibility",
+      };
+    }
+  }
+);
+
+ipcMain.handle("refunds:create", async (event, refundData) => {
+  try {
+    const db = await getDatabase();
+
+    // Validate refund eligibility first
+    const validation = db.validateRefundEligibility(
+      refundData.originalTransactionId,
+      refundData.refundItems
+    );
+    if (!validation.isValid) {
+      return {
+        success: false,
+        message: `Refund not allowed: ${validation.errors.join(", ")}`,
+        errors: validation.errors,
+      };
+    }
+
+    const refundTransaction = db.createRefundTransaction(refundData);
+
+    return {
+      success: true,
+      transaction: refundTransaction,
+    };
+  } catch (error) {
+    console.error("Create refund IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to create refund",
+    };
+  }
+});
+
+// Cleanup expired sessions every hour// Cleanup expired sessions every hour
 setInterval(async () => {
   await authAPI.cleanupExpiredSessions();
 }, 60 * 60 * 1000);

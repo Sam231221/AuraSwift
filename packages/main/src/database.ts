@@ -144,6 +144,12 @@ export interface Transaction {
   receiptNumber: string;
   timestamp: string;
   createdAt: string;
+  // Refund-specific fields
+  originalTransactionId?: string; // For refunds, links to original sale
+  refundReason?: string; // Why the refund was processed
+  refundMethod?: "original" | "store_credit" | "cash" | "card";
+  managerApprovalId?: string; // Manager who approved the refund (if required)
+  isPartialRefund?: boolean; // True if only some items were refunded
 }
 
 export interface TransactionItem {
@@ -154,6 +160,21 @@ export interface TransactionItem {
   unitPrice: number;
   totalPrice: number;
   appliedModifiers?: AppliedModifier[];
+  // Refund support
+  refundedQuantity?: number; // How many of this item have been refunded
+  weight?: number; // For weight-based products
+}
+
+export interface RefundItem {
+  originalItemId: string;
+  productId: string;
+  productName: string;
+  originalQuantity: number;
+  refundQuantity: number;
+  unitPrice: number;
+  refundAmount: number;
+  reason: string;
+  restockable: boolean; // Whether to return to inventory
 }
 
 export interface AppliedModifier {
@@ -548,6 +569,73 @@ export class DatabaseManager {
       `);
     } catch (err) {
       // Column already exists, ignore error
+    }
+
+    // Add refund-specific columns to transactions table
+    try {
+      this.db.exec(`
+        ALTER TABLE transactions ADD COLUMN originalTransactionId TEXT;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    try {
+      this.db.exec(`
+        ALTER TABLE transactions ADD COLUMN refundReason TEXT;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    try {
+      this.db.exec(`
+        ALTER TABLE transactions ADD COLUMN refundMethod TEXT;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    try {
+      this.db.exec(`
+        ALTER TABLE transactions ADD COLUMN managerApprovalId TEXT;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    try {
+      this.db.exec(`
+        ALTER TABLE transactions ADD COLUMN isPartialRefund BOOLEAN DEFAULT 0;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    // Add refund support to transaction items
+    try {
+      this.db.exec(`
+        ALTER TABLE transaction_items ADD COLUMN refundedQuantity INTEGER DEFAULT 0;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    try {
+      this.db.exec(`
+        ALTER TABLE transaction_items ADD COLUMN weight REAL;
+      `);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    // Add index for refund lookups
+    try {
+      this.db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_transactions_originalTransactionId ON transactions(originalTransactionId);
+      `);
+    } catch (err) {
+      // Index already exists, ignore error
     }
 
     // Insert default admin user if no users exist
@@ -1041,9 +1129,18 @@ export class DatabaseManager {
     // Build dynamic SQL for updates
     const fields = Object.keys(updates).filter((key) => key !== "modifiers");
     const setClause = fields.map((field) => `${field} = ?`).join(", ");
-    const values = fields.map(
-      (field) => updates[field as keyof typeof updates]
-    );
+    const values = fields.map((field) => {
+      const value = updates[field as keyof typeof updates];
+      // Convert boolean values to integers for SQLite
+      if (typeof value === "boolean") {
+        return value ? 1 : 0;
+      }
+      // Ensure other values are primitive types
+      if (value === null || value === undefined) {
+        return null;
+      }
+      return value;
+    });
 
     if (fields.length === 0) {
       return this.getProductById(id);
@@ -1503,6 +1600,52 @@ export class DatabaseManager {
     return stmt.all(businessId) as Shift[];
   }
 
+  // Shift reconciliation methods for auto-ended shifts
+  reconcileShift(
+    shiftId: string,
+    reconciliationData: {
+      actualCashDrawer: number;
+      managerNotes: string;
+      managerId: string;
+    }
+  ): void {
+    const stmt = this.db.prepare(`
+      UPDATE shifts 
+      SET 
+        finalCashDrawer = ?,
+        notes = CASE 
+          WHEN notes IS NULL THEN ?
+          ELSE notes || ' | Manager Reconciliation: ' || ?
+        END,
+        updatedAt = ?
+      WHERE id = ?
+    `);
+
+    const reconciliationNote = `Reconciled by manager. Actual cash: £${reconciliationData.actualCashDrawer.toFixed(
+      2
+    )}. ${reconciliationData.managerNotes}`;
+
+    stmt.run(
+      reconciliationData.actualCashDrawer,
+      reconciliationNote,
+      reconciliationNote,
+      new Date().toISOString(),
+      shiftId
+    );
+  }
+
+  getPendingReconciliationShifts(businessId: string): Shift[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM shifts 
+      WHERE businessId = ? 
+        AND status = 'ended'
+        AND notes LIKE '%Auto-ended%'
+        AND notes LIKE '%Requires manager approval%'
+      ORDER BY endTime DESC
+    `);
+    return stmt.all(businessId) as Shift[];
+  }
+
   // Transaction Management Methods
   createTransaction(
     transaction: Omit<Transaction, "id" | "createdAt">
@@ -1645,6 +1788,254 @@ export class DatabaseManager {
       UPDATE transactions SET status = 'voided', voidReason = ?, updatedAt = ? WHERE id = ?
     `);
     stmt.run(voidReason, new Date().toISOString(), transactionId);
+  }
+
+  // Refund Transaction Methods
+  getTransactionById(transactionId: string): Transaction | null {
+    const transactionStmt = this.db.prepare(`
+      SELECT * FROM transactions WHERE id = ? AND status = 'completed'
+    `);
+    const transaction = transactionStmt.get(transactionId) as
+      | Transaction
+      | undefined;
+
+    if (!transaction) return null;
+
+    // Get items for the transaction
+    transaction.items = this.getTransactionItems(transaction.id);
+    return transaction;
+  }
+
+  getTransactionByReceiptNumber(receiptNumber: string): Transaction | null {
+    const transactionStmt = this.db.prepare(`
+      SELECT * FROM transactions WHERE receiptNumber = ? AND status = 'completed' ORDER BY timestamp DESC LIMIT 1
+    `);
+    const transaction = transactionStmt.get(receiptNumber) as
+      | Transaction
+      | undefined;
+
+    if (!transaction) return null;
+
+    // Get items for the transaction
+    transaction.items = this.getTransactionItems(transaction.id);
+    return transaction;
+  }
+
+  getRecentTransactions(businessId: string, limit: number = 50): Transaction[] {
+    const transactionStmt = this.db.prepare(`
+      SELECT * FROM transactions 
+      WHERE businessId = ? AND status = 'completed' AND type = 'sale'
+      ORDER BY timestamp DESC 
+      LIMIT ?
+    `);
+    const transactions = transactionStmt.all(
+      businessId,
+      limit
+    ) as Transaction[];
+
+    // Get items for each transaction
+    for (const transaction of transactions) {
+      transaction.items = this.getTransactionItems(transaction.id);
+    }
+
+    return transactions;
+  }
+
+  createRefundTransaction(refundData: {
+    originalTransactionId: string;
+    shiftId: string;
+    businessId: string;
+    refundItems: RefundItem[];
+    refundReason: string;
+    refundMethod: "original" | "store_credit" | "cash" | "card";
+    managerApprovalId?: string;
+    cashierId: string;
+  }): Transaction {
+    // Get original transaction to validate refund
+    const originalTransaction = this.getTransactionById(
+      refundData.originalTransactionId
+    );
+    if (!originalTransaction) {
+      throw new Error("Original transaction not found");
+    }
+
+    // Calculate refund totals
+    const refundSubtotal = refundData.refundItems.reduce(
+      (sum, item) => sum + item.refundAmount,
+      0
+    );
+    const refundTax =
+      refundSubtotal * (originalTransaction.tax / originalTransaction.subtotal); // Proportional tax
+    const refundTotal = refundSubtotal + refundTax;
+
+    // Create refund transaction
+    const refundId = this.uuid.v4();
+    const receiptNumber = `REF-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    // Determine payment method for refund
+    let paymentMethod: "cash" | "card" | "mixed";
+    if (refundData.refundMethod === "original") {
+      paymentMethod = originalTransaction.paymentMethod;
+    } else if (refundData.refundMethod === "cash") {
+      paymentMethod = "cash";
+    } else if (refundData.refundMethod === "card") {
+      paymentMethod = "card";
+    } else {
+      // For store credit, we'll treat it as cash for now
+      paymentMethod = "cash";
+    }
+
+    const refundTransaction = this.db.transaction(() => {
+      // Create the refund transaction record
+      const transactionStmt = this.db.prepare(`
+        INSERT INTO transactions (
+          id, shiftId, businessId, type, subtotal, tax, total, 
+          paymentMethod, cashAmount, cardAmount, status, 
+          receiptNumber, timestamp, createdAt, originalTransactionId,
+          refundReason, refundMethod, managerApprovalId, isPartialRefund
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const isPartialRefund =
+        refundData.refundItems.length < originalTransaction.items.length ||
+        refundData.refundItems.some((refundItem) => {
+          const originalItem = originalTransaction.items.find(
+            (item) => item.id === refundItem.originalItemId
+          );
+          return (
+            originalItem && refundItem.refundQuantity < originalItem.quantity
+          );
+        });
+
+      transactionStmt.run(
+        refundId,
+        refundData.shiftId,
+        refundData.businessId,
+        "refund",
+        -refundSubtotal, // Negative for refund
+        -refundTax,
+        -refundTotal,
+        paymentMethod,
+        paymentMethod === "cash" ? -refundTotal : null,
+        paymentMethod === "card" ? -refundTotal : null,
+        "completed",
+        receiptNumber,
+        now,
+        now,
+        refundData.originalTransactionId,
+        refundData.refundReason,
+        refundData.refundMethod,
+        refundData.managerApprovalId || null,
+        isPartialRefund ? 1 : 0
+      );
+
+      // Create refund transaction items
+      for (const refundItem of refundData.refundItems) {
+        const itemId = this.uuid.v4();
+        const itemStmt = this.db.prepare(`
+          INSERT INTO transaction_items (
+            id, transactionId, productId, productName, quantity, 
+            unitPrice, totalPrice, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+
+        itemStmt.run(
+          itemId,
+          refundId,
+          refundItem.productId,
+          refundItem.productName,
+          -refundItem.refundQuantity, // Negative for refund
+          refundItem.unitPrice,
+          -refundItem.refundAmount,
+          now
+        );
+
+        // Update original item's refunded quantity
+        const updateOriginalStmt = this.db.prepare(`
+          UPDATE transaction_items 
+          SET refundedQuantity = COALESCE(refundedQuantity, 0) + ?
+          WHERE id = ?
+        `);
+        updateOriginalStmt.run(
+          refundItem.refundQuantity,
+          refundItem.originalItemId
+        );
+
+        // Update inventory if item is restockable
+        if (refundItem.restockable) {
+          const updateInventoryStmt = this.db.prepare(`
+            UPDATE products 
+            SET stockLevel = stockLevel + ?, updatedAt = ?
+            WHERE id = ?
+          `);
+          updateInventoryStmt.run(
+            refundItem.refundQuantity,
+            now,
+            refundItem.productId
+          );
+        }
+      }
+
+      return refundId;
+    });
+
+    refundTransaction();
+
+    // Return the created refund transaction
+    return this.getTransactionById(refundId)!;
+  }
+
+  validateRefundEligibility(
+    transactionId: string,
+    refundItems: RefundItem[]
+  ): {
+    isValid: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+
+    // Get original transaction
+    const originalTransaction = this.getTransactionById(transactionId);
+    if (!originalTransaction) {
+      errors.push("Original transaction not found");
+      return { isValid: false, errors };
+    }
+
+    // Check if transaction is too old (configurable - 30 days)
+    const transactionDate = new Date(originalTransaction.timestamp);
+    const daysDiff =
+      (Date.now() - transactionDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysDiff > 30) {
+      errors.push("Transaction is older than 30 days and cannot be refunded");
+    }
+
+    // Validate each refund item
+    for (const refundItem of refundItems) {
+      const originalItem = originalTransaction.items.find(
+        (item) => item.id === refundItem.originalItemId
+      );
+      if (!originalItem) {
+        errors.push(
+          `Item ${refundItem.productName} not found in original transaction`
+        );
+        continue;
+      }
+
+      // Check if refund quantity exceeds available quantity
+      const availableQuantity =
+        originalItem.quantity - (originalItem.refundedQuantity || 0);
+      if (refundItem.refundQuantity > availableQuantity) {
+        errors.push(
+          `Cannot refund ${refundItem.refundQuantity} of ${refundItem.productName}. Only ${availableQuantity} available.`
+        );
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
   }
 
   // Cash Drawer Count Methods

@@ -128,6 +128,82 @@ declare global {
       getActive: (cashierId: string) => Promise<APIResponse>;
       getTodaySchedule: (cashierId: string) => Promise<APIResponse>;
       getStats: (shiftId: string) => Promise<APIResponse>;
+      reconcile: (
+        shiftId: string,
+        reconciliationData: {
+          actualCashDrawer: number;
+          managerNotes: string;
+          managerId: string;
+        }
+      ) => Promise<APIResponse>;
+      getPendingReconciliation: (businessId: string) => Promise<APIResponse>;
+    };
+    transactionAPI: {
+      create: (transactionData: {
+        shiftId: string;
+        businessId: string;
+        type: "sale" | "refund" | "void";
+        subtotal: number;
+        tax: number;
+        total: number;
+        paymentMethod: "cash" | "card" | "mixed";
+        cashAmount?: number;
+        cardAmount?: number;
+        items: Array<{
+          productId: string;
+          productName: string;
+          quantity: number;
+          unitPrice: number;
+          totalPrice: number;
+        }>;
+        status: "completed" | "voided" | "pending";
+        customerId?: string;
+        receiptNumber: string;
+        timestamp: string;
+      }) => Promise<APIResponse>;
+      getByShift: (shiftId: string) => Promise<APIResponse>;
+    };
+    refundAPI: {
+      getTransactionById: (transactionId: string) => Promise<APIResponse>;
+      getTransactionByReceipt: (receiptNumber: string) => Promise<APIResponse>;
+      getRecentTransactions: (
+        businessId: string,
+        limit?: number
+      ) => Promise<APIResponse>;
+      validateEligibility: (
+        transactionId: string,
+        refundItems: Array<{
+          originalItemId: string;
+          productId: string;
+          productName: string;
+          originalQuantity: number;
+          refundQuantity: number;
+          unitPrice: number;
+          refundAmount: number;
+          reason: string;
+          restockable: boolean;
+        }>
+      ) => Promise<APIResponse>;
+      createRefund: (refundData: {
+        originalTransactionId: string;
+        shiftId: string;
+        businessId: string;
+        refundItems: Array<{
+          originalItemId: string;
+          productId: string;
+          productName: string;
+          originalQuantity: number;
+          refundQuantity: number;
+          unitPrice: number;
+          refundAmount: number;
+          reason: string;
+          restockable: boolean;
+        }>;
+        refundReason: string;
+        refundMethod: "original" | "store_credit" | "cash" | "card";
+        managerApprovalId?: string;
+        cashierId: string;
+      }) => Promise<APIResponse>;
     };
   }
 }

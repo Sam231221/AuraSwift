@@ -35,7 +35,7 @@ export interface Product {
   // Weight-based product fields
   requiresWeight?: boolean;
   unit?: "lb" | "kg" | "oz" | "g" | "each";
-  pricePerUnit?: number; // Price per weight unit (e.g., $1.99/lb)
+  pricePerUnit?: number; // Price per weight unit (e.g., £1.99/lb)
   createdAt: string;
   updatedAt: string;
 }

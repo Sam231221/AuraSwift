@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,19 +16,13 @@ import {
   Minus,
   Trash2,
   Scale,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
-
-// Define TypeScript interfaces
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  category: string;
-  pluCode?: string;
-  requiresWeight?: boolean;
-}
+import type { Product } from "@/types/product.types";
+import { toast } from "sonner";
 
 interface CartItem {
   product: Product;
@@ -53,59 +47,71 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [cashAmount, setCashAmount] = useState(0);
   const [transactionComplete, setTransactionComplete] = useState(false);
   const [weightInput, setWeightInput] = useState("");
+  const [selectedWeightProduct, setSelectedWeightProduct] =
+    useState<Product | null>(null);
 
-  // Sample product database
-  const [products] = useState<Product[]>([
-    {
-      id: "1001",
-      name: "Banana",
-      price: 0.99,
-      category: "Produce",
-      pluCode: "4011",
-      requiresWeight: true,
-    },
-    {
-      id: "1002",
-      name: "Apple",
-      price: 1.29,
-      category: "Produce",
-      pluCode: "4021",
-      requiresWeight: true,
-    },
-    { id: "1003", name: "Milk", price: 3.49, category: "Dairy" },
-    { id: "1004", name: "Bread", price: 2.99, category: "Bakery" },
-    { id: "1005", name: "Eggs", price: 2.49, category: "Dairy" },
-    {
-      id: "1006",
-      name: "Tomato",
-      price: 1.99,
-      category: "Produce",
-      pluCode: "4087",
-      requiresWeight: true,
-    },
-    { id: "1007", name: "Orange Juice", price: 2.99, category: "Beverages" },
-    { id: "1008", name: "Cereal", price: 3.99, category: "Breakfast" },
-    {
-      id: "1009",
-      name: "Chicken Breast",
-      price: 5.99,
-      category: "Meat",
-      requiresWeight: true,
-    },
-    { id: "1010", name: "Yogurt", price: 1.19, category: "Dairy" },
-  ]);
+  // Products from backend
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const { user } = useAuth();
+
+  // Load products from backend
+  const loadProducts = useCallback(async () => {
+    if (!user?.businessId) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await window.productAPI.getByBusiness(user.businessId);
+
+      if (response.success && response.products) {
+        // Filter to only active products
+        const activeProducts = response.products.filter(
+          (product) => product.isActive
+        );
+        setProducts(activeProducts);
+      } else {
+        const errorMessage =
+          "message" in response
+            ? String(response.message)
+            : "Failed to load products";
+        setError(errorMessage);
+        toast.error(errorMessage);
+      }
+    } catch (error) {
+      console.error("Error loading products:", error);
+      setError("Failed to load products");
+      toast.error("Failed to load products");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.businessId]);
+
+  // Load products on component mount
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   // Filtered products for search
   const filteredProducts = products.filter(
     (product) =>
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.pluCode?.includes(searchQuery)
+      product.plu?.includes(searchQuery) ||
+      product.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Calculate total
   const subtotal = cart.reduce((sum, item) => {
-    const itemTotal =
-      item.product.price * (item.quantity || 1) * (item.weight || 1);
+    let itemPrice = item.product.price;
+
+    // For weight-based products, use pricePerUnit if available
+    if (item.product.requiresWeight && item.product.pricePerUnit) {
+      itemPrice = item.product.pricePerUnit;
+    }
+
+    const itemTotal = itemPrice * (item.quantity || 1) * (item.weight || 1);
     return sum + itemTotal;
   }, 0);
 
@@ -169,16 +175,34 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const handleBarcodeScan = () => {
     if (barcodeInput.trim() === "") return;
 
-    const product = products.find((p) => p.id === barcodeInput);
+    // Search by ID, SKU, or PLU
+    const product = products.find(
+      (p) =>
+        p.id === barcodeInput ||
+        p.sku === barcodeInput ||
+        p.plu === barcodeInput
+    );
+
     if (product) {
       if (product.requiresWeight) {
-        const weight = parseFloat(weightInput) || 1;
-        addToCart(product, weight);
-        setWeightInput("");
+        if (weightInput && parseFloat(weightInput) > 0) {
+          addToCart(product, parseFloat(weightInput));
+          setWeightInput("");
+          setSelectedWeightProduct(null);
+        } else {
+          setSelectedWeightProduct(product);
+          toast.error(
+            `Please enter weight in ${product.unit || "units"} for ${
+              product.name
+            }`
+          );
+        }
       } else {
         addToCart(product);
       }
       setBarcodeInput("");
+    } else {
+      toast.error("Product not found");
     }
   };
 
@@ -190,9 +214,136 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   };
 
-  const completeTransaction = () => {
-    setTransactionComplete(true);
-    // In a real app, this would update inventory, record sale, etc.
+  const completeTransaction = async () => {
+    // Validate payment method
+    if (!paymentMethod) {
+      toast.error("Please select a payment method");
+      return;
+    }
+
+    // Validate cash payment
+    if (paymentMethod.type === "cash") {
+      if (cashAmount < total) {
+        toast.error(
+          `Insufficient cash. Need £${(total - cashAmount).toFixed(2)} more.`
+        );
+        return;
+      }
+
+      if (cashAmount <= 0) {
+        toast.error("Please enter a valid cash amount");
+        return;
+      }
+    }
+
+    // Validate cart
+    if (cart.length === 0) {
+      toast.error("Cart is empty");
+      return;
+    }
+
+    if (!user?.businessId) {
+      toast.error("No business ID found");
+      return;
+    }
+
+    try {
+      // Get active shift for the cashier
+      const shiftResponse = await window.shiftAPI.getActive(user.id);
+      if (!shiftResponse.success || !shiftResponse.data) {
+        toast.error("No active shift found. Please start your shift first.");
+        return;
+      }
+
+      const activeShift = shiftResponse.data as { id: string };
+
+      // Generate receipt number
+      const receiptNumber = `RCP-${Date.now()}`;
+
+      // Prepare transaction items
+      const transactionItems = cart.map((item) => {
+        let unitPrice = item.product.price;
+        let totalPrice = item.product.price * item.quantity;
+
+        // Handle weight-based products
+        if (
+          item.product.requiresWeight &&
+          item.weight &&
+          item.product.pricePerUnit
+        ) {
+          unitPrice = item.product.pricePerUnit;
+          totalPrice = item.product.pricePerUnit * item.weight * item.quantity;
+        }
+
+        return {
+          productId: item.product.id,
+          productName: item.product.name,
+          quantity: item.quantity,
+          unitPrice,
+          totalPrice,
+        };
+      });
+
+      // Map payment method to backend format
+      let backendPaymentMethod: "cash" | "card" | "mixed";
+      if (paymentMethod.type === "cash") {
+        backendPaymentMethod = "cash";
+      } else if (
+        paymentMethod.type === "card" ||
+        paymentMethod.type === "mobile"
+      ) {
+        backendPaymentMethod = "card";
+      } else {
+        backendPaymentMethod = "mixed"; // For voucher/split payments
+      }
+
+      // Create transaction
+      const transactionResponse = await window.transactionAPI.create({
+        shiftId: activeShift.id,
+        businessId: user.businessId,
+        type: "sale",
+        subtotal,
+        tax,
+        total,
+        paymentMethod: backendPaymentMethod,
+        cashAmount: paymentMethod.type === "cash" ? cashAmount : undefined,
+        cardAmount:
+          paymentMethod.type === "card" || paymentMethod.type === "mobile"
+            ? total
+            : undefined,
+        items: transactionItems,
+        status: "completed",
+        receiptNumber,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!transactionResponse.success) {
+        toast.error("Failed to record transaction");
+        return;
+      }
+
+      setTransactionComplete(true);
+
+      // Show success message with payment details
+      if (paymentMethod.type === "cash") {
+        const change = cashAmount - total;
+        if (change > 0) {
+          toast.success(`Transaction complete! Change: £${change.toFixed(2)}`);
+        } else {
+          toast.success("Transaction complete! Exact change received.");
+        }
+      } else {
+        toast.success(`Transaction complete! Paid by ${paymentMethod.type}`);
+      }
+
+      // TODO: Update inventory levels for sold products
+      // TODO: Open cash drawer for cash payments
+      // TODO: Generate and print receipt
+    } catch (error) {
+      console.error("Transaction error:", error);
+      toast.error("Failed to complete transaction");
+      return;
+    }
 
     setTimeout(() => {
       // Reset for next customer
@@ -200,12 +351,12 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       setPaymentStep(false);
       setPaymentMethod(null);
       setTransactionComplete(false);
+      setCashAmount(0);
     }, 3000);
   };
 
-  const { user } = useAuth();
   const navigate = useNavigate();
-  console.log(user);
+
   if (!user) {
     navigate("/");
     return;
@@ -242,19 +393,86 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Button>
               </div>
 
-              <div className="mt-3 flex items-center gap-2">
-                <Scale className="h-4 w-4 text-slate-500" />
-                <span className="text-sm text-slate-600">
-                  Weight (for produce):
+              <div
+                className={`mt-3 flex items-center gap-2 p-2 rounded ${
+                  selectedWeightProduct
+                    ? "bg-blue-50 border border-blue-200"
+                    : ""
+                }`}
+              >
+                <Scale
+                  className={`h-4 w-4 ${
+                    selectedWeightProduct ? "text-blue-600" : "text-slate-500"
+                  }`}
+                />
+                <span
+                  className={`text-sm ${
+                    selectedWeightProduct
+                      ? "text-blue-700 font-medium"
+                      : "text-slate-600"
+                  }`}
+                >
+                  {selectedWeightProduct
+                    ? `Weight for ${selectedWeightProduct.name}:`
+                    : "Weight (for produce):"}
                 </span>
                 <Input
                   type="number"
-                  placeholder="Enter weight"
+                  placeholder={
+                    selectedWeightProduct
+                      ? `Enter weight in ${
+                          selectedWeightProduct.unit || "units"
+                        }`
+                      : "Enter weight"
+                  }
                   value={weightInput}
                   onChange={(e) => setWeightInput(e.target.value)}
-                  className="bg-white border-slate-300 w-24"
+                  className={`w-24 ${
+                    selectedWeightProduct
+                      ? "border-blue-300"
+                      : "border-slate-300"
+                  } bg-white`}
                 />
-                <span className="text-sm text-slate-600">lbs</span>
+                <span
+                  className={`text-sm ${
+                    selectedWeightProduct
+                      ? "text-blue-600 font-medium"
+                      : "text-slate-600"
+                  }`}
+                >
+                  {selectedWeightProduct?.unit || "units"}
+                </span>
+                {selectedWeightProduct && (
+                  <>
+                    {weightInput && parseFloat(weightInput) > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          addToCart(
+                            selectedWeightProduct,
+                            parseFloat(weightInput)
+                          );
+                          setWeightInput("");
+                          setSelectedWeightProduct(null);
+                        }}
+                        className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        Add to Cart
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedWeightProduct(null);
+                        setWeightInput("");
+                      }}
+                      className="h-8 px-2 text-slate-600 hover:text-slate-800"
+                    >
+                      Clear
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -274,49 +492,112 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 className="bg-white border-slate-300 mb-4"
               />
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-80 overflow-y-auto p-1">
-                {filteredProducts.map((product) => (
-                  <motion.div
-                    key={product.id}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                  >
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                  <span className="ml-2 text-slate-600">
+                    Loading products...
+                  </span>
+                </div>
+              ) : error ? (
+                <div className="flex items-center justify-center py-8">
+                  <AlertCircle className="h-8 w-8 text-red-500" />
+                  <div className="ml-2">
+                    <p className="text-red-600">Failed to load products</p>
                     <Button
                       variant="outline"
-                      className="h-auto py-3 flex flex-col items-center bg-white border-slate-200 hover:bg-slate-50 w-full"
-                      onClick={() =>
-                        addToCart(
-                          product,
-                          product.requiresWeight
-                            ? parseFloat(weightInput) || 1
-                            : undefined
-                        )
-                      }
+                      size="sm"
+                      onClick={loadProducts}
+                      className="mt-2"
                     >
-                      <span className="font-medium text-slate-800">
-                        {product.name}
-                      </span>
-                      <span className="text-sm text-green-600 font-semibold">
-                        ${product.price.toFixed(2)}
-                      </span>
-                      {product.pluCode && (
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-slate-500">No products found</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-80 overflow-y-auto p-1">
+                  {filteredProducts.map((product) => (
+                    <motion.div
+                      key={product.id}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                    >
+                      <Button
+                        variant="outline"
+                        className={`h-auto py-3 flex flex-col items-center w-full transition-all ${
+                          selectedWeightProduct?.id === product.id
+                            ? "bg-blue-50 border-blue-300 hover:bg-blue-100"
+                            : "bg-white border-slate-200 hover:bg-slate-50"
+                        }`}
+                        onClick={() => {
+                          if (product.requiresWeight) {
+                            if (weightInput && parseFloat(weightInput) > 0) {
+                              addToCart(product, parseFloat(weightInput));
+                              setWeightInput("");
+                              setSelectedWeightProduct(null);
+                            } else {
+                              setSelectedWeightProduct(product);
+                              toast.error(
+                                `Please enter weight in ${
+                                  product.unit || "units"
+                                } for ${product.name}`
+                              );
+                            }
+                          } else {
+                            addToCart(product);
+                          }
+                        }}
+                      >
+                        <span className="font-medium text-slate-800">
+                          {product.name}
+                        </span>
+                        <span className="text-sm text-green-600 font-semibold">
+                          {product.requiresWeight && product.pricePerUnit
+                            ? `£${product.pricePerUnit.toFixed(2)}/${
+                                product.unit
+                              }`
+                            : `£${product.price.toFixed(2)}`}
+                        </span>
+                        <div className="flex gap-1 mt-1 flex-wrap justify-center">
+                          {product.requiresWeight && (
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-50 text-blue-700 border-blue-300 text-xs"
+                            >
+                              <Scale className="h-3 w-3 mr-1" />
+                              {product.unit || "weight"}
+                            </Badge>
+                          )}
+                          {product.plu && (
+                            <Badge
+                              variant="secondary"
+                              className="bg-slate-100 text-slate-600 text-xs"
+                            >
+                              PLU: {product.plu}
+                            </Badge>
+                          )}
+                        </div>
                         <Badge
                           variant="secondary"
                           className="mt-1 bg-slate-100 text-slate-600"
                         >
-                          PLU: {product.pluCode}
+                          SKU: {product.sku}
                         </Badge>
-                      )}
-                      {product.requiresWeight && (
-                        <div className="flex items-center mt-1 text-xs text-slate-500">
-                          <Scale className="h-3 w-3 mr-1" />
-                          Weight
-                        </div>
-                      )}
-                    </Button>
-                  </motion.div>
-                ))}
-              </div>
+                        {product.requiresWeight && (
+                          <div className="flex items-center mt-1 text-xs text-slate-500">
+                            <Scale className="h-3 w-3 mr-1" />
+                            Weight
+                          </div>
+                        )}
+                      </Button>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -359,11 +640,45 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                           </div>
                           {item.product.requiresWeight && item.weight && (
                             <div className="text-sm text-slate-500">
-                              Weight: {item.weight.toFixed(2)} lbs
+                              Weight: {item.weight.toFixed(2)}{" "}
+                              {item.product.unit || "lbs"}
                             </div>
                           )}
                           <div className="text-sm text-slate-500">
-                            ${item.product.price.toFixed(2)} each
+                            {item.product.requiresWeight &&
+                            item.product.pricePerUnit
+                              ? `£${item.product.pricePerUnit.toFixed(2)} per ${
+                                  item.product.unit
+                                }`
+                              : `£${item.product.price.toFixed(2)} each`}
+                          </div>
+                          <div className="text-sm font-medium text-green-600">
+                            {item.product.requiresWeight &&
+                            item.weight &&
+                            item.product.pricePerUnit ? (
+                              <>
+                                £
+                                {(
+                                  item.product.pricePerUnit *
+                                  item.weight *
+                                  item.quantity
+                                ).toFixed(2)}
+                                <span className="text-xs text-slate-500 ml-1">
+                                  ({item.weight.toFixed(2)} {item.product.unit}{" "}
+                                  × {item.quantity})
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                £
+                                {(item.product.price * item.quantity).toFixed(
+                                  2
+                                )}
+                                <span className="text-xs text-slate-500 ml-1">
+                                  (× {item.quantity})
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -412,15 +727,15 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               <div className="mt-4 pt-4 border-t border-slate-200">
                 <div className="flex justify-between mb-1 text-slate-700">
                   <span>Subtotal:</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>£{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between mb-1 text-slate-500">
                   <span>Tax (8%):</span>
-                  <span>${tax.toFixed(2)}</span>
+                  <span>£{tax.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg mt-3 pt-2 border-t border-slate-200 text-green-700">
                   <span>Total:</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>£{total.toFixed(2)}</span>
                 </div>
 
                 {!paymentStep ? (
@@ -516,26 +831,87 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                           <div className="flex justify-between text-slate-700">
                             <span>Amount Due:</span>
                             <span className="font-semibold">
-                              ${total.toFixed(2)}
+                              £{total.toFixed(2)}
                             </span>
                           </div>
+
                           <div>
                             <label className="text-sm text-slate-600">
                               Cash Received:
                             </label>
                             <Input
                               type="number"
+                              step="0.01"
                               placeholder="Enter cash amount"
-                              value={cashAmount}
+                              value={cashAmount || ""}
                               onChange={(e) =>
                                 setCashAmount(parseFloat(e.target.value) || 0)
                               }
-                              className="bg-white border-slate-300 mt-1"
+                              className={`mt-1 ${
+                                cashAmount > 0 && cashAmount < total
+                                  ? "border-red-300 bg-red-50"
+                                  : "bg-white border-slate-300"
+                              }`}
                             />
+                            {cashAmount > 0 && cashAmount < total && (
+                              <p className="text-red-600 text-sm mt-1">
+                                Insufficient funds. Need £
+                                {(total - cashAmount).toFixed(2)} more.
+                              </p>
+                            )}
                           </div>
-                          <div className="flex justify-between font-bold text-lg pt-2 border-t border-slate-200 text-green-700">
+
+                          <div
+                            className={`flex justify-between font-bold text-lg pt-2 border-t border-slate-200 ${
+                              cashAmount >= total
+                                ? "text-green-700"
+                                : cashAmount > 0
+                                ? "text-red-600"
+                                : "text-slate-600"
+                            }`}
+                          >
                             <span>Change:</span>
-                            <span>${(cashAmount - total).toFixed(2)}</span>
+                            <span>
+                              {cashAmount >= total
+                                ? `£${(cashAmount - total).toFixed(2)}`
+                                : cashAmount > 0
+                                ? `-£${(total - cashAmount).toFixed(2)}`
+                                : "£0.00"}
+                            </span>
+                          </div>
+
+                          {/* Quick cash amount buttons */}
+                          <div className="grid grid-cols-4 gap-2">
+                            {[5, 10, 20, 50].map((amount) => (
+                              <Button
+                                key={amount}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCashAmount(amount)}
+                                className="text-xs h-8"
+                              >
+                                £{amount}
+                              </Button>
+                            ))}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCashAmount(total)}
+                              className="flex-1 text-xs"
+                            >
+                              Exact Amount
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCashAmount(Math.ceil(total))}
+                              className="flex-1 text-xs"
+                            >
+                              Round Up
+                            </Button>
                           </div>
                         </div>
                       )}
@@ -550,11 +926,21 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       )}
 
                       <Button
-                        className="w-full mt-4 bg-green-600 hover:bg-green-700 h-11 text-lg"
+                        className={`w-full mt-4 h-11 text-lg ${
+                          paymentMethod?.type === "cash" && cashAmount < total
+                            ? "bg-slate-400 cursor-not-allowed"
+                            : "bg-green-600 hover:bg-green-700"
+                        }`}
                         onClick={completeTransaction}
+                        disabled={
+                          paymentMethod?.type === "cash" &&
+                          (cashAmount < total || cashAmount <= 0)
+                        }
                       >
                         <CheckCircle className="h-5 w-5 mr-2" />
-                        Complete Transaction
+                        {paymentMethod?.type === "cash" && cashAmount < total
+                          ? `Need £${(total - cashAmount).toFixed(2)} More`
+                          : "Complete Transaction"}
                       </Button>
                     </div>
                   )}
@@ -583,7 +969,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   Thank you for shopping with us.
                 </p>
                 <p className="mt-2 text-slate-700 font-semibold">
-                  Total: ${total.toFixed(2)}
+                  Total: £{total.toFixed(2)}
                 </p>
                 <Button
                   className="mt-4 bg-green-600 hover:bg-green-700"
