@@ -1620,6 +1620,11 @@ export class DatabaseManager {
     return stmt.all(businessId) as Shift[];
   }
 
+  getShiftById(shiftId: string): Shift | null {
+    const stmt = this.db.prepare("SELECT * FROM shifts WHERE id = ?");
+    return (stmt.get(shiftId) as Shift) || null;
+  }
+
   // Shift reconciliation methods for auto-ended shifts
   reconcileShift(
     shiftId: string,
@@ -2315,6 +2320,107 @@ export class DatabaseManager {
       SELECT * FROM cash_drawer_counts WHERE shiftId = ? ORDER BY timestamp ASC
     `);
     return stmt.all(shiftId) as CashDrawerCount[];
+  }
+
+  // Calculate expected cash amount for a shift
+  getExpectedCashForShift(shiftId: string): {
+    expectedAmount: number;
+    breakdown: {
+      startingCash: number;
+      cashSales: number;
+      cashRefunds: number;
+      cashVoids: number;
+    };
+  } {
+    // Get shift details
+    const shift = this.db
+      .prepare("SELECT * FROM shifts WHERE id = ?")
+      .get(shiftId) as Shift | null;
+
+    if (!shift) {
+      throw new Error("Shift not found");
+    }
+
+    // Calculate cash transactions for this shift
+    const cashTransactions = this.db
+      .prepare(
+        `
+        SELECT 
+          type,
+          SUM(CASE 
+            WHEN paymentMethod = 'cash' THEN total 
+            WHEN paymentMethod = 'mixed' THEN COALESCE(cashAmount, 0)
+            ELSE 0 
+          END) as cashAmount
+        FROM transactions 
+        WHERE shiftId = ? AND status = 'completed' 
+          AND (paymentMethod = 'cash' OR (paymentMethod = 'mixed' AND cashAmount > 0))
+        GROUP BY type
+      `
+      )
+      .all(shiftId) as Array<{ type: string; cashAmount: number }>;
+
+    let cashSales = 0;
+    let cashRefunds = 0;
+    let cashVoids = 0;
+
+    cashTransactions.forEach((transaction) => {
+      switch (transaction.type) {
+        case "sale":
+          cashSales += transaction.cashAmount;
+          break;
+        case "refund":
+          cashRefunds += Math.abs(transaction.cashAmount); // Refunds are negative, so we take absolute value
+          break;
+        case "void":
+          cashVoids += Math.abs(transaction.cashAmount); // Voids are negative, so we take absolute value
+          break;
+      }
+    });
+
+    const expectedAmount =
+      shift.startingCash + cashSales - cashRefunds - cashVoids;
+
+    return {
+      expectedAmount,
+      breakdown: {
+        startingCash: shift.startingCash,
+        cashSales,
+        cashRefunds,
+        cashVoids,
+      },
+    };
+  }
+
+  // Audit logging method
+  createAuditLog(auditData: {
+    userId: string;
+    action: string;
+    resource: string;
+    resourceId: string;
+    details?: any;
+  }): void {
+    const auditId = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    this.db
+      .prepare(
+        `
+        INSERT INTO audit_logs (
+          id, userId, action, resource, resourceId, details, timestamp, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(
+        auditId,
+        auditData.userId,
+        auditData.action,
+        auditData.resource,
+        auditData.resourceId,
+        auditData.details ? JSON.stringify(auditData.details) : null,
+        now,
+        now
+      );
   }
 
   // Reporting Methods

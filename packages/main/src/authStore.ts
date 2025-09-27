@@ -871,6 +871,101 @@ ipcMain.handle(
   }
 );
 
+// Cash Drawer Count IPC Handlers
+ipcMain.handle("cashDrawer:getExpectedCash", async (event, shiftId) => {
+  try {
+    const db = await getDatabase();
+    const result = db.getExpectedCashForShift(shiftId);
+
+    return {
+      success: true,
+      data: result,
+    };
+  } catch (error) {
+    console.error("Get expected cash IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get expected cash amount",
+    };
+  }
+});
+
+ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
+  try {
+    console.log("Backend: Processing cash count with data:", countData);
+    const db = await getDatabase();
+
+    // Get shift to determine business ID
+    const shift = db.getShiftById(countData.shiftId);
+
+    if (!shift) {
+      throw new Error("Shift not found");
+    }
+
+    // Create the cash drawer count
+    const cashDrawerCount = db.createCashDrawerCount({
+      shiftId: countData.shiftId,
+      businessId: shift.businessId,
+      countType: countData.countType,
+      expectedAmount: countData.expectedAmount,
+      countedAmount: countData.countedAmount,
+      variance: countData.variance,
+      notes: countData.notes,
+      countedBy: countData.countedBy,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Create audit log entry for the count
+    if (Math.abs(countData.variance) > 0) {
+      db.createAuditLog({
+        userId: countData.countedBy,
+        action: "cash-count",
+        resource: "cash_drawer_counts",
+        resourceId: cashDrawerCount.id,
+        details: {
+          countType: countData.countType,
+          expectedAmount: countData.expectedAmount,
+          countedAmount: countData.countedAmount,
+          variance: countData.variance,
+          denominations: countData.denominations || [],
+          managerApproval: countData.managerApprovalId,
+        },
+      });
+    }
+
+    console.log("Backend: Cash count created successfully");
+    return {
+      success: true,
+      data: cashDrawerCount,
+    };
+  } catch (error) {
+    console.error("Create cash count IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to create cash count",
+    };
+  }
+});
+
+ipcMain.handle("cashDrawer:getCountsByShift", async (event, shiftId) => {
+  try {
+    const db = await getDatabase();
+    const counts = db.getCashDrawerCountsByShiftId(shiftId);
+
+    return {
+      success: true,
+      data: counts,
+    };
+  } catch (error) {
+    console.error("Get cash drawer counts IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get cash drawer counts",
+    };
+  }
+});
+
 // Cleanup expired sessions every hour
 setInterval(async () => {
   await authAPI.cleanupExpiredSessions();

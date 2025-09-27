@@ -304,4 +304,31 @@ contextBridge.exposeInMainWorld("voidAPI", {
     ipcRenderer.invoke("voids:getTransactionByReceipt", receiptNumber),
 });
 
+// Cash Drawer Count API
+contextBridge.exposeInMainWorld("cashDrawerAPI", {
+  getExpectedCash: (shiftId: string) =>
+    ipcRenderer.invoke("cashDrawer:getExpectedCash", shiftId),
+
+  createCount: (countData: {
+    shiftId: string;
+    countType: "opening" | "mid-shift" | "closing" | "spot-check";
+    expectedAmount: number;
+    countedAmount: number;
+    variance: number;
+    notes?: string;
+    countedBy: string;
+    denominations?: Array<{
+      value: number;
+      count: number;
+      total: number;
+      label: string;
+      type: "note" | "coin";
+    }>;
+    managerApprovalId?: string;
+  }) => ipcRenderer.invoke("cashDrawer:createCount", countData),
+
+  getCountsByShift: (shiftId: string) =>
+    ipcRenderer.invoke("cashDrawer:getCountsByShift", shiftId),
+});
+
 export { sha256sum, versions };

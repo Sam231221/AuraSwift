@@ -220,6 +220,27 @@ declare global {
       getTransactionById: (transactionId: string) => Promise<APIResponse>;
       getTransactionByReceipt: (receiptNumber: string) => Promise<APIResponse>;
     };
+    cashDrawerAPI: {
+      getExpectedCash: (shiftId: string) => Promise<APIResponse>;
+      createCount: (countData: {
+        shiftId: string;
+        countType: "opening" | "mid-shift" | "closing" | "spot-check";
+        expectedAmount: number;
+        countedAmount: number;
+        variance: number;
+        notes?: string;
+        countedBy: string;
+        denominations?: Array<{
+          value: number;
+          count: number;
+          total: number;
+          label: string;
+          type: "note" | "coin";
+        }>;
+        managerApprovalId?: string;
+      }) => Promise<APIResponse>;
+      getCountsByShift: (shiftId: string) => Promise<APIResponse>;
+    };
   }
 }
 

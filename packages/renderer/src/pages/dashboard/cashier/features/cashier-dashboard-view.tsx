@@ -30,6 +30,7 @@ import { useAuth } from "@/shared/hooks";
 import { useNavigate } from "react-router-dom";
 import RefundTransactionView from "./refund-transaction-view.tsx";
 import VoidTransactionModal from "./void-transaction-view.tsx";
+import CashDrawerCountModal from "./cash-drawer-count-modal.tsx";
 
 // TypeScript interfaces
 interface Transaction {
@@ -40,6 +41,7 @@ interface Transaction {
   paymentMethod: "cash" | "card" | "mixed";
   items: TransactionItem[];
   type: "sale" | "refund" | "void";
+  status: "completed" | "voided" | "pending";
 }
 
 interface TransactionItem {
@@ -119,6 +121,10 @@ const CashierDashboardView = ({
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [showRefundView, setShowRefundView] = useState(false);
   const [showVoidModal, setShowVoidModal] = useState(false);
+  const [showCashCountModal, setShowCashCountModal] = useState(false);
+  const [cashCountType, setCashCountType] = useState<
+    "opening" | "mid-shift" | "closing" | "spot-check"
+  >("mid-shift");
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -985,13 +991,21 @@ const CashierDashboardView = ({
                   <span className="text-xs">Void Transaction</span>
                 </Button>
                 <Button
+                  onClick={() => {
+                    if (activeShift) {
+                      setCashCountType("mid-shift");
+                      setShowCashCountModal(true);
+                    }
+                  }}
                   variant="outline"
                   className={`h-16 flex flex-col border-slate-300 ${
                     !activeShift ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                   disabled={!activeShift}
                   title={
-                    !activeShift ? "Start your shift to access cash drawer" : ""
+                    !activeShift
+                      ? "Start your shift to access cash drawer"
+                      : "Perform cash drawer count"
                   }
                 >
                   <DollarSign className="h-5 w-5 mb-1" />
@@ -1212,6 +1226,20 @@ const CashierDashboardView = ({
           loadShiftData(); // Refresh shift stats and recent transactions
         }}
         activeShiftId={activeShift?.id || null}
+      />
+
+      {/* Cash Drawer Count Modal */}
+      <CashDrawerCountModal
+        isOpen={showCashCountModal}
+        onClose={() => setShowCashCountModal(false)}
+        onCountComplete={() => {
+          // Refresh dashboard data after successful count
+          setShowCashCountModal(false);
+          loadShiftData(); // Refresh shift stats and recent transactions
+        }}
+        activeShiftId={activeShift?.id || null}
+        countType={cashCountType}
+        startingCash={activeShift?.startingCash || 0}
       />
     </>
   );
