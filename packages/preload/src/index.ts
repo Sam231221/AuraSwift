@@ -240,6 +240,9 @@ contextBridge.exposeInMainWorld("refundAPI", {
   getRecentTransactions: (businessId: string, limit?: number) =>
     ipcRenderer.invoke("refunds:getRecentTransactions", businessId, limit),
 
+  getShiftTransactions: (shiftId: string, limit?: number) =>
+    ipcRenderer.invoke("refunds:getShiftTransactions", shiftId, limit),
+
   validateEligibility: (
     transactionId: string,
     refundItems: Array<{

@@ -1,39 +1,5 @@
-import React, { useState, useCallback } from "react";
-import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ArrowLeft,
-  Search,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle,
-  X,
-  Plus,
-  Minus,
-  Receipt,
-  CreditCard,
-  DollarSign,
-} from "lucide-react";
+import React, { useState, useCallback, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { toast } from "sonner";
 
@@ -70,11 +36,6 @@ interface RefundItem {
   restockable: boolean;
 }
 
-interface RefundTransactionViewProps {
-  onBack?: () => void;
-  onClose?: () => void;
-}
-
 const REFUND_REASONS = [
   "Defective/Damaged Item",
   "Wrong Item/Size",
@@ -87,12 +48,18 @@ const REFUND_REASONS = [
   "Other",
 ];
 
-const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
-  onBack,
+interface RefundModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onRefundProcessed: () => void;
+}
+
+const RefundTransactionView: React.FC<RefundModalProps> = ({
+  isOpen,
   onClose,
+  onRefundProcessed,
 }) => {
-  const handleClose = onBack || onClose;
-  // State management
+  const [currentView, setCurrentView] = useState<"search" | "refund">("search");
   const [searchType, setSearchType] = useState<
     "receipt" | "transaction" | "recent"
   >("receipt");
@@ -115,6 +82,18 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
 
   const { user } = useAuth();
 
+  // Reset modal when closed
+  useEffect(() => {
+    if (!isOpen) {
+      setCurrentView("search");
+      setOriginalTransaction(null);
+      setSelectedItems(new Map());
+      setSearchQuery("");
+      setRefundReason("");
+      setRefundMethod("original");
+    }
+  }, [isOpen]);
+
   // Load recent transactions
   const loadRecentTransactions = useCallback(async () => {
     if (!user?.businessId) return;
@@ -123,7 +102,7 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
       setIsSearching(true);
       const response = await window.refundAPI.getRecentTransactions(
         user.businessId,
-        20
+        10
       );
 
       if (response.success && "transactions" in response) {
@@ -132,11 +111,9 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
           transactions: Transaction[];
         };
         setRecentTransactions(transactionsResponse.transactions || []);
-      } else {
-        toast.error("Failed to load recent transactions");
       }
-    } catch (error) {
-      console.error("Error loading recent transactions:", error);
+    } catch (error: unknown) {
+      console.error("Failed to load recent transactions:", error);
       toast.error("Failed to load recent transactions");
     } finally {
       setIsSearching(false);
@@ -151,34 +128,25 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
     }
 
     setIsSearching(true);
-
     try {
-      let response;
-
-      if (searchType === "receipt") {
-        response = await window.refundAPI.getTransactionByReceipt(
-          searchQuery.trim()
-        );
-      } else {
-        response = await window.refundAPI.getTransactionById(
-          searchQuery.trim()
-        );
-      }
+      const response =
+        searchType === "receipt"
+          ? await window.refundAPI.getTransactionByReceipt(searchQuery.trim())
+          : await window.refundAPI.getTransactionById(searchQuery.trim());
 
       if (response.success && "transaction" in response) {
-        const transactionResponse = response as unknown as {
+        const transactionResponse = response as {
           success: boolean;
           transaction: Transaction;
         };
         setOriginalTransaction(transactionResponse.transaction);
-        setSelectedItems(new Map());
+        setCurrentView("refund");
       } else {
-        toast.error(response.message || "Transaction not found");
-        setOriginalTransaction(null);
+        toast.error("Transaction not found");
       }
-    } catch (error) {
-      console.error("Search error:", error);
-      toast.error("Search failed. Please try again.");
+    } catch (error: unknown) {
+      console.error("Search failed:", error);
+      toast.error("Search failed");
     } finally {
       setIsSearching(false);
     }
@@ -187,13 +155,12 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
   // Select transaction from recent list
   const selectTransaction = (transaction: Transaction) => {
     setOriginalTransaction(transaction);
-    setSelectedItems(new Map());
+    setCurrentView("refund");
   };
 
-  // Add item to refund selection
+  // Item management functions
   const addItemToRefund = (item: TransactionItem) => {
     const availableQuantity = item.quantity - (item.refundedQuantity || 0);
-
     if (availableQuantity <= 0) {
       toast.error("This item has already been fully refunded");
       return;
@@ -214,7 +181,6 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
     setSelectedItems((prev) => new Map(prev.set(item.id, refundItem)));
   };
 
-  // Remove item from refund selection
   const removeItemFromRefund = (itemId: string) => {
     setSelectedItems((prev) => {
       const newMap = new Map(prev);
@@ -223,7 +189,6 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
     });
   };
 
-  // Update refund item quantity
   const updateRefundQuantity = (itemId: string, newQuantity: number) => {
     const item = selectedItems.get(itemId);
     if (!item) return;
@@ -249,25 +214,20 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
     setSelectedItems((prev) => new Map(prev.set(itemId, updatedItem)));
   };
 
-  // Update refund item reason
   const updateRefundReason = (itemId: string, reason: string) => {
     const item = selectedItems.get(itemId);
     if (!item) return;
-
     setSelectedItems((prev) => new Map(prev.set(itemId, { ...item, reason })));
   };
 
-  // Update restockable status
   const updateRestockable = (itemId: string, restockable: boolean) => {
     const item = selectedItems.get(itemId);
     if (!item) return;
-
     setSelectedItems(
       (prev) => new Map(prev.set(itemId, { ...item, restockable }))
     );
   };
 
-  // Calculate refund totals
   const refundTotal = Array.from(selectedItems.values()).reduce(
     (sum, item) => sum + item.refundAmount,
     0
@@ -275,36 +235,28 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
 
   // Process refund
   const processRefund = async () => {
-    if (!originalTransaction || !user) {
-      toast.error("Missing transaction or user data");
-      return;
-    }
-
-    if (selectedItems.size === 0) {
-      toast.error("Please select items to refund");
-      return;
-    }
-
-    if (!refundReason.trim()) {
-      toast.error("Please provide a reason for the refund");
+    if (
+      !originalTransaction ||
+      !user ||
+      selectedItems.size === 0 ||
+      !refundReason.trim()
+    ) {
+      toast.error("Please complete all required fields");
       return;
     }
 
     setIsProcessing(true);
-
     try {
-      // Get active shift
       const shiftResponse = await window.shiftAPI.getActive(user.id);
-      if (!shiftResponse.success || !shiftResponse.data) {
-        toast.error("No active shift found. Please start your shift first.");
+      if (!shiftResponse.success) {
+        toast.error("No active shift found");
         return;
       }
 
-      const activeShift = shiftResponse.data as { id: string };
-
+      const shiftData = shiftResponse.data as { id: string };
       const refundData = {
         originalTransactionId: originalTransaction.id,
-        shiftId: activeShift.id,
+        shiftId: shiftData.id,
         businessId: user.businessId,
         refundItems: Array.from(selectedItems.values()),
         refundReason: refundReason.trim(),
@@ -316,619 +268,770 @@ const RefundTransactionView: React.FC<RefundTransactionViewProps> = ({
 
       if (response.success) {
         toast.success("Refund processed successfully");
-
-        // Reset form
-        setOriginalTransaction(null);
-        setSelectedItems(new Map());
-        setRefundReason("");
-        setRefundMethod("original");
-        setSearchQuery("");
-        setShowConfirmDialog(false);
-
-        // TODO: Print refund receipt
+        onRefundProcessed();
+        onClose();
       } else {
         toast.error(response.message || "Failed to process refund");
       }
-    } catch (error) {
-      console.error("Refund processing error:", error);
+    } catch (error: unknown) {
+      console.error("Failed to process refund:", error);
       toast.error("Failed to process refund");
     } finally {
       setIsProcessing(false);
+      setShowConfirmDialog(false);
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          onClick={handleClose}
-          className="border-slate-300"
+    <>
+      {/* Main Modal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Process Refund</h1>
-          <p className="text-slate-600">
-            Find and refund items from previous transactions
-          </p>
-        </div>
-      </div>
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-slate-200">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Process Refund
+              </h2>
+              <p className="text-slate-600 mt-1">
+                Find and refund items from previous transactions
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column - Transaction Search */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5 text-green-600" />
-                Find Original Transaction
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Search Type Selection */}
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant={searchType === "receipt" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSearchType("receipt")}
-                  className={searchType === "receipt" ? "bg-green-600" : ""}
-                >
-                  Receipt #
-                </Button>
-                <Button
-                  variant={searchType === "transaction" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSearchType("transaction")}
-                  className={searchType === "transaction" ? "bg-green-600" : ""}
-                >
-                  Transaction ID
-                </Button>
-                <Button
-                  variant={searchType === "recent" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setSearchType("recent");
-                    loadRecentTransactions();
+          {/* Content */}
+          <div className="flex-1 overflow-hidden">
+            <AnimatePresence mode="wait">
+              {currentView === "search" ? (
+                <SearchView
+                  key="search"
+                  searchType={searchType}
+                  setSearchType={setSearchType}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  isSearching={isSearching}
+                  recentTransactions={recentTransactions}
+                  onSearch={handleSearch}
+                  onSelectTransaction={selectTransaction}
+                  onLoadRecent={loadRecentTransactions}
+                />
+              ) : (
+                <RefundView
+                  key="refund"
+                  originalTransaction={originalTransaction}
+                  selectedItems={selectedItems}
+                  refundReason={refundReason}
+                  setRefundReason={setRefundReason}
+                  refundMethod={refundMethod}
+                  setRefundMethod={setRefundMethod}
+                  refundTotal={refundTotal}
+                  onAddItem={addItemToRefund}
+                  onRemoveItem={removeItemFromRefund}
+                  onUpdateQuantity={updateRefundQuantity}
+                  onUpdateReason={updateRefundReason}
+                  onUpdateRestockable={updateRestockable}
+                  onBack={() => {
+                    setCurrentView("search");
+                    setOriginalTransaction(null);
+                    setSelectedItems(new Map());
                   }}
-                  className={searchType === "recent" ? "bg-green-600" : ""}
-                >
-                  Recent
-                </Button>
-              </div>
-
-              {/* Search Input */}
-              {searchType !== "recent" && (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder={`Enter ${
-                      searchType === "receipt"
-                        ? "receipt number"
-                        : "transaction ID"
-                    }`}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={handleSearch}
-                    disabled={isSearching}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {isSearching ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Search className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+                  onProcess={() => setShowConfirmDialog(true)}
+                />
               )}
-
-              {/* Recent Transactions List */}
-              {searchType === "recent" && (
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {isSearching ? (
-                    <div className="text-center py-4">
-                      <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
-                      Loading recent transactions...
-                    </div>
-                  ) : recentTransactions.length === 0 ? (
-                    <div className="text-center py-4 text-slate-500">
-                      No recent transactions found
-                    </div>
-                  ) : (
-                    recentTransactions.map((transaction) => (
-                      <motion.div
-                        key={transaction.id}
-                        whileHover={{ scale: 1.02 }}
-                        className="p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50"
-                        onClick={() => selectTransaction(transaction)}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium">
-                              #{transaction.receiptNumber}
-                            </div>
-                            <div className="text-sm text-slate-500">
-                              {new Date(transaction.timestamp).toLocaleString()}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-green-600">
-                              £{transaction.total.toFixed(2)}
-                            </div>
-                            <Badge variant="secondary" className="text-xs">
-                              {transaction.items.length} items
-                            </Badge>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Original Transaction Details */}
-          {originalTransaction && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Receipt className="h-5 w-5 text-blue-600" />
-                    Transaction Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm text-slate-600">
-                        Receipt Number
-                      </Label>
-                      <div className="font-medium">
-                        #{originalTransaction.receiptNumber}
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-sm text-slate-600">
-                        Date & Time
-                      </Label>
-                      <div className="font-medium">
-                        {new Date(
-                          originalTransaction.timestamp
-                        ).toLocaleString()}
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-sm text-slate-600">
-                        Total Amount
-                      </Label>
-                      <div className="font-medium text-green-600">
-                        £{originalTransaction.total.toFixed(2)}
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-sm text-slate-600">
-                        Payment Method
-                      </Label>
-                      <Badge variant="outline" className="ml-2">
-                        {originalTransaction.paymentMethod}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Items List */}
-                  <div>
-                    <Label className="text-sm text-slate-600 mb-2 block">
-                      Items
-                    </Label>
-                    <div className="space-y-2">
-                      {originalTransaction.items.map((item) => {
-                        const availableQuantity =
-                          item.quantity - (item.refundedQuantity || 0);
-                        const isSelected = selectedItems.has(item.id);
-
-                        return (
-                          <div
-                            key={item.id}
-                            className={`p-3 border rounded-lg ${
-                              isSelected
-                                ? "border-green-300 bg-green-50"
-                                : "border-slate-200"
-                            }`}
-                          >
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="font-medium">
-                                  {item.productName}
-                                </div>
-                                <div className="text-sm text-slate-500">
-                                  Qty: {item.quantity} × £
-                                  {item.unitPrice.toFixed(2)}
-                                  {item.refundedQuantity ? (
-                                    <span className="ml-2 text-red-600">
-                                      ({item.refundedQuantity} refunded)
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <div className="text-sm font-medium text-slate-700">
-                                  £{item.totalPrice.toFixed(2)}
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                {availableQuantity > 0 && !isSelected && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => addItemToRefund(item)}
-                                    className="border-green-300 text-green-600 hover:bg-green-50"
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    Add to Refund
-                                  </Button>
-                                )}
-                                {isSelected && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                      removeItemFromRefund(item.id)
-                                    }
-                                    className="border-red-300 text-red-600 hover:bg-red-50"
-                                  >
-                                    <X className="h-3 w-3 mr-1" />
-                                    Remove
-                                  </Button>
-                                )}
-                                {availableQuantity === 0 && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    Fully Refunded
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </div>
-
-        {/* Right Column - Refund Configuration */}
-        <div className="space-y-6">
-          {selectedItems.size > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <RefreshCw className="h-5 w-5 text-red-600" />
-                    Refund Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Selected Items */}
-                  <div>
-                    <Label className="text-sm text-slate-600 mb-3 block">
-                      Selected Items
-                    </Label>
-                    <div className="space-y-3">
-                      {Array.from(selectedItems.values()).map((item) => (
-                        <div
-                          key={item.originalItemId}
-                          className="p-3 border border-green-300 rounded-lg bg-green-50"
-                        >
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className="font-medium">
-                                  {item.productName}
-                                </div>
-                                <div className="text-sm text-slate-600">
-                                  £{item.unitPrice.toFixed(2)} each
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="font-semibold text-green-600">
-                                  £{item.refundAmount.toFixed(2)}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Quantity Selection */}
-                            <div className="flex items-center gap-2">
-                              <Label className="text-sm w-16">Quantity:</Label>
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    updateRefundQuantity(
-                                      item.originalItemId,
-                                      item.refundQuantity - 1
-                                    )
-                                  }
-                                  disabled={item.refundQuantity <= 1}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <Input
-                                  type="number"
-                                  value={item.refundQuantity}
-                                  onChange={(e) =>
-                                    updateRefundQuantity(
-                                      item.originalItemId,
-                                      parseInt(e.target.value) || 1
-                                    )
-                                  }
-                                  className="w-16 h-8 text-center"
-                                  min="1"
-                                  max={item.originalQuantity}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    updateRefundQuantity(
-                                      item.originalItemId,
-                                      item.refundQuantity + 1
-                                    )
-                                  }
-                                  disabled={
-                                    item.refundQuantity >= item.originalQuantity
-                                  }
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Reason Selection */}
-                            <div>
-                              <Label className="text-sm">Reason:</Label>
-                              <Select
-                                value={item.reason}
-                                onValueChange={(value) =>
-                                  updateRefundReason(item.originalItemId, value)
-                                }
-                              >
-                                <SelectTrigger className="mt-1">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {REFUND_REASONS.map((reason) => (
-                                    <SelectItem key={reason} value={reason}>
-                                      {reason}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {/* Restockable Checkbox */}
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                id={`restock-${item.originalItemId}`}
-                                checked={item.restockable}
-                                onChange={(e) =>
-                                  updateRestockable(
-                                    item.originalItemId,
-                                    e.target.checked
-                                  )
-                                }
-                                className="rounded"
-                              />
-                              <Label
-                                htmlFor={`restock-${item.originalItemId}`}
-                                className="text-sm"
-                              >
-                                Return to inventory
-                              </Label>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Refund Method */}
-                  <div>
-                    <Label className="text-sm text-slate-600 mb-2 block">
-                      Refund Method
-                    </Label>
-                    <Select
-                      value={refundMethod}
-                      onValueChange={(value: string) =>
-                        setRefundMethod(
-                          value as "original" | "store_credit" | "cash" | "card"
-                        )
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="original">
-                          <div className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            Original Payment Method
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="cash">
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="h-4 w-4" />
-                            Cash Refund
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="card">
-                          <div className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            Card Refund
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="store_credit">
-                          <div className="flex items-center gap-2">
-                            <Receipt className="h-4 w-4" />
-                            Store Credit
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Refund Reason */}
-                  <div>
-                    <Label className="text-sm text-slate-600 mb-2 block">
-                      Overall Refund Reason
-                    </Label>
-                    <Textarea
-                      placeholder="Provide a detailed reason for this refund..."
-                      value={refundReason}
-                      onChange={(e) => setRefundReason(e.target.value)}
-                      className="min-h-20"
-                    />
-                  </div>
-
-                  {/* Refund Total */}
-                  <div className="border-t border-slate-200 pt-4">
-                    <div className="flex justify-between items-center text-lg font-semibold">
-                      <span>Refund Total:</span>
-                      <span className="text-red-600">
-                        £{refundTotal.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Process Button */}
-                  <Button
-                    onClick={() => setShowConfirmDialog(true)}
-                    disabled={selectedItems.size === 0 || !refundReason.trim()}
-                    className="w-full bg-red-600 hover:bg-red-700 h-12 text-lg"
-                  >
-                    <RefreshCw className="h-5 w-5 mr-2" />
-                    Process Refund
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          {/* Empty State */}
-          {selectedItems.size === 0 && originalTransaction && (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <RefreshCw className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-600 mb-2">
-                  No Items Selected
-                </h3>
-                <p className="text-slate-500">
-                  Select items from the transaction to process a refund
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+            </AnimatePresence>
+          </div>
+        </motion.div>
       </div>
 
       {/* Confirmation Dialog */}
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              Confirm Refund
-            </DialogTitle>
-            <DialogDescription>
-              Please review the refund details before processing.
-            </DialogDescription>
-          </DialogHeader>
+      <AnimatePresence>
+        {showConfirmDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                  <svg
+                    className="w-4 h-4 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Confirm Refund
+                </h3>
+              </div>
 
-          <div className="space-y-4">
+              <div className="space-y-4 mb-6">
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <h4 className="font-medium mb-2">Refund Summary:</h4>
+                  <div className="space-y-2">
+                    {Array.from(selectedItems.values()).map((item) => (
+                      <div
+                        key={item.originalItemId}
+                        className="flex justify-between text-sm"
+                      >
+                        <span>
+                          {item.productName} × {item.refundQuantity}
+                        </span>
+                        <span>£{item.refundAmount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t mt-2 pt-2 flex justify-between font-semibold">
+                    <span>Total:</span>
+                    <span className="text-red-600">
+                      £{refundTotal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-sm text-slate-600">
+                  <p>
+                    <strong>Method:</strong>{" "}
+                    {refundMethod === "original"
+                      ? "Original Payment Method"
+                      : refundMethod}
+                  </p>
+                  <p>
+                    <strong>Reason:</strong> {refundReason}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirmDialog(false)}
+                  disabled={isProcessing}
+                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={processRefund}
+                  disabled={isProcessing}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isProcessing ? (
+                    <>
+                      <svg
+                        className="w-4 h-4 animate-spin mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        ></path>
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    "Confirm Refund"
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
+// Search View Component
+const SearchView: React.FC<{
+  searchType: string;
+  setSearchType: (type: "receipt" | "transaction" | "recent") => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  isSearching: boolean;
+  recentTransactions: Transaction[];
+  onSearch: () => void;
+  onSelectTransaction: (transaction: Transaction) => void;
+  onLoadRecent: () => void;
+}> = ({
+  searchType,
+  setSearchType,
+  searchQuery,
+  setSearchQuery,
+  isSearching,
+  recentTransactions,
+  onSearch,
+  onSelectTransaction,
+  onLoadRecent,
+}) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className="p-6 h-full flex flex-col"
+    >
+      <div className="max-w-2xl mx-auto w-full space-y-6">
+        {/* Search Type Tabs */}
+        <div className="grid grid-cols-3 gap-2">
+          {(
+            [
+              { key: "receipt" as const, label: "Receipt Number" },
+              { key: "transaction" as const, label: "Transaction ID" },
+              { key: "recent" as const, label: "Recent Sales" },
+            ] as const
+          ).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => {
+                setSearchType(key);
+                if (key === "recent") onLoadRecent();
+              }}
+              className={`px-4 py-3 rounded-lg border transition-all ${
+                searchType === key
+                  ? "border-green-500 bg-green-50 text-green-700 font-medium"
+                  : "border-slate-300 text-slate-600 hover:border-slate-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search Input */}
+        {searchType !== "recent" && (
+          <div className="flex gap-3">
+            <input
+              type="text"
+              placeholder={`Enter ${
+                searchType === "receipt" ? "receipt number" : "transaction ID"
+              }`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && onSearch()}
+              className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-200"
+            />
+            <button
+              onClick={onSearch}
+              disabled={isSearching}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+            >
+              {isSearching ? (
+                <svg
+                  className="w-4 h-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  ></path>
+                </svg>
+              ) : (
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              )}
+              Search
+            </button>
+          </div>
+        )}
+
+        {/* Recent Transactions */}
+        {searchType === "recent" && (
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {recentTransactions.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <svg
+                  className="w-12 h-12 mx-auto mb-3 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                  />
+                </svg>
+                <p>No recent transactions found</p>
+              </div>
+            ) : (
+              recentTransactions.map((transaction) => (
+                <button
+                  key={transaction.id}
+                  onClick={() => onSelectTransaction(transaction)}
+                  className="w-full p-4 border border-slate-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-colors text-left"
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-semibold text-slate-900">
+                        #{transaction.receiptNumber}
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        {new Date(transaction.timestamp).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-green-600">
+                        £{transaction.total.toFixed(2)}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {transaction.items.length} items
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+// Refund View Component
+const RefundView: React.FC<{
+  originalTransaction: Transaction | null;
+  selectedItems: Map<string, RefundItem>;
+  refundReason: string;
+  setRefundReason: (reason: string) => void;
+  refundMethod: string;
+  setRefundMethod: (
+    method: "original" | "store_credit" | "cash" | "card"
+  ) => void;
+  refundTotal: number;
+  onAddItem: (item: TransactionItem) => void;
+  onRemoveItem: (itemId: string) => void;
+  onUpdateQuantity: (itemId: string, quantity: number) => void;
+  onUpdateReason: (itemId: string, reason: string) => void;
+  onUpdateRestockable: (itemId: string, restockable: boolean) => void;
+  onBack: () => void;
+  onProcess: () => void;
+}> = ({
+  originalTransaction,
+  selectedItems,
+  refundReason,
+  setRefundReason,
+  refundMethod,
+  setRefundMethod,
+  refundTotal,
+  onAddItem,
+  onRemoveItem,
+  onUpdateQuantity,
+  onUpdateReason,
+  onUpdateRestockable,
+  onBack,
+  onProcess,
+}) => {
+  if (!originalTransaction) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="h-full flex flex-col lg:flex-row"
+    >
+      {/* Left Panel - Transaction Details */}
+      <div className="lg:w-1/2 border-r border-slate-200 p-6 overflow-y-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </button>
+          <h3 className="text-lg font-semibold text-slate-900">
+            Transaction Details
+          </h3>
+        </div>
+
+        <div className="space-y-6">
+          {/* Transaction Info */}
+          <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
             <div>
-              <h4 className="font-medium mb-2">Refund Summary:</h4>
-              <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-600">
+                Receipt Number
+              </label>
+              <div className="font-semibold mt-1">
+                #{originalTransaction.receiptNumber}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-600">
+                Date & Time
+              </label>
+              <div className="font-semibold mt-1">
+                {new Date(originalTransaction.timestamp).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-600">
+                Total Amount
+              </label>
+              <div className="font-bold text-green-600 text-lg mt-1">
+                £{originalTransaction.total.toFixed(2)}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-600">
+                Payment Method
+              </label>
+              <div className="font-semibold mt-1 capitalize">
+                {originalTransaction.paymentMethod}
+              </div>
+            </div>
+          </div>
+
+          {/* Items List */}
+          <div>
+            <h4 className="font-medium text-slate-900 mb-3">
+              Items ({originalTransaction.items.length})
+            </h4>
+            <div className="space-y-3">
+              {originalTransaction.items.map((item) => {
+                const availableQuantity =
+                  item.quantity - (item.refundedQuantity || 0);
+                const isSelected = selectedItems.has(item.id);
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-4 border rounded-lg transition-all ${
+                      isSelected
+                        ? "border-green-300 bg-green-50"
+                        : availableQuantity === 0
+                        ? "border-slate-200 bg-slate-50 opacity-60"
+                        : "border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="font-semibold text-slate-900">
+                          {item.productName}
+                        </div>
+                        <div className="text-sm text-slate-600 mt-1">
+                          Qty: {item.quantity} × £{item.unitPrice.toFixed(2)}
+                          {item.refundedQuantity && (
+                            <span className="text-red-600 ml-2">
+                              ({item.refundedQuantity} refunded)
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-medium text-slate-900 mt-1">
+                          £{item.totalPrice.toFixed(2)}
+                        </div>
+                      </div>
+                      <div>
+                        {availableQuantity > 0 && !isSelected && (
+                          <button
+                            onClick={() => onAddItem(item)}
+                            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                          >
+                            Add to Refund
+                          </button>
+                        )}
+                        {isSelected && (
+                          <button
+                            onClick={() => onRemoveItem(item.id)}
+                            className="px-3 py-1 border border-red-300 text-red-600 text-sm rounded hover:bg-red-50"
+                          >
+                            Remove
+                          </button>
+                        )}
+                        {availableQuantity === 0 && (
+                          <span className="px-2 py-1 bg-slate-200 text-slate-600 text-xs rounded">
+                            Fully Refunded
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel - Refund Configuration */}
+      <div className="lg:w-1/2 p-6 overflow-y-auto">
+        <h3 className="text-lg font-semibold text-slate-900 mb-6">
+          Refund Configuration
+        </h3>
+
+        {selectedItems.size > 0 ? (
+          <div className="space-y-6">
+            {/* Selected Items */}
+            <div>
+              <h4 className="font-medium text-slate-900 mb-3">
+                Selected Items ({selectedItems.size})
+              </h4>
+              <div className="space-y-4">
                 {Array.from(selectedItems.values()).map((item) => (
                   <div
                     key={item.originalItemId}
-                    className="flex justify-between text-sm"
+                    className="p-4 border border-green-300 rounded-lg bg-green-50"
                   >
-                    <span>
-                      {item.productName} × {item.refundQuantity}
-                    </span>
-                    <span>£{item.refundAmount.toFixed(2)}</span>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-semibold text-slate-900">
+                            {item.productName}
+                          </div>
+                          <div className="text-sm text-slate-600">
+                            £{item.unitPrice.toFixed(2)} each
+                          </div>
+                        </div>
+                        <div className="font-bold text-green-600 text-lg">
+                          £{item.refundAmount.toFixed(2)}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm font-medium block mb-1">
+                            Quantity
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() =>
+                                onUpdateQuantity(
+                                  item.originalItemId,
+                                  item.refundQuantity - 1
+                                )
+                              }
+                              disabled={item.refundQuantity <= 1}
+                              className="w-8 h-8 border border-slate-300 rounded disabled:opacity-30 hover:bg-slate-50"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              value={item.refundQuantity}
+                              onChange={(e) =>
+                                onUpdateQuantity(
+                                  item.originalItemId,
+                                  parseInt(e.target.value) || 1
+                                )
+                              }
+                              className="w-16 h-8 border border-slate-300 rounded text-center"
+                              min="1"
+                              max={item.originalQuantity}
+                            />
+                            <button
+                              onClick={() =>
+                                onUpdateQuantity(
+                                  item.originalItemId,
+                                  item.refundQuantity + 1
+                                )
+                              }
+                              disabled={
+                                item.refundQuantity >= item.originalQuantity
+                              }
+                              className="w-8 h-8 border border-slate-300 rounded disabled:opacity-30 hover:bg-slate-50"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-sm font-medium block mb-1">
+                            Reason
+                          </label>
+                          <select
+                            value={item.reason}
+                            onChange={(e) =>
+                              onUpdateReason(
+                                item.originalItemId,
+                                e.target.value
+                              )
+                            }
+                            className="w-full h-8 border border-slate-300 rounded px-2 text-sm"
+                          >
+                            {REFUND_REASONS.map((reason) => (
+                              <option key={reason} value={reason}>
+                                {reason}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={item.restockable}
+                          onChange={(e) =>
+                            onUpdateRestockable(
+                              item.originalItemId,
+                              e.target.checked
+                            )
+                          }
+                          className="rounded border-slate-300"
+                        />
+                        Return to inventory
+                      </label>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="border-t pt-2">
-              <div className="flex justify-between font-semibold">
-                <span>Total Refund:</span>
+            {/* Refund Method */}
+            <div>
+              <label className="text-sm font-medium text-slate-900 block mb-2">
+                Refund Method
+              </label>
+              <select
+                value={refundMethod}
+                onChange={(e) =>
+                  setRefundMethod(
+                    e.target.value as
+                      | "original"
+                      | "store_credit"
+                      | "cash"
+                      | "card"
+                  )
+                }
+                className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:border-green-500"
+              >
+                <option value="original">Original Payment Method</option>
+                <option value="cash">Cash Refund</option>
+                <option value="card">Card Refund</option>
+                <option value="store_credit">Store Credit</option>
+              </select>
+            </div>
+
+            {/* Refund Reason */}
+            <div>
+              <label className="text-sm font-medium text-slate-900 block mb-2">
+                Overall Refund Reason
+              </label>
+              <textarea
+                placeholder="Provide a detailed reason for this refund..."
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:border-green-500 min-h-24 resize-vertical"
+              />
+            </div>
+
+            {/* Refund Total */}
+            <div className="border-t border-slate-200 pt-4">
+              <div className="flex justify-between items-center text-xl font-bold">
+                <span>Refund Total:</span>
                 <span className="text-red-600">£{refundTotal.toFixed(2)}</span>
               </div>
             </div>
 
-            <div>
-              <p className="text-sm text-slate-600">
-                <strong>Method:</strong>{" "}
-                {refundMethod === "original"
-                  ? "Original Payment Method"
-                  : refundMethod}
-              </p>
-              <p className="text-sm text-slate-600">
-                <strong>Reason:</strong> {refundReason}
-              </p>
-            </div>
+            {/* Process Button */}
+            <button
+              onClick={onProcess}
+              disabled={!refundReason.trim()}
+              className="w-full p-4 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-semibold text-lg"
+            >
+              Process Refund
+            </button>
           </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmDialog(false)}
-              disabled={isProcessing}
+        ) : (
+          <div className="text-center py-12 text-slate-500">
+            <svg
+              className="w-16 h-16 mx-auto mb-3 opacity-50"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              Cancel
-            </Button>
-            <Button
-              onClick={processRefund}
-              disabled={isProcessing}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isProcessing ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Confirm Refund
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+              />
+            </svg>
+            <h4 className="text-lg font-medium text-slate-600 mb-2">
+              No Items Selected
+            </h4>
+            <p>Select items from the transaction to configure your refund</p>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 };
 

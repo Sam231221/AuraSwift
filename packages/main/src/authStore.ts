@@ -521,13 +521,16 @@ ipcMain.handle("shift:getStats", async (event, shiftId) => {
     const transactions = db.getTransactionsByShiftId(shiftId);
 
     const stats = {
-      totalTransactions: transactions.length,
+      totalTransactions: transactions.filter((t) => t.status === "completed")
+        .length,
       totalSales: transactions
-        .filter((t) => t.status === "completed")
+        .filter((t) => t.type === "sale" && t.status === "completed")
         .reduce((sum, t) => sum + t.total, 0),
-      totalRefunds: transactions
-        .filter((t) => t.type === "refund")
-        .reduce((sum, t) => sum + t.total, 0),
+      totalRefunds: Math.abs(
+        transactions
+          .filter((t) => t.type === "refund" && t.status === "completed")
+          .reduce((sum, t) => sum + t.total, 0)
+      ),
       totalVoids: transactions.filter((t) => t.status === "voided").length,
     };
 
@@ -681,6 +684,27 @@ ipcMain.handle(
       return {
         success: false,
         message: "Failed to get recent transactions",
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  "refunds:getShiftTransactions",
+  async (event, shiftId, limit = 50) => {
+    try {
+      const db = await getDatabase();
+      const transactions = db.getShiftTransactions(shiftId, limit);
+
+      return {
+        success: true,
+        transactions,
+      };
+    } catch (error) {
+      console.error("Get shift transactions IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to get shift transactions",
       };
     }
   }

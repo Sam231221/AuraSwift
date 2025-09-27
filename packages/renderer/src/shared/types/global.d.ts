@@ -170,6 +170,10 @@ declare global {
         businessId: string,
         limit?: number
       ) => Promise<APIResponse>;
+      getShiftTransactions: (
+        shiftId: string,
+        limit?: number
+      ) => Promise<APIResponse>;
       validateEligibility: (
         transactionId: string,
         refundItems: Array<{

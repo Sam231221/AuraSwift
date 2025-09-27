@@ -1824,7 +1824,7 @@ export class DatabaseManager {
   getRecentTransactions(businessId: string, limit: number = 50): Transaction[] {
     const transactionStmt = this.db.prepare(`
       SELECT * FROM transactions 
-      WHERE businessId = ? AND status = 'completed' AND type = 'sale'
+      WHERE businessId = ? AND status = 'completed'
       ORDER BY timestamp DESC 
       LIMIT ?
     `);
@@ -1832,6 +1832,24 @@ export class DatabaseManager {
       businessId,
       limit
     ) as Transaction[];
+
+    // Get items for each transaction
+    for (const transaction of transactions) {
+      transaction.items = this.getTransactionItems(transaction.id);
+    }
+
+    return transactions;
+  }
+
+  // Get transactions for current shift only
+  getShiftTransactions(shiftId: string, limit: number = 50): Transaction[] {
+    const transactionStmt = this.db.prepare(`
+      SELECT * FROM transactions 
+      WHERE shiftId = ? AND status = 'completed'
+      ORDER BY timestamp DESC 
+      LIMIT ?
+    `);
+    const transactions = transactionStmt.all(shiftId, limit) as Transaction[];
 
     // Get items for each transaction
     for (const transaction of transactions) {
@@ -2111,9 +2129,11 @@ export class DatabaseManager {
       .filter((t) => t.type === "sale" && t.status === "completed")
       .reduce((sum, t) => sum + t.total, 0);
 
-    const totalRefunds = transactions
-      .filter((t) => t.type === "refund" && t.status === "completed")
-      .reduce((sum, t) => sum + t.total, 0);
+    const totalRefunds = Math.abs(
+      transactions
+        .filter((t) => t.type === "refund" && t.status === "completed")
+        .reduce((sum, t) => sum + t.total, 0)
+    );
 
     const totalVoids = transactions
       .filter((t) => t.status === "voided")

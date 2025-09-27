@@ -28,16 +28,27 @@ import {
 
 import { useAuth } from "@/shared/hooks";
 import { useNavigate } from "react-router-dom";
-import RefundTransactionView from "./refund-transaction-view";
+import RefundTransactionView from "./refund-transaction-view.tsx";
 
 // TypeScript interfaces
 interface Transaction {
   id: string;
-  amount: number;
-  time: string;
-  items: number;
-  paymentMethod: "cash" | "card" | "mobile";
-  status: "completed" | "refunded" | "voided";
+  receiptNumber: string;
+  timestamp: string;
+  total: number;
+  paymentMethod: "cash" | "card" | "mixed";
+  items: TransactionItem[];
+  type: "sale" | "refund" | "void";
+}
+
+interface TransactionItem {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  refundedQuantity?: number;
 }
 
 interface Shift {
@@ -87,7 +98,7 @@ const CashierDashboardView = ({
   onNewTransaction,
 }: CashierDashboardViewProps) => {
   // State management
-  const [transactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
   const [todaySchedule, setTodaySchedule] = useState<Schedule | null>(null);
   const [shiftStats, setShiftStats] = useState<ShiftStats>({
@@ -187,51 +198,85 @@ const CashierDashboardView = ({
     return () => clearInterval(overtimeInterval);
   }, [activeShift, todaySchedule, showOvertimeWarning, handleAutoEndShift]);
 
+  // Load shift data function
+  const loadShiftData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+
+      if (!user?.id) return;
+
+      // Load active shift
+      const activeShiftResponse = await window.shiftAPI.getActive(user.id);
+      if (activeShiftResponse.success && activeShiftResponse.data) {
+        const shiftData = activeShiftResponse.data as Shift;
+        setActiveShift(shiftData);
+
+        // Load shift stats if shift is active
+        const statsResponse = await window.shiftAPI.getStats(shiftData.id);
+        if (statsResponse.success && statsResponse.data) {
+          setShiftStats(statsResponse.data as ShiftStats);
+        }
+      } else {
+        setActiveShift(null);
+      }
+
+      // Load today's schedule
+      const scheduleResponse = await window.shiftAPI.getTodaySchedule(user.id);
+      if (scheduleResponse.success && scheduleResponse.data) {
+        setTodaySchedule(scheduleResponse.data as Schedule);
+      } else {
+        setTodaySchedule(null);
+      }
+
+      // Load recent transactions (including refunds) - prioritize current shift if active
+      try {
+        let transactionsResponse;
+        if (activeShiftResponse.success && activeShiftResponse.data) {
+          // If there's an active shift, get transactions from current shift only
+          const shiftData = activeShiftResponse.data as Shift;
+          transactionsResponse = await window.refundAPI.getShiftTransactions(
+            shiftData.id,
+            10
+          );
+        } else if (user.businessId) {
+          // If no active shift, get recent transactions from business
+          transactionsResponse = await window.refundAPI.getRecentTransactions(
+            user.businessId,
+            10
+          );
+        }
+
+        if (
+          transactionsResponse &&
+          transactionsResponse.success &&
+          "transactions" in transactionsResponse
+        ) {
+          const transactionsData = transactionsResponse as {
+            success: boolean;
+            transactions: Transaction[];
+          };
+          setTransactions(transactionsData.transactions || []);
+        }
+      } catch (transactionError) {
+        console.error("Failed to load recent transactions:", transactionError);
+        // Don't fail the entire load if transactions fail
+        setTransactions([]);
+      }
+    } catch (error) {
+      console.error("Failed to load shift data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id, user?.businessId]);
+
   // Load shift data on component mount
   useEffect(() => {
-    const loadShiftData = async () => {
-      try {
-        setIsLoading(true);
-
-        if (!user?.id) return;
-
-        // Load active shift
-        const activeShiftResponse = await window.shiftAPI.getActive(user.id);
-        if (activeShiftResponse.success && activeShiftResponse.data) {
-          const shiftData = activeShiftResponse.data as Shift;
-          setActiveShift(shiftData);
-
-          // Load shift stats if shift is active
-          const statsResponse = await window.shiftAPI.getStats(shiftData.id);
-          if (statsResponse.success && statsResponse.data) {
-            setShiftStats(statsResponse.data as ShiftStats);
-          }
-        } else {
-          setActiveShift(null);
-        }
-
-        // Load today's schedule
-        const scheduleResponse = await window.shiftAPI.getTodaySchedule(
-          user.id
-        );
-        if (scheduleResponse.success && scheduleResponse.data) {
-          setTodaySchedule(scheduleResponse.data as Schedule);
-        } else {
-          setTodaySchedule(null);
-        }
-      } catch (error) {
-        console.error("Failed to load shift data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadShiftData();
 
     // Refresh data every 30 seconds
     const interval = setInterval(loadShiftData, 30000);
     return () => clearInterval(interval);
-  }, [user?.id]);
+  }, [loadShiftData]);
 
   console.log("Debug schedule data:", {
     activeShift,
@@ -787,67 +832,79 @@ const CashierDashboardView = ({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {transactions.map((transaction: Transaction) => (
-                <motion.div
-                  key={transaction.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`
+              {transactions.length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <div className="mb-2">
+                    <ShoppingCart className="h-8 w-8 mx-auto opacity-50" />
+                  </div>
+                  <p className="text-sm">No recent transactions</p>
+                  <p className="text-xs mt-1">
+                    Transactions will appear here once processed
+                  </p>
+                </div>
+              ) : (
+                transactions.map((transaction: Transaction) => (
+                  <motion.div
+                    key={transaction.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`
                       p-2 rounded-full
                       ${
-                        transaction.status === "completed"
+                        transaction.type === "sale"
                           ? "bg-green-100 text-green-600"
                           : ""
                       }
                       ${
-                        transaction.status === "refunded"
+                        transaction.type === "refund"
                           ? "bg-red-100 text-red-600"
                           : ""
                       }
                       ${
-                        transaction.status === "voided"
+                        transaction.type === "void"
                           ? "bg-amber-100 text-amber-600"
                           : ""
                       }
                     `}
-                    >
-                      {transaction.status === "completed" && (
-                        <CheckCircle className="h-4 w-4" />
-                      )}
-                      {transaction.status === "refunded" && (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                      {transaction.status === "voided" && (
-                        <XCircle className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-medium">
-                        Transaction #{transaction.id}
+                      >
+                        {transaction.type === "sale" && (
+                          <CheckCircle className="h-4 w-4" />
+                        )}
+                        {transaction.type === "refund" && (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        {transaction.type === "void" && (
+                          <XCircle className="h-4 w-4" />
+                        )}
                       </div>
-                      <div className="text-sm text-slate-500">
-                        {transaction.time} • {transaction.items} items
+                      <div>
+                        <div className="font-medium">
+                          #{transaction.receiptNumber}
+                        </div>
+                        <div className="text-sm text-slate-500">
+                          {new Date(transaction.timestamp).toLocaleString()} •{" "}
+                          {transaction.items.length} items
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div
-                      className={`font-semibold ${
-                        transaction.status === "completed"
-                          ? "text-green-700"
-                          : "text-red-700"
-                      }`}
-                    >
-                      {transaction.status === "completed" ? "+" : "-"}$
-                      {transaction.amount.toFixed(2)}
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={`
+                    <div className="text-right">
+                      <div
+                        className={`font-semibold ${
+                          transaction.type === "sale"
+                            ? "text-green-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {transaction.type === "sale" ? "+" : "-"}£
+                        {transaction.total.toFixed(2)}
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`
                       text-xs
                       ${
                         transaction.paymentMethod === "cash"
@@ -860,17 +917,18 @@ const CashierDashboardView = ({
                           : ""
                       }
                       ${
-                        transaction.paymentMethod === "mobile"
+                        transaction.paymentMethod === "mixed"
                           ? "bg-purple-50 text-purple-700"
                           : ""
                       }
                     `}
-                    >
-                      {transaction.paymentMethod}
-                    </Badge>
-                  </div>
-                </motion.div>
-              ))}
+                      >
+                        {transaction.paymentMethod}
+                      </Badge>
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1129,10 +1187,16 @@ const CashierDashboardView = ({
         </DialogContent>
       </Dialog>
 
-      {/* Refund Transaction View */}
-      {showRefundView && (
-        <RefundTransactionView onClose={() => setShowRefundView(false)} />
-      )}
+      {/* Refund Transaction Modal */}
+      <RefundTransactionView
+        isOpen={showRefundView}
+        onClose={() => setShowRefundView(false)}
+        onRefundProcessed={() => {
+          // Refresh dashboard data after successful refund
+          setShowRefundView(false);
+          loadShiftData(); // Refresh shift stats and recent transactions
+        }}
+      />
     </>
   );
 };
