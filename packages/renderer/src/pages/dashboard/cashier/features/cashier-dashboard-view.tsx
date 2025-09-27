@@ -29,6 +29,7 @@ import {
 import { useAuth } from "@/shared/hooks";
 import { useNavigate } from "react-router-dom";
 import RefundTransactionView from "./refund-transaction-view.tsx";
+import VoidTransactionModal from "./void-transaction-view.tsx";
 
 // TypeScript interfaces
 interface Transaction {
@@ -117,6 +118,7 @@ const CashierDashboardView = ({
   const [showOvertimeWarning, setShowOvertimeWarning] = useState(false);
   const [overtimeMinutes, setOvertimeMinutes] = useState(0);
   const [showRefundView, setShowRefundView] = useState(false);
+  const [showVoidModal, setShowVoidModal] = useState(false);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -899,8 +901,9 @@ const CashierDashboardView = ({
                             : "text-red-700"
                         }`}
                       >
-                        {transaction.type === "sale" ? "+" : "-"}£
-                        {transaction.total.toFixed(2)}
+                        {transaction.type === "sale"
+                          ? `+£${Math.abs(transaction.total).toFixed(2)}`
+                          : `-£${Math.abs(transaction.total).toFixed(2)}`}
                       </div>
                       <Badge
                         variant="outline"
@@ -968,6 +971,7 @@ const CashierDashboardView = ({
                   <span className="text-xs">Process Refund</span>
                 </Button>
                 <Button
+                  onClick={() => activeShift && setShowVoidModal(true)}
                   variant="outline"
                   className={`h-16 flex flex-col border-slate-300 ${
                     !activeShift ? "opacity-50 cursor-not-allowed" : ""
@@ -1196,6 +1200,18 @@ const CashierDashboardView = ({
           setShowRefundView(false);
           loadShiftData(); // Refresh shift stats and recent transactions
         }}
+      />
+
+      {/* Void Transaction Modal */}
+      <VoidTransactionModal
+        isOpen={showVoidModal}
+        onClose={() => setShowVoidModal(false)}
+        onVoidComplete={() => {
+          // Refresh dashboard data after successful void
+          setShowVoidModal(false);
+          loadShiftData(); // Refresh shift stats and recent transactions
+        }}
+        activeShiftId={activeShift?.id || null}
       />
     </>
   );

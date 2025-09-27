@@ -568,12 +568,14 @@ ipcMain.handle("transactions:create", async (event, transactionData) => {
 
 ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
   try {
+    console.log("Getting transactions for shift ID:", shiftId);
     const db = await getDatabase();
     const transactions = db.getTransactionsByShiftId(shiftId);
+    console.log("Found transactions:", transactions.length, transactions);
 
     return {
       success: true,
-      transactions,
+      data: transactions,
     };
   } catch (error) {
     console.error("Get transactions by shift IPC error:", error);
@@ -766,7 +768,110 @@ ipcMain.handle("refunds:create", async (event, refundData) => {
   }
 });
 
-// Cleanup expired sessions every hour// Cleanup expired sessions every hour
+// Void transaction handlers
+ipcMain.handle("voids:validateEligibility", async (event, transactionId) => {
+  try {
+    const db = await getDatabase();
+    const validation = db.validateVoidEligibility(transactionId);
+
+    return {
+      success: true,
+      data: validation,
+    };
+  } catch (error) {
+    console.error("Validate void eligibility IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to validate void eligibility",
+    };
+  }
+});
+
+ipcMain.handle("voids:create", async (event, voidData) => {
+  try {
+    console.log("Backend: Processing void request with data:", voidData);
+    const db = await getDatabase();
+
+    // Validate void eligibility first
+    console.log("Backend: Validating void eligibility...");
+    const validation = db.validateVoidEligibility(voidData.transactionId);
+    console.log("Backend: Validation result:", validation);
+
+    if (!validation.isValid) {
+      console.log("Backend: Void validation failed:", validation.errors);
+      return {
+        success: false,
+        message: `Void not allowed: ${validation.errors.join(", ")}`,
+        errors: validation.errors,
+      };
+    }
+
+    // Check if manager approval is required but not provided
+    if (validation.requiresManagerApproval && !voidData.managerApprovalId) {
+      console.log("Backend: Manager approval required but not provided");
+      return {
+        success: false,
+        message: "Manager approval required for this void operation",
+        requiresManagerApproval: true,
+      };
+    }
+
+    console.log("Backend: Executing void transaction...");
+    const result = db.voidTransaction(voidData);
+    console.log("Backend: Void transaction result:", result);
+
+    return result;
+  } catch (error) {
+    console.error("Create void IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to void transaction",
+    };
+  }
+});
+
+// Additional void API handlers for transaction lookup
+ipcMain.handle("voids:getTransactionById", async (event, transactionId) => {
+  try {
+    const db = await getDatabase();
+    const transaction = db.getTransactionByIdAnyStatus(transactionId);
+
+    return {
+      success: true,
+      data: transaction,
+    };
+  } catch (error) {
+    console.error("Get transaction by ID for void IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get transaction",
+    };
+  }
+});
+
+ipcMain.handle(
+  "voids:getTransactionByReceipt",
+  async (event, receiptNumber) => {
+    try {
+      const db = await getDatabase();
+      const transaction =
+        db.getTransactionByReceiptNumberAnyStatus(receiptNumber);
+
+      return {
+        success: true,
+        data: transaction,
+      };
+    } catch (error) {
+      console.error("Get transaction by receipt for void IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to get transaction",
+      };
+    }
+  }
+);
+
+// Cleanup expired sessions every hour
 setInterval(async () => {
   await authAPI.cleanupExpiredSessions();
 }, 60 * 60 * 1000);

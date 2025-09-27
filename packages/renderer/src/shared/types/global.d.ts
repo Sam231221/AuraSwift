@@ -209,6 +209,17 @@ declare global {
         cashierId: string;
       }) => Promise<APIResponse>;
     };
+    voidAPI: {
+      validateEligibility: (transactionId: string) => Promise<APIResponse>;
+      voidTransaction: (voidData: {
+        transactionId: string;
+        cashierId: string;
+        reason: string;
+        managerApprovalId?: string;
+      }) => Promise<APIResponse>;
+      getTransactionById: (transactionId: string) => Promise<APIResponse>;
+      getTransactionByReceipt: (receiptNumber: string) => Promise<APIResponse>;
+    };
   }
 }
 

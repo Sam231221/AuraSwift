@@ -285,4 +285,23 @@ contextBridge.exposeInMainWorld("refundAPI", {
   }) => ipcRenderer.invoke("refunds:create", refundData),
 });
 
+// Void Management API
+contextBridge.exposeInMainWorld("voidAPI", {
+  validateEligibility: (transactionId: string) =>
+    ipcRenderer.invoke("voids:validateEligibility", transactionId),
+
+  voidTransaction: (voidData: {
+    transactionId: string;
+    cashierId: string;
+    reason: string;
+    managerApprovalId?: string;
+  }) => ipcRenderer.invoke("voids:create", voidData),
+
+  getTransactionById: (transactionId: string) =>
+    ipcRenderer.invoke("voids:getTransactionById", transactionId),
+
+  getTransactionByReceipt: (receiptNumber: string) =>
+    ipcRenderer.invoke("voids:getTransactionByReceipt", receiptNumber),
+});
+
 export { sha256sum, versions };

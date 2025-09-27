@@ -504,6 +504,21 @@ export class DatabaseManager {
       )
     `);
 
+    // Audit logs table for tracking sensitive operations
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        action TEXT NOT NULL,
+        resource TEXT NOT NULL,
+        resourceId TEXT NOT NULL,
+        details TEXT,
+        timestamp TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (userId) REFERENCES users (id)
+      )
+    `);
+
     // Create indexes for better performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -544,6 +559,11 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_shiftId ON cash_drawer_counts(shiftId);
       CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_businessId ON cash_drawer_counts(businessId);
       CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_countType ON cash_drawer_counts(countType);
+
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_userId ON audit_logs(userId);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
     `);
 
     // Add weight-related fields to products table if they don't exist
@@ -1783,11 +1803,129 @@ export class DatabaseManager {
     return items;
   }
 
-  voidTransaction(transactionId: string, voidReason: string): void {
-    const stmt = this.db.prepare(`
-      UPDATE transactions SET status = 'voided', voidReason = ?, updatedAt = ? WHERE id = ?
-    `);
-    stmt.run(voidReason, new Date().toISOString(), transactionId);
+  voidTransaction(voidData: {
+    transactionId: string;
+    cashierId: string;
+    reason: string;
+    managerApprovalId?: string;
+  }): {
+    success: boolean;
+    message: string;
+  } {
+    const transaction = this.db.transaction(() => {
+      console.log(
+        "Database: Starting void transaction for ID:",
+        voidData.transactionId
+      );
+
+      // Get original transaction
+      const originalTransaction = this.getTransactionByIdAnyStatus(
+        voidData.transactionId
+      );
+      console.log("Database: Original transaction:", originalTransaction);
+
+      if (!originalTransaction) {
+        throw new Error("Transaction not found");
+      }
+
+      // Check if transaction can be voided
+      if (originalTransaction.status !== "completed") {
+        console.log(
+          "Database: Transaction status is not completed:",
+          originalTransaction.status
+        );
+        throw new Error("Only completed transactions can be voided");
+      }
+
+      // Check time window (30 minutes for void)
+      const transactionTime = new Date(originalTransaction.timestamp);
+      const now = new Date();
+      const timeDifferenceMinutes =
+        (now.getTime() - transactionTime.getTime()) / (1000 * 60);
+
+      console.log(
+        "Database: Time difference in minutes:",
+        timeDifferenceMinutes
+      );
+
+      if (timeDifferenceMinutes > 30 && !voidData.managerApprovalId) {
+        throw new Error(
+          "Transaction is older than 30 minutes and requires manager approval"
+        );
+      }
+
+      // Update transaction status to voided
+      console.log("Database: Updating transaction status to voided");
+      const updateStmt = this.db.prepare(`
+        UPDATE transactions 
+        SET status = 'voided', voidReason = ?
+        WHERE id = ?
+      `);
+
+      const now_iso = new Date().toISOString();
+      const updateResult = updateStmt.run(
+        voidData.reason,
+        voidData.transactionId
+      );
+      console.log("Database: Update transaction result:", updateResult);
+
+      // Restore inventory for all items in the transaction
+      console.log(
+        "Database: Restoring inventory for",
+        originalTransaction.items.length,
+        "items"
+      );
+      for (const item of originalTransaction.items) {
+        const updateInventoryStmt = this.db.prepare(`
+          UPDATE products 
+          SET stockLevel = stockLevel + ?, updatedAt = ?
+          WHERE id = ?
+        `);
+        updateInventoryStmt.run(item.quantity, now_iso, item.productId);
+      }
+
+      // Create audit log entry
+      const auditId = this.uuid.v4();
+      const auditStmt = this.db.prepare(`
+        INSERT INTO audit_logs (
+          id, userId, action, resource, resourceId, details, timestamp, createdAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      auditStmt.run(
+        auditId,
+        voidData.cashierId,
+        "void",
+        "transactions",
+        voidData.transactionId,
+        JSON.stringify({
+          reason: voidData.reason,
+          managerApproval: voidData.managerApprovalId,
+          originalAmount: originalTransaction.total,
+        }),
+        now_iso,
+        now_iso
+      );
+
+      return voidData.transactionId;
+    });
+
+    try {
+      console.log("Database: Executing void transaction...");
+      transaction();
+      console.log("Database: Void transaction completed successfully");
+      return {
+        success: true,
+        message: "Transaction voided successfully",
+      };
+    } catch (error) {
+      console.error("Database: Void transaction failed:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to void transaction",
+      };
+    }
   }
 
   // Refund Transaction Methods
@@ -1806,9 +1944,43 @@ export class DatabaseManager {
     return transaction;
   }
 
+  // Get transaction by ID regardless of status (used for void operations)
+  getTransactionByIdAnyStatus(transactionId: string): Transaction | null {
+    const transactionStmt = this.db.prepare(`
+      SELECT * FROM transactions WHERE id = ?
+    `);
+    const transaction = transactionStmt.get(transactionId) as
+      | Transaction
+      | undefined;
+
+    if (!transaction) return null;
+
+    // Get items for the transaction
+    transaction.items = this.getTransactionItems(transaction.id);
+    return transaction;
+  }
+
   getTransactionByReceiptNumber(receiptNumber: string): Transaction | null {
     const transactionStmt = this.db.prepare(`
       SELECT * FROM transactions WHERE receiptNumber = ? AND status = 'completed' ORDER BY timestamp DESC LIMIT 1
+    `);
+    const transaction = transactionStmt.get(receiptNumber) as
+      | Transaction
+      | undefined;
+
+    if (!transaction) return null;
+
+    // Get items for the transaction
+    transaction.items = this.getTransactionItems(transaction.id);
+    return transaction;
+  }
+
+  // Get transaction by receipt number regardless of status (used for void operations)
+  getTransactionByReceiptNumberAnyStatus(
+    receiptNumber: string
+  ): Transaction | null {
+    const transactionStmt = this.db.prepare(`
+      SELECT * FROM transactions WHERE receiptNumber = ? ORDER BY timestamp DESC LIMIT 1
     `);
     const transaction = transactionStmt.get(receiptNumber) as
       | Transaction
@@ -2053,6 +2225,50 @@ export class DatabaseManager {
     return {
       isValid: errors.length === 0,
       errors,
+    };
+  }
+
+  validateVoidEligibility(transactionId: string): {
+    isValid: boolean;
+    errors: string[];
+    requiresManagerApproval: boolean;
+  } {
+    const errors: string[] = [];
+    let requiresManagerApproval = false;
+
+    // Get transaction
+    const transaction = this.getTransactionByIdAnyStatus(transactionId);
+    if (!transaction) {
+      errors.push("Transaction not found");
+      return { isValid: false, errors, requiresManagerApproval: false };
+    }
+
+    // Check if already voided or refunded
+    if (transaction.status !== "completed") {
+      errors.push("Transaction is not in completed status");
+    }
+
+    // Check time window (30 minutes for normal void)
+    const transactionTime = new Date(transaction.timestamp);
+    const now = new Date();
+    const timeDifferenceMinutes =
+      (now.getTime() - transactionTime.getTime()) / (1000 * 60);
+
+    if (timeDifferenceMinutes > 30) {
+      requiresManagerApproval = true;
+    }
+
+    // Check if payment method allows void (card payments might be settled)
+    if (transaction.paymentMethod === "card" && timeDifferenceMinutes > 60) {
+      errors.push(
+        "Card payment may be settled - refund required instead of void"
+      );
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      requiresManagerApproval,
     };
   }
 
