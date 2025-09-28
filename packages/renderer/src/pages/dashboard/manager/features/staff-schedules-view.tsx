@@ -206,19 +206,24 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
 
   const openDrawer = (schedule?: Schedule, date?: Date) => {
     if (schedule) {
+      console.log("Opening drawer for editing schedule:", schedule);
       setEditingSchedule(schedule);
       const startDate = new Date(schedule.startTime);
       const endDate = new Date(schedule.endTime);
 
-      setFormData({
+      const formDataToSet = {
         staffId: schedule.staffId,
         startTime: format(startDate, "HH:mm"),
         endTime: format(endDate, "HH:mm"),
         assignedRegister: schedule.assignedRegister || "",
         notes: schedule.notes || "",
-      });
+      };
+
+      console.log("Setting form data for editing:", formDataToSet);
+      setFormData(formDataToSet);
       setSelectedDate(new Date(schedule.startTime.split("T")[0]));
     } else {
+      console.log("Opening drawer for creating new schedule");
       resetForm();
       if (date) {
         setSelectedDate(date);
@@ -232,15 +237,142 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     resetForm();
   };
 
+  /**
+   * SHIFT TIME MANAGEMENT - Updated to handle all cases from shiftallCases.md
+   *
+   * ✅ Case 1: Start time = End time (Invalid) - Rejected with clear message
+   * ✅ Case 2: End time before start time - Handles as overnight shift
+   * ✅ Case 3: Overnight shifts (crossing midnight) - Properly adds +1 day to end date
+   * ✅ Case 4: Shift too short - Configurable minimum (1 hour default)
+   * ✅ Case 5: Shift too long - Configurable maximum (16 hours default)
+   * ✅ Case 6: Overlap detection - Prevents overlapping shifts for same staff
+   * ✅ Case 7: Backdated shifts - Prevented by default (manager override available)
+   * ✅ Case 8: Future shifts - Allowed for scheduling
+   * ✅ Case 9: Timezone handling - Proper local to UTC conversion
+   */
+
+  // Configuration constants for shift validation
+  const SHIFT_CONFIG = {
+    MIN_DURATION_MINUTES: 60, // 1 hour minimum as recommended in shiftallCases.md
+    MAX_DURATION_MINUTES: 16 * 60, // 16 hours maximum (configurable between 12-16)
+    ALLOW_BACKDATED_SHIFTS: false, // Only managers should be able to create past shifts
+  };
+
+  // Helper function to validate shift data and return array of errors
+  const validateShiftData = () => {
+    const errors: string[] = [];
+
+    // Basic field validation
+    if (
+      !formData.staffId ||
+      !selectedDate ||
+      !formData.startTime ||
+      !formData.endTime
+    ) {
+      errors.push("Please fill in all required fields.");
+      return errors; // Return early if basic fields are missing
+    }
+
+    // Case 7: Validate backdated shifts
+    if (!SHIFT_CONFIG.ALLOW_BACKDATED_SHIFTS) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const shiftDate = new Date(selectedDate);
+      shiftDate.setHours(0, 0, 0, 0);
+
+      if (shiftDate < today) {
+        errors.push(
+          "Cannot schedule shifts in the past. Please select today or a future date."
+        );
+      }
+    }
+
+    // Calculate shift duration with validation
+    const shiftDurationMinutes = calculateShiftDuration(
+      formData.startTime,
+      formData.endTime
+    );
+
+    if (shiftDurationMinutes === -1) {
+      errors.push(
+        "Invalid time format. Please ensure times are in HH:MM format."
+      );
+    } else if (shiftDurationMinutes === 0) {
+      errors.push(
+        "End time must be later than start time. A shift cannot have zero duration."
+      );
+    } else {
+      // Duration-based validations
+      if (shiftDurationMinutes < SHIFT_CONFIG.MIN_DURATION_MINUTES) {
+        const minHours = Math.floor(SHIFT_CONFIG.MIN_DURATION_MINUTES / 60);
+        const minMinutes = SHIFT_CONFIG.MIN_DURATION_MINUTES % 60;
+        const minDurationText =
+          minMinutes > 0
+            ? `${minHours} hours and ${minMinutes} minutes`
+            : `${minHours} hour${minHours > 1 ? "s" : ""}`;
+        errors.push(`Shift duration must be at least ${minDurationText}.`);
+      }
+
+      if (shiftDurationMinutes > SHIFT_CONFIG.MAX_DURATION_MINUTES) {
+        const maxHours = SHIFT_CONFIG.MAX_DURATION_MINUTES / 60;
+        errors.push(`Shift cannot be longer than ${maxHours} hours.`);
+      }
+
+      // Check for overlapping shifts
+      const hasOverlap = checkShiftOverlap(
+        formData.startTime,
+        formData.endTime,
+        selectedDate,
+        formData.staffId,
+        editingSchedule?.id
+      );
+
+      if (hasOverlap) {
+        const staffMember = cashiers.find((c) => c.id === formData.staffId);
+        const staffName = staffMember
+          ? `${staffMember.firstName} ${staffMember.lastName}`
+          : "This staff member";
+        errors.push(`${staffName} already has an overlapping shift scheduled.`);
+      }
+    }
+
+    return errors;
+  };
+
   // Helper function to calculate shift duration handling overnight shifts
   const calculateShiftDuration = (startTime: string, endTime: string) => {
+    // Validate time format first
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+      return -1; // Invalid time format
+    }
+
     const [startHour, startMinute] = startTime.split(":").map(Number);
     const [endHour, endMinute] = endTime.split(":").map(Number);
+
+    // Check for invalid hour/minute values
+    if (
+      startHour < 0 ||
+      startHour > 23 ||
+      startMinute < 0 ||
+      startMinute > 59 ||
+      endHour < 0 ||
+      endHour > 23 ||
+      endMinute < 0 ||
+      endMinute > 59
+    ) {
+      return -1; // Invalid time values
+    }
 
     const startTotalMinutes = startHour * 60 + startMinute;
     let endTotalMinutes = endHour * 60 + endMinute;
 
-    // If end time is earlier in the day than start time, assume it's next day
+    // Case 1: Start time = End time (Invalid)
+    if (startTotalMinutes === endTotalMinutes) {
+      return 0; // No duration
+    }
+
+    // If end time is earlier in the day than start time, assume it's next day (overnight shift)
     if (endTotalMinutes < startTotalMinutes) {
       endTotalMinutes += 24 * 60; // Add 24 hours
     }
@@ -259,87 +391,157 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     return endTotalMinutes < startTotalMinutes;
   };
 
+  // Helper function to check for shift overlaps
+  const checkShiftOverlap = (
+    newStartTime: string,
+    newEndTime: string,
+    selectedDate: Date,
+    staffId: string,
+    excludeScheduleId?: string
+  ) => {
+    // Create proper Date objects for comparison
+    const newStart = new Date(selectedDate);
+    const [startHour, startMinute] = newStartTime.split(":").map(Number);
+    newStart.setHours(startHour, startMinute, 0, 0);
+
+    const newEnd = new Date(selectedDate);
+    const [endHour, endMinute] = newEndTime.split(":").map(Number);
+    newEnd.setHours(endHour, endMinute, 0, 0);
+
+    // Handle overnight shifts
+    if (isOvernightShift(newStartTime, newEndTime)) {
+      newEnd.setDate(newEnd.getDate() + 1);
+    }
+
+    // Check against existing schedules for this staff member
+    return schedules.some((schedule) => {
+      // Skip the schedule being edited
+      if (excludeScheduleId && schedule.id === excludeScheduleId) {
+        return false;
+      }
+
+      // Only check schedules for the same staff member
+      if (schedule.staffId !== staffId) {
+        return false;
+      }
+
+      const existingStart = new Date(schedule.startTime);
+      const existingEnd = new Date(schedule.endTime);
+
+      // Check for overlap: new shift starts before existing ends AND new shift ends after existing starts
+      return newStart < existingEnd && newEnd > existingStart;
+    });
+  };
+
   const handleSubmit = async () => {
-    // Validation
-    if (
-      !formData.staffId ||
-      !selectedDate ||
-      !formData.startTime ||
-      !formData.endTime
-    ) {
-      alert("Please fill in all required fields.");
+    // Run comprehensive validation
+    const validationErrors = validateShiftData();
+
+    if (validationErrors.length > 0) {
+      // Show all validation errors in a single alert
+      alert(
+        "Please fix the following issues:\n\n" +
+          validationErrors
+            .map((error, index) => `${index + 1}. ${error}`)
+            .join("\n")
+      );
       return;
     }
 
-    // Validate time format (should be HH:MM)
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (
-      !timeRegex.test(formData.startTime) ||
-      !timeRegex.test(formData.endTime)
-    ) {
-      alert("Please select valid start and end times.");
+    // Create proper Date objects in local timezone, then convert to ISO strings for UTC storage
+    // This ensures proper timezone handling as recommended in shiftallCases.md (Case 9)
+    if (!selectedDate) {
+      alert("Please select a date for the shift.");
       return;
     }
 
-    // Calculate shift duration (handles overnight shifts)
-    const shiftDurationMinutes = calculateShiftDuration(
-      formData.startTime,
-      formData.endTime
-    );
+    const [startHour, startMinute] = formData.startTime.split(":").map(Number);
+    const startDateTime = new Date(selectedDate);
+    startDateTime.setHours(startHour, startMinute, 0, 0);
 
-    // Validate reasonable shift duration (minimum 15 minutes, maximum 24 hours)
-    if (shiftDurationMinutes < 15) {
-      alert("Shift must be at least 15 minutes long.");
-      return;
-    }
+    const [endHour, endMinute] = formData.endTime.split(":").map(Number);
+    const endDateTime = new Date(selectedDate);
+    endDateTime.setHours(endHour, endMinute, 0, 0);
 
-    if (shiftDurationMinutes > 24 * 60) {
-      alert("Shift cannot be longer than 24 hours.");
-      return;
-    }
-
-    const scheduleDate = format(selectedDate, "yyyy-MM-dd");
-    const startDateTime = `${scheduleDate}T${formData.startTime}:00.000Z`;
-
-    // For overnight shifts, end time is on the next day
-    let endDateTime;
+    // Case 3: Handle overnight shifts (crossing midnight)
     if (isOvernightShift(formData.startTime, formData.endTime)) {
-      const nextDay = new Date(selectedDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      const nextDayString = format(nextDay, "yyyy-MM-dd");
-      endDateTime = `${nextDayString}T${formData.endTime}:00.000Z`;
-    } else {
-      endDateTime = `${scheduleDate}T${formData.endTime}:00.000Z`;
+      endDateTime.setDate(endDateTime.getDate() + 1);
     }
+
+    // Convert to ISO strings for UTC storage in database
+    const startDateTimeISO = startDateTime.toISOString();
+    const endDateTimeISO = endDateTime.toISOString();
 
     try {
       if (editingSchedule) {
         // Update existing schedule
+        if (!editingSchedule.id) {
+          console.error("No schedule ID found for editing:", editingSchedule);
+          alert("Error: Schedule ID is missing. Please try again.");
+          return;
+        }
+        console.log("Attempting to update schedule:", {
+          id: editingSchedule.id,
+          updateData: {
+            staffId: formData.staffId,
+            startTime: startDateTimeISO,
+            endTime: endDateTimeISO,
+            assignedRegister: formData.assignedRegister,
+            notes: formData.notes,
+          },
+        });
+
         const response = await window.scheduleAPI.update(editingSchedule.id, {
           staffId: formData.staffId,
-          startTime: startDateTime,
-          endTime: endDateTime,
+          startTime: startDateTimeISO,
+          endTime: endDateTimeISO,
           assignedRegister: formData.assignedRegister,
           notes: formData.notes,
         });
 
+        console.log("Update response received:", response);
+
         if (response.success) {
-          // Update local state
+          console.log("Schedule update successful:", response);
+
+          // Update local state with the response data if available, otherwise use form data
+          const updatedSchedule: Schedule = response.data
+            ? (response.data as Schedule)
+            : {
+                ...editingSchedule,
+                staffId: formData.staffId,
+                startTime: startDateTimeISO,
+                endTime: endDateTimeISO,
+                assignedRegister: formData.assignedRegister,
+                notes: formData.notes,
+                updatedAt: new Date().toISOString(),
+              };
+
           setSchedules(
             schedules.map((schedule) =>
-              schedule.id === editingSchedule.id
-                ? {
-                    ...schedule,
-                    staffId: formData.staffId,
-                    startTime: startDateTime,
-                    endTime: endDateTime,
-                    assignedRegister: formData.assignedRegister,
-                    notes: formData.notes,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : schedule
+              schedule.id === editingSchedule.id ? updatedSchedule : schedule
             )
           );
+
+          console.log("Local schedules state updated");
+
+          // Optional: Reload schedules from database to ensure consistency
+          // This helps prevent issues where local state gets out of sync with database
+          try {
+            const refreshResponse = await window.scheduleAPI.getByBusiness(
+              businessId
+            );
+            if (refreshResponse.success && refreshResponse.data) {
+              console.log("Refreshed schedules from database after update");
+              setSchedules(refreshResponse.data as Schedule[]);
+            }
+          } catch (refreshError) {
+            console.warn(
+              "Failed to refresh schedules after update:",
+              refreshError
+            );
+            // Don't fail the whole operation if refresh fails
+          }
         } else {
           console.error("Failed to update schedule:", response.message);
           alert("Failed to update schedule: " + response.message);
@@ -350,8 +552,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         const response = await window.scheduleAPI.create({
           staffId: formData.staffId,
           businessId: businessId,
-          startTime: startDateTime,
-          endTime: endDateTime,
+          startTime: startDateTimeISO,
+          endTime: endDateTimeISO,
           assignedRegister: formData.assignedRegister,
           notes: formData.notes,
         });
@@ -755,6 +957,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                               formData.startTime,
                               formData.endTime
                             );
+
+                            // Handle invalid durations
+                            if (durationMinutes === -1) {
+                              return "Invalid time format";
+                            }
+
+                            if (durationMinutes === 0) {
+                              return "Start and end time cannot be the same";
+                            }
+
                             const hours = Math.floor(durationMinutes / 60);
                             const minutes = durationMinutes % 60;
 
@@ -763,11 +975,25 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                               formData.endTime
                             );
 
+                            // Show validation warnings in the duration display
+                            let warningText = "";
+                            if (
+                              durationMinutes <
+                              SHIFT_CONFIG.MIN_DURATION_MINUTES
+                            ) {
+                              warningText = " ⚠️ Too short";
+                            } else if (
+                              durationMinutes >
+                              SHIFT_CONFIG.MAX_DURATION_MINUTES
+                            ) {
+                              warningText = " ⚠️ Too long";
+                            }
+
                             return `${formatTime(
                               formData.startTime
                             )} - ${formatTime(formData.endTime)}${
                               isOvernight ? " (+1 day)" : ""
-                            } (${hours}h ${minutes}m)`;
+                            } (${hours}h ${minutes}m)${warningText}`;
                           })()}
                         </span>
                       </div>

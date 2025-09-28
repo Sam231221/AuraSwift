@@ -308,21 +308,24 @@ ipcMain.handle("schedules:getByStaff", async (event, staffId) => {
 ipcMain.handle("schedules:update", async (event, id, updates) => {
   try {
     if (!db) db = await getDatabase();
-    // Note: This would need a generic update method in DatabaseManager
-    // For now, we'll implement individual update methods as needed
-    if (updates.status) {
-      db.updateScheduleStatus(id, updates.status);
-    }
-    // TODO: Implement full schedule update method in DatabaseManager
+
+    console.log("Updating schedule:", { id, updates });
+
+    const updatedSchedule = db.updateSchedule(id, updates);
+
+    console.log("Schedule updated successfully:", updatedSchedule);
+
     return {
       success: true,
       message: "Schedule updated successfully",
+      data: updatedSchedule,
     };
   } catch (error) {
     console.error("Update schedule IPC error:", error);
     return {
       success: false,
-      message: "Failed to update schedule",
+      message:
+        error instanceof Error ? error.message : "Failed to update schedule",
     };
   }
 });
@@ -330,8 +333,13 @@ ipcMain.handle("schedules:update", async (event, id, updates) => {
 ipcMain.handle("schedules:delete", async (event, id) => {
   try {
     if (!db) db = await getDatabase();
-    // TODO: Implement deleteSchedule method in DatabaseManager
-    console.log("Delete schedule:", id);
+
+    console.log("Deleting schedule:", id);
+
+    db.deleteSchedule(id);
+
+    console.log("Schedule deleted successfully:", id);
+
     return {
       success: true,
       message: "Schedule deleted successfully",
@@ -340,7 +348,8 @@ ipcMain.handle("schedules:delete", async (event, id) => {
     console.error("Delete schedule IPC error:", error);
     return {
       success: false,
-      message: "Failed to delete schedule",
+      message:
+        error instanceof Error ? error.message : "Failed to delete schedule",
     };
   }
 });
@@ -543,6 +552,26 @@ ipcMain.handle("shift:getStats", async (event, shiftId) => {
     return {
       success: false,
       message: "Failed to get shift stats",
+    };
+  }
+});
+
+ipcMain.handle("shift:getHourlyStats", async (event, shiftId) => {
+  try {
+    console.log("Getting hourly stats for shift:", shiftId);
+    if (!db) db = await getDatabase();
+
+    const hourlyStats = db.getHourlyTransactionStats(shiftId);
+
+    return {
+      success: true,
+      data: hourlyStats,
+    };
+  } catch (error) {
+    console.error("Get hourly stats IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get hourly stats",
     };
   }
 });

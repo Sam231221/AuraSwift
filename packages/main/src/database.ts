@@ -1564,6 +1564,90 @@ export class DatabaseManager {
     stmt.run(status, new Date().toISOString(), scheduleId);
   }
 
+  updateSchedule(
+    scheduleId: string,
+    updates: Partial<
+      Pick<
+        Schedule,
+        | "staffId"
+        | "startTime"
+        | "endTime"
+        | "assignedRegister"
+        | "notes"
+        | "status"
+      >
+    >
+  ): Schedule {
+    const now = new Date().toISOString();
+
+    // Build dynamic UPDATE query based on provided fields
+    const fields = [];
+    const values = [];
+
+    if (updates.staffId !== undefined) {
+      fields.push("staffId = ?");
+      values.push(updates.staffId);
+    }
+    if (updates.startTime !== undefined) {
+      fields.push("startTime = ?");
+      values.push(updates.startTime);
+    }
+    if (updates.endTime !== undefined) {
+      fields.push("endTime = ?");
+      values.push(updates.endTime);
+    }
+    if (updates.assignedRegister !== undefined) {
+      fields.push("assignedRegister = ?");
+      values.push(updates.assignedRegister);
+    }
+    if (updates.notes !== undefined) {
+      fields.push("notes = ?");
+      values.push(updates.notes);
+    }
+    if (updates.status !== undefined) {
+      fields.push("status = ?");
+      values.push(updates.status);
+    }
+
+    // Always update the updatedAt timestamp
+    fields.push("updatedAt = ?");
+    values.push(now);
+    values.push(scheduleId);
+
+    if (fields.length === 1) {
+      // Only updatedAt was added
+      throw new Error("No fields to update");
+    }
+
+    const stmt = this.db.prepare(`
+      UPDATE schedules SET ${fields.join(", ")} WHERE id = ?
+    `);
+    stmt.run(...values);
+
+    // Return the updated schedule
+    const getStmt = this.db.prepare(`
+      SELECT * FROM schedules WHERE id = ?
+    `);
+    const updated = getStmt.get(scheduleId) as Schedule;
+
+    if (!updated) {
+      throw new Error("Schedule not found after update");
+    }
+
+    return updated;
+  }
+
+  deleteSchedule(scheduleId: string): void {
+    const stmt = this.db.prepare(`
+      DELETE FROM schedules WHERE id = ?
+    `);
+    const result = stmt.run(scheduleId);
+
+    if (result.changes === 0) {
+      throw new Error("Schedule not found");
+    }
+  }
+
   // Shift Management Methods
   createShift(shift: Omit<Shift, "id" | "createdAt" | "updatedAt">): Shift {
     const id = this.uuid.v4();
@@ -1665,6 +1749,79 @@ export class DatabaseManager {
       SELECT * FROM shifts WHERE businessId = ? ORDER BY startTime DESC
     `);
     return stmt.all(businessId) as Shift[];
+  }
+
+  getHourlyTransactionStats(shiftId: string): {
+    lastHour: number;
+    currentHour: number;
+    averagePerHour: number;
+  } {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const currentHourStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      now.getHours(),
+      0,
+      0
+    );
+
+    // Get transactions from the last hour
+    const lastHourStmt = this.db.prepare(`
+      SELECT COUNT(*) as count FROM transactions 
+      WHERE shiftId = ? 
+        AND timestamp >= ? 
+        AND timestamp <= ?
+        AND status = 'completed'
+    `);
+    const lastHourResult = lastHourStmt.get(
+      shiftId,
+      oneHourAgo.toISOString(),
+      now.toISOString()
+    ) as { count: number };
+
+    // Get transactions from current hour
+    const currentHourStmt = this.db.prepare(`
+      SELECT COUNT(*) as count FROM transactions 
+      WHERE shiftId = ? 
+        AND timestamp >= ?
+        AND status = 'completed'
+    `);
+    const currentHourResult = currentHourStmt.get(
+      shiftId,
+      currentHourStart.toISOString()
+    ) as { count: number };
+
+    // Get shift start time for average calculation
+    const shiftStmt = this.db.prepare(
+      `SELECT startTime FROM shifts WHERE id = ?`
+    );
+    const shift = shiftStmt.get(shiftId) as { startTime: string } | undefined;
+
+    let averagePerHour = 0;
+    if (shift) {
+      const shiftStart = new Date(shift.startTime);
+      const hoursWorked = Math.max(
+        (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60),
+        0.1
+      ); // Minimum 0.1 hour to avoid division by zero
+
+      const totalTransactionsStmt = this.db.prepare(`
+        SELECT COUNT(*) as count FROM transactions 
+        WHERE shiftId = ? AND status = 'completed'
+      `);
+      const totalResult = totalTransactionsStmt.get(shiftId) as {
+        count: number;
+      };
+      averagePerHour = totalResult.count / hoursWorked;
+    }
+
+    return {
+      lastHour: lastHourResult.count,
+      currentHour: currentHourResult.count,
+      averagePerHour: Math.round(averagePerHour * 10) / 10, // Round to 1 decimal place
+    };
   }
 
   getShiftById(shiftId: string): Shift | null {

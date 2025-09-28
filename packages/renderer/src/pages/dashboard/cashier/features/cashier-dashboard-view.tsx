@@ -54,13 +54,35 @@ interface TransactionItem {
   refundedQuantity?: number;
 }
 
+/**
+ * SHIFT vs SCHEDULE DISTINCTION (as per shifttimeCase.md):
+ *
+ * Scenario Implemented:
+ * 1. Manager creates schedule: 2 PM - 9 PM (Sept 26)
+ * 2. Cashier logs in late at 3:33 PM
+ * 3. Manager later extends end time to 10 PM and sets start time to 1 PM
+ * 4. Dashboard shows:
+ *    - Scheduled Shift: 1:00 PM – 10:00 PM
+ *    - Clocked In: 3:33 PM (33m late)
+ *    - Ends: 10:00 PM
+ *    - Time Remaining: 6h 27m (calculated from scheduled end time)
+ *
+ * Key Implementation:
+ * - Schedule = What manager planned (can be updated live)
+ * - Shift = What actually happened (actual clock-in/out times - never overwritten)
+ * - Time remaining calculated from SCHEDULED end time
+ * - Progress calculated from ACTUAL start time to SCHEDULED end time
+ * - Manager changes update live every 30 seconds while preserving actual work times
+ * - Reports will show variance between scheduled vs actual hours
+ */
+
 interface Shift {
   id: string;
-  scheduleId?: string;
+  scheduleId?: string; // Links to the planned schedule
   cashierId: string;
   businessId: string;
-  startTime: string;
-  endTime?: string;
+  startTime: string; // ACTUAL clock-in time (when cashier really started)
+  endTime?: string; // ACTUAL clock-out time (when cashier really ended)
   status: "active" | "ended";
   startingCash: number;
   finalCashDrawer?: number;
@@ -79,13 +101,13 @@ interface Schedule {
   id: string;
   staffId: string;
   businessId: string;
-  startTime: string;
-  endTime: string;
+  startTime: string; // PLANNED start time (what manager scheduled)
+  endTime: string; // PLANNED end time (what manager scheduled - can be updated live)
   status: "upcoming" | "active" | "completed" | "missed";
   assignedRegister?: string;
   notes?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt: string; // Changes when manager modifies scheduled times
 }
 
 interface ShiftStats {
@@ -110,6 +132,15 @@ const CashierDashboardView = ({
     totalRefunds: 0,
     totalVoids: 0,
   });
+  const [hourlyStats, setHourlyStats] = useState<{
+    lastHour: number;
+    currentHour: number;
+    averagePerHour: number;
+  }>({
+    lastHour: 0,
+    currentHour: 0,
+    averagePerHour: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [showStartShiftDialog, setShowStartShiftDialog] = useState(false);
   const [showEndShiftDialog, setShowEndShiftDialog] = useState(false);
@@ -129,13 +160,13 @@ const CashierDashboardView = ({
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Handle automatic shift ending when overtime exceeds threshold
+  // Handle automadtic shift ending when overtime exceeds threshold
   const handleAutoEndShift = useCallback(
     async (minutesOvertime: number) => {
       if (!activeShift) return;
 
       try {
-        // Auto-end with current cash drawer balance (estimated)
+        // Auto-end swith current mm cash drawer balance (estimated)
         const estimatedCashDrawer =
           activeShift.startingCash + (shiftStats.totalSales || 0);
 
@@ -156,6 +187,11 @@ const CashierDashboardView = ({
             totalSales: 0,
             totalRefunds: 0,
             totalVoids: 0,
+          });
+          setHourlyStats({
+            lastHour: 0,
+            currentHour: 0,
+            averagePerHour: 0,
           });
           setShowOvertimeWarning(false);
           setOvertimeMinutes(0);
@@ -224,8 +260,27 @@ const CashierDashboardView = ({
         if (statsResponse.success && statsResponse.data) {
           setShiftStats(statsResponse.data as ShiftStats);
         }
+
+        // Load hourly stats if shift is active
+        const hourlyStatsResponse = await window.shiftAPI.getHourlyStats(
+          shiftData.id
+        );
+        if (hourlyStatsResponse.success && hourlyStatsResponse.data) {
+          setHourlyStats(
+            hourlyStatsResponse.data as {
+              lastHour: number;
+              currentHour: number;
+              averagePerHour: number;
+            }
+          );
+        }
       } else {
         setActiveShift(null);
+        setHourlyStats({
+          lastHour: 0,
+          currentHour: 0,
+          averagePerHour: 0,
+        });
       }
 
       // Load today's schedule
@@ -281,7 +336,9 @@ const CashierDashboardView = ({
   useEffect(() => {
     loadShiftData();
 
-    // Refresh data every 30 seconds
+    // Refresh data every 30 seconds to pick up schedule changes made by manager
+    // This ensures that when manager extends end time (e.g., 9 PM to 10 PM),
+    // cashier dashboard updates live while preserving actual work times
     const interval = setInterval(loadShiftData, 30000);
     return () => clearInterval(interval);
   }, [loadShiftData]);
@@ -349,15 +406,26 @@ const CashierDashboardView = ({
       ? shiftStats.totalSales / shiftStats.totalTransactions
       : 0;
 
+  // Calculate shift progress based on SCHEDULED duration vs time elapsed since ACTUAL start
+  // This reflects the scenario: cashier clocked in late but progress is based on remaining scheduled time
   const shiftProgress =
     activeShift && todaySchedule
       ? (() => {
           const now = new Date();
-          const shiftStart = new Date(activeShift.startTime);
-          const scheduleEnd = new Date(todaySchedule.endTime);
-          const totalDuration = scheduleEnd.getTime() - shiftStart.getTime();
-          const elapsed = now.getTime() - shiftStart.getTime();
-          return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
+          const actualStart = new Date(activeShift.startTime); // When cashier actually started
+          const scheduledEnd = new Date(todaySchedule.endTime); // When scheduled to end (may be updated by manager)
+
+          // Calculate elapsed time since actual start
+          const actualElapsed = now.getTime() - actualStart.getTime();
+
+          // Calculate total time from actual start to scheduled end
+          const totalDuration = scheduledEnd.getTime() - actualStart.getTime();
+
+          // Progress is based on actual work time vs remaining scheduled time
+          return Math.min(
+            Math.max((actualElapsed / totalDuration) * 100, 0),
+            100
+          );
         })()
       : 0;
 
@@ -432,6 +500,11 @@ const CashierDashboardView = ({
           totalRefunds: 0,
           totalVoids: 0,
         });
+        setHourlyStats({
+          lastHour: 0,
+          currentHour: 0,
+          averagePerHour: 0,
+        });
         setShowStartShiftDialog(false);
         setShowLateStartConfirm(false);
       } else {
@@ -487,6 +560,11 @@ const CashierDashboardView = ({
           totalSales: 0,
           totalRefunds: 0,
           totalVoids: 0,
+        });
+        setHourlyStats({
+          lastHour: 0,
+          currentHour: 0,
+          averagePerHour: 0,
         });
         setShowEndShiftDialog(false);
         setShowOvertimeWarning(false);
@@ -561,61 +639,87 @@ const CashierDashboardView = ({
             <h2 className="font-semibold text-lg">
               {activeShift ? "Current Shift" : "No Active Shift"}
             </h2>
-            <p className="text-slate-600">
-              {activeShift ? (
-                <>
-                  Started at{" "}
-                  {new Date(activeShift.startTime).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}{" "}
-                  • Ends at{" "}
-                  {todaySchedule
-                    ? new Date(todaySchedule.endTime).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      })
-                    : "--:--"}
-                </>
+            <div className="text-slate-600 space-y-1">
+              {activeShift && todaySchedule ? (
+                <div className="text-sm">
+                  <span className="font-medium text-emerald-700">
+                    Active Shift • Clocked in at{" "}
+                    {new Date(activeShift.startTime).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                    {(() => {
+                      // Show if cashier was late or early
+                      const actualStart = new Date(activeShift.startTime);
+                      const scheduledStart = new Date(todaySchedule.startTime);
+                      const diffMinutes = Math.floor(
+                        (actualStart.getTime() - scheduledStart.getTime()) /
+                          (1000 * 60)
+                      );
+
+                      if (diffMinutes > 5) {
+                        return ` (${diffMinutes}m late)`;
+                      } else if (diffMinutes < -5) {
+                        return ` (${Math.abs(diffMinutes)}m early)`;
+                      }
+                      return " (on time)";
+                    })()}
+                  </span>
+                </div>
+              ) : activeShift ? (
+                <div className="text-sm">
+                  <span className="font-medium text-emerald-700">
+                    Active Shift • Started at{" "}
+                    {new Date(activeShift.startTime).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}{" "}
+                    • No schedule found
+                  </span>
+                </div>
               ) : todaySchedule ? (
-                (() => {
-                  const startDate = new Date(todaySchedule.startTime);
-                  const endDate = new Date(todaySchedule.endTime);
+                <div className="text-sm">
+                  <span>
+                    {(() => {
+                      const startDate = new Date(todaySchedule.startTime);
+                      const endDate = new Date(todaySchedule.endTime);
 
-                  const formatOptions = {
-                    hour: "2-digit" as const,
-                    minute: "2-digit" as const,
-                    hour12: true,
-                  };
+                      const formatOptions = {
+                        hour: "2-digit" as const,
+                        minute: "2-digit" as const,
+                        hour12: true,
+                      };
 
-                  const startTimeStr = startDate.toLocaleTimeString(
-                    [],
-                    formatOptions
-                  );
-                  const endTimeStr = endDate.toLocaleTimeString(
-                    [],
-                    formatOptions
-                  );
+                      const startTimeStr = startDate.toLocaleTimeString(
+                        [],
+                        formatOptions
+                      );
+                      const endTimeStr = endDate.toLocaleTimeString(
+                        [],
+                        formatOptions
+                      );
 
-                  // Check if shift goes into the next day
-                  const isOvernightShift =
-                    endDate.getDate() !== startDate.getDate();
+                      // Check if shift goes into the next day
+                      const isOvernightShift =
+                        endDate.getDate() !== startDate.getDate();
 
-                  if (isOvernightShift) {
-                    const endDayName = endDate.toLocaleDateString([], {
-                      weekday: "short",
-                    });
-                    return `Scheduled: ${startTimeStr} - ${endTimeStr} (${endDayName})`;
-                  } else {
-                    return `Scheduled: ${startTimeStr} - ${endTimeStr}`;
-                  }
-                })()
+                      if (isOvernightShift) {
+                        const endDayName = endDate.toLocaleDateString([], {
+                          weekday: "short",
+                        });
+                        return `Scheduled: ${startTimeStr} - ${endTimeStr} (${endDayName})`;
+                      } else {
+                        return `Scheduled: ${startTimeStr} - ${endTimeStr}`;
+                      }
+                    })()}
+                  </span>
+                </div>
               ) : (
-                "No schedule found for today"
+                <div className="text-sm">No schedule found for today</div>
               )}
-            </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-slate-500" />
@@ -693,6 +797,97 @@ const CashierDashboardView = ({
               <span>Auto-end in {120 - overtimeMinutes} minutes</span>
             </div>
           )}
+
+          {/* Shift Summary - matches shifttimeCase.md scenario example */}
+          {activeShift && todaySchedule && (
+            <div className="mt-3 p-3 bg-slate-50 rounded-lg text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-slate-500 font-medium">
+                    Scheduled Shift:
+                    {(() => {
+                      // Show indicator if schedule was recently updated (within last hour)
+                      const updatedAt = new Date(todaySchedule.updatedAt);
+                      const now = new Date();
+                      const hoursSinceUpdate =
+                        (now.getTime() - updatedAt.getTime()) /
+                        (1000 * 60 * 60);
+
+                      if (hoursSinceUpdate < 1) {
+                        return (
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                            Recently Updated
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </span>
+                  <div className="font-mono text-slate-700">
+                    {new Date(todaySchedule.startTime).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}{" "}
+                    –{" "}
+                    {new Date(todaySchedule.endTime).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium">
+                    Time Remaining:
+                  </span>
+                  <div className="font-mono text-emerald-700 font-semibold">
+                    {(() => {
+                      const now = new Date();
+                      const scheduleEnd = new Date(todaySchedule.endTime);
+                      const timeRemaining =
+                        scheduleEnd.getTime() - now.getTime();
+
+                      if (timeRemaining <= 0) {
+                        return "Shift Complete";
+                      }
+
+                      const hoursRemaining = Math.floor(
+                        timeRemaining / (1000 * 60 * 60)
+                      );
+                      const minutesRemaining = Math.floor(
+                        (timeRemaining % (1000 * 60 * 60)) / (1000 * 60)
+                      );
+
+                      return `${hoursRemaining}h ${minutesRemaining}m`;
+                    })()}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium">
+                    Clocked In:
+                  </span>
+                  <div className="font-mono text-slate-700">
+                    {new Date(activeShift.startTime).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium">Ends:</span>
+                  <div className="font-mono text-slate-700">
+                    {new Date(todaySchedule.endTime).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -747,7 +942,7 @@ const CashierDashboardView = ({
                 <span>This shift</span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                Last hour: 12 transactions
+                Last hour: {hourlyStats.lastHour} transactions
               </div>
             </CardContent>
           </Card>

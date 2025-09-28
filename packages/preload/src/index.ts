@@ -187,6 +187,9 @@ contextBridge.exposeInMainWorld("shiftAPI", {
 
   getStats: (shiftId: string) => ipcRenderer.invoke("shift:getStats", shiftId),
 
+  getHourlyStats: (shiftId: string) =>
+    ipcRenderer.invoke("shift:getHourlyStats", shiftId),
+
   reconcile: (
     shiftId: string,
     reconciliationData: {
