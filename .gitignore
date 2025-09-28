@@ -54,3 +54,8 @@ thumbs.db
 # Editor-based Rest Client
 .idea/httpRequests
 /.idea/csv-plugin.xml
+
+# Development database files
+dev-data/*.db
+dev-data/*.db-wal
+dev-data/*.db-shm

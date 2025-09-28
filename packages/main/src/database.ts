@@ -1,8 +1,12 @@
 import { app } from "electron";
 import path from "path";
+import fs from "fs";
 import { createRequire } from "module";
+import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export interface User {
   id: string;
@@ -243,13 +247,56 @@ export class DatabaseManager {
       };
       this.uuid = { v4: uuidv4 };
 
-      const dbPath = path.join(app.getPath("userData"), "pos_system.db");
+      const dbPath = this.getDatabasePath();
+      console.log("Database path:", dbPath);
+
+      // Ensure the directory exists
+      const dbDir = path.dirname(dbPath);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+
       this.db = new Database(dbPath);
       this.initializeTables();
       this.initialized = true;
     } catch (error) {
       console.error("Database initialization error:", error);
       throw error;
+    }
+  }
+
+  private getDatabasePath(): string {
+    // Multiple ways to detect development mode
+    const isDev =
+      process.env.NODE_ENV === "development" ||
+      process.env.ELECTRON_IS_DEV === "true" ||
+      !app.isPackaged;
+
+    // Allow override via environment variable for testing
+    const customDbPath = process.env.POS_DB_PATH;
+    if (customDbPath) {
+      console.log("Using custom database path:", customDbPath);
+      return customDbPath;
+    }
+
+    if (isDev) {
+      // Development: Store in project directory
+      const projectRoot = path.join(__dirname, "..", "..", "..");
+      const devDbPath = path.join(projectRoot, "dev-data", "pos_system.db");
+      console.log("🔧 Development mode: Using project directory for database");
+      console.log("📁 Database will be created at:", devDbPath);
+      return devDbPath;
+    } else {
+      // Production: Use proper user data directory based on platform
+      const userDataPath = app.getPath("userData");
+      const prodDbPath = path.join(
+        userDataPath,
+        "NepStoresPos",
+        "pos_system.db"
+      );
+      console.log("🚀 Production mode: Using user data directory for database");
+      console.log("📁 Database will be created at:", prodDbPath);
+      return prodDbPath;
     }
   }
 
@@ -2505,6 +2552,38 @@ export class DatabaseManager {
 
   close(): void {
     this.db.close();
+  }
+
+  // Utility method to get database information
+  getDatabaseInfo(): {
+    path: string;
+    mode: "development" | "production";
+    exists: boolean;
+    size?: number;
+  } {
+    const dbPath = this.getDatabasePath();
+    const isDev =
+      process.env.NODE_ENV === "development" ||
+      process.env.ELECTRON_IS_DEV === "true" ||
+      !app.isPackaged;
+
+    const info = {
+      path: dbPath,
+      mode: isDev ? ("development" as const) : ("production" as const),
+      exists: fs.existsSync(dbPath),
+      size: undefined as number | undefined,
+    };
+
+    if (info.exists) {
+      try {
+        const stats = fs.statSync(dbPath);
+        info.size = stats.size;
+      } catch (error) {
+        console.warn("Could not get database file size:", error);
+      }
+    }
+
+    return info;
   }
 }
 

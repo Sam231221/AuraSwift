@@ -24,7 +24,14 @@
     "typecheck": "npm run typecheck -ws --if-present",
     "create-renderer": "cd packages && node ./integrate-renderer/create-renderer.js",
     "integrate-renderer": "npm start --workspace @app/integrate-renderer",
-    "init": "npm run create-renderer && npm run integrate-renderer && npm install"
+    "init": "npm run create-renderer && npm run integrate-renderer && npm install",
+    "db:dev:clean": "rm -f dev-data/pos_system.db* && echo 'Development database cleaned'",
+    "db:dev:backup": "cp dev-data/pos_system.db dev-data/pos_system_backup_$(date +%Y%m%d_%H%M%S).db 2>/dev/null && echo 'Database backed up' || echo 'No database to backup'",
+    "db:dev:restore": "ls -la dev-data/pos_system_backup_*.db 2>/dev/null || echo 'No backup files found'",
+    "db:info": "echo 'Database info available via: window.databaseAPI.getInfo() in the app console'",
+    "db:migrate": "node migrate-existing-db.mjs",
+    "db:paths": "node migrate-existing-db.mjs show-paths",
+    "db:copy-data": "node migrate-existing-db.mjs copy-data"
   },
   "devDependencies": {
     "@npmcli/map-workspaces": "5.0.0",

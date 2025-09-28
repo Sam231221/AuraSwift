@@ -319,6 +319,62 @@ npm run init
 
 Set up the initial environment by creating a new renderer, integrating it, and installing the necessary packages.
 
+## 🗄️ Database Configuration
+
+This POS system uses **environment-aware database storage**:
+
+- **Development**: Database stored in `./dev-data/pos_system.db` (project directory)
+- **Production**: Database stored in OS-specific user data directory
+  - **Windows**: `%APPDATA%/NepStoresPos/pos_system.db`
+  - **macOS**: `~/Library/Application Support/NepStoresPos/pos_system.db`
+  - **Linux**: `~/.config/NepStoresPos/pos_system.db`
+
+### Database Management Scripts
+
+- `npm run db:dev:clean` - Remove development database
+- `npm run db:dev:backup` - Create timestamped backup of development database
+- `npm run db:dev:restore` - List available backup files
+- `npm run db:info` - Show how to get database information in the app
+
+### Using an Existing Database
+
+If you have an existing database file, you have several options:
+
+**Option 1: Use Custom Path (Recommended)**
+
+```bash
+export POS_DB_PATH="/path/to/your/existing/database.db"
+npm start
+```
+
+**Option 2: Migration Helper Scripts**
+
+```bash
+# Check your existing database
+npm run db:migrate check /path/to/your/database.db
+
+# Copy to development location
+npm run db:migrate copy-to-dev /path/to/your/database.db
+
+# Copy to production location
+npm run db:migrate copy-to-prod /path/to/your/database.db
+
+# Show all database path locations
+npm run db:paths
+```
+
+**Option 3: Manual Copy**
+
+```bash
+# For development
+cp "/path/to/your/database.db" "./dev-data/pos_system.db"
+
+# For production (macOS)
+cp "/path/to/your/database.db" "$HOME/Library/Application Support/NepStoresPos/pos_system.db"
+```
+
+See [use-existing-db.md](./use-existing-db.md) for detailed migration instructions.
+
 ## Contribution
 
 See [Contributing Guide](CONTRIBUTING.md).

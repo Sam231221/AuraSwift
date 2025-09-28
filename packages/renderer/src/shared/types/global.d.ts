@@ -241,6 +241,9 @@ declare global {
       }) => Promise<APIResponse>;
       getCountsByShift: (shiftId: string) => Promise<APIResponse>;
     };
+    databaseAPI: {
+      getInfo: () => Promise<APIResponse>;
+    };
   }
 }
 

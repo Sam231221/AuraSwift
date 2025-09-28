@@ -331,4 +331,9 @@ contextBridge.exposeInMainWorld("cashDrawerAPI", {
     ipcRenderer.invoke("cashDrawer:getCountsByShift", shiftId),
 });
 
+// Database Information API (for debugging)
+contextBridge.exposeInMainWorld("databaseAPI", {
+  getInfo: () => ipcRenderer.invoke("database:getInfo"),
+});
+
 export { sha256sum, versions };

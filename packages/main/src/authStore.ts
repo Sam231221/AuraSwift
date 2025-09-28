@@ -966,6 +966,25 @@ ipcMain.handle("cashDrawer:getCountsByShift", async (event, shiftId) => {
   }
 });
 
+// Database Information IPC Handler (for debugging)
+ipcMain.handle("database:getInfo", async () => {
+  try {
+    const db = await getDatabase();
+    const info = db.getDatabaseInfo();
+
+    return {
+      success: true,
+      data: info,
+    };
+  } catch (error) {
+    console.error("Get database info IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get database information",
+    };
+  }
+});
+
 // Cleanup expired sessions every hour
 setInterval(async () => {
   await authAPI.cleanupExpiredSessions();
