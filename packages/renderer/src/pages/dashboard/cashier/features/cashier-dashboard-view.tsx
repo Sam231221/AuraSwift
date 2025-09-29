@@ -212,12 +212,32 @@ const CashierDashboardView = ({
             `Your shift has been automatically ended due to excessive overtime (${minutesOvertime} minutes). ` +
               `The cash drawer amount has been estimated. Please contact your manager for shift reconciliation.`
           );
+
+          // Reload shift data to ensure UI is in sync with server state
+          setTimeout(async () => {
+            // Manually reload shift data without dependency on loadShiftData function
+            try {
+              if (!user?.id) return;
+              const activeShiftResponse = await window.shiftAPI.getActive(
+                user.id
+              );
+              if (!activeShiftResponse.success || !activeShiftResponse.data) {
+                // Force component to re-render by updating a state that will trigger recalculation
+                setActiveShift(null);
+              }
+            } catch (error) {
+              console.error(
+                "Failed to refresh shift data after auto-end:",
+                error
+              );
+            }
+          }, 1000);
         }
       } catch (error) {
         console.error("Failed to auto-end shift:", error);
       }
     },
-    [activeShift, shiftStats]
+    [activeShift, shiftStats, user?.id]
   );
 
   // Check for overtime and handle automatic shift ending
@@ -392,11 +412,40 @@ const CashierDashboardView = ({
     ? (() => {
         const now = new Date();
         const scheduledStart = new Date(todaySchedule.startTime);
+        const scheduledEnd = new Date(todaySchedule.endTime);
         const timeDifference = now.getTime() - scheduledStart.getTime();
         const minutesDifference = timeDifference / (1000 * 60);
 
+        // Check if shift has already ended
+        const timeFromEnd = now.getTime() - scheduledEnd.getTime();
+        const minutesAfterEnd = timeFromEnd / (1000 * 60);
+
         const EARLY_START_MINUTES = 15;
         const LATE_START_MINUTES = 30;
+
+        // Don't allow starting shifts that are more than 1 hour past their end time
+        if (minutesAfterEnd > 60) {
+          const hoursAfterEnd = Math.floor(minutesAfterEnd / 60);
+          const remainingMinutes = Math.floor(minutesAfterEnd % 60);
+
+          let overdueText;
+          if (hoursAfterEnd > 0) {
+            if (remainingMinutes === 0) {
+              overdueText =
+                hoursAfterEnd === 1 ? "1 hour" : `${hoursAfterEnd} hours`;
+            } else {
+              overdueText = `${hoursAfterEnd}h ${remainingMinutes}m`;
+            }
+          } else {
+            overdueText = `${Math.floor(minutesAfterEnd)} minutes`;
+          }
+
+          return {
+            canStart: false,
+            buttonText: "Shift Ended",
+            reason: `Shift ended ${overdueText} ago`,
+          };
+        }
 
         if (minutesDifference < -EARLY_START_MINUTES) {
           const minutesUntilStart = Math.ceil(-minutesDifference);
@@ -484,8 +533,27 @@ const CashierDashboardView = ({
     // Validate shift timing
     const now = new Date();
     const scheduledStart = new Date(todaySchedule.startTime);
+    const scheduledEnd = new Date(todaySchedule.endTime);
     const timeDifference = now.getTime() - scheduledStart.getTime();
     const minutesDifference = timeDifference / (1000 * 60);
+
+    // Check if the scheduled shift has already ended
+    const timeFromEnd = now.getTime() - scheduledEnd.getTime();
+    const minutesAfterEnd = timeFromEnd / (1000 * 60);
+
+    // Don't allow starting shifts that are more than 1 hour past their scheduled end time
+    if (minutesAfterEnd > 60) {
+      alert(
+        `This shift ended at ${scheduledEnd.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })} and is now ${Math.floor(minutesAfterEnd / 60)}h ${Math.floor(
+          minutesAfterEnd % 60
+        )}m overdue. Please contact your manager to reschedule or create a new shift.`
+      );
+      return;
+    }
 
     // Allow starting 15 minutes early or up to 30 minutes late
     const EARLY_START_MINUTES = 15;
