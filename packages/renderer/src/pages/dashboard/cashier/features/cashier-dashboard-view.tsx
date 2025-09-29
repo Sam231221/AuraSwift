@@ -407,10 +407,25 @@ const CashierDashboardView = ({
           };
         } else if (minutesDifference > LATE_START_MINUTES) {
           const minutesLate = Math.floor(minutesDifference);
+          const hoursLate = Math.floor(minutesLate / 60);
+          const remainingMinutes = minutesLate % 60;
+
+          let lateText;
+          if (hoursLate > 0) {
+            if (remainingMinutes === 0) {
+              lateText =
+                hoursLate === 1 ? "1 hour late" : `${hoursLate} hours late`;
+            } else {
+              lateText = `${hoursLate}h ${remainingMinutes}m late`;
+            }
+          } else {
+            lateText = `${minutesLate} minutes late`;
+          }
+
           return {
             canStart: true,
             buttonText: `Start Shift (Late)`,
-            reason: `${minutesLate} minutes late`,
+            reason: lateText,
           };
         } else {
           return {
@@ -693,9 +708,32 @@ const CashierDashboardView = ({
                       );
 
                       if (diffMinutes > 5) {
-                        return ` (${diffMinutes}m late)`;
+                        const hours = Math.floor(diffMinutes / 60);
+                        const minutes = diffMinutes % 60;
+
+                        if (hours > 0) {
+                          if (minutes === 0) {
+                            return ` (${hours}h late)`;
+                          } else {
+                            return ` (${hours}h ${minutes}m late)`;
+                          }
+                        } else {
+                          return ` (${diffMinutes}m late)`;
+                        }
                       } else if (diffMinutes < -5) {
-                        return ` (${Math.abs(diffMinutes)}m early)`;
+                        const absDiffMinutes = Math.abs(diffMinutes);
+                        const hours = Math.floor(absDiffMinutes / 60);
+                        const minutes = absDiffMinutes % 60;
+
+                        if (hours > 0) {
+                          if (minutes === 0) {
+                            return ` (${hours}h early)`;
+                          } else {
+                            return ` (${hours}h ${minutes}m early)`;
+                          }
+                        } else {
+                          return ` (${absDiffMinutes}m early)`;
+                        }
                       }
                       return " (on time)";
                     })()}
@@ -1431,7 +1469,22 @@ const CashierDashboardView = ({
           <DialogHeader>
             <DialogTitle>Late Shift Start</DialogTitle>
             <DialogDescription>
-              You are {lateStartMinutes} minutes late for your scheduled shift.
+              You are{" "}
+              {(() => {
+                const hours = Math.floor(lateStartMinutes / 60);
+                const minutes = lateStartMinutes % 60;
+
+                if (hours > 0) {
+                  if (minutes === 0) {
+                    return hours === 1 ? "1 hour" : `${hours} hours`;
+                  } else {
+                    return `${hours}h ${minutes}m`;
+                  }
+                } else {
+                  return `${lateStartMinutes} minutes`;
+                }
+              })()}{" "}
+              late for your scheduled shift.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
