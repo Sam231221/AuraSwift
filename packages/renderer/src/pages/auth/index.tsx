@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -63,12 +62,7 @@ export default function AuthPage() {
 
       {/* Right Side - Auth Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <motion.div
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8 }}
-          className="w-full max-w-md"
-        >
+        <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
@@ -158,20 +152,15 @@ export default function AuthPage() {
             </CardContent>
           </Card>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1, duration: 0.5 }}
-            className="mt-8 text-center"
-          >
+          <div className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
               {"Need help? "}
               <Button variant="link" className="p-0 h-auto text-sm">
                 Contact Support
               </Button>
             </p>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       </div>
     </div>
   );

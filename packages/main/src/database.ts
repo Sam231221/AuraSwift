@@ -21,6 +21,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   isActive: boolean;
+  address: string;
 }
 
 export interface Permission {
@@ -327,6 +328,7 @@ export class DatabaseManager {
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         isActive BOOLEAN DEFAULT 1,
+        address TEXT DEFAULT '',
         FOREIGN KEY (businessId) REFERENCES businesses (id)
       )
     `);
@@ -840,8 +842,8 @@ export class DatabaseManager {
       this.db
         .prepare(
           `
-        INSERT INTO users (id, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (id, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
         )
         .run(
@@ -856,7 +858,8 @@ export class DatabaseManager {
           JSON.stringify(permissions),
           now,
           now,
-          1
+          1,
+          "" // Default empty address
         );
     } finally {
       // Re-enable foreign key constraints

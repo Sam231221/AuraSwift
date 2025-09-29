@@ -9,13 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import {
   Dialog,
   DialogContent,
@@ -521,22 +515,22 @@ export default function CashierManagementView({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            <div className="space-y-3 py-3">
               {/* Avatar Upload */}
-              <div className="flex justify-center">
+              <div className="flex">
                 <AvatarUpload
                   value={editUser.avatar}
                   onChange={(avatar) =>
                     setEditUser((prev) => ({ ...prev, avatar: avatar || "" }))
                   }
                   type="user"
-                  className="w-20 h-20"
-                  size="lg"
+                  className="w-15 h-15"
+                  size="md"
                 />
               </div>
 
               {/* Name Fields */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid mt-12 grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="editFirstName">First Name *</Label>
                   <Input
@@ -781,16 +775,6 @@ export default function CashierManagementView({
                 />
               </div>
             </div>
-            <Select value={filterRole} onValueChange={setFilterRole}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="cashier">Cashiers</SelectItem>
-                <SelectItem value="manager">Managers</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>

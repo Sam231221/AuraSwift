@@ -57,6 +57,25 @@ ipcMain.handle("auth:register", async (event, userData) => {
   }
 });
 
+// Register business owner (automatically sets role to admin)
+ipcMain.handle("auth:registerBusiness", async (event, userData) => {
+  try {
+    // Business owners are automatically admin users
+    const registrationData = {
+      ...userData,
+      role: "admin" as const,
+    };
+
+    return await authAPI.register(registrationData);
+  } catch (error) {
+    console.error("Business registration IPC error:", error);
+    return {
+      success: false,
+      message: "Business registration failed due to server error",
+    };
+  }
+});
+
 ipcMain.handle("auth:login", async (event, credentials) => {
   try {
     return await authAPI.login(credentials);

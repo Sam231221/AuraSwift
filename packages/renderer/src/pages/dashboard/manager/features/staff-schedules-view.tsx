@@ -237,20 +237,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     resetForm();
   };
 
-  /**
-   * SHIFT TIME MANAGEMENT - Updated to handle all cases from shiftallCases.md
-   *
-   * ✅ Case 1: Start time = End time (Invalid) - Rejected with clear message
-   * ✅ Case 2: End time before start time - Handles as overnight shift
-   * ✅ Case 3: Overnight shifts (crossing midnight) - Properly adds +1 day to end date
-   * ✅ Case 4: Shift too short - Configurable minimum (1 hour default)
-   * ✅ Case 5: Shift too long - Configurable maximum (16 hours default)
-   * ✅ Case 6: Overlap detection - Prevents overlapping shifts for same staff
-   * ✅ Case 7: Backdated shifts - Prevented by default (manager override available)
-   * ✅ Case 8: Future shifts - Allowed for scheduling
-   * ✅ Case 9: Timezone handling - Proper local to UTC conversion
-   */
-
   // Configuration constants for shift validation
   const SHIFT_CONFIG = {
     MIN_DURATION_MINUTES: 60, // 1 hour minimum as recommended in shiftallCases.md
@@ -647,7 +633,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 p-6">
+    <div className="min-h-screen  p-6">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}

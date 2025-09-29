@@ -109,15 +109,6 @@ export function RegisterForm({
             size="md"
             disabled={isLoading}
           />
-
-          <AvatarUpload
-            value={userAvatar || undefined}
-            onChange={setUserAvatar}
-            type="user"
-            label="Your Profile Photo (Optional)"
-            size="md"
-            disabled={isLoading}
-          />
         </div>
 
         <div className="space-y-2">
