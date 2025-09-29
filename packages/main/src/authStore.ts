@@ -401,8 +401,23 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
     console.log("Starting shift for cashier:", shiftData.cashierId);
     if (!db) db = await getDatabase();
 
-    // Check if cashier already has an active shift
-    const existingShift = db.getActiveShiftByCashier(shiftData.cashierId);
+    // Clean up overdue and old unclosed shifts first to prevent conflicts
+    const overdueCount = db.autoEndOverdueShiftsToday();
+    if (overdueCount > 0) {
+      console.log(
+        `Auto-ended ${overdueCount} overdue shifts before starting new shift`
+      );
+    }
+
+    const closedCount = db.autoCloseOldActiveShifts();
+    if (closedCount > 0) {
+      console.log(
+        `Auto-closed ${closedCount} old active shifts before starting new shift`
+      );
+    }
+
+    // Check if cashier already has an active shift (only check today's shifts)
+    const existingShift = db.getTodaysActiveShiftByCashier(shiftData.cashierId);
     if (existingShift) {
       return {
         success: false,
@@ -481,7 +496,20 @@ ipcMain.handle("shift:getActive", async (event, cashierId) => {
     console.log("Getting active shift for cashier:", cashierId);
     if (!db) db = await getDatabase();
 
-    const shift = db.getActiveShiftByCashier(cashierId);
+    // First, auto-end any overdue shifts from today (more aggressive)
+    const overdueCount = db.autoEndOverdueShiftsToday();
+    if (overdueCount > 0) {
+      console.log(`Auto-ended ${overdueCount} overdue shifts from today`);
+    }
+
+    // Then clean up old unclosed shifts (24+ hours old)
+    const closedCount = db.autoCloseOldActiveShifts();
+    if (closedCount > 0) {
+      console.log(`Auto-closed ${closedCount} old active shifts`);
+    }
+
+    // Use the new method that checks for today's active shift only
+    const shift = db.getTodaysActiveShiftByCashier(cashierId);
     return {
       success: true,
       data: shift,
@@ -572,6 +600,26 @@ ipcMain.handle("shift:getHourlyStats", async (event, shiftId) => {
     return {
       success: false,
       message: "Failed to get hourly stats",
+    };
+  }
+});
+
+ipcMain.handle("shift:getCashDrawerBalance", async (event, shiftId) => {
+  try {
+    console.log("Getting current cash drawer balance for shift:", shiftId);
+    if (!db) db = await getDatabase();
+
+    const cashBalance = db.getCurrentCashDrawerBalance(shiftId);
+
+    return {
+      success: true,
+      data: cashBalance,
+    };
+  } catch (error) {
+    console.error("Get cash drawer balance IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get cash drawer balance",
     };
   }
 });

@@ -129,6 +129,7 @@ declare global {
       getTodaySchedule: (cashierId: string) => Promise<APIResponse>;
       getStats: (shiftId: string) => Promise<APIResponse>;
       getHourlyStats: (shiftId: string) => Promise<APIResponse>;
+      getCashDrawerBalance: (shiftId: string) => Promise<APIResponse>;
       reconcile: (
         shiftId: string,
         reconciliationData: {

@@ -284,7 +284,7 @@ export class DatabaseManager {
       const projectRoot = path.join(__dirname, "..", "..", "..");
       const devDbPath = path.join(projectRoot, "dev-data", "pos_system.db");
       console.log("🔧 Development mode: Using project directory for database");
-      console.log("📁 Database will be created at:", devDbPath);
+      console.log("📁 Database at:", devDbPath);
       return devDbPath;
     } else {
       // Production: Use proper user data directory based on platform
@@ -295,7 +295,7 @@ export class DatabaseManager {
         "pos_system.db"
       );
       console.log("🚀 Production mode: Using user data directory for database");
-      console.log("📁 Database will be created at:", prodDbPath);
+      console.log("📁 Database at:", prodDbPath);
       return prodDbPath;
     }
   }
@@ -1698,6 +1698,194 @@ export class DatabaseManager {
     return (stmt.get(cashierId) as Shift) || null;
   }
 
+  // Get active shift for cashier, but only if it started today or within the last 24 hours
+  // This prevents old unclosed shifts from interfering with new shifts
+  getTodaysActiveShiftByCashier(cashierId: string): Shift | null {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(6, 0, 0, 0); // Consider shifts from 6 AM yesterday to account for night shifts
+
+    const stmt = this.db.prepare(`
+      SELECT * FROM shifts 
+      WHERE cashierId = ? 
+        AND status = 'active' 
+        AND startTime >= ? 
+      ORDER BY startTime DESC 
+      LIMIT 1
+    `);
+    return (stmt.get(cashierId, yesterday.toISOString()) as Shift) || null;
+  }
+
+  // Auto-close old unclosed shifts that are more than 24 hours old
+  // This should be called periodically to clean up abandoned shifts
+  autoCloseOldActiveShifts(): number {
+    const now = new Date();
+    const nowString = now.toISOString();
+
+    // 1. Close shifts older than 24 hours (basic cleanup)
+    const basicCutoffTime = new Date(now);
+    basicCutoffTime.setDate(basicCutoffTime.getDate() - 1);
+    basicCutoffTime.setHours(6, 0, 0, 0);
+
+    // 2. Get all active shifts to check individually
+    const activeShiftsStmt = this.db.prepare(`
+      SELECT s.*, sch.endTime as scheduledEndTime 
+      FROM shifts s
+      LEFT JOIN schedules sch ON s.scheduleId = sch.id
+      WHERE s.status = 'active'
+    `);
+    const activeShifts = activeShiftsStmt.all();
+
+    let closedCount = 0;
+
+    for (const shift of activeShifts) {
+      let shouldClose = false;
+      let closeReason = "";
+
+      const shiftStart = new Date(shift.startTime);
+
+      // Rule 1: Close shifts older than 24 hours
+      if (shiftStart < basicCutoffTime) {
+        shouldClose = true;
+        closeReason =
+          "Auto-closed - shift was left open for more than 24 hours";
+      }
+
+      // Rule 2: Close shifts that are way past their scheduled end time
+      else if (shift.scheduledEndTime) {
+        const scheduledEnd = new Date(shift.scheduledEndTime);
+        const hoursOverdue =
+          (now.getTime() - scheduledEnd.getTime()) / (1000 * 60 * 60);
+
+        // Close shifts that are more than 4 hours past scheduled end time
+        if (hoursOverdue > 4) {
+          shouldClose = true;
+          closeReason = `Auto-closed - shift was ${Math.round(
+            hoursOverdue
+          )} hours past scheduled end time`;
+        }
+      }
+
+      // Rule 3: Close shifts that started more than 16 hours ago (even without schedule)
+      else {
+        const hoursActive =
+          (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60);
+        if (hoursActive > 16) {
+          shouldClose = true;
+          closeReason = `Auto-closed - shift was active for ${Math.round(
+            hoursActive
+          )} hours without schedule`;
+        }
+      }
+
+      if (shouldClose) {
+        // Calculate estimated cash drawer based on sales
+        const estimatedCash = shift.startingCash + (shift.totalSales || 0);
+
+        const updateStmt = this.db.prepare(`
+          UPDATE shifts 
+          SET 
+            status = 'ended',
+            endTime = ?,
+            finalCashDrawer = ?,
+            expectedCashDrawer = ?,
+            notes = COALESCE(notes || '; ', '') || ?
+          WHERE id = ?
+        `);
+
+        updateStmt.run(
+          nowString,
+          estimatedCash,
+          estimatedCash,
+          closeReason,
+          shift.id
+        );
+
+        closedCount++;
+        console.log(`Auto-closed shift ${shift.id}: ${closeReason}`);
+      }
+    }
+
+    return closedCount;
+  }
+
+  // Check for shifts that should be auto-ended today (more aggressive than the 24-hour cleanup)
+  // This is called when someone tries to start a new shift or when checking active shifts
+  autoEndOverdueShiftsToday(): number {
+    const now = new Date();
+    const nowString = now.toISOString();
+
+    const activeShiftsStmt = this.db.prepare(`
+      SELECT s.*, sch.endTime as scheduledEndTime 
+      FROM shifts s
+      LEFT JOIN schedules sch ON s.scheduleId = sch.id
+      WHERE s.status = 'active'
+        AND DATE(s.startTime) = DATE(?)
+    `);
+    const activeShifts = activeShiftsStmt.all(nowString);
+
+    let closedCount = 0;
+
+    for (const shift of activeShifts) {
+      let shouldClose = false;
+      let closeReason = "";
+
+      if (shift.scheduledEndTime) {
+        const scheduledEnd = new Date(shift.scheduledEndTime);
+        const hoursOverdue =
+          (now.getTime() - scheduledEnd.getTime()) / (1000 * 60 * 60);
+
+        // More aggressive: Close shifts that are 2+ hours past scheduled end time
+        if (hoursOverdue > 2) {
+          shouldClose = true;
+          closeReason = `Auto-closed - shift was ${Math.round(
+            hoursOverdue
+          )} hours past scheduled end time`;
+        }
+      } else {
+        // No schedule - close if active for more than 12 hours
+        const shiftStart = new Date(shift.startTime);
+        const hoursActive =
+          (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60);
+        if (hoursActive > 12) {
+          shouldClose = true;
+          closeReason = `Auto-closed - shift was active for ${Math.round(
+            hoursActive
+          )} hours without schedule`;
+        }
+      }
+
+      if (shouldClose) {
+        const estimatedCash = shift.startingCash + (shift.totalSales || 0);
+
+        const updateStmt = this.db.prepare(`
+          UPDATE shifts 
+          SET 
+            status = 'ended',
+            endTime = ?,
+            finalCashDrawer = ?,
+            expectedCashDrawer = ?,
+            notes = COALESCE(notes || '; ', '') || ?
+          WHERE id = ?
+        `);
+
+        updateStmt.run(
+          nowString,
+          estimatedCash,
+          estimatedCash,
+          closeReason,
+          shift.id
+        );
+
+        closedCount++;
+        console.log(`Auto-ended overdue shift ${shift.id}: ${closeReason}`);
+      }
+    }
+
+    return closedCount;
+  }
+
   endShift(
     shiftId: string,
     endData: {
@@ -2524,6 +2712,52 @@ export class DatabaseManager {
       SELECT * FROM cash_drawer_counts WHERE shiftId = ? ORDER BY timestamp ASC
     `);
     return stmt.all(shiftId) as CashDrawerCount[];
+  }
+
+  // Get current cash drawer balance based on latest count or estimated amount
+  getCurrentCashDrawerBalance(shiftId: string): {
+    amount: number;
+    isEstimated: boolean;
+    lastCountTime?: string;
+    variance?: number;
+  } {
+    // Get shift details
+    const shiftStmt = this.db.prepare(`SELECT * FROM shifts WHERE id = ?`);
+    const shift = shiftStmt.get(shiftId) as Shift | null;
+
+    if (!shift) {
+      return { amount: 0, isEstimated: true };
+    }
+
+    // Get the most recent cash count
+    const countStmt = this.db.prepare(`
+      SELECT * FROM cash_drawer_counts 
+      WHERE shiftId = ? 
+      ORDER BY timestamp DESC 
+      LIMIT 1
+    `);
+    const latestCount = countStmt.get(shiftId) as CashDrawerCount | null;
+
+    if (latestCount) {
+      // Use actual counted amount
+      const expectedAtCountTime = this.getExpectedCashForShift(shiftId);
+      const variance =
+        latestCount.countedAmount - expectedAtCountTime.expectedAmount;
+
+      return {
+        amount: latestCount.countedAmount,
+        isEstimated: false,
+        lastCountTime: latestCount.timestamp,
+        variance: variance,
+      };
+    } else {
+      // Estimate based on starting cash + sales
+      const expectedCash = this.getExpectedCashForShift(shiftId);
+      return {
+        amount: expectedCash.expectedAmount,
+        isEstimated: true,
+      };
+    }
   }
 
   // Calculate expected cash amount for a shift

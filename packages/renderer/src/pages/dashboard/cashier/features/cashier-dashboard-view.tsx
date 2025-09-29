@@ -141,6 +141,15 @@ const CashierDashboardView = ({
     currentHour: 0,
     averagePerHour: 0,
   });
+  const [cashDrawerBalance, setCashDrawerBalance] = useState<{
+    amount: number;
+    isEstimated: boolean;
+    lastCountTime?: string;
+    variance?: number;
+  }>({
+    amount: 0,
+    isEstimated: true,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [showStartShiftDialog, setShowStartShiftDialog] = useState(false);
   const [showEndShiftDialog, setShowEndShiftDialog] = useState(false);
@@ -193,9 +202,12 @@ const CashierDashboardView = ({
             currentHour: 0,
             averagePerHour: 0,
           });
+          setCashDrawerBalance({
+            amount: 0,
+            isEstimated: true,
+          });
           setShowOvertimeWarning(false);
           setOvertimeMinutes(0);
-
           alert(
             `Your shift has been automatically ended due to excessive overtime (${minutesOvertime} minutes). ` +
               `The cash drawer amount has been estimated. Please contact your manager for shift reconciliation.`
@@ -274,12 +286,31 @@ const CashierDashboardView = ({
             }
           );
         }
+
+        // Load cash drawer balance if shift is active
+        const cashBalanceResponse = await window.shiftAPI.getCashDrawerBalance(
+          shiftData.id
+        );
+        if (cashBalanceResponse.success && cashBalanceResponse.data) {
+          setCashDrawerBalance(
+            cashBalanceResponse.data as {
+              amount: number;
+              isEstimated: boolean;
+              lastCountTime?: string;
+              variance?: number;
+            }
+          );
+        }
       } else {
         setActiveShift(null);
         setHourlyStats({
           lastHour: 0,
           currentHour: 0,
           averagePerHour: 0,
+        });
+        setCashDrawerBalance({
+          amount: 0,
+          isEstimated: true,
         });
       }
 
@@ -396,11 +427,6 @@ const CashierDashboardView = ({
       };
 
   // Calculate derived values
-  const cashVariance = activeShift
-    ? (activeShift.finalCashDrawer || 0) -
-      (activeShift.startingCash + (shiftStats.totalSales || 0))
-    : 0;
-
   const averageTransaction =
     shiftStats.totalTransactions > 0
       ? shiftStats.totalSales / shiftStats.totalTransactions
@@ -505,6 +531,10 @@ const CashierDashboardView = ({
           currentHour: 0,
           averagePerHour: 0,
         });
+        setCashDrawerBalance({
+          amount: 0,
+          isEstimated: true,
+        });
         setShowStartShiftDialog(false);
         setShowLateStartConfirm(false);
       } else {
@@ -565,6 +595,10 @@ const CashierDashboardView = ({
           lastHour: 0,
           currentHour: 0,
           averagePerHour: 0,
+        });
+        setCashDrawerBalance({
+          amount: 0,
+          isEstimated: true,
         });
         setShowEndShiftDialog(false);
         setShowOvertimeWarning(false);
@@ -963,27 +997,44 @@ const CashierDashboardView = ({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-amber-700">
-                £
-                {(
-                  (activeShift?.finalCashDrawer ||
-                    activeShift?.startingCash ||
-                    0) + (shiftStats.totalSales || 0)
-                ).toFixed(2)}
+                £{cashDrawerBalance.amount.toFixed(2)}
+                {cashDrawerBalance.isEstimated && (
+                  <span className="text-xs text-amber-600 ml-1">(est.)</span>
+                )}
               </div>
               <div
                 className={`flex items-center mt-2 text-sm ${
-                  cashVariance >= 0 ? "text-green-600" : "text-red-600"
+                  (cashDrawerBalance.variance || 0) >= 0
+                    ? "text-green-600"
+                    : "text-red-600"
                 }`}
               >
-                {cashVariance >= 0 ? (
+                {(cashDrawerBalance.variance || 0) >= 0 ? (
                   <CheckCircle className="h-4 w-4 mr-1" />
                 ) : (
                   <AlertTriangle className="h-4 w-4 mr-1" />
                 )}
-                <span>Variance: £{Math.abs(cashVariance).toFixed(2)}</span>
+                <span>
+                  Variance: £
+                  {Math.abs(cashDrawerBalance.variance || 0).toFixed(2)}
+                  {cashDrawerBalance.isEstimated && " (est.)"}
+                </span>
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                Starting: £{(activeShift?.startingCash || 0).toFixed(2)}
+                {cashDrawerBalance.lastCountTime ? (
+                  <>
+                    Last count:{" "}
+                    {new Date(
+                      cashDrawerBalance.lastCountTime
+                    ).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </>
+                ) : (
+                  <>Starting: £{(activeShift?.startingCash || 0).toFixed(2)}</>
+                )}
               </div>
             </CardContent>
           </Card>

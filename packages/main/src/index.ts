@@ -15,6 +15,38 @@ export async function initApp(initConfig: AppInitConfig) {
   const db = await getDatabase();
   console.log("Database initialized");
 
+  // Set up periodic cleanup of old unclosed shifts
+  // Run cleanup every 30 minutes
+  const cleanupInterval = setInterval(() => {
+    try {
+      const closedCount = db.autoCloseOldActiveShifts();
+      if (closedCount > 0) {
+        console.log(
+          `Periodic cleanup: Auto-closed ${closedCount} old active shifts`
+        );
+      }
+    } catch (error) {
+      console.error("Error during periodic shift cleanup:", error);
+    }
+  }, 30 * 60 * 1000); // 30 minutes
+
+  // Clean up on app exit
+  process.on("exit", () => {
+    clearInterval(cleanupInterval);
+  });
+
+  // Run cleanup immediately on startup
+  try {
+    const initialCleanupCount = db.autoCloseOldActiveShifts();
+    if (initialCleanupCount > 0) {
+      console.log(
+        `Startup cleanup: Auto-closed ${initialCleanupCount} old active shifts`
+      );
+    }
+  } catch (error) {
+    console.error("Error during startup shift cleanup:", error);
+  }
+
   const moduleRunner = createModuleRunner()
     .init(
       createWindowManagerModule({
