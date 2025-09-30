@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useCallback, memo } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -169,13 +169,198 @@ const CashierDashboardView = ({
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Handle automadtic shift ending when overtime exceeds threshold
+  // Load shift data function with smart updates to prevent flickering
+  const loadShiftData = useCallback(
+    async (isInitialLoad = false) => {
+      try {
+        if (isInitialLoad) {
+          setIsLoading(true);
+        }
+
+        if (!user?.id) return;
+
+        // Load active shift
+        const activeShiftResponse = await window.shiftAPI.getActive(user.id);
+        if (activeShiftResponse.success && activeShiftResponse.data) {
+          const shiftData = activeShiftResponse.data as Shift;
+
+          // Only update if data has actually changed
+          setActiveShift((prevShift) => {
+            if (
+              !prevShift ||
+              JSON.stringify(prevShift) !== JSON.stringify(shiftData)
+            ) {
+              return shiftData;
+            }
+            return prevShift;
+          });
+
+          // Load shift stats if shift is active
+          const statsResponse = await window.shiftAPI.getStats(shiftData.id);
+          if (statsResponse.success && statsResponse.data) {
+            const newStats = statsResponse.data as ShiftStats;
+            setShiftStats((prevStats) => {
+              if (JSON.stringify(prevStats) !== JSON.stringify(newStats)) {
+                return newStats;
+              }
+              return prevStats;
+            });
+          }
+
+          // Load hourly stats if shift is active
+          const hourlyStatsResponse = await window.shiftAPI.getHourlyStats(
+            shiftData.id
+          );
+          if (hourlyStatsResponse.success && hourlyStatsResponse.data) {
+            const newHourlyStats = hourlyStatsResponse.data as {
+              lastHour: number;
+              currentHour: number;
+              averagePerHour: number;
+            };
+            setHourlyStats((prevHourlyStats) => {
+              if (
+                JSON.stringify(prevHourlyStats) !==
+                JSON.stringify(newHourlyStats)
+              ) {
+                return newHourlyStats;
+              }
+              return prevHourlyStats;
+            });
+          }
+
+          // Load cash drawer balance if shift is active
+          const cashBalanceResponse =
+            await window.shiftAPI.getCashDrawerBalance(shiftData.id);
+          if (cashBalanceResponse.success && cashBalanceResponse.data) {
+            const newCashBalance = cashBalanceResponse.data as {
+              amount: number;
+              isEstimated: boolean;
+              lastCountTime?: string;
+              variance?: number;
+            };
+            setCashDrawerBalance((prevCashBalance) => {
+              if (
+                JSON.stringify(prevCashBalance) !==
+                JSON.stringify(newCashBalance)
+              ) {
+                return newCashBalance;
+              }
+              return prevCashBalance;
+            });
+          }
+        } else {
+          // Only update if currently there is an active shift
+          setActiveShift((prevShift) => (prevShift ? null : prevShift));
+          setHourlyStats((prevStats) => {
+            const defaultStats = {
+              lastHour: 0,
+              currentHour: 0,
+              averagePerHour: 0,
+            };
+            if (JSON.stringify(prevStats) !== JSON.stringify(defaultStats)) {
+              return defaultStats;
+            }
+            return prevStats;
+          });
+          setCashDrawerBalance((prevBalance) => {
+            const defaultBalance = {
+              amount: 0,
+              isEstimated: true,
+            };
+            if (
+              JSON.stringify(prevBalance) !== JSON.stringify(defaultBalance)
+            ) {
+              return defaultBalance;
+            }
+            return prevBalance;
+          });
+        }
+
+        // Load today's schedule
+        const scheduleResponse = await window.shiftAPI.getTodaySchedule(
+          user.id
+        );
+        if (scheduleResponse.success && scheduleResponse.data) {
+          const newSchedule = scheduleResponse.data as Schedule;
+          setTodaySchedule((prevSchedule) => {
+            if (
+              !prevSchedule ||
+              JSON.stringify(prevSchedule) !== JSON.stringify(newSchedule)
+            ) {
+              return newSchedule;
+            }
+            return prevSchedule;
+          });
+        } else {
+          setTodaySchedule((prevSchedule) =>
+            prevSchedule ? null : prevSchedule
+          );
+        }
+
+        // Load recent transactions (including refunds) - prioritize current shift if active
+        try {
+          let transactionsResponse;
+          if (activeShiftResponse.success && activeShiftResponse.data) {
+            // If there's an active shift, get transactions from current shift only
+            const shiftData = activeShiftResponse.data as Shift;
+            transactionsResponse = await window.refundAPI.getShiftTransactions(
+              shiftData.id,
+              10
+            );
+          } else if (user.businessId) {
+            // If no active shift, get recent transactions from business
+            transactionsResponse = await window.refundAPI.getRecentTransactions(
+              user.businessId,
+              10
+            );
+          }
+
+          if (
+            transactionsResponse &&
+            transactionsResponse.success &&
+            "transactions" in transactionsResponse
+          ) {
+            const transactionsData = transactionsResponse as {
+              success: boolean;
+              transactions: Transaction[];
+            };
+            const newTransactions = transactionsData.transactions || [];
+            setTransactions((prevTransactions) => {
+              if (
+                JSON.stringify(prevTransactions) !==
+                JSON.stringify(newTransactions)
+              ) {
+                return newTransactions;
+              }
+              return prevTransactions;
+            });
+          }
+        } catch (transactionError) {
+          console.error(
+            "Failed to load recent transactions:",
+            transactionError
+          );
+          // Don't fail the entire load if transactions fail
+          setTransactions([]);
+        }
+      } catch (error) {
+        console.error("Failed to load shift data:", error);
+      } finally {
+        if (isInitialLoad) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [user?.id, user?.businessId]
+  );
+
+  // Handle automatic shift ending when overtime exceeds threshold
   const handleAutoEndShift = useCallback(
     async (minutesOvertime: number) => {
       if (!activeShift) return;
 
       try {
-        // Auto-end swith current mm cash drawer balance (estimated)
+        // Auto-end shift with current cash drawer balance (estimated)
         const estimatedCashDrawer =
           activeShift.startingCash + (shiftStats.totalSales || 0);
 
@@ -214,30 +399,15 @@ const CashierDashboardView = ({
           );
 
           // Reload shift data to ensure UI is in sync with server state
-          setTimeout(async () => {
-            // Manually reload shift data without dependency on loadShiftData function
-            try {
-              if (!user?.id) return;
-              const activeShiftResponse = await window.shiftAPI.getActive(
-                user.id
-              );
-              if (!activeShiftResponse.success || !activeShiftResponse.data) {
-                // Force component to re-render by updating a state that will trigger recalculation
-                setActiveShift(null);
-              }
-            } catch (error) {
-              console.error(
-                "Failed to refresh shift data after auto-end:",
-                error
-              );
-            }
+          setTimeout(() => {
+            loadShiftData(false); // Refresh without loading indicator
           }, 1000);
         }
       } catch (error) {
         console.error("Failed to auto-end shift:", error);
       }
     },
-    [activeShift, shiftStats, user?.id]
+    [activeShift, shiftStats, loadShiftData]
   );
 
   // Check for overtime and handle automatic shift ending
@@ -274,125 +444,21 @@ const CashierDashboardView = ({
     return () => clearInterval(overtimeInterval);
   }, [activeShift, todaySchedule, showOvertimeWarning, handleAutoEndShift]);
 
-  // Load shift data function
-  const loadShiftData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-
-      if (!user?.id) return;
-
-      // Load active shift
-      const activeShiftResponse = await window.shiftAPI.getActive(user.id);
-      if (activeShiftResponse.success && activeShiftResponse.data) {
-        const shiftData = activeShiftResponse.data as Shift;
-        setActiveShift(shiftData);
-
-        // Load shift stats if shift is active
-        const statsResponse = await window.shiftAPI.getStats(shiftData.id);
-        if (statsResponse.success && statsResponse.data) {
-          setShiftStats(statsResponse.data as ShiftStats);
-        }
-
-        // Load hourly stats if shift is active
-        const hourlyStatsResponse = await window.shiftAPI.getHourlyStats(
-          shiftData.id
-        );
-        if (hourlyStatsResponse.success && hourlyStatsResponse.data) {
-          setHourlyStats(
-            hourlyStatsResponse.data as {
-              lastHour: number;
-              currentHour: number;
-              averagePerHour: number;
-            }
-          );
-        }
-
-        // Load cash drawer balance if shift is active
-        const cashBalanceResponse = await window.shiftAPI.getCashDrawerBalance(
-          shiftData.id
-        );
-        if (cashBalanceResponse.success && cashBalanceResponse.data) {
-          setCashDrawerBalance(
-            cashBalanceResponse.data as {
-              amount: number;
-              isEstimated: boolean;
-              lastCountTime?: string;
-              variance?: number;
-            }
-          );
-        }
-      } else {
-        setActiveShift(null);
-        setHourlyStats({
-          lastHour: 0,
-          currentHour: 0,
-          averagePerHour: 0,
-        });
-        setCashDrawerBalance({
-          amount: 0,
-          isEstimated: true,
-        });
-      }
-
-      // Load today's schedule
-      const scheduleResponse = await window.shiftAPI.getTodaySchedule(user.id);
-      if (scheduleResponse.success && scheduleResponse.data) {
-        setTodaySchedule(scheduleResponse.data as Schedule);
-      } else {
-        setTodaySchedule(null);
-      }
-
-      // Load recent transactions (including refunds) - prioritize current shift if active
-      try {
-        let transactionsResponse;
-        if (activeShiftResponse.success && activeShiftResponse.data) {
-          // If there's an active shift, get transactions from current shift only
-          const shiftData = activeShiftResponse.data as Shift;
-          transactionsResponse = await window.refundAPI.getShiftTransactions(
-            shiftData.id,
-            10
-          );
-        } else if (user.businessId) {
-          // If no active shift, get recent transactions from business
-          transactionsResponse = await window.refundAPI.getRecentTransactions(
-            user.businessId,
-            10
-          );
-        }
-
-        if (
-          transactionsResponse &&
-          transactionsResponse.success &&
-          "transactions" in transactionsResponse
-        ) {
-          const transactionsData = transactionsResponse as {
-            success: boolean;
-            transactions: Transaction[];
-          };
-          setTransactions(transactionsData.transactions || []);
-        }
-      } catch (transactionError) {
-        console.error("Failed to load recent transactions:", transactionError);
-        // Don't fail the entire load if transactions fail
-        setTransactions([]);
-      }
-    } catch (error) {
-      console.error("Failed to load shift data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.id, user?.businessId]);
-
   // Load shift data on component mount
   useEffect(() => {
-    loadShiftData();
+    loadShiftData(true); // Initial load with loading indicator
 
     // Refresh data every 30 seconds to pick up schedule changes made by manager
     // This ensures that when manager extends end time (e.g., 9 PM to 10 PM),
     // cashier dashboard updates live while preserving actual work times
-    const interval = setInterval(loadShiftData, 30000);
+    const interval = setInterval(() => {
+      // Only refresh if component is still mounted and user is authenticated
+      if (user?.id) {
+        loadShiftData(false); // Background refresh without loading indicator
+      }
+    }, 30000); // Reduced frequency from 2 seconds to 30 seconds to prevent flickering
     return () => clearInterval(interval);
-  }, [loadShiftData]);
+  }, [loadShiftData, user?.id]);
 
   // Calculate shift timing validation
   const shiftTimingInfo = todaySchedule
@@ -701,39 +767,33 @@ const CashierDashboardView = ({
     <>
       {/* Overtime Warning Banner */}
       {showOvertimeWarning && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-red-100 border border-red-300 p-4 rounded-lg mb-4"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              <div>
-                <h3 className="font-semibold text-red-800">
-                  Shift Overtime Warning
-                </h3>
-                <p className="text-sm text-red-700">
-                  Your shift is {overtimeMinutes} minutes past the scheduled end
-                  time. Please end your shift as soon as possible.
-                  {overtimeMinutes >= 60 && (
-                    <span className="font-medium">
-                      {" "}
-                      Shifts exceeding 2 hours overtime will be automatically
-                      ended.
-                    </span>
-                  )}
-                </p>
-              </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+            <div>
+              <h3 className="font-semibold text-red-800">
+                Shift Overtime Warning
+              </h3>
+              <p className="text-sm text-red-700">
+                Your shift is {overtimeMinutes} minutes past the scheduled end
+                time. Please end your shift as soon as possible.
+                {overtimeMinutes >= 60 && (
+                  <span className="font-medium">
+                    {" "}
+                    Shifts exceeding 2 hours overtime will be automatically
+                    ended.
+                  </span>
+                )}
+              </p>
             </div>
-            <Button
-              onClick={handleEndShiftClick}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              End Shift Now
-            </Button>
           </div>
-        </motion.div>
+          <Button
+            onClick={handleEndShiftClick}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            End Shift Now
+          </Button>
+        </div>
       )}
 
       {/* Shift Status Bar */}
@@ -934,18 +994,27 @@ const CashierDashboardView = ({
                     Scheduled Shift:
                     {(() => {
                       // Show indicator if schedule was recently updated (within last hour)
+                      // Only show if updatedAt is different from createdAt (actual update, not just creation)
                       const updatedAt = new Date(todaySchedule.updatedAt);
+                      const createdAt = new Date(todaySchedule.createdAt);
                       const now = new Date();
-                      const hoursSinceUpdate =
-                        (now.getTime() - updatedAt.getTime()) /
-                        (1000 * 60 * 60);
 
-                      if (hoursSinceUpdate < 1) {
-                        return (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
-                            Recently Updated
-                          </span>
-                        );
+                      // Check if the schedule was actually updated after creation
+                      const wasActuallyUpdated =
+                        updatedAt.getTime() > createdAt.getTime();
+
+                      if (wasActuallyUpdated) {
+                        const hoursSinceUpdate =
+                          (now.getTime() - updatedAt.getTime()) /
+                          (1000 * 60 * 60);
+
+                        if (hoursSinceUpdate < 1) {
+                          return (
+                            <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                              Recently Updated
+                            </span>
+                          );
+                        }
                       }
                       return null;
                     })()}
@@ -1542,7 +1611,7 @@ const CashierDashboardView = ({
         onRefundProcessed={() => {
           // Refresh dashboard data after successful refund
           setShowRefundView(false);
-          loadShiftData(); // Refresh shift stats and recent transactions
+          loadShiftData(false); // Refresh shift stats and recent transactions without loading indicator
         }}
       />
 
@@ -1553,7 +1622,7 @@ const CashierDashboardView = ({
         onVoidComplete={() => {
           // Refresh dashboard data after successful void
           setShowVoidModal(false);
-          loadShiftData(); // Refresh shift stats and recent transactions
+          loadShiftData(false); // Refresh shift stats and recent transactions without loading indicator
         }}
         activeShiftId={activeShift?.id || null}
       />
@@ -1565,7 +1634,7 @@ const CashierDashboardView = ({
         onCountComplete={() => {
           // Refresh dashboard data after successful count
           setShowCashCountModal(false);
-          loadShiftData(); // Refresh shift stats and recent transactions
+          loadShiftData(false); // Refresh dashboard data without loading indicator
         }}
         activeShiftId={activeShift?.id || null}
         countType={cashCountType}
@@ -1575,4 +1644,4 @@ const CashierDashboardView = ({
   );
 };
 
-export default CashierDashboardView;
+export default memo(CashierDashboardView);
