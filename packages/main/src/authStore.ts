@@ -233,6 +233,79 @@ ipcMain.handle("products:delete", async (event, id) => {
   }
 });
 
+// Category Management IPC handlers
+ipcMain.handle("categories:create", async (event, categoryData) => {
+  try {
+    return await authAPI.createCategory(categoryData);
+  } catch (error) {
+    console.error("Create category IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to create category",
+    };
+  }
+});
+
+ipcMain.handle("categories:getByBusiness", async (event, businessId) => {
+  try {
+    return await authAPI.getCategoriesByBusiness(businessId);
+  } catch (error) {
+    console.error("Get categories by business IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get categories",
+    };
+  }
+});
+
+ipcMain.handle("categories:getById", async (event, id) => {
+  try {
+    return await authAPI.getCategoryById(id);
+  } catch (error) {
+    console.error("Get category by ID IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get category",
+    };
+  }
+});
+
+ipcMain.handle("categories:update", async (event, id, updates) => {
+  try {
+    return await authAPI.updateCategory(id, updates);
+  } catch (error) {
+    console.error("Update category IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to update category",
+    };
+  }
+});
+
+ipcMain.handle("categories:delete", async (event, id) => {
+  try {
+    return await authAPI.deleteCategory(id);
+  } catch (error) {
+    console.error("Delete category IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to delete category",
+    };
+  }
+});
+
+ipcMain.handle("categories:reorder", async (event, businessId, categoryIds) => {
+  try {
+    return await authAPI.reorderCategories(businessId, categoryIds);
+  } catch (error) {
+    console.error("Reorder categories IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to reorder categories",
+    };
+  }
+});
+
 ipcMain.handle("modifiers:create", async (event, modifierData) => {
   try {
     return await authAPI.createModifier(modifierData);

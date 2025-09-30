@@ -19,6 +19,7 @@ import {
   Minus,
   TrendingDown,
   Scale,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,16 +48,19 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
 import type { Product, Modifier } from "@/types/product.types";
+import ManageCategoriesView from "./manage-categories-view";
 
-// Categories for products
-const categories = [
-  "Starters",
-  "Mains",
-  "Desserts",
-  "Soft Drinks",
-  "Alcoholic Beverages",
-  "Coffee & Tea",
-];
+// Category type
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  businessId: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface ProductManagementViewProps {
   onBack: () => void;
@@ -70,10 +74,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   // State management
   const [currentView, setCurrentView] = useState<
-    "productDashboard" | "productManagement"
+    "productDashboard" | "productManagement" | "categoryManagement"
   >("productDashboard");
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -102,7 +107,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     sku: "",
     plu: "",
     image: "",
-    category: categories[0],
+    category: "",
     stockLevel: 0,
     minStockLevel: 5,
     modifiers: [] as Modifier[],
@@ -135,12 +140,27 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     }
   }, [user]);
 
-  // Load products on component mount
+  const loadCategories = useCallback(async () => {
+    try {
+      const response = await window.categoryAPI.getByBusiness(user!.businessId);
+      if (response.success && response.categories) {
+        setCategories(response.categories);
+      } else {
+        toast.error("Failed to load categories");
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      toast.error("Failed to load categories");
+    }
+  }, [user]);
+
+  // Load data on component mount
   useEffect(() => {
     if (user?.businessId) {
       loadProducts();
+      loadCategories();
     }
-  }, [user, loadProducts]);
+  }, [user, loadProducts, loadCategories]);
 
   // Close drawer when view changes
   useEffect(() => {
@@ -188,7 +208,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       sku: "",
       plu: "",
       image: "",
-      category: categories[0],
+      category: categories.length > 0 ? categories[0].id : "",
       stockLevel: 0,
       minStockLevel: 5,
       modifiers: [],
@@ -197,13 +217,53 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       pricePerUnit: 0,
     });
     setEditingProduct(null);
-  }, []);
+  }, [categories]);
 
-  const handleAddProduct = async () => {
-    if (!newProduct.name || !newProduct.sku || !user?.businessId) {
-      toast.error("Please fill in all required fields");
+  const openAddProductDrawer = useCallback(() => {
+    // Ensure we have categories loaded before opening
+    if (categories.length === 0) {
+      toast.error("Please wait for categories to load or add a category first");
       return;
     }
+    resetForm();
+    setIsDrawerOpen(true);
+  }, [categories, resetForm]);
+
+  const handleAddProduct = async () => {
+    if (
+      !newProduct.name ||
+      !newProduct.sku ||
+      !newProduct.category ||
+      !user?.businessId
+    ) {
+      toast.error(
+        "Please fill in all required fields (name, SKU, and category)"
+      );
+      return;
+    }
+
+    // Additional validation for category
+    if (!categories.find((cat) => cat.id === newProduct.category)) {
+      toast.error("Please select a valid category");
+      return;
+    }
+
+    // Validate modifiers - remove empty ones and validate required fields
+    const validModifiers = newProduct.modifiers
+      .filter((modifier) => {
+        if (!modifier.name.trim()) return false;
+        // Ensure modifier has at least one valid option
+        const validOptions = modifier.options.filter((option) =>
+          option.name.trim()
+        );
+        return validOptions.length > 0;
+      })
+      .map((modifier) => ({
+        ...modifier,
+        options: modifier.options.filter((option) => option.name.trim()),
+        businessId: user.businessId,
+        updatedAt: new Date().toISOString(),
+      }));
 
     try {
       setLoading(true);
@@ -211,9 +271,18 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       const productData = {
         ...newProduct,
         businessId: user.businessId,
+        // Include only valid modifiers
+        modifiers: validModifiers,
       };
 
       console.log("Saving product data:", productData);
+      console.log("Product category:", productData.category);
+      console.log("Available categories:", categories);
+      console.log("Product modifiers count:", productData.modifiers.length);
+      console.log(
+        "Product modifiers detail:",
+        JSON.stringify(productData.modifiers, null, 2)
+      );
       console.log("requiresWeight value:", productData.requiresWeight);
       console.log("requiresWeight type:", typeof productData.requiresWeight);
 
@@ -224,22 +293,78 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           productData
         );
         if (response.success && response.product) {
+          console.log("Updated product response:", response.product);
+          console.log("Updated product modifiers:", response.product.modifiers);
           setProducts(
             products.map((p) =>
               p.id === editingProduct.id ? response.product! : p
             )
           );
           toast.success("Product updated successfully");
+
+          // If there are modifiers, handle them separately if needed
+          if (newProduct.modifiers && newProduct.modifiers.length > 0) {
+            console.log("Original modifiers sent:", newProduct.modifiers);
+            console.log(
+              "Modifiers in updated product:",
+              response.product.modifiers
+            );
+            if (
+              !response.product.modifiers ||
+              response.product.modifiers.length === 0
+            ) {
+              console.warn(
+                "WARNING: Modifiers were not saved to the database!"
+              );
+              console.log(
+                "This indicates the backend API needs to be updated to handle modifiers properly"
+              );
+              console.log("Expected modifiers:", validModifiers);
+              console.log("Received modifiers:", response.product.modifiers);
+              toast.error(
+                "Product updated but modifiers were not saved. Please check the backend API."
+              );
+            }
+          }
         } else {
+          console.error("Product update failed:", response);
           toast.error(response.message || "Failed to update product");
         }
       } else {
         // Create new product
         const response = await window.productAPI.create(productData);
         if (response.success && response.product) {
+          console.log("Created product response:", response.product);
+          console.log("Created product modifiers:", response.product.modifiers);
           setProducts([...products, response.product]);
           toast.success("Product created successfully");
+
+          // If there are modifiers, handle them separately if needed
+          if (newProduct.modifiers && newProduct.modifiers.length > 0) {
+            console.log("Original modifiers sent:", newProduct.modifiers);
+            console.log(
+              "Modifiers in created product:",
+              response.product.modifiers
+            );
+            if (
+              !response.product.modifiers ||
+              response.product.modifiers.length === 0
+            ) {
+              console.warn(
+                "WARNING: Modifiers were not saved to the database!"
+              );
+              console.log(
+                "This indicates the backend API needs to be updated to handle modifiers properly"
+              );
+              console.log("Expected modifiers:", validModifiers);
+              console.log("Received modifiers:", response.product.modifiers);
+              toast.error(
+                "Product saved but modifiers were not saved. Please check the backend API."
+              );
+            }
+          }
         } else {
+          console.error("Product creation failed:", response);
           toast.error(response.message || "Failed to create product");
         }
       }
@@ -362,7 +487,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const addModifier = () => {
     const now = new Date().toISOString();
     const newModifier: Modifier = {
-      id: Date.now().toString(),
+      id: `modifier_${Date.now()}`,
       name: "",
       type: "single",
       required: false,
@@ -371,13 +496,14 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       updatedAt: now,
       options: [
         {
-          id: Date.now().toString() + "_opt",
+          id: `option_${Date.now()}`,
           name: "",
           price: 0,
           createdAt: now,
         },
       ],
     };
+    console.log("Adding new modifier:", newModifier);
     setNewProduct({
       ...newProduct,
       modifiers: [...newProduct.modifiers, newModifier],
@@ -386,7 +512,15 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   const updateModifier = (index: number, modifier: Modifier) => {
     const updatedModifiers = [...newProduct.modifiers];
-    updatedModifiers[index] = modifier;
+    updatedModifiers[index] = {
+      ...modifier,
+      updatedAt: new Date().toISOString(),
+      businessId: user?.businessId || modifier.businessId,
+    };
+    console.log(
+      `Updating modifier at index ${index}:`,
+      updatedModifiers[index]
+    );
     setNewProduct({ ...newProduct, modifiers: updatedModifiers });
   };
 
@@ -531,9 +665,17 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               variant="outline"
               className="w-full justify-start"
               onClick={() => {
-                resetForm();
-                setIsDrawerOpen(true);
+                setCurrentView("categoryManagement");
               }}
+            >
+              <Tag className="w-4 h-4 mr-3" />
+              Manage Categories
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={openAddProductDrawer}
             >
               <Plus className="w-4 h-4 mr-3" />
               Add New Product
@@ -608,12 +750,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           </div>
         </div>
 
-        <Button
-          onClick={() => {
-            resetForm();
-            setIsDrawerOpen(true);
-          }}
-        >
+        <Button onClick={openAddProductDrawer}>
           <Plus className="w-4 h-4 mr-2" />
           Add Product
         </Button>
@@ -640,8 +777,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -690,12 +827,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                 ? "Get started by adding your first product to the menu."
                 : "Try adjusting your search criteria or filters."}
             </p>
-            <Button
-              onClick={() => {
-                resetForm();
-                setIsDrawerOpen(true);
-              }}
-            >
+            <Button onClick={openAddProductDrawer}>
               <Plus className="w-4 h-4 mr-2" />
               Add Product
             </Button>
@@ -793,7 +925,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         {showFields.category && (
                           <td className="p-4">
                             <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                              {product.category}
+                              {categories.find(
+                                (cat) => cat.id === product.category
+                              )?.name || "Unknown"}
                             </span>
                           </td>
                         )}
@@ -1066,6 +1200,10 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         >
           {currentView === "productDashboard" ? (
             <ProductDashboardView />
+          ) : currentView === "categoryManagement" ? (
+            <ManageCategoriesView
+              onBack={() => setCurrentView("productDashboard")}
+            />
           ) : (
             <ProductsDetailsView />
           )}
@@ -1164,7 +1302,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   </div>
 
                   <div>
-                    <Label htmlFor="category">Category</Label>
+                    <Label htmlFor="category">Category *</Label>
                     <Select
                       value={newProduct.category}
                       onValueChange={(value) =>
@@ -1172,14 +1310,26 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                       }
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue
+                          placeholder={
+                            categories.length === 0
+                              ? "No categories available"
+                              : "Select a category"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
+                        {categories.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            No categories found - please add a category first
                           </SelectItem>
-                        ))}
+                        ) : (
+                          categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1398,9 +1548,24 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                 </div>
 
                 {/* Debug info */}
-                <div className="text-xs text-gray-500">
-                  Debug: {newProduct.modifiers?.length || 0} modifiers found
-                  {editingProduct && <span> (editing mode)</span>}
+                <div className="text-xs text-gray-500 space-y-1">
+                  <div>
+                    Debug: {newProduct.modifiers?.length || 0} modifiers found
+                    {editingProduct && <span> (editing mode)</span>}
+                  </div>
+                  {newProduct.modifiers && newProduct.modifiers.length > 0 && (
+                    <div>
+                      Modifiers:{" "}
+                      {newProduct.modifiers
+                        .map(
+                          (m, i) =>
+                            `${i + 1}. ${m.name || "Unnamed"} (${
+                              m.options.length
+                            } options)`
+                        )
+                        .join(", ")}
+                    </div>
+                  )}
                 </div>
 
                 {newProduct.modifiers && newProduct.modifiers.length > 0 ? (
@@ -1470,11 +1635,17 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                             onClick={() => {
                               const now = new Date().toISOString();
                               const newOption = {
-                                id: Date.now().toString() + "_opt",
+                                id: `option_${Date.now()}_${Math.random()
+                                  .toString(36)
+                                  .substr(2, 9)}`,
                                 name: "",
                                 price: 0,
                                 createdAt: now,
                               };
+                              console.log(
+                                "Adding new option to modifier:",
+                                newOption
+                              );
                               updateModifier(index, {
                                 ...modifier,
                                 options: [...modifier.options, newOption],

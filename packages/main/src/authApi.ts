@@ -49,6 +49,7 @@ export interface CreateProductRequest {
   stockLevel: number;
   minStockLevel: number;
   businessId: string;
+  modifiers?: Modifier[];
   // Weight-based product fields
   requiresWeight?: boolean;
   unit?: "lb" | "kg" | "oz" | "g" | "each";
@@ -429,15 +430,83 @@ export class AuthAPI {
         // SKU doesn't exist, which is good
       }
 
+      // Extract modifiers from product data
+      const { modifiers, ...productDataWithoutModifiers } = productData;
+
+      // Create the product first
       const product = await db.createProduct({
-        ...productData,
+        ...productDataWithoutModifiers,
         isActive: true,
       });
+
+      // Handle modifiers if provided
+      if (modifiers && modifiers.length > 0) {
+        console.log("Processing modifiers for product:", product.id);
+        console.log("Modifiers data:", JSON.stringify(modifiers, null, 2));
+
+        for (const modifier of modifiers) {
+          try {
+            console.log(`Creating modifier: ${modifier.name}`);
+
+            // Create the modifier
+            const createdModifier = await db.createModifier({
+              name: modifier.name,
+              type: modifier.type,
+              required: modifier.required,
+              businessId: productData.businessId,
+            });
+
+            console.log("Created modifier:", createdModifier);
+
+            // Add modifier options
+            if (modifier.options && modifier.options.length > 0) {
+              console.log(
+                `Adding ${modifier.options.length} options to modifier ${createdModifier.id}`
+              );
+              for (const option of modifier.options) {
+                if (option.name.trim()) {
+                  console.log(
+                    `Creating option: ${option.name} - $${option.price}`
+                  );
+                  const createdOption = await db.createModifierOption(
+                    createdModifier.id,
+                    {
+                      name: option.name,
+                      price: option.price || 0,
+                    }
+                  );
+                  console.log("Created option:", createdOption);
+                }
+              }
+            }
+
+            // Link modifier to product
+            console.log(
+              `Linking modifier ${createdModifier.id} to product ${product.id}`
+            );
+            db.addModifierToProduct(product.id, createdModifier.id);
+
+            console.log(
+              "Successfully created and linked modifier:",
+              createdModifier.id,
+              "to product:",
+              product.id
+            );
+          } catch (modifierError: any) {
+            console.error("Error creating modifier:", modifierError);
+            console.error("Modifier data that failed:", modifier);
+            // Continue with other modifiers even if one fails
+          }
+        }
+      }
+
+      // Fetch the complete product with modifiers
+      const completeProduct = db.getProductById(product.id);
 
       return {
         success: true,
         message: "Product created successfully",
-        product,
+        product: completeProduct,
       };
     } catch (error: any) {
       console.error("Product creation error:", error);
@@ -517,12 +586,72 @@ export class AuthAPI {
         }
       }
 
-      const product = await db.updateProduct(id, updates);
+      // Extract modifiers from updates
+      const { modifiers, ...updatesWithoutModifiers } = updates;
+
+      // Update the product first
+      const product = await db.updateProduct(id, updatesWithoutModifiers);
+
+      // Handle modifiers if provided
+      if (modifiers !== undefined) {
+        console.log("Updating modifiers for product:", id, modifiers);
+
+        // Get current product modifiers
+        const currentModifiers = db.getProductModifiers(id);
+
+        // Remove all existing modifiers for this product
+        for (const modifier of currentModifiers) {
+          db.removeModifierFromProduct(id, modifier.id);
+        }
+
+        // Add new modifiers
+        if (modifiers && modifiers.length > 0) {
+          for (const modifier of modifiers) {
+            try {
+              // Create the modifier
+              const createdModifier = await db.createModifier({
+                name: modifier.name,
+                type: modifier.type,
+                required: modifier.required,
+                businessId: product.businessId,
+              });
+
+              // Add modifier options
+              if (modifier.options && modifier.options.length > 0) {
+                for (const option of modifier.options) {
+                  if (option.name.trim()) {
+                    await db.createModifierOption(createdModifier.id, {
+                      name: option.name,
+                      price: option.price || 0,
+                    });
+                  }
+                }
+              }
+
+              // Link modifier to product
+              db.addModifierToProduct(id, createdModifier.id);
+
+              console.log(
+                "Successfully updated modifier:",
+                createdModifier.id,
+                "for product:",
+                id
+              );
+            } catch (modifierError: any) {
+              console.error("Error updating modifier:", modifierError);
+              // Continue with other modifiers even if one fails
+            }
+          }
+        }
+      }
+
+      // Fetch the complete updated product with modifiers
+      const updatedProduct = db.getProductById(id);
 
       return {
         success: true,
         message: "Product updated successfully",
-        product,
+        product: updatedProduct,
       };
     } catch (error: any) {
       console.error("Product update error:", error);
@@ -557,6 +686,160 @@ export class AuthAPI {
       return {
         success: false,
         message: error.message || "Failed to delete product",
+      };
+    }
+  }
+
+  // Category Management Methods
+
+  /**
+   * Create a new category
+   */
+  async createCategory(categoryData: any): Promise<any> {
+    try {
+      const db = await this.getDb();
+      const category = await db.createCategory(categoryData);
+
+      return {
+        success: true,
+        message: "Category created successfully",
+        category,
+      };
+    } catch (error: any) {
+      console.error("Category creation error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to create category",
+      };
+    }
+  }
+
+  /**
+   * Get categories by business ID
+   */
+  async getCategoriesByBusiness(businessId: string): Promise<any> {
+    try {
+      const db = await this.getDb();
+      const categories = await db.getCategoriesByBusiness(businessId);
+
+      return {
+        success: true,
+        categories,
+      };
+    } catch (error: any) {
+      console.error("Get categories error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get categories",
+      };
+    }
+  }
+
+  /**
+   * Get category by ID
+   */
+  async getCategoryById(id: string): Promise<any> {
+    try {
+      const db = await this.getDb();
+      const category = await db.getCategoryById(id);
+
+      if (!category) {
+        return {
+          success: false,
+          message: "Category not found",
+        };
+      }
+
+      return {
+        success: true,
+        category,
+      };
+    } catch (error: any) {
+      console.error("Get category error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get category",
+      };
+    }
+  }
+
+  /**
+   * Update category
+   */
+  async updateCategory(id: string, updates: any): Promise<any> {
+    try {
+      const db = await this.getDb();
+      const category = await db.updateCategory(id, updates);
+
+      if (!category) {
+        return {
+          success: false,
+          message: "Category not found",
+        };
+      }
+
+      return {
+        success: true,
+        message: "Category updated successfully",
+        category,
+      };
+    } catch (error: any) {
+      console.error("Update category error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to update category",
+      };
+    }
+  }
+
+  /**
+   * Delete category
+   */
+  async deleteCategory(id: string): Promise<any> {
+    try {
+      const db = await this.getDb();
+      const deleted = await db.deleteCategory(id);
+
+      if (!deleted) {
+        return {
+          success: false,
+          message: "Category not found",
+        };
+      }
+
+      return {
+        success: true,
+        message: "Category deleted successfully",
+      };
+    } catch (error: any) {
+      console.error("Delete category error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to delete category",
+      };
+    }
+  }
+
+  /**
+   * Reorder categories
+   */
+  async reorderCategories(
+    businessId: string,
+    categoryIds: string[]
+  ): Promise<any> {
+    try {
+      const db = await this.getDb();
+      await db.reorderCategories(businessId, categoryIds);
+
+      return {
+        success: true,
+        message: "Categories reordered successfully",
+      };
+    } catch (error: any) {
+      console.error("Reorder categories error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to reorder categories",
       };
     }
   }

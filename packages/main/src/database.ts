@@ -97,6 +97,18 @@ export interface StockAdjustment {
   timestamp: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  parentId?: string | null;
+  description?: string;
+  businessId: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Schedule {
   id: string;
   staffId: string;
@@ -345,6 +357,30 @@ export class DatabaseManager {
       )
     `);
 
+    // Categories table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        parentId TEXT,
+        description TEXT,
+        businessId TEXT NOT NULL,
+        isActive BOOLEAN DEFAULT 1,
+        sortOrder INTEGER DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (businessId) REFERENCES businesses (id),
+        FOREIGN KEY (parentId) REFERENCES categories (id) ON DELETE SET NULL
+      )
+    `);
+
+    // Ensure parentId column exists in categories table (migration for older DBs)
+    try {
+      this.db.exec(`ALTER TABLE categories ADD COLUMN parentId TEXT;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
     // Products table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS products (
@@ -364,7 +400,8 @@ export class DatabaseManager {
         isActive BOOLEAN DEFAULT 1,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
-        FOREIGN KEY (businessId) REFERENCES businesses (id)
+        FOREIGN KEY (businessId) REFERENCES businesses (id),
+        FOREIGN KEY (category) REFERENCES categories (id)
       )
     `);
 
@@ -574,6 +611,10 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
       CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions(userId);
 
+      CREATE INDEX IF NOT EXISTS idx_categories_businessId ON categories(businessId);
+      CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
+      CREATE INDEX IF NOT EXISTS idx_categories_sortOrder ON categories(sortOrder);
+      
       CREATE INDEX IF NOT EXISTS idx_products_businessId ON products(businessId);
       CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
       CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
@@ -707,6 +748,45 @@ export class DatabaseManager {
       // Index already exists, ignore error
     }
 
+    // Migration: Rename category column to categoryId in products table if needed
+    try {
+      // Check if the old 'category' column exists
+      const tableInfo = this.db.pragma("table_info(products)");
+      const hasOldCategoryColumn = tableInfo.some(
+        (col: any) => col.name === "category"
+      );
+      const hasCategoryIdColumn = tableInfo.some(
+        (col: any) => col.name === "categoryId"
+      );
+
+      if (hasOldCategoryColumn && !hasCategoryIdColumn) {
+        console.log(
+          "Migrating products table: renaming category to categoryId"
+        );
+
+        // SQLite doesn't support RENAME COLUMN directly, so we need to:
+        // 1. Add the new column
+        // 2. Copy data from old column to new column
+        // 3. Drop the old column (by recreating table)
+
+        this.db.exec(`ALTER TABLE products ADD COLUMN categoryId TEXT;`);
+
+        // Copy data from category to categoryId
+        this.db.exec(
+          `UPDATE products SET categoryId = category WHERE categoryId IS NULL;`
+        );
+
+        // We'll leave the old category column for now to avoid data loss
+        // In a future migration, we can remove it completely
+        console.log(
+          "Migration completed: added categoryId column and copied data"
+        );
+      }
+    } catch (err) {
+      console.error("Error during category->categoryId migration:", err);
+      // Continue without failing, as this might be expected in some cases
+    }
+
     // Insert default admin user if no users exist
     this.createDefaultAdmin();
   }
@@ -836,6 +916,9 @@ export class DatabaseManager {
         `
           )
           .run(businessId, userData.businessName, userId, now, now);
+
+        // Create default categories for new business
+        await this.createDefaultCategories(businessId);
       }
 
       // Create user
@@ -1088,6 +1171,228 @@ export class DatabaseManager {
 
     return result.changes > 0;
   }
+
+  // Category CRUD operations
+
+  /**
+   * Create a new category
+   */
+  async createCategory(categoryData: {
+    name: string;
+    description?: string;
+    businessId: string;
+    sortOrder?: number;
+    parentId?: string | null;
+  }): Promise<Category> {
+    const categoryId = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    // Get the next sort order if not provided
+    const nextSortOrder =
+      categoryData.sortOrder !== undefined
+        ? categoryData.sortOrder
+        : this.getNextCategorySortOrder(categoryData.businessId);
+
+    this.db
+      .prepare(
+        `
+        INSERT INTO categories (id, name, parentId, description, businessId, sortOrder, createdAt, updatedAt, isActive)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(
+        categoryId,
+        categoryData.name,
+        categoryData.parentId || null,
+        categoryData.description || "",
+        categoryData.businessId,
+        nextSortOrder,
+        now,
+        now,
+        1
+      );
+
+    return this.getCategoryById(categoryId);
+  }
+
+  /**
+   * Get category by ID
+   */
+  getCategoryById(id: string): Category {
+    const category = this.db
+      .prepare("SELECT * FROM categories WHERE id = ?")
+      .get(id) as Category;
+
+    if (!category) {
+      throw new Error(`Category with ID ${id} not found`);
+    }
+
+    return category;
+  }
+
+  /**
+   * Get all categories for a business
+   */
+  getCategoriesByBusiness(businessId: string): Category[] {
+    // Return categories as a flat list, but you can build a tree in UI
+    return this.db
+      .prepare(
+        "SELECT * FROM categories WHERE businessId = ? AND isActive = 1 ORDER BY sortOrder ASC, name ASC"
+      )
+      .all(businessId) as Category[];
+  }
+
+  /**
+   * Update category
+   */
+  updateCategory(
+    id: string,
+    updates: Partial<Omit<Category, "id" | "businessId" | "createdAt">>
+  ): Category {
+    const now = new Date().toISOString();
+    const allowedFields = [
+      "name",
+      "description",
+      "sortOrder",
+      "isActive",
+      "parentId",
+    ];
+
+    const updateFields: string[] = [];
+    const updateValues: any[] = [];
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (allowedFields.includes(key) && value !== undefined) {
+        updateFields.push(`${key} = ?`);
+        updateValues.push(value);
+      }
+    });
+
+    if (updateFields.length === 0) {
+      return this.getCategoryById(id);
+    }
+
+    updateFields.push("updatedAt = ?");
+    updateValues.push(now, id);
+
+    this.db
+      .prepare(`UPDATE categories SET ${updateFields.join(", ")} WHERE id = ?`)
+      .run(...updateValues);
+
+    return this.getCategoryById(id);
+  }
+
+  /**
+   * Delete category (soft delete)
+   */
+  deleteCategory(id: string): boolean {
+    const now = new Date().toISOString();
+
+    // Check if category is being used by any products
+    const productsUsingCategory = this.db
+      .prepare(
+        "SELECT COUNT(*) as count FROM products WHERE category = ? AND isActive = 1"
+      )
+      .get(id) as { count: number };
+
+    if (productsUsingCategory.count > 0) {
+      throw new Error(
+        `Cannot delete category. ${productsUsingCategory.count} products are still using this category.`
+      );
+    }
+
+    const result = this.db
+      .prepare("UPDATE categories SET isActive = 0, updatedAt = ? WHERE id = ?")
+      .run(now, id);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Get next sort order for categories in a business
+   */
+  private getNextCategorySortOrder(businessId: string): number {
+    const maxOrder = this.db
+      .prepare(
+        "SELECT MAX(sortOrder) as maxOrder FROM categories WHERE businessId = ?"
+      )
+      .get(businessId) as { maxOrder: number | null };
+
+    return (maxOrder?.maxOrder || 0) + 1;
+  }
+
+  /**
+   * Reorder categories
+   */
+  reorderCategories(businessId: string, categoryIds: string[]): void {
+    const transaction = this.db.transaction(() => {
+      categoryIds.forEach((categoryId, index) => {
+        this.db
+          .prepare(
+            "UPDATE categories SET sortOrder = ?, updatedAt = ? WHERE id = ? AND businessId = ?"
+          )
+          .run(index + 1, new Date().toISOString(), categoryId, businessId);
+      });
+    });
+
+    transaction();
+  }
+
+  /**
+   * Create default categories for a new business
+   */
+  createDefaultCategories(businessId: string): void {
+    const defaultCategories = [
+      { name: "Fresh Produce", description: "Fresh fruits and vegetables" },
+      {
+        name: "Dairy & Eggs",
+        description: "Milk, cheese, eggs, and dairy products",
+      },
+      {
+        name: "Meat & Poultry",
+        description: "Fresh meat, chicken, and seafood",
+      },
+      { name: "Bakery", description: "Fresh bread, pastries, and baked goods" },
+      {
+        name: "Frozen Foods",
+        description: "Frozen meals, ice cream, and frozen vegetables",
+      },
+      {
+        name: "Pantry Essentials",
+        description: "Canned goods, pasta, rice, and cooking essentials",
+      },
+      {
+        name: "Snacks & Confectionery",
+        description: "Chips, candy, chocolates, and snacks",
+      },
+      {
+        name: "Beverages",
+        description: "Soft drinks, juices, water, and beverages",
+      },
+      {
+        name: "Health & Beauty",
+        description: "Personal care and health products",
+      },
+      {
+        name: "Household Items",
+        description: "Cleaning supplies and household necessities",
+      },
+    ];
+
+    const transaction = this.db.transaction(() => {
+      defaultCategories.forEach((category, index) => {
+        this.createCategory({
+          name: category.name,
+          description: category.description,
+          businessId,
+          sortOrder: index + 1,
+        });
+      });
+    });
+
+    transaction();
+  }
+
   // Product CRUD operations
 
   /**
@@ -1098,6 +1403,20 @@ export class DatabaseManager {
   ): Promise<Product> {
     const productId = this.uuid.v4();
     const now = new Date().toISOString();
+
+    // Debug logging
+    console.log("createProduct called with data:", {
+      name: productData.name,
+      category: productData.category,
+      categoryType: typeof productData.category,
+      categoryLength: productData.category ? productData.category.length : 0,
+      businessId: productData.businessId,
+    });
+
+    // Validate required fields
+    if (!productData.category || productData.category.trim() === "") {
+      throw new Error("Category is required and cannot be empty");
+    }
 
     const result = this.db
       .prepare(
@@ -1119,7 +1438,7 @@ export class DatabaseManager {
         productData.sku,
         productData.plu,
         productData.image,
-        productData.category,
+        productData.category, // Use category field directly
         productData.stockLevel,
         productData.minStockLevel,
         productData.businessId,
@@ -1156,6 +1475,10 @@ export class DatabaseManager {
 
     // Get modifiers for this product
     const modifiers = this.getProductModifiers(id);
+    console.log(
+      `Retrieved ${modifiers.length} modifiers for product ${id}:`,
+      modifiers
+    );
 
     return {
       ...product,

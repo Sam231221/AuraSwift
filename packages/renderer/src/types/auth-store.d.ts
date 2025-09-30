@@ -48,15 +48,11 @@ declare global {
         message: string;
         product?: import("../types/product.types").Product;
       }>;
-      getByBusiness: (
-        businessId: string
-      ) => Promise<{
+      getByBusiness: (businessId: string) => Promise<{
         success: boolean;
         products?: import("../types/product.types").Product[];
       }>;
-      getById: (
-        id: string
-      ) => Promise<{
+      getById: (id: string) => Promise<{
         success: boolean;
         product?: import("../types/product.types").Product;
       }>;
@@ -100,12 +96,84 @@ declare global {
         userId: string;
         businessId: string;
       }) => Promise<{ success: boolean; message: string }>;
-      getStockAdjustments: (
-        productId: string
-      ) => Promise<{
+      getStockAdjustments: (productId: string) => Promise<{
         success: boolean;
         adjustments?: import("../types/product.types").StockAdjustment[];
       }>;
+    };
+    categoryAPI: {
+      create: (categoryData: {
+        name: string;
+        description?: string;
+        businessId: string;
+        sortOrder?: number;
+      }) => Promise<{
+        success: boolean;
+        message: string;
+        category?: {
+          id: string;
+          name: string;
+          description?: string;
+          businessId: string;
+          isActive: boolean;
+          sortOrder: number;
+          createdAt: string;
+          updatedAt: string;
+        };
+      }>;
+      getByBusiness: (businessId: string) => Promise<{
+        success: boolean;
+        categories?: Array<{
+          id: string;
+          name: string;
+          description?: string;
+          businessId: string;
+          isActive: boolean;
+          sortOrder: number;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+      }>;
+      getById: (id: string) => Promise<{
+        success: boolean;
+        category?: {
+          id: string;
+          name: string;
+          description?: string;
+          businessId: string;
+          isActive: boolean;
+          sortOrder: number;
+          createdAt: string;
+          updatedAt: string;
+        };
+      }>;
+      update: (
+        id: string,
+        updates: {
+          name?: string;
+          description?: string;
+          isActive?: boolean;
+          sortOrder?: number;
+        }
+      ) => Promise<{
+        success: boolean;
+        message: string;
+        category?: {
+          id: string;
+          name: string;
+          description?: string;
+          businessId: string;
+          isActive: boolean;
+          sortOrder: number;
+          createdAt: string;
+          updatedAt: string;
+        };
+      }>;
+      delete: (id: string) => Promise<{ success: boolean; message: string }>;
+      reorder: (
+        businessId: string,
+        categoryIds: string[]
+      ) => Promise<{ success: boolean; message: string }>;
     };
   }
 }

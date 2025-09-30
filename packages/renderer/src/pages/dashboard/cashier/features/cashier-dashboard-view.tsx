@@ -394,19 +394,6 @@ const CashierDashboardView = ({
     return () => clearInterval(interval);
   }, [loadShiftData]);
 
-  console.log("Debug schedule data:", {
-    activeShift,
-    todaySchedule,
-    todayScheduleStartTime: todaySchedule?.startTime,
-    todayScheduleEndTime: todaySchedule?.endTime,
-    parsedStartTime: todaySchedule
-      ? new Date(todaySchedule.startTime).toString()
-      : null,
-    parsedEndTime: todaySchedule
-      ? new Date(todaySchedule.endTime).toString()
-      : null,
-  });
-
   // Calculate shift timing validation
   const shiftTimingInfo = todaySchedule
     ? (() => {
@@ -1033,153 +1020,134 @@ const CashierDashboardView = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
         {/* Today's Sales Total */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="bg-white border-slate-200 shadow-sm h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-base font-semibold">
-                <span className="text-slate-700">Today's Sales</span>
-                <DollarSign className="h-5 w-5 text-green-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-700">
-                £{(shiftStats.totalSales || 0).toFixed(2)}
-              </div>
-              <div className="flex items-center mt-2 text-sm text-slate-600">
-                <TrendingUp className="h-4 w-4 mr-1 text-green-500" />
-                <span>{shiftStats.totalTransactions || 0} transactions</span>
-              </div>
-              <div className="text-xs text-slate-500 mt-1">
-                Average: £{averageTransaction.toFixed(2)}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+
+        <Card className="bg-white border-slate-200 shadow-sm h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-base font-semibold">
+              <span className="text-slate-700">Today's Sales</span>
+              <DollarSign className="h-5 w-5 text-green-600" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-700">
+              £{(shiftStats.totalSales || 0).toFixed(2)}
+            </div>
+            <div className="flex items-center mt-2 text-sm text-slate-600">
+              <TrendingUp className="h-4 w-4 mr-1 text-green-500" />
+              <span>{shiftStats.totalTransactions || 0} transactions</span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Average: £{averageTransaction.toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Transaction Count */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="bg-white border-slate-200 shadow-sm h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-base font-semibold">
-                <span className="text-slate-700">Transactions</span>
-                <ShoppingCart className="h-5 w-5 text-blue-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-700">
-                {shiftStats.totalTransactions || 0}
-              </div>
-              <div className="flex items-center mt-2 text-sm text-slate-600">
-                <Clock className="h-4 w-4 mr-1 text-blue-500" />
-                <span>This shift</span>
-              </div>
-              <div className="text-xs text-slate-500 mt-1">
-                Last hour: {hourlyStats.lastHour} transactions
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+
+        <Card className="bg-white border-slate-200 shadow-sm h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-base font-semibold">
+              <span className="text-slate-700">Transactions</span>
+              <ShoppingCart className="h-5 w-5 text-blue-600" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-700">
+              {shiftStats.totalTransactions || 0}
+            </div>
+            <div className="flex items-center mt-2 text-sm text-slate-600">
+              <Clock className="h-4 w-4 mr-1 text-blue-500" />
+              <span>This shift</span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Last hour: {hourlyStats.lastHour} transactions
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Cash Drawer Balance */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="bg-white border-slate-200 shadow-sm h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-base font-semibold">
-                <span className="text-slate-700">Cash Drawer</span>
-                <DollarSign className="h-5 w-5 text-amber-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-700">
-                £{cashDrawerBalance.amount.toFixed(2)}
-                {cashDrawerBalance.isEstimated && (
-                  <span className="text-xs text-amber-600 ml-1">(est.)</span>
-                )}
-              </div>
-              <div
-                className={`flex items-center mt-2 text-sm ${
-                  (cashDrawerBalance.variance || 0) >= 0
-                    ? "text-green-600"
-                    : "text-red-600"
-                }`}
-              >
-                {(cashDrawerBalance.variance || 0) >= 0 ? (
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                )}
-                <span>
-                  Variance: £
-                  {Math.abs(cashDrawerBalance.variance || 0).toFixed(2)}
-                  {cashDrawerBalance.isEstimated && " (est.)"}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 mt-1">
-                {cashDrawerBalance.lastCountTime ? (
-                  <>
-                    Last count:{" "}
-                    {new Date(
-                      cashDrawerBalance.lastCountTime
-                    ).toLocaleTimeString([], {
+
+        <Card className="bg-white border-slate-200 shadow-sm h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-base font-semibold">
+              <span className="text-slate-700">Cash Drawer</span>
+              <DollarSign className="h-5 w-5 text-amber-600" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-700">
+              £{cashDrawerBalance.amount.toFixed(2)}
+              {cashDrawerBalance.isEstimated && (
+                <span className="text-xs text-amber-600 ml-1">(est.)</span>
+              )}
+            </div>
+            <div
+              className={`flex items-center mt-2 text-sm ${
+                (cashDrawerBalance.variance || 0) >= 0
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}
+            >
+              {(cashDrawerBalance.variance || 0) >= 0 ? (
+                <CheckCircle className="h-4 w-4 mr-1" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 mr-1" />
+              )}
+              <span>
+                Variance: £
+                {Math.abs(cashDrawerBalance.variance || 0).toFixed(2)}
+                {cashDrawerBalance.isEstimated && " (est.)"}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              {cashDrawerBalance.lastCountTime ? (
+                <>
+                  Last count:{" "}
+                  {new Date(cashDrawerBalance.lastCountTime).toLocaleTimeString(
+                    [],
+                    {
                       hour: "2-digit",
                       minute: "2-digit",
                       hour12: true,
-                    })}
-                  </>
-                ) : (
-                  <>Starting: £{(activeShift?.startingCash || 0).toFixed(2)}</>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                    }
+                  )}
+                </>
+              ) : (
+                <>Starting: £{(activeShift?.startingCash || 0).toFixed(2)}</>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Refunds & Voided */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="bg-white border-slate-200 shadow-sm h-full">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-base font-semibold">
-                <span className="text-slate-700">Adjustments</span>
-                <RefreshCw className="h-5 w-5 text-red-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-slate-600">Refunds:</span>
-                <span className="font-semibold text-red-700">
-                  -£{(shiftStats.totalRefunds || 0).toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-600">Voided Transactions:</span>
-                <span className="font-semibold text-red-700">
-                  {shiftStats.totalVoids || 0}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 mt-2">
-                Total adjustments:{" "}
-                {(shiftStats.totalVoids || 0) +
-                  ((shiftStats.totalRefunds || 0) > 0 ? 1 : 0)}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+
+        <Card className="bg-white border-slate-200 shadow-sm h-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between text-base font-semibold">
+              <span className="text-slate-700">Adjustments</span>
+              <RefreshCw className="h-5 w-5 text-red-600" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-slate-600">Refunds:</span>
+              <span className="font-semibold text-red-700">
+                -£{(shiftStats.totalRefunds || 0).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600">Voided Transactions:</span>
+              <span className="font-semibold text-red-700">
+                {shiftStats.totalVoids || 0}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 mt-2">
+              Total adjustments:{" "}
+              {(shiftStats.totalVoids || 0) +
+                ((shiftStats.totalRefunds || 0) > 0 ? 1 : 0)}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -1204,12 +1172,7 @@ const CashierDashboardView = ({
                 </div>
               ) : (
                 transactions.map((transaction: Transaction) => (
-                  <motion.div
-                    key={transaction.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-200"
-                  >
+                  <div key={transaction.id}>
                     <div className="flex items-center gap-3">
                       <div
                         className={`
@@ -1287,7 +1250,7 @@ const CashierDashboardView = ({
                         {transaction.paymentMethod}
                       </Badge>
                     </div>
-                  </motion.div>
+                  </div>
                 ))
               )}
             </div>
