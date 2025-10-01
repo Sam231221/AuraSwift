@@ -17,19 +17,19 @@ In production builds, the database is stored in the proper user data directory:
 ### Windows
 
 ```
-%APPDATA%/NepStoresPos/pos_system.db
+%APPDATA%/AuraSwift/pos_system.db
 ```
 
 ### macOS
 
 ```
-~/Library/Application Support/NepStoresPos/pos_system.db
+~/Library/Application Support/AuraSwift/pos_system.db
 ```
 
 ### Linux
 
 ```
-~/.config/NepStoresPos/pos_system.db
+~/.config/AuraSwift/pos_system.db
 ```
 
 ## Environment Detection

@@ -1,6 +1,6 @@
 {
-  "name": "nepstores-pos",
-  "description": "NepStores POS is the pos software for NepStores supermarket.",
+  "name": "auraswift",
+  "description": "AuraSwift is the pos software for supermarket.",
   "version": "3.1.0",
   "private": true,
   "type": "module",
@@ -40,10 +40,12 @@
     "create-vite": "7.1.2",
     "electron": "38.1.2",
     "electron-builder": "26.0.12",
+    "electron-rebuild": "^3.2.9",
     "glob": "11.0.3",
     "playwright": "^1.55.0"
   },
   "dependencies": {
-    "@app/main": "*"
+    "@app/main": "*",
+    "dotenv": "^16.4.5"
   }
 }

@@ -2,6 +2,7 @@ interface APIResponse {
   success: boolean;
   message: string;
   data?: unknown;
+  token?: string;
   user?: {
     id: string;
     email: string;
@@ -10,7 +11,18 @@ interface APIResponse {
     businessName: string;
     role: "cashier" | "manager" | "admin";
     businessId: string;
+    permissions: Array<{
+      id: string;
+      name: string;
+      description: string;
+      module: string;
+      action: string;
+      resource: string;
+    }>;
     avatar?: string;
+    createdAt: string;
+    updatedAt: string;
+    isActive: boolean;
   };
   users?: Array<{
     id: string;

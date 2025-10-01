@@ -46,7 +46,7 @@ function simulateDatabasePath(isPackaged, nodeEnv, electronIsDev, customPath) {
       userDataPath = path.join(userHome, ".config");
     }
 
-    const prodDbPath = path.join(userDataPath, "NepStoresPos", "pos_system.db");
+    const prodDbPath = path.join(userDataPath, "AuraSwift", "pos_system.db");
     console.log(`🚀 Result: Production path - ${prodDbPath}`);
     return prodDbPath;
   }

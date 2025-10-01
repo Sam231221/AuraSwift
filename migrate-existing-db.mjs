@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Database Migration Helper
- * 
+ *
  * This script helps you integrate an existing database with the new
  * environment-aware database system and copy data between databases.
  */
@@ -18,37 +18,47 @@ const __dirname = path.dirname(__filename);
 function showUsage() {
   console.log("🗄️  Database Migration Helper\n");
   console.log("Usage:");
-  console.log("  node migrate-existing-db.mjs <command> [source-path] [target-path]");
+  console.log(
+    "  node migrate-existing-db.mjs <command> [source-path] [target-path]"
+  );
   console.log();
   console.log("Commands:");
-  console.log("  check <path>     - Check if database file is valid and accessible");
+  console.log(
+    "  check <path>     - Check if database file is valid and accessible"
+  );
   console.log("  copy-to-dev <path>  - Copy database to development location");
   console.log("  copy-to-prod <path> - Copy database to production location");
-  console.log("  copy-data <source> <target> - Copy data from source DB to target DB");
+  console.log(
+    "  copy-data <source> <target> - Copy data from source DB to target DB"
+  );
   console.log("  show-paths       - Show all database path locations");
   console.log("  help            - Show this help message");
   console.log();
   console.log("Examples:");
   console.log("  node migrate-existing-db.mjs check /path/to/old/database.db");
-  console.log("  node migrate-existing-db.mjs copy-to-dev /path/to/old/database.db");
+  console.log(
+    "  node migrate-existing-db.mjs copy-to-dev /path/to/old/database.db"
+  );
   console.log("  node migrate-existing-db.mjs copy-data /old/db.db /new/db.db");
-  console.log("  POS_DB_PATH='/old/db.db' npm start  # Use custom path directly");
+  console.log(
+    "  POS_DB_PATH='/old/db.db' npm start  # Use custom path directly"
+  );
 }
 
 function checkDatabase(dbPath) {
   console.log(`🔍 Checking database: ${dbPath}\n`);
-  
+
   if (!fs.existsSync(dbPath)) {
     console.log("❌ Database file does not exist");
     return false;
   }
-  
+
   console.log("✅ Database file exists");
-  
+
   const stats = fs.statSync(dbPath);
   console.log(`📁 File size: ${(stats.size / 1024).toFixed(2)} KB`);
   console.log(`📅 Last modified: ${stats.mtime.toLocaleString()}`);
-  
+
   try {
     fs.accessSync(dbPath, fs.constants.R_OK);
     console.log("✅ Database file is readable");
@@ -57,21 +67,21 @@ function checkDatabase(dbPath) {
     console.log(`   Error: ${err.message}`);
     return false;
   }
-  
+
   try {
     fs.accessSync(dbPath, fs.constants.W_OK);
     console.log("✅ Database file is writable");
   } catch (err) {
     console.log("⚠️  Database file is read-only");
   }
-  
+
   return true;
 }
 
 function getProductionDbPath() {
   const userHome = process.env.HOME || process.env.USERPROFILE || "/tmp";
   let userDataPath;
-  
+
   if (process.platform === "win32") {
     userDataPath = path.join(userHome, "AppData", "Roaming");
   } else if (process.platform === "darwin") {
@@ -79,8 +89,8 @@ function getProductionDbPath() {
   } else {
     userDataPath = path.join(userHome, ".config");
   }
-  
-  return path.join(userDataPath, "NepStoresPos", "pos_system.db");
+
+  return path.join(userDataPath, "AuraSwift", "pos_system.db");
 }
 
 function getDevelopmentDbPath() {
@@ -89,15 +99,15 @@ function getDevelopmentDbPath() {
 
 function showPaths() {
   console.log("📍 Database Path Locations:\n");
-  
+
   console.log("Development:");
   console.log(`  ${getDevelopmentDbPath()}`);
   console.log();
-  
+
   console.log("Production:");
   console.log(`  ${getProductionDbPath()}`);
   console.log();
-  
+
   console.log("Custom (using environment variable):");
   console.log("  export POS_DB_PATH='/your/custom/path.db'");
   console.log("  npm start");
@@ -107,20 +117,20 @@ function copyDatabase(sourcePath, targetPath, targetType) {
   console.log(`📋 Copying database to ${targetType} location...\n`);
   console.log(`Source: ${sourcePath}`);
   console.log(`Target: ${targetPath}`);
-  
+
   if (!checkDatabase(sourcePath)) {
     return false;
   }
-  
+
   console.log();
-  
+
   // Create target directory if it doesn't exist
   const targetDir = path.dirname(targetPath);
   if (!fs.existsSync(targetDir)) {
     console.log(`📁 Creating directory: ${targetDir}`);
     fs.mkdirSync(targetDir, { recursive: true });
   }
-  
+
   // Check if target already exists
   if (fs.existsSync(targetPath)) {
     console.log("⚠️  Target database already exists!");
@@ -129,13 +139,15 @@ function copyDatabase(sourcePath, targetPath, targetType) {
     fs.copyFileSync(targetPath, backupPath);
     console.log(`   Backup created: ${backupPath}`);
   }
-  
+
   try {
     fs.copyFileSync(sourcePath, targetPath);
     console.log("✅ Database copied successfully!");
     console.log();
     console.log("Next steps:");
-    console.log(`  npm start  # Start the application with ${targetType} database`);
+    console.log(
+      `  npm start  # Start the application with ${targetType} database`
+    );
     return true;
   } catch (error) {
     console.log("❌ Failed to copy database");
@@ -162,21 +174,25 @@ async function copyDatabaseData(sourceDbPath, targetDbPath) {
 
   try {
     // Import better-sqlite3 dynamically
-    const Database = require('better-sqlite3');
-    
+    const Database = require("better-sqlite3");
+
     console.log("\n📂 Opening databases...");
     const sourceDb = new Database(sourceDbPath, { readonly: true });
     const targetDb = new Database(targetDbPath);
 
     // Get list of tables from source database
     console.log("🔍 Analyzing source database structure...");
-    const tables = sourceDb.prepare(`
+    const tables = sourceDb
+      .prepare(
+        `
       SELECT name FROM sqlite_master 
       WHERE type='table' AND name NOT LIKE 'sqlite_%'
-    `).all();
+    `
+      )
+      .all();
 
     console.log(`📊 Found ${tables.length} tables to copy:`);
-    tables.forEach(table => console.log(`   - ${table.name}`));
+    tables.forEach((table) => console.log(`   - ${table.name}`));
 
     // Begin transaction for data copying
     const transaction = targetDb.transaction(() => {
@@ -186,8 +202,10 @@ async function copyDatabaseData(sourceDbPath, targetDbPath) {
 
         try {
           // Get all data from source table
-          const sourceData = sourceDb.prepare(`SELECT * FROM ${tableName}`).all();
-          
+          const sourceData = sourceDb
+            .prepare(`SELECT * FROM ${tableName}`)
+            .all();
+
           if (sourceData.length === 0) {
             console.log(`   ⚪ Table ${tableName} is empty - skipping`);
             continue;
@@ -199,8 +217,8 @@ async function copyDatabaseData(sourceDbPath, targetDbPath) {
 
           // Get column names from the first row
           const columns = Object.keys(sourceData[0]);
-          const placeholders = columns.map(() => '?').join(', ');
-          const columnNames = columns.join(', ');
+          const placeholders = columns.map(() => "?").join(", ");
+          const columnNames = columns.join(", ");
 
           // Prepare insert statement
           const insertStmt = targetDb.prepare(
@@ -210,15 +228,17 @@ async function copyDatabaseData(sourceDbPath, targetDbPath) {
           // Insert all data
           let insertedCount = 0;
           for (const row of sourceData) {
-            const values = columns.map(col => row[col]);
+            const values = columns.map((col) => row[col]);
             insertStmt.run(values);
             insertedCount++;
           }
 
           console.log(`   ✅ Copied ${insertedCount} records`);
-
         } catch (error) {
-          console.log(`   ⚠️  Error copying table ${tableName}:`, error.message);
+          console.log(
+            `   ⚠️  Error copying table ${tableName}:`,
+            error.message
+          );
           // Continue with other tables even if one fails
         }
       }
@@ -238,56 +258,66 @@ async function copyDatabaseData(sourceDbPath, targetDbPath) {
     console.log("  3. Create a backup if everything looks good");
 
     return true;
-
   } catch (error) {
     console.log("\n❌ Data copy failed:");
     console.log(`   Error: ${error.message}`);
-    
-    if (error.code === 'MODULE_NOT_FOUND' && error.message.includes('better-sqlite3')) {
+
+    if (
+      error.code === "MODULE_NOT_FOUND" &&
+      error.message.includes("better-sqlite3")
+    ) {
       console.log("\n💡 Solution: Install better-sqlite3 in the main package:");
       console.log("   cd packages/main && npm install better-sqlite3");
     }
-    
+
     return false;
   }
 }
 
 // Main execution
 async function main() {
-  const [,, command, sourcePath, targetPath] = process.argv;
+  const [, , command, sourcePath, targetPath] = process.argv;
 
   switch (command) {
     case "check":
       if (!sourcePath) {
         console.log("❌ Please provide the path to your database file");
-        console.log("   Example: node migrate-existing-db.mjs check /path/to/database.db");
+        console.log(
+          "   Example: node migrate-existing-db.mjs check /path/to/database.db"
+        );
         process.exit(1);
       }
       checkDatabase(sourcePath);
       break;
-      
+
     case "copy-to-dev":
       if (!sourcePath) {
         console.log("❌ Please provide the path to your database file");
-        console.log("   Example: node migrate-existing-db.mjs copy-to-dev /path/to/database.db");
+        console.log(
+          "   Example: node migrate-existing-db.mjs copy-to-dev /path/to/database.db"
+        );
         process.exit(1);
       }
       copyDatabase(sourcePath, getDevelopmentDbPath(), "development");
       break;
-      
+
     case "copy-to-prod":
       if (!sourcePath) {
         console.log("❌ Please provide the path to your database file");
-        console.log("   Example: node migrate-existing-db.mjs copy-to-prod /path/to/database.db");
+        console.log(
+          "   Example: node migrate-existing-db.mjs copy-to-prod /path/to/database.db"
+        );
         process.exit(1);
       }
       copyDatabase(sourcePath, getProductionDbPath(), "production");
       break;
-      
+
     case "copy-data":
       if (!sourcePath || !targetPath) {
         console.log("❌ Please provide both source and target database paths");
-        console.log("   Example: node migrate-existing-db.mjs copy-data /source/db.db /target/db.db");
+        console.log(
+          "   Example: node migrate-existing-db.mjs copy-data /source/db.db /target/db.db"
+        );
         process.exit(1);
       }
       await copyDatabaseData(sourcePath, targetPath);
@@ -296,13 +326,13 @@ async function main() {
     case "show-paths":
       showPaths();
       break;
-      
+
     case "help":
     case "--help":
     case "-h":
       showUsage();
       break;
-      
+
     default:
       console.log("❌ Unknown command or missing arguments\n");
       showUsage();

@@ -69,7 +69,7 @@ export default function CashierManagementView({
   const { user, createUser } = useAuth();
   const [cashiers, setCashiers] = useState<StaffUser[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterRole, setFilterRole] = useState<string>("all");
+  const [filterRole] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);

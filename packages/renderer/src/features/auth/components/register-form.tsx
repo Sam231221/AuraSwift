@@ -29,7 +29,7 @@ export function RegisterForm({
   isLoading,
 }: RegisterFormProps) {
   const [showPassword, setShowPassword] = useState(false);
-  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userAvatar] = useState<string | null>(null);
   const [businessAvatar, setBusinessAvatar] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

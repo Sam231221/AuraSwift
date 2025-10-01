@@ -302,11 +302,7 @@ export class DatabaseManager {
     } else {
       // Production: Use proper user data directory based on platform
       const userDataPath = app.getPath("userData");
-      const prodDbPath = path.join(
-        userDataPath,
-        "NepStoresPos",
-        "pos_system.db"
-      );
+      const prodDbPath = path.join(userDataPath, "AuraSwift", "pos_system.db");
       console.log("🚀 Production mode: Using user data directory for database");
       console.log("📁 Database at:", prodDbPath);
       return prodDbPath;
@@ -381,7 +377,7 @@ export class DatabaseManager {
       // Column already exists, ignore error
     }
 
-    // Products table
+    // Products table (includes weight-based product fields)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY,
@@ -398,6 +394,9 @@ export class DatabaseManager {
         minStockLevel INTEGER DEFAULT 0,
         businessId TEXT NOT NULL,
         isActive BOOLEAN DEFAULT 1,
+        requiresWeight BOOLEAN DEFAULT 0,
+        unit TEXT DEFAULT 'each',
+        pricePerUnit REAL,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         FOREIGN KEY (businessId) REFERENCES businesses (id),
@@ -514,7 +513,7 @@ export class DatabaseManager {
       )
     `);
 
-    // Transactions table for sales, refunds, voids
+    // Transactions table for sales, refunds, voids (includes refund-specific fields)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS transactions (
         id TEXT PRIMARY KEY,
@@ -533,12 +532,19 @@ export class DatabaseManager {
         receiptNumber TEXT NOT NULL,
         timestamp TEXT NOT NULL,
         createdAt TEXT NOT NULL,
+        originalTransactionId TEXT,
+        refundReason TEXT,
+        refundMethod TEXT CHECK (refundMethod IN ('original', 'store_credit', 'cash', 'card')),
+        managerApprovalId TEXT,
+        isPartialRefund BOOLEAN DEFAULT 0,
         FOREIGN KEY (shiftId) REFERENCES shifts (id),
-        FOREIGN KEY (businessId) REFERENCES businesses (id)
+        FOREIGN KEY (businessId) REFERENCES businesses (id),
+        FOREIGN KEY (originalTransactionId) REFERENCES transactions (id),
+        FOREIGN KEY (managerApprovalId) REFERENCES users (id)
       )
     `);
 
-    // Transaction items table for individual line items
+    // Transaction items table for individual line items (includes refund support and weight fields)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS transaction_items (
         id TEXT PRIMARY KEY,
@@ -548,6 +554,8 @@ export class DatabaseManager {
         quantity INTEGER NOT NULL,
         unitPrice REAL NOT NULL,
         totalPrice REAL NOT NULL,
+        refundedQuantity INTEGER DEFAULT 0,
+        weight REAL,
         createdAt TEXT NOT NULL,
         FOREIGN KEY (transactionId) REFERENCES transactions (id),
         FOREIGN KEY (productId) REFERENCES products (id)
@@ -654,138 +662,10 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+      
+      -- Additional indexes for refund functionality
+      CREATE INDEX IF NOT EXISTS idx_transactions_originalTransactionId ON transactions(originalTransactionId);
     `);
-
-    // Add weight-related fields to products table if they don't exist
-    try {
-      this.db.exec(`
-        ALTER TABLE products ADD COLUMN requiresWeight BOOLEAN DEFAULT 0;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    try {
-      this.db.exec(`
-        ALTER TABLE products ADD COLUMN unit TEXT DEFAULT 'each';
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    try {
-      this.db.exec(`
-        ALTER TABLE products ADD COLUMN pricePerUnit REAL;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    // Add refund-specific columns to transactions table
-    try {
-      this.db.exec(`
-        ALTER TABLE transactions ADD COLUMN originalTransactionId TEXT;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    try {
-      this.db.exec(`
-        ALTER TABLE transactions ADD COLUMN refundReason TEXT;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    try {
-      this.db.exec(`
-        ALTER TABLE transactions ADD COLUMN refundMethod TEXT;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    try {
-      this.db.exec(`
-        ALTER TABLE transactions ADD COLUMN managerApprovalId TEXT;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    try {
-      this.db.exec(`
-        ALTER TABLE transactions ADD COLUMN isPartialRefund BOOLEAN DEFAULT 0;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    // Add refund support to transaction items
-    try {
-      this.db.exec(`
-        ALTER TABLE transaction_items ADD COLUMN refundedQuantity INTEGER DEFAULT 0;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    try {
-      this.db.exec(`
-        ALTER TABLE transaction_items ADD COLUMN weight REAL;
-      `);
-    } catch (err) {
-      // Column already exists, ignore error
-    }
-
-    // Add index for refund lookups
-    try {
-      this.db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_transactions_originalTransactionId ON transactions(originalTransactionId);
-      `);
-    } catch (err) {
-      // Index already exists, ignore error
-    }
-
-    // Migration: Rename category column to categoryId in products table if needed
-    try {
-      // Check if the old 'category' column exists
-      const tableInfo = this.db.pragma("table_info(products)");
-      const hasOldCategoryColumn = tableInfo.some(
-        (col: any) => col.name === "category"
-      );
-      const hasCategoryIdColumn = tableInfo.some(
-        (col: any) => col.name === "categoryId"
-      );
-
-      if (hasOldCategoryColumn && !hasCategoryIdColumn) {
-        console.log(
-          "Migrating products table: renaming category to categoryId"
-        );
-
-        // SQLite doesn't support RENAME COLUMN directly, so we need to:
-        // 1. Add the new column
-        // 2. Copy data from old column to new column
-        // 3. Drop the old column (by recreating table)
-
-        this.db.exec(`ALTER TABLE products ADD COLUMN categoryId TEXT;`);
-
-        // Copy data from category to categoryId
-        this.db.exec(
-          `UPDATE products SET categoryId = category WHERE categoryId IS NULL;`
-        );
-
-        // We'll leave the old category column for now to avoid data loss
-        // In a future migration, we can remove it completely
-        console.log(
-          "Migration completed: added categoryId column and copied data"
-        );
-      }
-    } catch (err) {
-      console.error("Error during category->categoryId migration:", err);
-      // Continue without failing, as this might be expected in some cases
-    }
 
     // Insert default admin user if no users exist
     this.createDefaultAdmin();

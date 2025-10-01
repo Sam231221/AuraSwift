@@ -1,9 +1,10 @@
 import { configureStore } from "@reduxjs/toolkit";
-import AuthReducer from "./reducers/AuthSlice";
+// AuthSlice is empty, removing import
+// import AuthReducer from "./AuthSlice";
 
 const store = configureStore({
   reducer: {
-    auth: AuthReducer,
+    // auth: AuthReducer, // AuthSlice is empty, commenting out
   },
 
   middleware: (getDefaultMiddleware) =>

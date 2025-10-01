@@ -143,7 +143,7 @@ It is one of the **main POS database layer** (different from `authStore.ts` whic
 - Creates & manages a **SQLite database** at:
 
   ```
-  ~/Library/Application Support/nepstores-pos/pos_system.db
+  ~/Library/Application Support/auraswift/pos_system.db
   ```
 
 - Defines **tables** for:

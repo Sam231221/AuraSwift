@@ -325,9 +325,9 @@ This POS system uses **environment-aware database storage**:
 
 - **Development**: Database stored in `./dev-data/pos_system.db` (project directory)
 - **Production**: Database stored in OS-specific user data directory
-  - **Windows**: `%APPDATA%/NepStoresPos/pos_system.db`
-  - **macOS**: `~/Library/Application Support/NepStoresPos/pos_system.db`
-  - **Linux**: `~/.config/NepStoresPos/pos_system.db`
+  - **Windows**: `%APPDATA%/AuraSwift/pos_system.db`
+  - **macOS**: `~/Library/Application Support/AuraSwift/pos_system.db`
+  - **Linux**: `~/.config/AuraSwift/pos_system.db`
 
 ### Database Management Scripts
 
@@ -370,7 +370,7 @@ npm run db:paths
 cp "/path/to/your/database.db" "./dev-data/pos_system.db"
 
 # For production (macOS)
-cp "/path/to/your/database.db" "$HOME/Library/Application Support/NepStoresPos/pos_system.db"
+cp "/path/to/your/database.db" "$HOME/Library/Application Support/AuraSwift/pos_system.db"
 ```
 
 See [use-existing-db.md](./use-existing-db.md) for detailed migration instructions.

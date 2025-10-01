@@ -1,5 +1,10 @@
 // Load environment variables from .env file
-import "dotenv/config";
+try {
+  await import("dotenv/config");
+} catch (error) {
+  // Ignore dotenv import errors in production builds where it might not be available
+  console.log("Dotenv not available, continuing without .env file loading");
+}
 
 import { initApp } from "@app/main";
 import { fileURLToPath } from "node:url";

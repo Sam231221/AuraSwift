@@ -19,7 +19,7 @@ npm start
 ```bash
 # Set the environment variable before launching
 export POS_DB_PATH="/path/to/your/existing/database.db"
-./dist/NepStoresPos.app/Contents/MacOS/NepStoresPos
+./dist/AuraSwift.app/Contents/MacOS/AuraSwift
 ```
 
 ### Permanent Configuration:
@@ -53,30 +53,30 @@ Move your database to the production location:
 
 ```bash
 # Create the application data directory
-mkdir -p "$HOME/Library/Application Support/NepStoresPos"
+mkdir -p "$HOME/Library/Application Support/AuraSwift"
 
 # Copy your existing database
-cp "/path/to/your/existing/database.db" "$HOME/Library/Application Support/NepStoresPos/pos_system.db"
+cp "/path/to/your/existing/database.db" "$HOME/Library/Application Support/AuraSwift/pos_system.db"
 ```
 
 ### Windows:
 
 ```cmd
 # Create the application data directory
-mkdir "%APPDATA%\NepStoresPos"
+mkdir "%APPDATA%\AuraSwift"
 
 # Copy your existing database
-copy "C:\path\to\your\existing\database.db" "%APPDATA%\NepStoresPos\pos_system.db"
+copy "C:\path\to\your\existing\database.db" "%APPDATA%\AuraSwift\pos_system.db"
 ```
 
 ### Linux:
 
 ```bash
 # Create the application data directory
-mkdir -p "$HOME/.config/NepStoresPos"
+mkdir -p "$HOME/.config/AuraSwift"
 
 # Copy your existing database
-cp "/path/to/your/existing/database.db" "$HOME/.config/NepStoresPos/pos_system.db"
+cp "/path/to/your/existing/database.db" "$HOME/.config/AuraSwift/pos_system.db"
 ```
 
 ## Verify Database Integration
