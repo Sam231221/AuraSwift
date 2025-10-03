@@ -366,4 +366,49 @@ contextBridge.exposeInMainWorld("databaseAPI", {
   getInfo: () => ipcRenderer.invoke("database:getInfo"),
 });
 
+// Thermal Printer API
+contextBridge.exposeInMainWorld("printerAPI", {
+  getStatus: () => ipcRenderer.invoke("printer:getStatus"),
+  connect: (config: { type: string; interface: string }) =>
+    ipcRenderer.invoke("printer:connect", config),
+  disconnect: () => ipcRenderer.invoke("printer:disconnect"),
+  printReceipt: (transactionData: any) =>
+    ipcRenderer.invoke("printer:printReceipt", transactionData),
+  cancelPrint: () => ipcRenderer.invoke("printer:cancelPrint"),
+  getAvailableInterfaces: () =>
+    ipcRenderer.invoke("printer:getAvailableInterfaces"),
+});
+
+// Payment API for BBPOS WisePad 3 card reader integration
+contextBridge.exposeInMainWorld("paymentAPI", {
+  // Card Reader Operations
+  initializeReader: (config: {
+    type: "bbpos_wisepad3" | "simulated";
+    connectionType: "usb" | "bluetooth";
+    deviceId?: string;
+    simulated?: boolean;
+  }) => ipcRenderer.invoke("payment:initialize-reader", config),
+
+  discoverReaders: () => ipcRenderer.invoke("payment:discover-readers"),
+  getReaderStatus: () => ipcRenderer.invoke("payment:reader-status"),
+  testReader: () => ipcRenderer.invoke("payment:test-reader"),
+  disconnectReader: () => ipcRenderer.invoke("payment:disconnect-reader"),
+
+  // Payment Processing
+  createPaymentIntent: (data: {
+    amount: number;
+    currency: string;
+    description?: string;
+    metadata?: Record<string, string>;
+  }) => ipcRenderer.invoke("payment:create-intent", data),
+
+  processCardPayment: (paymentIntentId: string) =>
+    ipcRenderer.invoke("payment:process-card", paymentIntentId),
+
+  cancelPayment: () => ipcRenderer.invoke("payment:cancel"),
+
+  // Connection Token (for Stripe Terminal)
+  getConnectionToken: () => ipcRenderer.invoke("payment:connection-token"),
+});
+
 export { sha256sum, versions };

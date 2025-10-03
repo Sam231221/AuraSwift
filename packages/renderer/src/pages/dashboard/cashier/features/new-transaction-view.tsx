@@ -23,6 +23,21 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
 import type { Product } from "@/types/product.types";
 import { toast } from "sonner";
+import { useProductionScanner } from "@/hooks/useProductionScanner";
+import {
+  ScannerStatusBar,
+  ScanHistory,
+} from "@/components/scanner/ScannerStatusComponents";
+import { ScannerAudio } from "@/utils/scannerAudio";
+import { useReceiptPrintingFlow } from "@/hooks/useThermalPrinter";
+import { ReceiptPrinterStatus } from "@/components/printer/ReceiptPrinterComponents";
+import type { TransactionData } from "@/types/printer";
+import { useCardPayment } from "@/hooks/useStripeTerminal";
+import {
+  PaymentTerminal,
+  PaymentStatusModal,
+} from "@/components/payment/PaymentComponents";
+import { PaymentFlow, PaymentStep } from "@/utils/paymentFlow";
 
 interface CartItem {
   product: Product;
@@ -56,6 +71,118 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [error, setError] = useState<string | null>(null);
 
   const { user } = useAuth();
+
+  // Scanner state
+  const [audioEnabled, setAudioEnabled] = useState(true);
+
+  // Thermal printer integration
+  const {
+    isShowingStatus,
+    printStatus,
+    printerInfo,
+    isConnected: printerConnected,
+    startPrintingFlow,
+    handleRetryPrint,
+    handleSkipReceipt,
+    handleEmailReceipt,
+    handleNewSale,
+  } = useReceiptPrintingFlow();
+
+  // Card payment integration
+  const {
+    readerStatus,
+    paymentState,
+    isReady: cardReaderReady,
+    processQuickPayment,
+    cancelPayment,
+    isProcessing: cardProcessing,
+  } = useCardPayment();
+
+  // Card payment modal state
+  const [showCardPayment, setShowCardPayment] = useState(false);
+  const [cardPaymentResult, setCardPaymentResult] = useState<{
+    success: boolean;
+    paymentIntent?: {
+      id: string;
+      amount: number;
+      currency: string;
+      status: string;
+    };
+    error?: string;
+  } | null>(null);
+
+  // Hardware barcode scanner integration
+  const handleHardwareScan = useCallback(
+    async (barcode: string): Promise<boolean> => {
+      console.log("🔍 Hardware scanner detected barcode:", barcode);
+
+      // Search by barcode, PLU, or SKU
+      const product = products.find(
+        (p) =>
+          p.id === barcode ||
+          p.sku === barcode ||
+          p.plu === barcode ||
+          p.sku.toLowerCase() === barcode.toLowerCase()
+      );
+
+      if (product) {
+        if (product.requiresWeight) {
+          // For weight-based products, we need to handle this specially
+          if (
+            selectedWeightProduct?.id === product.id &&
+            weightInput &&
+            parseFloat(weightInput) > 0
+          ) {
+            // If we already have the weight input for this product
+            addToCart(product, parseFloat(weightInput));
+            setWeightInput("");
+            setSelectedWeightProduct(null);
+            return true;
+          } else {
+            // Set as selected weight product and prompt for weight
+            setSelectedWeightProduct(product);
+            toast.warning(
+              `⚖️ Weight required for ${product.name}. Enter weight in ${
+                product.unit || "units"
+              } and scan again.`
+            );
+            return false; // Return false to play error sound and indicate incomplete scan
+          }
+        } else {
+          // Normal product, add directly to cart
+          addToCart(product);
+          console.log("✅ Product added to cart:", product.name);
+          return true; // Success!
+        }
+      } else {
+        console.warn("❌ Product not found for barcode:", barcode);
+        toast.error(`Product not found: ${barcode}`);
+        return false; // Product not found
+      }
+    },
+    [products, selectedWeightProduct, weightInput]
+  );
+
+  // Initialize scanner hook
+  const {
+    scannerStatus,
+    scanLog,
+    clearScanLog,
+    reset: resetScanner,
+  } = useProductionScanner({
+    onScan: handleHardwareScan,
+    enableAudio: audioEnabled,
+    minBarcodeLength: 4, // Allow shorter codes for PLU
+    maxBarcodeLength: 20, // Allow longer codes for various barcode formats
+    scanTimeout: 250, // Slightly longer timeout for reliability
+  });
+
+  // Initialize audio on component mount
+  useEffect(() => {
+    if (audioEnabled) {
+      ScannerAudio.init().catch(console.warn);
+    }
+  }, [audioEnabled]);
 
   // Load products from backend
   const loadProducts = useCallback(async () => {
@@ -120,6 +247,12 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   // Functions for cart operations
   const addToCart = (product: Product, weight?: number) => {
+    console.log(
+      "🛒 Adding to cart:",
+      product.name,
+      weight ? `(${weight} ${product.unit})` : ""
+    );
+
     setCart((prevCart) => {
       const existingItemIndex = prevCart.findIndex(
         (item) => item.product.id === product.id
@@ -128,25 +261,44 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       if (existingItemIndex >= 0) {
         const updatedCart = [...prevCart];
         const existingItem = updatedCart[existingItemIndex];
+        const newQuantity = existingItem.quantity + 1;
+        const newWeight = product.requiresWeight
+          ? (existingItem.weight || 0) + (weight || 0)
+          : undefined;
 
         updatedCart[existingItemIndex] = {
           ...existingItem,
-          quantity: existingItem.quantity + 1,
-          weight: product.requiresWeight
-            ? (existingItem.weight || 0) + (weight || 0)
-            : undefined,
+          quantity: newQuantity,
+          weight: newWeight,
         };
+
+        // Show success toast for scanner feedback
+        toast.success(
+          `Added ${product.name} (${newQuantity}x)${
+            product.requiresWeight && newWeight
+              ? ` - ${newWeight.toFixed(2)} ${product.unit}`
+              : ""
+          }`
+        );
 
         return updatedCart;
       } else {
-        return [
-          ...prevCart,
-          {
-            product,
-            quantity: 1,
-            weight: product.requiresWeight ? weight : undefined,
-          },
-        ];
+        const newItem = {
+          product,
+          quantity: 1,
+          weight: product.requiresWeight ? weight : undefined,
+        };
+
+        // Show success toast for scanner feedback
+        toast.success(
+          `Added ${product.name}${
+            product.requiresWeight && weight
+              ? ` - ${weight.toFixed(2)} ${product.unit}`
+              : ""
+          }`
+        );
+
+        return [...prevCart, newItem];
       }
     });
   };
@@ -206,33 +358,113 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   };
 
-  const handlePayment = (method: PaymentMethod["type"]) => {
+  const handlePayment = async (method: PaymentMethod["type"]) => {
+    // Reset any previous payment state before starting new payment
+    setCardPaymentResult(null);
+    setShowCardPayment(false);
+
     setPaymentMethod({ type: method });
 
     if (method === "cash") {
       setCashAmount(total);
+    } else if (method === "card" || method === "mobile") {
+      // Start card payment flow
+      await handleCardPayment();
     }
   };
 
-  const completeTransaction = async () => {
-    // Validate payment method
-    if (!paymentMethod) {
-      toast.error("Please select a payment method");
-      return;
-    }
-
-    // Validate cash payment
-    if (paymentMethod.type === "cash") {
-      if (cashAmount < total) {
-        toast.error(
-          `Insufficient cash. Need £${(total - cashAmount).toFixed(2)} more.`
-        );
+  const handleCardPayment = async () => {
+    try {
+      if (!cardReaderReady) {
+        toast.error("Card reader not ready. Please check connection.");
         return;
       }
 
-      if (cashAmount <= 0) {
-        toast.error("Please enter a valid cash amount");
+      setShowCardPayment(true);
+
+      // Convert total from dollars to cents
+      const amountInCents = Math.round(total * 100);
+
+      console.log("💳 Starting card payment:", {
+        amount: amountInCents,
+        total: total,
+        currency: "gbp",
+      });
+
+      const result = await processQuickPayment(amountInCents, "gbp");
+
+      setCardPaymentResult(result);
+
+      if (result.success) {
+        toast.success("Card payment successful!");
+
+        // Automatically complete the transaction
+        await completeTransactionWithCardPayment(result);
+      } else {
+        toast.error(`Card payment failed: ${result.error}`);
+        // Reset payment state on failure
+        setShowCardPayment(false);
+        setPaymentMethod(null);
+        setPaymentStep(false);
+      }
+    } catch (error) {
+      console.error("Card payment error:", error);
+      toast.error("Card payment failed");
+      // Reset payment state on error
+      setShowCardPayment(false);
+      setPaymentMethod(null);
+      setPaymentStep(false);
+      setCardPaymentResult({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  };
+
+  const completeTransactionWithCardPayment = async (cardResult: {
+    paymentIntent?: {
+      id: string;
+      amount: number;
+      currency: string;
+      status: string;
+    };
+  }) => {
+    // Continue with the existing transaction completion logic
+    // but skip the payment validation since card payment is already processed
+    await completeTransaction(true, cardResult);
+  };
+
+  const completeTransaction = async (
+    skipPaymentValidation = false,
+    cardPaymentResult?: {
+      paymentIntent?: {
+        id: string;
+        amount: number;
+        currency: string;
+        status: string;
+      };
+    }
+  ) => {
+    // Validate payment method (skip for card payments already processed)
+    if (!skipPaymentValidation) {
+      if (!paymentMethod) {
+        toast.error("Please select a payment method");
         return;
+      }
+
+      // Validate cash payment
+      if (paymentMethod.type === "cash") {
+        if (cashAmount < total) {
+          toast.error(
+            `Insufficient cash. Need £${(total - cashAmount).toFixed(2)} more.`
+          );
+          return;
+        }
+
+        if (cashAmount <= 0) {
+          toast.error("Please enter a valid cash amount");
+          return;
+        }
       }
     }
 
@@ -286,11 +518,14 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
       // Map payment method to backend format
       let backendPaymentMethod: "cash" | "card" | "mixed";
-      if (paymentMethod.type === "cash") {
+      if (skipPaymentValidation) {
+        // Card payment already processed
+        backendPaymentMethod = "card";
+      } else if (paymentMethod?.type === "cash") {
         backendPaymentMethod = "cash";
       } else if (
-        paymentMethod.type === "card" ||
-        paymentMethod.type === "mobile"
+        paymentMethod?.type === "card" ||
+        paymentMethod?.type === "mobile"
       ) {
         backendPaymentMethod = "card";
       } else {
@@ -306,11 +541,16 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         tax,
         total,
         paymentMethod: backendPaymentMethod,
-        cashAmount: paymentMethod.type === "cash" ? cashAmount : undefined,
-        cardAmount:
-          paymentMethod.type === "card" || paymentMethod.type === "mobile"
-            ? total
-            : undefined,
+        cashAmount: skipPaymentValidation
+          ? undefined
+          : paymentMethod?.type === "cash"
+          ? cashAmount
+          : undefined,
+        cardAmount: skipPaymentValidation
+          ? total
+          : paymentMethod?.type === "card" || paymentMethod?.type === "mobile"
+          ? total
+          : undefined,
         items: transactionItems,
         status: "completed",
         receiptNumber,
@@ -324,8 +564,78 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
       setTransactionComplete(true);
 
+      // Prepare receipt data for thermal printing
+      const receiptData: TransactionData = {
+        id: receiptNumber,
+        timestamp: new Date(),
+        cashierId: user.id,
+        cashierName: `${user.firstName} ${user.lastName}`,
+        businessId: user.businessId,
+        businessName: user.businessName,
+        items: cart.map((item) => {
+          let unitPrice = item.product.price;
+          let itemTotal = item.product.price * item.quantity;
+
+          if (
+            item.product.requiresWeight &&
+            item.weight &&
+            item.product.pricePerUnit
+          ) {
+            unitPrice = item.product.pricePerUnit;
+            itemTotal = item.product.pricePerUnit * item.weight * item.quantity;
+          }
+
+          return {
+            id: item.product.id,
+            name: item.product.name,
+            quantity: item.quantity,
+            price: unitPrice,
+            total: itemTotal,
+            sku: item.product.sku || "",
+            category: item.product.category || "",
+          };
+        }),
+        subtotal,
+        tax,
+        discount: 0,
+        total,
+        amountPaid: skipPaymentValidation
+          ? total
+          : paymentMethod?.type === "cash"
+          ? cashAmount
+          : total,
+        change: skipPaymentValidation
+          ? 0
+          : paymentMethod?.type === "cash"
+          ? Math.max(0, cashAmount - total)
+          : 0,
+        paymentMethods: [
+          {
+            type: skipPaymentValidation
+              ? "card"
+              : paymentMethod?.type === "mobile"
+              ? "digital"
+              : paymentMethod?.type === "voucher" ||
+                paymentMethod?.type === "split"
+              ? "other"
+              : paymentMethod?.type || "cash",
+            amount: skipPaymentValidation
+              ? total
+              : paymentMethod?.type === "cash"
+              ? cashAmount
+              : total,
+          },
+        ],
+        receiptNumber,
+      };
+
+      // Start thermal printing flow
+      await startPrintingFlow(receiptData);
+
       // Show success message with payment details
-      if (paymentMethod.type === "cash") {
+      if (skipPaymentValidation) {
+        toast.success("Transaction complete! Paid by card");
+      } else if (paymentMethod?.type === "cash") {
         const change = cashAmount - total;
         if (change > 0) {
           toast.success(`Transaction complete! Change: £${change.toFixed(2)}`);
@@ -333,26 +643,35 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           toast.success("Transaction complete! Exact change received.");
         }
       } else {
-        toast.success(`Transaction complete! Paid by ${paymentMethod.type}`);
+        toast.success(`Transaction complete! Paid by ${paymentMethod?.type}`);
       }
 
       // TODO: Update inventory levels for sold products
       // TODO: Open cash drawer for cash payments
-      // TODO: Generate and print receipt
     } catch (error) {
       console.error("Transaction error:", error);
       toast.error("Failed to complete transaction");
       return;
     }
 
-    setTimeout(() => {
-      // Reset for next customer
-      setCart([]);
-      setPaymentStep(false);
-      setPaymentMethod(null);
-      setTransactionComplete(false);
-      setCashAmount(0);
-    }, 3000);
+    // Only reset automatically if no printer modal is showing
+    if (!isShowingStatus) {
+      setTimeout(() => {
+        // Reset for next customer
+        setCart([]);
+        setPaymentStep(false);
+        setPaymentMethod(null);
+        setTransactionComplete(false);
+        setCashAmount(0);
+        setShowCardPayment(false);
+        setCardPaymentResult(null);
+      }, 3000);
+    }
+  };
+
+  // Wrapper function for button click
+  const handleCompleteTransaction = () => {
+    completeTransaction();
   };
 
   const navigate = useNavigate();
@@ -365,6 +684,18 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   return (
     <>
       <Button onClick={onBack}> Go to dashboard</Button>
+
+      {/* Hardware Scanner Status Bar */}
+      <ScannerStatusBar
+        scannerStatus={scannerStatus}
+        audioEnabled={audioEnabled}
+        onToggleAudio={() => {
+          setAudioEnabled(!audioEnabled);
+          ScannerAudio.setEnabled(!audioEnabled);
+        }}
+        onReset={resetScanner}
+        className="mb-4"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Product Scanning & Selection */}
@@ -391,6 +722,15 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 >
                   Scan
                 </Button>
+              </div>
+
+              {/* Hardware Scanner Info */}
+              <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-green-800">
+                  <ScanBarcode className="h-4 w-4" />
+                  <span className="font-medium">Hardware Scanner Ready:</span>
+                  <span>Just scan any product barcode directly!</span>
+                </div>
               </div>
 
               <div
@@ -759,6 +1099,15 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </CardContent>
           </Card>
 
+          {/* Hardware Scanner History */}
+          {scanLog.length > 0 && (
+            <ScanHistory
+              scanLog={scanLog}
+              onClearLog={clearScanLog}
+              maxVisible={3}
+            />
+          )}
+
           {/* Payment Section */}
           {paymentStep && (
             <motion.div
@@ -767,9 +1116,26 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             >
               <Card className="bg-white border-slate-200 shadow-sm">
                 <CardHeader className="bg-slate-50 py-3">
-                  <CardTitle className="flex items-center gap-2 text-slate-700">
-                    <CreditCard className="h-5 w-5 text-green-600" />
-                    Payment Method
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <CreditCard className="h-5 w-5 text-green-600" />
+                      Payment Method
+                    </div>
+                    {/* Card Reader Status */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <div
+                        className={`h-2 w-2 rounded-full ${
+                          cardReaderReady ? "bg-green-500" : "bg-red-500"
+                        }`}
+                      />
+                      <span
+                        className={
+                          cardReaderReady ? "text-green-600" : "text-red-600"
+                        }
+                      >
+                        Card Reader {cardReaderReady ? "Ready" : "Not Ready"}
+                      </span>
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -789,13 +1155,20 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       </Button>
                       <Button
                         variant="outline"
-                        className="h-16 bg-white border-slate-300 hover:bg-slate-50 text-slate-700"
+                        className={`h-16 border-slate-300 text-slate-700 ${
+                          cardReaderReady
+                            ? "bg-white hover:bg-slate-50"
+                            : "bg-gray-100 cursor-not-allowed opacity-60"
+                        }`}
                         onClick={() => handlePayment("card")}
+                        disabled={!cardReaderReady}
                       >
                         <div className="flex flex-col items-center">
                           <span>Card</span>
                           <span className="text-xs text-slate-500">
-                            Credit/Debit
+                            {cardReaderReady
+                              ? "Credit/Debit"
+                              : "Reader Not Ready"}
                           </span>
                         </div>
                       </Button>
@@ -931,7 +1304,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             ? "bg-slate-400 cursor-not-allowed"
                             : "bg-green-600 hover:bg-green-700"
                         }`}
-                        onClick={completeTransaction}
+                        onClick={handleCompleteTransaction}
                         disabled={
                           paymentMethod?.type === "cash" &&
                           (cashAmount < total || cashAmount <= 0)
@@ -954,7 +1327,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
             >
               <motion.div
                 initial={{ scale: 0.8 }}
@@ -982,6 +1355,60 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           )}
         </div>
       </div>
+
+      {/* Receipt Printer Status Modal */}
+      {isShowingStatus && !showCardPayment && (
+        <ReceiptPrinterStatus
+          printStatus={printStatus}
+          printerInfo={printerInfo || undefined}
+          onRetryPrint={handleRetryPrint}
+          onSkipReceipt={handleSkipReceipt}
+          onEmailReceipt={handleEmailReceipt}
+          onNewSale={() => {
+            handleNewSale();
+            // Reset transaction state
+            setCart([]);
+            setPaymentStep(false);
+            setPaymentMethod(null);
+            setTransactionComplete(false);
+            setCashAmount(0);
+          }}
+        />
+      )}
+
+      {/* Card Payment Status Modal */}
+      {showCardPayment && (
+        <PaymentStatusModal
+          isOpen={true}
+          paymentState={{
+            step: paymentState.step,
+            message: paymentState.message,
+            canCancel: paymentState.canCancel,
+            progress: paymentState.progress,
+          }}
+          amount={Math.round(total * 100)} // Convert to cents
+          onCancel={async () => {
+            if (cardProcessing) {
+              await cancelPayment();
+            }
+            // Fully reset payment state
+            setShowCardPayment(false);
+            setCardPaymentResult(null);
+            setPaymentMethod(null);
+            setPaymentStep(false);
+          }}
+          onRetry={async () => {
+            setCardPaymentResult(null);
+            await handleCardPayment();
+          }}
+          onClose={() => {
+            setShowCardPayment(false);
+            setCardPaymentResult(null);
+            setPaymentMethod(null);
+            setPaymentStep(false);
+          }}
+        />
+      )}
     </>
   );
 };

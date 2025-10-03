@@ -384,9 +384,9 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
 
   // Format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-GB", {
       style: "currency",
-      currency: "USD",
+      currency: "gbp",
     }).format(amount);
   };
 

@@ -258,6 +258,107 @@ declare global {
     databaseAPI: {
       getInfo: () => Promise<APIResponse>;
     };
+    printerAPI: {
+      getStatus: () => Promise<{
+        connected: boolean;
+        interface: string;
+        type: string;
+        error?: string;
+      }>;
+      connect: (config: { type: string; interface: string }) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      disconnect: () => Promise<void>;
+      printReceipt: (transactionData: {
+        id: string;
+        items: Array<{
+          name: string;
+          quantity: number;
+          price: number;
+          total: number;
+        }>;
+        total: number;
+        timestamp: Date;
+        cashierName: string;
+        businessName: string;
+      }) => Promise<{
+        success: boolean;
+        error?: string;
+      }>;
+      cancelPrint: () => Promise<void>;
+      getAvailableInterfaces: () => Promise<
+        Array<{
+          type: "usb" | "bluetooth";
+          name: string;
+          address: string;
+        }>
+      >;
+    };
+
+    paymentAPI: {
+      // Card Reader Operations
+      initializeReader: (config: {
+        type: "bbpos_wisepad3" | "simulated";
+        connectionType: "usb" | "bluetooth";
+        deviceId?: string;
+        simulated?: boolean;
+      }) => Promise<{ success: boolean; error?: string }>;
+
+      discoverReaders: () => Promise<{
+        success: boolean;
+        readers: Array<{
+          type: string;
+          id: string;
+          name: string;
+          connectionType: "usb" | "bluetooth";
+        }>;
+      }>;
+
+      getReaderStatus: () => Promise<{
+        connected: boolean;
+        deviceType: string;
+        connectionType: "usb" | "bluetooth" | "none";
+        batteryLevel?: number;
+        firmwareVersion?: string;
+        lastActivity?: string;
+        error?: string;
+      }>;
+
+      testReader: () => Promise<{ success: boolean; error?: string }>;
+      disconnectReader: () => Promise<{ success: boolean }>;
+
+      // Payment Processing
+      createPaymentIntent: (data: {
+        amount: number;
+        currency: string;
+        description?: string;
+        metadata?: Record<string, string>;
+      }) => Promise<{
+        success: boolean;
+        clientSecret?: string;
+        error?: string;
+      }>;
+
+      processCardPayment: (paymentIntentId: string) => Promise<{
+        success: boolean;
+        paymentIntent?: {
+          id: string;
+          amount: number;
+          currency: string;
+          status: string;
+        };
+        error?: string;
+        errorCode?: string;
+      }>;
+
+      cancelPayment: () => Promise<{ success: boolean; error?: string }>;
+      getConnectionToken: () => Promise<{
+        success: boolean;
+        secret?: string;
+        error?: string;
+      }>;
+    };
   }
 }
 

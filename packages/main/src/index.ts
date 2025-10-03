@@ -1,3 +1,7 @@
+// Load environment variables
+import dotenv from "dotenv";
+dotenv.config();
+
 import type { AppInitConfig } from "./AppInitConfig.js";
 import { createModuleRunner } from "./ModuleRunner.js";
 import { disallowMultipleAppInstance } from "./modules/SingleInstanceApp.js";
@@ -9,11 +13,18 @@ import { allowInternalOrigins } from "./modules/BlockNotAllowdOrigins.js";
 import { allowExternalUrls } from "./modules/ExternalUrls.js";
 import "./authStore.js"; // Initialize auth handlers
 import { getDatabase } from "./database.js";
-
 export async function initApp(initConfig: AppInitConfig) {
   // Initialize database
   const db = await getDatabase();
   console.log("Database initialized");
+
+  // Initialize thermal printer service after database is ready
+  await import("./thermalPrinterService.js");
+  console.log("Thermal printer service initialized");
+
+  // Initialize payment service for BBPOS WisePad 3 and Stripe integration
+  await import("./services/paymentService.js");
+  console.log("Payment service initialized");
 
   // Set up periodic cleanup of old unclosed shifts
   // Run cleanup every 30 minutes

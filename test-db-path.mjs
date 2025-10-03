@@ -1,8 +1,6 @@
 /**
  * Database Path Test Utility
- *
- * This script helps verify the database path logic works correctly
- * in different environments.
+
  */
 
 import path from "path";
