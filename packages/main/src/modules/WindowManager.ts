@@ -1,6 +1,6 @@
 import type { AppModule } from "../AppModule.js";
 import { ModuleContext } from "../ModuleContext.js";
-import { BrowserWindow } from "electron";
+import { BrowserWindow, Menu } from "electron";
 import type { AppInitConfig } from "../AppInitConfig.js";
 import { join } from "node:path";
 
@@ -23,6 +23,10 @@ class WindowManager implements AppModule {
 
   async enable({ app }: ModuleContext): Promise<void> {
     await app.whenReady();
+
+    // Hide the application menu completely (removes File, Edit, View, etc.)
+    Menu.setApplicationMenu(null);
+
     await this.restoreOrCreateWindow(true);
     app.on("second-instance", () => this.restoreOrCreateWindow(true));
     app.on("activate", () => this.restoreOrCreateWindow(true));
@@ -38,6 +42,8 @@ class WindowManager implements AppModule {
     const browserWindow = new BrowserWindow({
       show: false, // Use the 'ready-to-show' event to show the instantiated BrowserWindow.
       icon: iconPath, // Set the window icon
+      title: "", // Set the window title
+      autoHideMenuBar: true, // Hide menu bar on Windows/Linux
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
@@ -46,6 +52,9 @@ class WindowManager implements AppModule {
         preload: this.#preload.path,
       },
     });
+
+    // Hide the menu bar completely
+    browserWindow.setMenuBarVisibility(false);
 
     if (this.#renderer instanceof URL) {
       await browserWindow.loadURL(this.#renderer.href);
