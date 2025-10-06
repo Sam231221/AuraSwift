@@ -10,6 +10,32 @@ export default /** @type import('electron-builder').Configuration */
     buildResources: 'buildResources',
   },
   generateUpdatesFilesForAllChannels: true,
+  mac: {
+    target: [
+      {
+        target: 'dmg',
+        arch: ['x64', 'arm64']
+      },
+      {
+        target: 'zip',
+        arch: ['x64', 'arm64']
+      }
+    ],
+    icon: 'buildResources/icon.icns'
+  },
+  win: {
+    target: [
+      {
+        target: 'nsis',
+        arch: ['x64', 'ia32']
+      },
+      {
+        target: 'portable',
+        arch: ['x64']
+      }
+    ],
+    icon: 'buildResources/icon.png'
+  },
   linux: {
     target: ['deb'],
   },

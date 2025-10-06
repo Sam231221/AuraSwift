@@ -19,6 +19,10 @@
   "scripts": {
     "build": "npm run build -ws --if-present",
     "compile": "npm run build && electron-builder build --config electron-builder.mjs",
+    "compile:mac": "npm run build && electron-builder --mac --config electron-builder.mjs",
+    "compile:win": "npm run build && electron-builder --win --config electron-builder.mjs",
+    "compile:linux": "npm run build && electron-builder --linux --config electron-builder.mjs",
+    "compile:all": "npm run build && electron-builder --mac --win --linux --config electron-builder.mjs",
     "test": "npx playwright test ./tests/e2e.spec.ts",
     "start": "node packages/dev-mode.js",
     "typecheck": "npm run typecheck -ws --if-present",
@@ -42,7 +46,8 @@
     "electron-builder": "26.0.12",
     "electron-rebuild": "^3.2.9",
     "glob": "11.0.3",
-    "playwright": "^1.55.0"
+    "playwright": "^1.55.0",
+    "wine": "^1.0.0"
   },
   "dependencies": {
     "@app/main": "*",

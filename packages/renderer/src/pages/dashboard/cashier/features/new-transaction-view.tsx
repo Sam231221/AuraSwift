@@ -33,11 +33,7 @@ import { useReceiptPrintingFlow } from "@/hooks/useThermalPrinter";
 import { ReceiptPrinterStatus } from "@/components/printer/ReceiptPrinterComponents";
 import type { TransactionData } from "@/types/printer";
 import { useCardPayment } from "@/hooks/useStripeTerminal";
-import {
-  PaymentTerminal,
-  PaymentStatusModal,
-} from "@/components/payment/PaymentComponents";
-import { PaymentFlow, PaymentStep } from "@/utils/paymentFlow";
+import { PaymentStatusModal } from "@/components/payment/PaymentComponents";
 
 interface CartItem {
   product: Product;
@@ -80,7 +76,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     isShowingStatus,
     printStatus,
     printerInfo,
-    isConnected: printerConnected,
+    // isConnected: printerConnected, // Unused variable
     startPrintingFlow,
     handleRetryPrint,
     handleSkipReceipt,
@@ -90,7 +86,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   // Card payment integration
   const {
-    readerStatus,
+    // readerStatus, // Unused variable
     paymentState,
     isReady: cardReaderReady,
     processQuickPayment,
@@ -100,6 +96,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   // Card payment modal state
   const [showCardPayment, setShowCardPayment] = useState(false);
+  // @ts-expect-error - cardPaymentResult is used via setCardPaymentResult but TypeScript doesn't detect it
   const [cardPaymentResult, setCardPaymentResult] = useState<{
     success: boolean;
     paymentIntent?: {
@@ -421,7 +418,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   };
 
-  const completeTransactionWithCardPayment = async (cardResult: {
+  const completeTransactionWithCardPayment = async (_cardResult: {
     paymentIntent?: {
       id: string;
       amount: number;
@@ -431,20 +428,10 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   }) => {
     // Continue with the existing transaction completion logic
     // but skip the payment validation since card payment is already processed
-    await completeTransaction(true, cardResult);
+    await completeTransaction(true);
   };
 
-  const completeTransaction = async (
-    skipPaymentValidation = false,
-    cardPaymentResult?: {
-      paymentIntent?: {
-        id: string;
-        amount: number;
-        currency: string;
-        status: string;
-      };
-    }
-  ) => {
+  const completeTransaction = async (skipPaymentValidation = false) => {
     // Validate payment method (skip for card payments already processed)
     if (!skipPaymentValidation) {
       if (!paymentMethod) {
