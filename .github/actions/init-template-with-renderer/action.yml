@@ -1,7 +1,4 @@
-name: Setup Electr    - uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'emplate with Renderer
+name: Setup Electron Template with Renderer
 description: Initialize the Electron template with renderer package and dependencies
 
 inputs:
@@ -21,7 +18,7 @@ runs:
 
     - uses: actions/setup-node@v4
       with:
-        node-version: "22.x"
+        node-version: "20.x"
         cache: "npm"
 
     - name: Check if renderer directory exists
