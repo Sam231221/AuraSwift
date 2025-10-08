@@ -1,4 +1,7 @@
-name: Setup boilerplate
+name: Setup boil    - uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+        cache: 'npm'late
 inputs:
   renderer-template:
     description: Define what vite template should be used to create renderer in case if renderer package doesn't exist
@@ -47,10 +50,13 @@ runs:
       shell: bash
 
     - name: Install Dependencies
-      run: >-
+      run: |
+        set -e
         if [ "${{ steps.check-renderer.outputs.RENDERER_EXIST }}" == "true" ] && [ -f "package-lock.json" ]; then
-          npm ci --cache-min=0 --no-audit
+          echo "Using npm ci for existing project..."
+          npm ci --prefer-offline --no-audit --progress=false
         else
-          npm install --cache-min=0 --no-audit
+          echo "Using npm install for new project..."
+          npm install --prefer-offline --no-audit --progress=false
         fi
       shell: bash

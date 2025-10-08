@@ -7,7 +7,7 @@ on:
         description: Define what vite template should be used to create renderer in case if renderer package doesn't exist
         required: false
         type: string
-        default: ''
+        default: ""
       app-version:
         required: true
         type: string
@@ -17,7 +17,7 @@ on:
 
 defaults:
   run:
-    shell: 'bash'
+    shell: "bash"
 
 permissions:
   contents: write
@@ -31,7 +31,7 @@ env:
   npm_config_fund: false
 
 jobs:
-  typeckeck:
+  typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -39,7 +39,7 @@ jobs:
         name: Setup boilerplate
         with:
           renderer-template: ${{inputs.renderer-template}}
-      - run: npm run typecheck --if-present
+      - run: npm run typecheck -ws --if-present
 
   compile:
     strategy:
@@ -58,7 +58,7 @@ jobs:
           renderer-template: ${{inputs.renderer-template}}
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
-      - run: npm run compile -- -p never
+      - run: npm run compile -- --publish never
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
 
