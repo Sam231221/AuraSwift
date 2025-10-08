@@ -1,7 +1,34 @@
 # This workflow is the entry point for all CI processes.
 # It is from here that all other workflows are launched.
+
 name: Entry CI
 on:
+  workflow_dispatch:
+    inputs:
+      distribution-channel:
+        description: Distribution channel for release. It can be `beta`, `alpha` or any string.
+        type: string
+        required: false
+        default: "main"
+      renderer-template:
+        description: Define what vite template should be used to create renderer in case if renderer package doesn't exist
+        required: false
+        type: string
+        default: ""
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - .editorconfig
+      - ".idea/**"
+      - ".vscode/**"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - .editorconfig
+      - ".idea/**"
+      - ".vscode/**"
   workflow_call:
     inputs:
       distribution-channel:
@@ -12,10 +39,10 @@ on:
         description: Define what vite template should be used to create renderer in case if renderer package doesn't exist
         required: false
         type: string
-        default: ''
+        default: ""
 
 concurrency:
-  group: ${{github.workflow}}-${{ github.ref }}-${{inputs.distribution-channel}}
+  group: ${{github.workflow}}-${{ github.ref }}-${{ inputs.distribution-channel || 'main' }}
   cancel-in-progress: true
 
 permissions:
@@ -24,40 +51,57 @@ permissions:
   attestations: write
 
 jobs:
+  #Job1
   prepare:
     name: Prepare shared data for multi-platform compilation
     runs-on: ubuntu-latest
     outputs:
+      #outputs three values for use in later jobs.
       APP_VERSION: ${{ steps.APP_VERSION.outputs.APP_VERSION }}
       COMMIT_TIMESTAMP: ${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}
       APP_FULL_VERSION: ${{ steps.APP_FULL_VERSION.outputs.APP_FULL_VERSION }}
     steps:
+      #Step 1: Checks out your repository code.
       - uses: actions/checkout@v5
+
+      #Step 2: Gets the commit timestamp and sets it as an output.
       - id: COMMIT_TIMESTAMP
         run: echo "COMMIT_TIMESTAMP=$(git show -s --format=%ct ${{ github.sha }})" >> $GITHUB_OUTPUT
+      #Step 3: Reads the app version from package.json and sets it as an output.
       - id: APP_VERSION
         run: echo "APP_VERSION=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+
+      #Step 4: Combines version, channel, and timestamp into a full version string.
       - id: APP_FULL_VERSION
-        run: echo "APP_FULL_VERSION=${{ steps.APP_VERSION.outputs.APP_VERSION }}-${{inputs.distribution-channel}}.${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_OUTPUT
+        run: echo "APP_FULL_VERSION=${{ steps.APP_VERSION.outputs.APP_VERSION }}-${{ inputs.distribution-channel || 'main' }}.${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_OUTPUT
+
+      #Step 5: Adds summary info to the workflow run for easy viewing.
       - run: |
           echo "- \`COMMIT_TIMESTAMP\`: ${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_STEP_SUMMARY
           echo "- \`APP_VERSION\`: ${{ steps.APP_VERSION.outputs.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- \`APP_FULL_VERSION\`: ${{ steps.APP_FULL_VERSION.outputs.APP_FULL_VERSION }}" >> $GITHUB_STEP_SUMMARY
 
+  #Job2
   compile-and-test:
+    #depends on prepare job
     needs:
       - prepare
     permissions:
       contents: write
       id-token: write
       attestations: write
+
+    #Uses another workflow file (compile-and-test.yml)
     uses: ./.github/workflows/compile-and-test.yml
+    #Passes inputs and outputs to that workflow
     with:
       renderer-template: ${{ inputs.renderer-template }}
       app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
-      distribution-channel: ${{inputs.distribution-channel}}
+      distribution-channel: ${{ inputs.distribution-channel || 'main' }}
 
+  #Job3
   deploy:
+    #Only runs on push to the main branch
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
@@ -65,6 +109,7 @@ jobs:
       - prepare
       - compile-and-test
     uses: ./.github/workflows/deploy.yml
+    #Uses another workflow file (deploy.yml) passing required inputs.
     with:
-      distribution-channel: ${{ inputs.renderer-template }}
+      distribution-channel: ${{ inputs.distribution-channel || 'main' }}
       app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
