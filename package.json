@@ -44,8 +44,8 @@
     "create-vite": "7.1.2",
     "electron": "38.1.2",
     "electron-builder": "26.0.12",
-    "electron-rebuild": "^3.2.9",
-    "glob": "11.0.3",
+    "@electron/rebuild": "^4.0.1",
+    "glob": "^11.0.3",
     "playwright": "^1.55.0"
   },
   "dependencies": {

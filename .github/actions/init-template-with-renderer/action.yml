@@ -3,8 +3,7 @@ inputs:
   renderer-template:
     description: Define what vite template should be used to create renderer in case if renderer package doesn't exist
     required: false
-    default: ''
-
+    default: ""
 
 runs:
   using: "composite"
@@ -17,7 +16,7 @@ runs:
 
     - uses: actions/setup-node@v4
       with:
-        node-version: 'latest'
+        node-version: "latest"
 
     - name: Check if renderer directory exists
       id: check-renderer
@@ -43,11 +42,15 @@ runs:
         restore-keys: |
           npm-${{ runner.os }}-${{ inputs.renderer-template }}-
 
+    - name: Clear npm cache (integrity issue workaround)
+      run: npm cache clean --force
+      shell: bash
+
     - name: Install Dependencies
       run: >-
         if [ "${{ steps.check-renderer.outputs.RENDERER_EXIST }}" == "true" ] && [ -f "package-lock.json" ]; then
-          npm ci
+          npm ci --cache-min=0 --no-audit
         else
-          npm install
+          npm install --cache-min=0 --no-audit
         fi
       shell: bash
