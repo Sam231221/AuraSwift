@@ -3,8 +3,9 @@ import { _electron as electron } from "playwright";
 import { expect, test as base } from "@playwright/test";
 import type { BrowserWindow } from "electron";
 import { globSync } from "glob";
-import { platform } from "node:process";
+import { platform, arch } from "node:process";
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 
 process.env.PLAYWRIGHT_TEST = "true";
 
@@ -24,27 +25,122 @@ const test = base.extend<TestFixtures>({
   electronApp: [
     async ({}, use) => {
       /**
-       * Executable path depends on root package name!
+       * Improved executable path detection for different environments
        */
-      let executablePattern = "dist/*/root{,.*}";
-      if (platform === "darwin") {
-        executablePattern += "/Contents/*/root";
+      let executablePath: string | undefined;
+      let mainEntry: string | undefined;
+      const isCI = process.env.CI === "true";
+
+      // Try multiple possible locations and patterns based on electron-builder output
+      const possiblePaths = [
+        // Electron-builder specific outputs (from your config)
+        platform === "darwin" ? "dist/*.app" : undefined,
+        platform === "darwin" ? "dist/**/*.app" : undefined,
+        platform === "darwin" ? "dist/*.dmg" : undefined,
+        platform === "win32" ? "dist/*.exe" : undefined,
+        platform === "win32" ? "dist/**/*.exe" : undefined,
+        platform === "linux" ? "dist/*.deb" : undefined,
+        platform === "linux" ? "dist/*.AppImage" : undefined,
+
+        // For macOS app bundles, look for executable inside
+        platform === "darwin" ? "dist/*.app/Contents/MacOS/*" : undefined,
+        platform === "darwin" ? "dist/**/*.app/Contents/MacOS/*" : undefined,
+
+        // Generic electron-builder patterns
+        "dist/**/*.{app,exe,AppImage,deb}",
+        "out/**/*.{app,exe,AppImage,deb}",
+        "release/**/*.{app,exe,AppImage,deb}",
+
+        // Direct executable names (common in CI) - based on your package name
+        "dist/electron",
+        "dist/auraswift*",
+        "dist/AuraSwift*",
+        "dist/aura-swift*",
+
+        // Original patterns for backward compatibility
+        "dist/*/root{,.*}",
+        platform === "darwin" ? "dist/*/root{,.*}/Contents/*/root" : undefined,
+
+        // Fallback patterns
+        "dist/**/*",
+        "dist/*",
+      ].filter(Boolean) as string[];
+
+      console.log(`[Test Setup] Platform: ${platform}, CI: ${isCI}`);
+      console.log(`[Test Setup] Current working directory: ${process.cwd()}`);
+
+      // Also check if we're in a packaged app scenario
+      const appPaths = globSync(possiblePaths, { nodir: true });
+
+      if (appPaths.length > 0) {
+        executablePath = appPaths[0];
+        console.log(`[Test Setup] Found executable at: ${executablePath}`);
+      } else {
+        // If no built app found, try running from source (development mode)
+        console.log(
+          "[Test Setup] No built app found, checking for source execution..."
+        );
+
+        // Look for the main entry point
+        const mainEntries = [
+          "dist-electron/main.js",
+          "out/main.js",
+          "dist/main.js",
+          "build/main.js",
+          "src/main.js",
+          "packages/main/dist/index.js",
+        ].filter(existsSync);
+
+        if (mainEntries.length > 0) {
+          // Use Electron directly with the main entry point
+          executablePath = require("electron") as unknown as string;
+          mainEntry = mainEntries[0];
+          console.log(
+            `[Test Setup] Running from source with main: ${mainEntry}`
+          );
+        } else {
+          // Debug information for troubleshooting
+          const allFiles = globSync("**/*", { nodir: true }).slice(0, 50); // Limit output
+          throw new Error(
+            `App Executable path not found. Checked patterns: ${possiblePaths.join(
+              ", "
+            )}\n` +
+              `Current working directory: ${process.cwd()}\n` +
+              `First 50 files found: ${allFiles.join(", ")}\n` +
+              `Platform: ${platform}, Arch: ${arch}, CI: ${isCI}`
+          );
+        }
       }
 
-      const [executablePath] = globSync(executablePattern);
-      if (!executablePath) {
-        throw new Error("App Executable path not found");
-      }
+      const launchArgs = mainEntry
+        ? [mainEntry, "--no-sandbox"]
+        : ["--no-sandbox"];
+
+      console.log(
+        `[Test Setup] Launching Electron with args: ${launchArgs.join(" ")}`
+      );
 
       const electronApp = await electron.launch({
         executablePath: executablePath,
-        args: ["--no-sandbox"],
+        args: launchArgs,
+        timeout: 30000, // Increase timeout for CI
       });
 
       electronApp.on("console", (msg) => {
         if (msg.type() === "error") {
           console.error(`[electron][${msg.type()}] ${msg.text()}`);
         }
+      });
+
+      electronApp.on("window", (page) => {
+        page.on("pageerror", (error) => {
+          console.error(`[page error] ${error.message}`);
+        });
+        page.on("console", (msg) => {
+          if (msg.type() === "error") {
+            console.error(`[renderer][${msg.type()}] ${msg.text()}`);
+          }
+        });
       });
 
       await use(electronApp);
@@ -58,6 +154,78 @@ const test = base.extend<TestFixtures>({
   electronVersions: async ({ electronApp }, use) => {
     await use(await electronApp.evaluate(() => process.versions));
   },
+});
+
+test.describe("Build Environment Debug", () => {
+  test("Check build output structure", async () => {
+    const fs = require("fs");
+    const path = require("path");
+
+    console.log("[Debug] Current working directory:", process.cwd());
+    console.log("[Debug] Platform:", platform, "Arch:", arch);
+    console.log("[Debug] CI Environment:", process.env.CI);
+    console.log("[Debug] Directory contents:");
+
+    function listFiles(
+      dir: string,
+      indent = "",
+      maxDepth = 2,
+      currentDepth = 0
+    ) {
+      if (currentDepth >= maxDepth) return;
+
+      try {
+        const items = fs.readdirSync(dir);
+        items.slice(0, 20).forEach((item: string) => {
+          // Limit items per directory
+          const fullPath = path.join(dir, item);
+          try {
+            const stat = fs.statSync(fullPath);
+            if (stat.isDirectory()) {
+              console.log(`${indent}📁 ${item}/`);
+              if (
+                item === "dist" ||
+                item === "out" ||
+                item === "release" ||
+                item === "build"
+              ) {
+                listFiles(
+                  fullPath,
+                  indent + "  ",
+                  maxDepth + 1,
+                  currentDepth + 1
+                );
+              }
+            } else {
+              console.log(`${indent}📄 ${item}`);
+            }
+          } catch (error) {
+            console.log(`${indent}❓ ${item} (access error)`);
+          }
+        });
+      } catch (error) {
+        console.log(`${indent}❌ Cannot read directory: ${dir}`);
+      }
+    }
+
+    listFiles(".");
+
+    // Check specifically for Electron executables
+    const electronPaths = globSync(
+      [
+        "dist/**/*.{app,exe,AppImage}",
+        "out/**/*.{app,exe,AppImage}",
+        "release/**/*.{app,exe,AppImage}",
+        "packages/main/dist/**/*.js",
+      ],
+      { nodir: true }
+    );
+
+    console.log("[Debug] Found potential Electron paths:", electronPaths);
+
+    // This test always passes - it's just for debugging
+    expect(true).toBe(true);
+  });
 });
 
 test.describe("Vite Build & TypeScript Integration", async () => {

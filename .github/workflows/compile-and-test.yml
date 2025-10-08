@@ -62,11 +62,21 @@ jobs:
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
 
-      - run: npm run test --if-present
-        if: matrix.os != 'ubuntu-latest'
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+        if: hashFiles('tests/**') != ''
 
-      - run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- npm run test --if-present
-        if: matrix.os == 'ubuntu-latest'
+      - name: Run tests (Windows/macOS)
+        run: npm run test --if-present
+        if: matrix.os != 'ubuntu-latest' && hashFiles('tests/**') != ''
+        env:
+          CI: true
+
+      - name: Run tests (Linux with Xvfb)
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- npm run test --if-present
+        if: matrix.os == 'ubuntu-latest' && hashFiles('tests/**') != ''
+        env:
+          CI: true
 
       - uses: actions/attest-build-provenance@v3
         with:
