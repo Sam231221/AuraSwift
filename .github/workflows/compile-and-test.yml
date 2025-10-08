@@ -57,12 +57,22 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libusb-1.0-0-dev libudev-dev
+          sudo apt-get install -y \
+            build-essential \
+            python3-dev \
+            libusb-1.0-0-dev \
+            libudev-dev \
+            pkg-config
 
       - uses: ./.github/actions/init-template-with-renderer
         name: Setup boilerplate
         with:
           renderer-template: ${{inputs.renderer-template}}
+
+      - name: Rebuild native modules for Electron
+        run: npx electron-rebuild
+        env:
+          NODE_ENV: production
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
       - run: npm run compile -- --publish never
