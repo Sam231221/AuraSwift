@@ -8,7 +8,10 @@ import { ipcMain } from "electron";
 
 // Thermal printer library interface
 interface ThermalPrinterLib {
-  init(config: PrinterConfig): Promise<ThermalPrinter>;
+  default?: any;
+  ThermalPrinter?: any;
+  CharacterSet?: any;
+  [key: string]: any;
 }
 
 interface ThermalPrinter {
@@ -132,7 +135,8 @@ export class ThermalPrinterService {
       }
 
       // Initialize printer with config
-      this.printer = await thermalPrinterLib.init({
+      const { ThermalPrinter } = thermalPrinterLib;
+      this.printer = new ThermalPrinter({
         type: config.type || "epson",
         interface: config.interface,
         options: {
