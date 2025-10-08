@@ -1,7 +1,6 @@
-name: Setup boil    - uses: actions/setup-node@v4
-      with:
-        node-version: '22.x'
-        cache: 'npm'late
+name: Setup Electron Template with Renderer
+description: Initialize the Electron template with renderer package and dependencies
+
 inputs:
   renderer-template:
     description: Define what vite template should be used to create renderer in case if renderer package doesn't exist
@@ -19,7 +18,8 @@ runs:
 
     - uses: actions/setup-node@v4
       with:
-        node-version: "latest"
+        node-version: "22.x"
+        cache: "npm"
 
     - name: Check if renderer directory exists
       id: check-renderer
