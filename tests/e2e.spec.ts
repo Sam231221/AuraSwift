@@ -33,33 +33,24 @@ const test = base.extend<TestFixtures>({
 
       // Try multiple possible locations and patterns based on electron-builder output
       const possiblePaths = [
-        // Electron-builder specific outputs (from your config)
-        platform === "darwin" ? "dist/*.app" : undefined,
-        platform === "darwin" ? "dist/**/*.app" : undefined,
-        platform === "darwin" ? "dist/*.dmg" : undefined,
-        platform === "win32" ? "dist/*.exe" : undefined,
-        platform === "win32" ? "dist/**/*.exe" : undefined,
-        platform === "linux" ? "dist/*.deb" : undefined,
-        platform === "linux" ? "dist/*.AppImage" : undefined,
+        // Windows-specific patterns (prioritized since we're Windows-only now)
+        "dist/*.exe",
+        "dist/**/*.exe",
+        "dist/win-unpacked/*.exe",
+        "dist/win-unpacked/**/*.exe",
 
-        // For macOS app bundles, look for executable inside
-        platform === "darwin" ? "dist/*.app/Contents/MacOS/*" : undefined,
-        platform === "darwin" ? "dist/**/*.app/Contents/MacOS/*" : undefined,
+        // Electron-builder Windows output patterns
+        "dist/**/auraswift.exe",
+        "dist/**/AuraSwift.exe",
+        "dist/**/aura-swift.exe",
+        "dist/auraswift*.exe",
+        "dist/AuraSwift*.exe",
+        "dist/aura-swift*.exe",
 
-        // Generic electron-builder patterns
-        "dist/**/*.{app,exe,AppImage,deb}",
-        "out/**/*.{app,exe,AppImage,deb}",
-        "release/**/*.{app,exe,AppImage,deb}",
-
-        // Direct executable names (common in CI) - based on your package name
-        "dist/electron",
-        "dist/auraswift*",
-        "dist/AuraSwift*",
-        "dist/aura-swift*",
-
-        // Original patterns for backward compatibility
-        "dist/*/root{,.*}",
-        platform === "darwin" ? "dist/*/root{,.*}/Contents/*/root" : undefined,
+        // Generic executable patterns
+        "dist/**/*.exe",
+        "out/**/*.exe",
+        "release/**/*.exe",
 
         // Fallback patterns
         "dist/**/*",

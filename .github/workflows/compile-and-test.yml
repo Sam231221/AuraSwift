@@ -27,6 +27,8 @@ permissions:
 env:
   NODE_NO_WARNINGS: 1
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+  ELECTRON_DISABLE_GPU: 1
+  ELECTRON_NO_SANDBOX: 1
   npm_config_audit: false
   npm_config_fund: false
 
@@ -42,27 +44,14 @@ jobs:
       - run: npm run typecheck -ws --if-present
 
   compile:
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - windows-latest
-          - ubuntu-latest
-          - macos-latest
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install system dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install Windows dependencies for Electron
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            python3-dev \
-            libusb-1.0-0-dev \
-            libudev-dev \
-            pkg-config
+          choco install vcredist2015 -y
+        shell: powershell
 
       - uses: ./.github/actions/init-template-with-renderer
         name: Setup boilerplate
@@ -75,25 +64,47 @@ jobs:
           NODE_ENV: production
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
-      - run: npm run compile -- --publish never
+
+      - name: Build and compile Electron app
+        run: npm run compile -- --publish never
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
+          NODE_ENV: production
+
+      - name: Verify build output
+        run: |
+          echo "Build completed. Checking output:"
+          if (Test-Path "dist") { 
+            dir dist -Recurse | Select-Object FullName | Format-Table -AutoSize
+          } else { 
+            echo "ERROR: No dist directory found after build!"
+            exit 1
+          }
+        shell: powershell
 
       - name: Install Playwright
         run: npx playwright install --with-deps
         if: hashFiles('tests/**') != ''
 
-      - name: Run tests (Windows/macOS)
-        run: npm run test --if-present
-        if: matrix.os != 'ubuntu-latest' && hashFiles('tests/**') != ''
-        env:
-          CI: true
+      - name: Debug build output structure
+        if: hashFiles('tests/**') != ''
+        run: |
+          echo "Current directory contents:"
+          dir
+          echo "Dist directory contents:"
+          if (Test-Path "dist") { dir dist -Recurse } else { echo "No dist directory found" }
+          echo "Looking for executables:"
+          if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { echo "No executables found" }
+        shell: powershell
 
-      - name: Run tests (Linux with Xvfb)
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- npm run test --if-present
-        if: matrix.os == 'ubuntu-latest' && hashFiles('tests/**') != ''
+      - name: Run tests
+        run: npm run test --if-present
+        if: hashFiles('tests/**') != ''
         env:
           CI: true
+          ELECTRON_DISABLE_GPU: 1
+          ELECTRON_NO_SANDBOX: 1
+          DEBUG: playwright:*
 
       - uses: actions/attest-build-provenance@v3
         with:
@@ -102,5 +113,5 @@ jobs:
       - name: Upload compiled app
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-${{inputs.distribution-channel}}
+          name: windows-${{inputs.distribution-channel}}
           path: dist
