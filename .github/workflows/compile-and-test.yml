@@ -51,6 +51,7 @@ jobs:
       - name: Install Windows dependencies for Electron
         run: |
           choco install vcredist2015 -y
+          choco install vcredist2019 -y
         shell: powershell
 
       - uses: ./.github/actions/init-template-with-renderer
@@ -58,12 +59,18 @@ jobs:
         with:
           renderer-template: ${{inputs.renderer-template}}
 
-      - name: Rebuild native modules for Electron
-        run: npx electron-rebuild
+      - run: npm version "${{inputs.app-version}}" --no-git-tag-version
+
+      - name: Clean and rebuild native modules for Electron
+        run: |
+          echo "Cleaning previous builds..."
+          if (Test-Path "dist") { Remove-Item -Recurse -Force dist }
+          echo "Rebuilding native modules for Electron..."
+          npx electron-rebuild --verbose
+          echo "Electron rebuild completed"
+        shell: powershell
         env:
           NODE_ENV: production
-
-      - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
       - name: Build and compile Electron app
         run: npm run compile -- --publish never
@@ -97,13 +104,27 @@ jobs:
           if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { echo "No executables found" }
         shell: powershell
 
+      - name: Pre-test native module verification
+        if: hashFiles('tests/**') != ''
+        run: |
+          echo "Verifying native modules are properly built..."
+          if (Test-Path "node_modules/better-sqlite3/build") {
+            echo "better-sqlite3 native build found"
+            dir "node_modules/better-sqlite3/build" -Recurse
+          } else {
+            echo "WARNING: better-sqlite3 native build not found"
+          }
+        shell: powershell
+
       - name: Run tests
         run: npm run test --if-present
         if: hashFiles('tests/**') != ''
         env:
           CI: true
+          NODE_ENV: test
           ELECTRON_DISABLE_GPU: 1
           ELECTRON_NO_SANDBOX: 1
+          PLAYWRIGHT_HEADLESS: 1
           DEBUG: playwright:*
 
       - uses: actions/attest-build-provenance@v3

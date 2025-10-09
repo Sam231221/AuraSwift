@@ -23,6 +23,7 @@
     "compile:win": "npm run build && electron-builder --win --config electron-builder.mjs",
     "compile:linux": "npm run build && electron-builder --linux --config electron-builder.mjs",
     "compile:all": "npm run build && electron-builder --mac --win --linux --config electron-builder.mjs",
+    "postinstall": "electron-rebuild",
     "test": "npx playwright test ./tests/e2e.spec.ts",
     "start": "node packages/dev-mode.js",
     "typecheck": "npm run typecheck -ws --if-present",

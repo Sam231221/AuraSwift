@@ -104,8 +104,13 @@ const test = base.extend<TestFixtures>({
       }
 
       const launchArgs = mainEntry
-        ? [mainEntry, "--no-sandbox"]
-        : ["--no-sandbox"];
+        ? [mainEntry, "--no-sandbox", "--disable-gpu", "--headless"]
+        : ["--no-sandbox", "--disable-gpu", "--headless"];
+
+      // Add more args for Windows CI environment
+      if (isCI && platform === "win32") {
+        launchArgs.push("--disable-dev-shm-usage", "--disable-extensions");
+      }
 
       console.log(
         `[Test Setup] Launching Electron with args: ${launchArgs.join(" ")}`
@@ -114,7 +119,13 @@ const test = base.extend<TestFixtures>({
       const electronApp = await electron.launch({
         executablePath: executablePath,
         args: launchArgs,
-        timeout: 30000, // Increase timeout for CI
+        timeout: 60000, // Increase timeout for CI with native modules
+        env: {
+          ...process.env,
+          NODE_ENV: "test",
+          ELECTRON_DISABLE_GPU: "1",
+          ELECTRON_NO_SANDBOX: "1",
+        },
       });
 
       electronApp.on("console", (msg) => {
