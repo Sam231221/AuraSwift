@@ -34,12 +34,14 @@ const test = base.extend<TestFixtures>({
       // Try multiple possible locations and patterns based on electron-builder output
       const possiblePaths = [
         // Windows-specific patterns (prioritized since we're Windows-only now)
+        "dist/win-unpacked/auraswift.exe",
+        "dist/win-unpacked/AuraSwift.exe",
+        "dist/win-unpacked/*.exe",
         "dist/*.exe",
         "dist/**/*.exe",
-        "dist/win-unpacked/*.exe",
         "dist/win-unpacked/**/*.exe",
 
-        // Electron-builder Windows output patterns
+        // Electron-builder Windows output patterns (common locations)
         "dist/**/auraswift.exe",
         "dist/**/AuraSwift.exe",
         "dist/**/aura-swift.exe",
@@ -52,9 +54,10 @@ const test = base.extend<TestFixtures>({
         "out/**/*.exe",
         "release/**/*.exe",
 
-        // Fallback patterns
-        "dist/**/*",
-        "dist/*",
+        // Development mode fallbacks (if no built executable found)
+        "packages/entry-point.mjs",
+        "dist/main.js",
+        "out/main.js",
       ].filter(Boolean) as string[];
 
       console.log(`[Test Setup] Platform: ${platform}, CI: ${isCI}`);
@@ -116,17 +119,58 @@ const test = base.extend<TestFixtures>({
         `[Test Setup] Launching Electron with args: ${launchArgs.join(" ")}`
       );
 
-      const electronApp = await electron.launch({
-        executablePath: executablePath,
-        args: launchArgs,
-        timeout: 60000, // Increase timeout for CI with native modules
-        env: {
-          ...process.env,
-          NODE_ENV: "test",
-          ELECTRON_DISABLE_GPU: "1",
-          ELECTRON_NO_SANDBOX: "1",
-        },
-      });
+      let electronApp;
+      try {
+        electronApp = await electron.launch({
+          executablePath: executablePath,
+          args: launchArgs,
+          timeout: 60000, // Increase timeout for CI with native modules
+          env: {
+            ...process.env,
+            NODE_ENV: "test",
+            ELECTRON_DISABLE_GPU: "1",
+            ELECTRON_NO_SANDBOX: "1",
+            ELECTRON_ENABLE_LOGGING: "1",
+          },
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error(
+          `[Test Setup] Failed to launch Electron: ${errorMessage}`
+        );
+        console.error(`[Test Setup] Executable path: ${executablePath}`);
+        console.error(`[Test Setup] Launch args: ${launchArgs.join(" ")}`);
+
+        // If we're using a built executable and it fails, try development mode
+        if (!mainEntry && executablePath.endsWith(".exe")) {
+          console.log("[Test Setup] Trying development mode as fallback...");
+          const electronBinary = require("electron") as unknown as string;
+          const devMainEntry = "packages/entry-point.mjs";
+
+          if (existsSync(devMainEntry)) {
+            console.log(
+              `[Test Setup] Attempting to launch with development entry: ${devMainEntry}`
+            );
+            electronApp = await electron.launch({
+              executablePath: electronBinary,
+              args: [devMainEntry, ...launchArgs],
+              timeout: 60000,
+              env: {
+                ...process.env,
+                NODE_ENV: "test",
+                ELECTRON_DISABLE_GPU: "1",
+                ELECTRON_NO_SANDBOX: "1",
+                ELECTRON_ENABLE_LOGGING: "1",
+              },
+            });
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
 
       electronApp.on("console", (msg) => {
         if (msg.type() === "error") {

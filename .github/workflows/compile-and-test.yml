@@ -81,13 +81,32 @@ jobs:
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
-      - name: Clean and rebuild native modules for Electron
+      - name: Force clean native modules and rebuild for Electron
         run: |
-          echo "Cleaning previous builds..."
+          echo "Cleaning previous builds and native modules..."
           if (Test-Path "dist") { Remove-Item -Recurse -Force dist }
-          echo "Rebuilding native modules for Electron..."
-          npx electron-rebuild --verbose
+
+          echo "Cleaning native module builds..."
+          if (Test-Path "node_modules/better-sqlite3/build") { 
+            Remove-Item -Recurse -Force "node_modules/better-sqlite3/build"
+            echo "Cleaned better-sqlite3 build directory"
+          }
+          if (Test-Path "node_modules/node-hid/build") { 
+            Remove-Item -Recurse -Force "node_modules/node-hid/build"
+            echo "Cleaned node-hid build directory"
+          }
+
+          echo "Rebuilding ALL native modules for Electron..."
+          npx electron-rebuild --verbose --force
           echo "Electron rebuild completed"
+
+          echo "Verifying native module builds..."
+          if (Test-Path "node_modules/better-sqlite3/build") {
+            echo "✅ better-sqlite3 rebuilt successfully"
+            dir "node_modules/better-sqlite3/build" -Name
+          } else {
+            echo "❌ better-sqlite3 rebuild failed"
+          }
         shell: powershell
         env:
           NODE_ENV: production
@@ -98,11 +117,25 @@ jobs:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
           NODE_ENV: production
 
-      - name: Verify build output
+      - name: Verify build output and native modules
         run: |
           echo "Build completed. Checking output:"
           if (Test-Path "dist") { 
-            dir dist -Recurse | Select-Object FullName | Format-Table -AutoSize
+            echo "✅ Dist directory found"
+            echo "Main executable files:"
+            dir dist -Recurse -Include "*.exe" | Select-Object FullName
+            
+            echo "Checking native modules in build..."
+            if (Test-Path "dist/win-unpacked/resources/app.asar.unpacked/node_modules/better-sqlite3") {
+              echo "✅ better-sqlite3 found in build"
+              if (Test-Path "dist/win-unpacked/resources/app.asar.unpacked/node_modules/better-sqlite3/build") {
+                echo "✅ better-sqlite3 native build included"
+              } else {
+                echo "❌ better-sqlite3 native build missing from build"
+              }
+            } else {
+              echo "❌ better-sqlite3 not found in build"
+            }
           } else { 
             echo "ERROR: No dist directory found after build!"
             exit 1
@@ -136,6 +169,25 @@ jobs:
           }
         shell: powershell
 
+      - name: Test Electron launch manually (debug)
+        if: hashFiles('tests/**') != ''
+        run: |
+          echo "Testing Electron launch manually..."
+          $electronPath = "node_modules\.bin\electron.cmd"
+          if (Test-Path $electronPath) {
+            echo "Electron binary found at: $electronPath"
+            try {
+              # Try to get Electron version
+              & $electronPath --version
+              echo "✅ Electron can execute"
+            } catch {
+              echo "❌ Electron execution failed: $_"
+            }
+          } else {
+            echo "❌ Electron binary not found"
+          }
+        shell: powershell
+
       - name: Run tests
         run: npm run test --if-present
         if: hashFiles('tests/**') != ''
@@ -145,6 +197,7 @@ jobs:
           ELECTRON_DISABLE_GPU: 1
           ELECTRON_NO_SANDBOX: 1
           PLAYWRIGHT_HEADLESS: 1
+          ELECTRON_ENABLE_LOGGING: 1
           DEBUG: playwright:*
 
       - uses: actions/attest-build-provenance@v3
