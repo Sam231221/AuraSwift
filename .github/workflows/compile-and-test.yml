@@ -48,10 +48,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install Windows dependencies for Electron
+      - name: Setup MSBuild (Windows)
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup Python for node-gyp
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Verify Windows build environment
         run: |
-          choco install vcredist2015 -y
-          choco install vcredist2019 -y
+          echo "Build environment verification:"
+          echo "MSBuild: $(msbuild -version | Select-Object -First 1)"
+          echo "Python: $(python --version)"
+          echo "Node.js: $(node --version)"
+          echo "npm: $(npm --version)"
         shell: powershell
 
       - uses: ./.github/actions/init-template-with-renderer
