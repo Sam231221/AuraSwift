@@ -54,3 +54,6 @@ runs:
           npm install --prefer-offline --no-audit --progress=false
         fi
       shell: bash
+      env:
+        PYTHON: python
+        msvs_version: 2022

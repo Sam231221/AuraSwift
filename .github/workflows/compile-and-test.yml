@@ -46,15 +46,17 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Configure npm for Windows native modules
+      - name: Configure environment for Windows native modules
         run: |
-          echo "Configuring npm for Windows native module compilation..."
-          npm config set msvs_version 2022
-          npm config set python python
+          echo "Setting up environment for Windows native module compilation..."
           echo "Node.js version: $(node --version)"
           echo "Python version: $(python --version)"
           echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
+          echo "Environment configured for node-gyp"
         shell: powershell
+        env:
+          PYTHON: python
+          msvs_version: 2022
 
       - uses: ./.github/actions/init-template-with-renderer
         name: Setup boilerplate
@@ -75,14 +77,15 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Configure npm for Windows native modules
+      - name: Configure environment for Windows native modules
         run: |
-          echo "Configuring npm for Windows native module compilation..."
+          echo "Setting up environment for Windows native module compilation..."
           echo "Using GitHub Actions built-in MSBuild and Python (no windows-build-tools needed)"
-          npm config set msvs_version 2022
-          npm config set python python
-          echo "Windows build tools configuration completed"
+          echo "Environment configured for node-gyp"
         shell: powershell
+        env:
+          PYTHON: python
+          msvs_version: 2022
 
       - name: Verify Windows build environment
         run: |
@@ -130,6 +133,8 @@ jobs:
         shell: powershell
         env:
           NODE_ENV: production
+          PYTHON: python
+          msvs_version: 2022
 
       - name: Build and compile Electron app (Windows only)
         run: npm run compile:win -- --publish never
