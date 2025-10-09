@@ -46,18 +46,14 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install Windows build tools for native modules
+      - name: Configure npm for Windows native modules
         run: |
-          echo "Installing Windows build tools and dependencies..."
-          npm install --global --production windows-build-tools
-          echo "Windows build tools installation completed"
-        shell: powershell
-
-      - name: Set npm configuration for Windows builds
-        run: |
+          echo "Configuring npm for Windows native module compilation..."
           npm config set msvs_version 2022
           npm config set python python
-          echo "NPM configuration set for Windows builds"
+          echo "Node.js version: $(node --version)"
+          echo "Python version: $(python --version)"
+          echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
         shell: powershell
 
       - uses: ./.github/actions/init-template-with-renderer
@@ -79,27 +75,23 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install Windows build tools for native modules
+      - name: Configure npm for Windows native modules
         run: |
-          echo "Installing Windows build tools and dependencies..."
-          npm install --global --production windows-build-tools
-          echo "Windows build tools installation completed"
-        shell: powershell
-
-      - name: Set npm configuration for Windows builds
-        run: |
+          echo "Configuring npm for Windows native module compilation..."
+          echo "Using GitHub Actions built-in MSBuild and Python (no windows-build-tools needed)"
           npm config set msvs_version 2022
           npm config set python python
-          echo "NPM configuration set for Windows builds"
+          echo "Windows build tools configuration completed"
         shell: powershell
 
       - name: Verify Windows build environment
         run: |
-          echo "Build environment verification:"
+          echo "Build environment verification (using GitHub Actions built-in tools):"
           echo "MSBuild: $(msbuild -version | Select-Object -First 1)"
           echo "Python: $(python --version)"
           echo "Node.js: $(node --version)"
           echo "npm: $(npm --version)"
+          echo "Build tools ready for native module compilation"
         shell: powershell
 
       - uses: ./.github/actions/init-template-with-renderer
