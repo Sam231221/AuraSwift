@@ -56,6 +56,11 @@ class WindowManager implements AppModule {
     // Hide the menu bar completely
     browserWindow.setMenuBarVisibility(false);
 
+    // Ensure window shows when ready to prevent "main window not visible" test failures
+    browserWindow.once("ready-to-show", () => {
+      browserWindow.show();
+    });
+
     if (this.#renderer instanceof URL) {
       await browserWindow.loadURL(this.#renderer.href);
     } else {

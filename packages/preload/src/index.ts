@@ -411,4 +411,8 @@ contextBridge.exposeInMainWorld("paymentAPI", {
   getConnectionToken: () => ipcRenderer.invoke("payment:connection-token"),
 });
 
+// Generic IPC send function for testing and general IPC communication
+export const send = (channel: string, ...args: any[]) =>
+  ipcRenderer.invoke(channel, ...args);
+
 export { sha256sum, versions };

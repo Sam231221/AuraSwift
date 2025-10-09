@@ -46,6 +46,20 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Install Windows build tools for native modules
+        run: |
+          echo "Installing Windows build tools and dependencies..."
+          npm install --global --production windows-build-tools
+          echo "Windows build tools installation completed"
+        shell: powershell
+
+      - name: Set npm configuration for Windows builds
+        run: |
+          npm config set msvs_version 2022
+          npm config set python python
+          echo "NPM configuration set for Windows builds"
+        shell: powershell
+
       - uses: ./.github/actions/init-template-with-renderer
         name: Setup boilerplate
         with:
@@ -64,6 +78,20 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+
+      - name: Install Windows build tools for native modules
+        run: |
+          echo "Installing Windows build tools and dependencies..."
+          npm install --global --production windows-build-tools
+          echo "Windows build tools installation completed"
+        shell: powershell
+
+      - name: Set npm configuration for Windows builds
+        run: |
+          npm config set msvs_version 2022
+          npm config set python python
+          echo "NPM configuration set for Windows builds"
+        shell: powershell
 
       - name: Verify Windows build environment
         run: |
@@ -111,8 +139,8 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Build and compile Electron app
-        run: npm run compile -- --publish never
+      - name: Build and compile Electron app (Windows only)
+        run: npm run compile:win -- --publish never
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
           NODE_ENV: production
