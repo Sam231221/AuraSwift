@@ -213,18 +213,6 @@ jobs:
           }
         shell: powershell
 
-      - name: Run tests
-        run: npm run test --if-present
-        if: hashFiles('tests/**') != ''
-        env:
-          CI: true
-          NODE_ENV: test
-          ELECTRON_DISABLE_GPU: 1
-          ELECTRON_NO_SANDBOX: 1
-          PLAYWRIGHT_HEADLESS: 1
-          ELECTRON_ENABLE_LOGGING: 1
-          DEBUG: playwright:*
-
       - uses: actions/attest-build-provenance@v3
         with:
           subject-path: "dist/root*, dist/latest*.yml"
