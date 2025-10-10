@@ -59,7 +59,7 @@
     "dotenv": "^16.6.1",
     "node-addon-api": "^8.3.0",
     "node-hid": "^3.2.0",
-    "serialport": "^13.1.0",
+    "serialport": "^13.0.0",
     "stripe": "^19.0.0",
     "usb": "^2.16.0"
   }

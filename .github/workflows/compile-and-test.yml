@@ -52,22 +52,13 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install Windows build tools for native modules
-        run: |
-          echo "Installing global build tools for native module compilation..."
-          npm install --global --production windows-build-tools
-          npm install --global node-gyp
-          echo "Build tools installation completed"
-        shell: powershell
-
       - name: Configure environment for Windows native modules
         run: |
           echo "Setting up environment for Windows native module compilation..."
           echo "Node.js version: $(node --version)"
           echo "Python version: $(python --version)"
-          echo "node-gyp version: $(node-gyp --version)"
           echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
-          echo "Environment configured for node-gyp"
+          echo "Modern Windows build environment ready (Node.js 18+ includes necessary build tools)"
         shell: powershell
         env:
           PYTHON: python
@@ -98,22 +89,13 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Install Windows build tools for native modules
-        run: |
-          echo "Installing global build tools for native module compilation..."
-          npm install --global --production windows-build-tools
-          npm install --global node-gyp
-          echo "Build tools installation completed"
-        shell: powershell
-
       - name: Configure environment for Windows native modules
         run: |
           echo "Setting up environment for Windows native module compilation..."
           echo "Node.js version: $(node --version)"
           echo "Python version: $(python --version)"
-          echo "node-gyp version: $(node-gyp --version)"
           echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
-          echo "Environment configured for node-gyp"
+          echo "Modern Windows build environment ready (Node.js 18+ includes necessary build tools)"
         shell: powershell
         env:
           PYTHON: python
