@@ -87,6 +87,28 @@ jobs:
           PYTHON: python
           msvs_version: 2022
 
+      - name: Install Windows hardware development dependencies
+        run: |
+          echo "Installing Windows SDK components for hardware integration..."
+
+          # Install Windows SDK for USB/HID development (if needed)
+          # Note: GitHub Actions runners already have most required tools
+          echo "Checking for Windows SDK availability..."
+          if (Get-Command "msbuild" -ErrorAction SilentlyContinue) {
+            echo "✅ MSBuild is available"
+          } else {
+            echo "❌ MSBuild not found"
+          }
+
+          # Check for required headers for native modules
+          echo "Verifying build environment for hardware native modules..."
+          echo "Python: $(python --version)"
+          echo "Node.js: $(node --version)"
+          echo "npm: $(npm --version)"
+
+          echo "Hardware development environment ready"
+        shell: powershell
+
       - name: Verify Windows build environment
         run: |
           echo "Build environment verification (using GitHub Actions built-in tools):"
@@ -109,26 +131,77 @@ jobs:
           echo "Cleaning previous builds and native modules..."
           if (Test-Path "dist") { Remove-Item -Recurse -Force dist }
 
-          echo "Cleaning native module builds..."
+          echo "Cleaning ALL hardware native module builds..."
+          # Database module
           if (Test-Path "node_modules/better-sqlite3/build") { 
             Remove-Item -Recurse -Force "node_modules/better-sqlite3/build"
             echo "Cleaned better-sqlite3 build directory"
           }
+          # USB HID devices (Card readers)
           if (Test-Path "node_modules/node-hid/build") { 
             Remove-Item -Recurse -Force "node_modules/node-hid/build"
             echo "Cleaned node-hid build directory"
+          }
+          # Serial communication (Printers)
+          if (Test-Path "node_modules/serialport/build") { 
+            Remove-Item -Recurse -Force "node_modules/serialport/build"
+            echo "Cleaned serialport build directory"
+          }
+          # Direct USB access
+          if (Test-Path "node_modules/usb/build") { 
+            Remove-Item -Recurse -Force "node_modules/usb/build"
+            echo "Cleaned usb build directory"
           }
 
           echo "Rebuilding ALL native modules for Electron..."
           npx electron-rebuild --verbose --force
           echo "Electron rebuild completed"
 
-          echo "Verifying native module builds..."
+          echo "Verifying ALL hardware native module builds..."
+          $allSuccess = $true
+
+          # Verify better-sqlite3 (Database)
           if (Test-Path "node_modules/better-sqlite3/build") {
-            echo "✅ better-sqlite3 rebuilt successfully"
+            echo "✅ better-sqlite3 rebuilt successfully (Database support)"
             dir "node_modules/better-sqlite3/build" -Name
           } else {
-            echo "❌ better-sqlite3 rebuild failed"
+            echo "❌ better-sqlite3 rebuild FAILED - DATABASE WILL NOT WORK"
+            $allSuccess = $false
+          }
+
+          # Verify node-hid (USB HID - Card readers)
+          if (Test-Path "node_modules/node-hid/build") {
+            echo "✅ node-hid rebuilt successfully (USB card reader support)"
+            dir "node_modules/node-hid/build" -Name
+          } else {
+            echo "❌ node-hid rebuild FAILED - CARD READERS WILL NOT WORK"
+            $allSuccess = $false
+          }
+
+          # Verify serialport (Serial - Printers)
+          if (Test-Path "node_modules/serialport/build") {
+            echo "✅ serialport rebuilt successfully (Serial printer support)"
+            dir "node_modules/serialport/build" -Name
+          } else {
+            echo "❌ serialport rebuild FAILED - SERIAL PRINTERS WILL NOT WORK"
+            $allSuccess = $false
+          }
+
+          # Verify usb (Direct USB access)
+          if (Test-Path "node_modules/usb/build") {
+            echo "✅ usb rebuilt successfully (Direct USB device support)"
+            dir "node_modules/usb/build" -Name
+          } else {
+            echo "❌ usb rebuild FAILED - USB DEVICES WILL NOT WORK"
+            $allSuccess = $false
+          }
+
+          if (-not $allSuccess) {
+            echo "💥 CRITICAL: Some hardware modules failed to build!"
+            echo "This will cause hardware integration failures in production"
+            exit 1
+          } else {
+            echo "🎉 All hardware native modules verified successfully!"
           }
         shell: powershell
         env:
@@ -142,24 +215,80 @@ jobs:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
           NODE_ENV: production
 
-      - name: Verify build output and native modules
+      - name: Verify build output and ALL hardware native modules
         run: |
-          echo "Build completed. Checking output:"
+          echo "Build completed. Checking output and hardware integration..."
           if (Test-Path "dist") { 
             echo "✅ Dist directory found"
             echo "Main executable files:"
             dir dist -Recurse -Include "*.exe" | Select-Object FullName
             
-            echo "Checking native modules in build..."
-            if (Test-Path "dist/win-unpacked/resources/app.asar.unpacked/node_modules/better-sqlite3") {
+            echo "Checking ALL hardware native modules in build..."
+            $buildSuccess = $true
+            $unpackedPath = "dist/win-unpacked/resources/app.asar.unpacked/node_modules"
+            
+            # Check better-sqlite3 (Database)
+            if (Test-Path "$unpackedPath/better-sqlite3") {
               echo "✅ better-sqlite3 found in build"
-              if (Test-Path "dist/win-unpacked/resources/app.asar.unpacked/node_modules/better-sqlite3/build") {
-                echo "✅ better-sqlite3 native build included"
+              if (Test-Path "$unpackedPath/better-sqlite3/build") {
+                echo "✅ better-sqlite3 native build included (Database support)"
               } else {
-                echo "❌ better-sqlite3 native build missing from build"
+                echo "❌ better-sqlite3 native build missing - DATABASE BROKEN"
+                $buildSuccess = $false
               }
             } else {
-              echo "❌ better-sqlite3 not found in build"
+              echo "❌ better-sqlite3 not found in build - DATABASE MISSING"
+              $buildSuccess = $false
+            }
+            
+            # Check node-hid (Card readers)
+            if (Test-Path "$unpackedPath/node-hid") {
+              echo "✅ node-hid found in build"
+              if (Test-Path "$unpackedPath/node-hid/build") {
+                echo "✅ node-hid native build included (Card reader support)"
+              } else {
+                echo "❌ node-hid native build missing - CARD READERS BROKEN"
+                $buildSuccess = $false
+              }
+            } else {
+              echo "❌ node-hid not found in build - CARD READERS MISSING"
+              $buildSuccess = $false
+            }
+            
+            # Check serialport (Printers)
+            if (Test-Path "$unpackedPath/serialport") {
+              echo "✅ serialport found in build"
+              if (Test-Path "$unpackedPath/serialport/build") {
+                echo "✅ serialport native build included (Serial printer support)"
+              } else {
+                echo "❌ serialport native build missing - SERIAL PRINTERS BROKEN"
+                $buildSuccess = $false
+              }
+            } else {
+              echo "❌ serialport not found in build - SERIAL PRINTERS MISSING"
+              $buildSuccess = $false
+            }
+            
+            # Check usb (USB devices)
+            if (Test-Path "$unpackedPath/usb") {
+              echo "✅ usb found in build"
+              if (Test-Path "$unpackedPath/usb/build") {
+                echo "✅ usb native build included (USB device support)"
+              } else {
+                echo "❌ usb native build missing - USB DEVICES BROKEN"
+                $buildSuccess = $false
+              }
+            } else {
+              echo "❌ usb not found in build - USB DEVICES MISSING"
+              $buildSuccess = $false
+            }
+            
+            if (-not $buildSuccess) {
+              echo "💥 CRITICAL: Hardware modules missing from build!"
+              echo "Production deployment will have hardware integration failures"
+              exit 1
+            } else {
+              echo "🎉 All hardware modules successfully included in build!"
             }
           } else { 
             echo "ERROR: No dist directory found after build!"
@@ -182,15 +311,52 @@ jobs:
           if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { echo "No executables found" }
         shell: powershell
 
-      - name: Pre-test native module verification
+      - name: Pre-test hardware module verification
         if: hashFiles('tests/**') != ''
         run: |
-          echo "Verifying native modules are properly built..."
+          echo "Verifying ALL hardware native modules are properly built before testing..."
+          $testReady = $true
+
+          # Check better-sqlite3 (Database)
           if (Test-Path "node_modules/better-sqlite3/build") {
-            echo "better-sqlite3 native build found"
+            echo "✅ better-sqlite3 native build ready for testing"
             dir "node_modules/better-sqlite3/build" -Recurse
           } else {
-            echo "WARNING: better-sqlite3 native build not found"
+            echo "❌ WARNING: better-sqlite3 native build not found - Database tests may fail"
+            $testReady = $false
+          }
+
+          # Check node-hid (Card readers)
+          if (Test-Path "node_modules/node-hid/build") {
+            echo "✅ node-hid native build ready for testing"
+            dir "node_modules/node-hid/build" -Recurse
+          } else {
+            echo "❌ WARNING: node-hid native build not found - Card reader tests may fail"
+            $testReady = $false
+          }
+
+          # Check serialport (Printers)
+          if (Test-Path "node_modules/serialport/build") {
+            echo "✅ serialport native build ready for testing"
+            dir "node_modules/serialport/build" -Recurse
+          } else {
+            echo "❌ WARNING: serialport native build not found - Printer tests may fail"
+            $testReady = $false
+          }
+
+          # Check usb (USB devices)
+          if (Test-Path "node_modules/usb/build") {
+            echo "✅ usb native build ready for testing"
+            dir "node_modules/usb/build" -Recurse
+          } else {
+            echo "❌ WARNING: usb native build not found - USB device tests may fail"
+            $testReady = $false
+          }
+
+          if ($testReady) {
+            echo "🎉 All hardware modules ready for comprehensive testing!"
+          } else {
+            echo "⚠️ Some hardware modules missing - Tests will run in simulation mode"
           }
         shell: powershell
 
@@ -212,6 +378,45 @@ jobs:
             echo "❌ Electron binary not found"
           }
         shell: powershell
+
+      - name: Run main E2E tests
+        run: npm run test:all --if-present
+        if: hashFiles('tests/**') != ''
+        env:
+          CI: true
+          NODE_ENV: test
+          ELECTRON_DISABLE_GPU: 1
+          ELECTRON_NO_SANDBOX: 1
+          PLAYWRIGHT_HEADLESS: 1
+          ELECTRON_ENABLE_LOGGING: 1
+          DEBUG: playwright:*
+          # Hardware simulation environment
+          HARDWARE_SIMULATION_MODE: true
+          MOCK_PRINTER_ENABLED: true
+          MOCK_CARD_READER_ENABLED: true
+          MOCK_SCANNER_ENABLED: true
+          # Native module paths
+          PYTHON: python
+          msvs_version: 2022
+
+      - name: Run hardware integration tests
+        run: npx playwright test ./tests/hardware-integration.spec.ts
+        if: hashFiles('tests/hardware-integration.spec.ts') != ''
+        env:
+          CI: true
+          NODE_ENV: test
+          ELECTRON_DISABLE_GPU: 1
+          ELECTRON_NO_SANDBOX: 1
+          PLAYWRIGHT_HEADLESS: 1
+          ELECTRON_ENABLE_LOGGING: 1
+          # Hardware simulation environment
+          HARDWARE_SIMULATION_MODE: true
+          MOCK_PRINTER_ENABLED: true
+          MOCK_CARD_READER_ENABLED: true
+          MOCK_SCANNER_ENABLED: true
+          # Native module paths
+          PYTHON: python
+          msvs_version: 2022
 
       - uses: actions/attest-build-provenance@v3
         with:
