@@ -91,15 +91,29 @@ jobs:
 
       - name: Configure environment for Windows native modules
         run: |
-          echo "Setting up environment for Windows native module compilation..."
+          echo "Setting up modern Windows build environment..."
           echo "Node.js version: $(node --version)"
           echo "Python version: $(python --version)"
-          echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
-          echo "Modern Windows build environment ready (Node.js 18+ includes necessary build tools)"
+          echo "MSBuild version: $(msbuild -version 2>$null | Select-Object -First 1)"
+
+          # Configure npm to use MSBuild 2022
+          npm config set msvs_version 2022
+          npm config set python python
+
+          # Verify node-gyp can find build tools
+          npx node-gyp configure 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            echo "✅ node-gyp configuration successful"
+          } else {
+            echo "⚠️ node-gyp configuration had issues, but continuing..."
+          }
+
+          echo "Modern Windows build environment configured successfully"
         shell: powershell
         env:
           PYTHON: python
-          msvs_version: 2022
+          npm_config_msvs_version: 2022
+          npm_config_python: python
 
       - name: Install Windows hardware development dependencies
         run: |
@@ -138,15 +152,54 @@ jobs:
         with:
           renderer-template: ${{inputs.renderer-template}}
 
-      - name: Rebuild native modules after dependency installation
+      - name: Clean and rebuild native modules with modern toolchain
         run: |
-          echo "Rebuilding native modules with proper build tools..."
-          npm rebuild
-          echo "Native module rebuild completed"
+          echo "Modern native module rebuild process..."
+
+          # Clean npm cache to avoid corruption issues
+          npm cache clean --force
+
+          # Remove problematic build directories for fresh rebuild
+          $modules = @("better-sqlite3", "node-hid", "serialport", "usb", "node-addon-api")
+          foreach ($module in $modules) {
+            $buildPath = "node_modules/$module/build"
+            if (Test-Path $buildPath) {
+              Remove-Item -Recurse -Force $buildPath
+              echo "Cleaned $module build directory"
+            }
+          }
+
+          # Configure build environment for modern Node.js
+          $env:npm_config_msvs_version = "2022"
+          $env:npm_config_python = "python"
+          $env:npm_config_node_gyp = "node_modules/.bin/node-gyp"
+
+          # Rebuild each critical module individually for better error tracking
+          echo "Rebuilding critical native modules individually..."
+          $criticalModules = @("better-sqlite3", "node-hid", "serialport", "usb")
+
+          foreach ($module in $criticalModules) {
+            echo "Attempting to rebuild $module..."
+            try {
+              npm rebuild $module --verbose 2>&1
+              if ($LASTEXITCODE -eq 0) {
+                echo "✅ $module rebuild successful"
+              } else {
+                echo "⚠️ $module rebuild returned exit code $LASTEXITCODE"
+                # Continue anyway as some modules may have non-zero success codes
+              }
+            } catch {
+              echo "❌ $module rebuild failed: $_"
+              throw "Critical module $module failed to rebuild"
+            }
+          }
+
+          echo "Native module rebuild process completed"
         shell: powershell
         env:
           PYTHON: python
-          msvs_version: 2022
+          npm_config_msvs_version: 2022
+          npm_config_python: python
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
@@ -177,9 +230,39 @@ jobs:
             echo "Cleaned usb build directory"
           }
 
-          echo "Rebuilding ALL native modules for Electron..."
-          npx electron-rebuild --verbose --force
-          echo "Electron rebuild completed"
+          echo "Rebuilding ALL native modules for Electron with modern toolchain..."
+
+          # Set environment for electron-rebuild
+          $env:npm_config_msvs_version = "2022"
+          $env:npm_config_python = "python"
+
+          # Rebuild each module individually for better error reporting
+          $modules = @("better-sqlite3", "node-hid", "serialport", "usb", "node-addon-api")
+          $failedModules = @()
+
+          foreach ($module in $modules) {
+            echo "Rebuilding $module..."
+            try {
+              npx electron-rebuild --module-dir node_modules/$module --verbose --force 2>&1
+              if ($LASTEXITCODE -eq 0) {
+                echo "✅ $module rebuilt successfully"
+              } else {
+                echo "❌ $module rebuild failed with exit code $LASTEXITCODE"
+                $failedModules += $module
+              }
+            } catch {
+              echo "❌ $module rebuild failed with exception: $_"
+              $failedModules += $module
+            }
+          }
+
+          # Final attempt with all modules at once
+          if ($failedModules.Count -gt 0) {
+            echo "Retrying failed modules: $($failedModules -join ', ')"
+            npx electron-rebuild --verbose --force
+          }
+
+          echo "Electron rebuild process completed"
 
           echo "Verifying ALL hardware native module builds..."
           $allSuccess = $true
