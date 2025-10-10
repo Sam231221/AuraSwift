@@ -38,6 +38,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Setup Node.js 18 for native module compatibility
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
       - name: Setup MSBuild (Windows)
         uses: microsoft/setup-msbuild@v2
 
@@ -46,11 +52,20 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Install Windows build tools for native modules
+        run: |
+          echo "Installing global build tools for native module compilation..."
+          npm install --global --production windows-build-tools
+          npm install --global node-gyp
+          echo "Build tools installation completed"
+        shell: powershell
+
       - name: Configure environment for Windows native modules
         run: |
           echo "Setting up environment for Windows native module compilation..."
           echo "Node.js version: $(node --version)"
           echo "Python version: $(python --version)"
+          echo "node-gyp version: $(node-gyp --version)"
           echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
           echo "Environment configured for node-gyp"
         shell: powershell
@@ -69,6 +84,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Setup Node.js 18 for native module compatibility
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
       - name: Setup MSBuild (Windows)
         uses: microsoft/setup-msbuild@v2
 
@@ -77,10 +98,21 @@ jobs:
         with:
           python-version: "3.x"
 
+      - name: Install Windows build tools for native modules
+        run: |
+          echo "Installing global build tools for native module compilation..."
+          npm install --global --production windows-build-tools
+          npm install --global node-gyp
+          echo "Build tools installation completed"
+        shell: powershell
+
       - name: Configure environment for Windows native modules
         run: |
           echo "Setting up environment for Windows native module compilation..."
-          echo "Using GitHub Actions built-in MSBuild and Python (no windows-build-tools needed)"
+          echo "Node.js version: $(node --version)"
+          echo "Python version: $(python --version)"
+          echo "node-gyp version: $(node-gyp --version)"
+          echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
           echo "Environment configured for node-gyp"
         shell: powershell
         env:
@@ -123,6 +155,16 @@ jobs:
         name: Setup boilerplate
         with:
           renderer-template: ${{inputs.renderer-template}}
+
+      - name: Rebuild native modules after dependency installation
+        run: |
+          echo "Rebuilding native modules with proper build tools..."
+          npm rebuild
+          echo "Native module rebuild completed"
+        shell: powershell
+        env:
+          PYTHON: python
+          msvs_version: 2022
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
