@@ -127,33 +127,34 @@ jobs:
       - name: Install dependencies (skip optional)
         run: npm install --no-optional
 
-      - name: Rebuild modules (PowerShell)
-        shell: pwsh
-        run: |
-          $moduleDirs = Get-ChildItem -Path "node_modules" -Directory
-          foreach ($dir in $moduleDirs) {
-            if ($dir.Name.StartsWith("@")) {
-              # For scoped packages, get all subdirectories
-              $scopedPkgs = Get-ChildItem -Path $dir.FullName -Directory
-              foreach ($pkg in $scopedPkgs) {
-                $fullPkgName = "$($dir.Name)/$($pkg.Name)"
-                Write-Host "Rebuilding $fullPkgName..."
-                try {
-                  npm rebuild $fullPkgName
-                } catch {
-                Write-Host ("Failed to rebuild ${fullPkgName}: " + $_)
-                }
-              }
-            } else {
-              Write-Host "Rebuilding $($dir.Name)..."
-              try {
-                npm rebuild $dir.Name
-              } catch {
-                Write-Host ("Failed to rebuild ${dir.Name}: " + $_)
+        # Efficient native module rebuild first
+      - name: Rebuild native modules
+        run: npm rebuild
+        shell: powershell
 
-              }
+      # Check for missing native modules (fast fail)
+      - name: Verify native modules
+        run: |
+          $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
+          $missing = $false
+          foreach ($module in $modules) {
+            if (!(Test-Path "node_modules/$module/build")) {
+              Write-Host "❌ $module native build missing"
+              $missing = $true
             }
           }
+          if ($missing) { exit 1 }
+        shell: powershell
+
+      # Fallback: Clean install ONLY IF native modules missing or rebuild fails
+      - name: Clean install if rebuild failed
+        if: failure()
+        run: |
+          rmdir /s /q node_modules
+          del package-lock.json
+          npm install --no-optional
+        shell: powershell
+
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
       # Build Electron app
       - name: Build and compile Electron app (Windows only)
