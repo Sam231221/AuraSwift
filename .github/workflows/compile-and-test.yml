@@ -129,6 +129,9 @@ jobs:
         with:
           renderer-template: ${{inputs.renderer-template}}
 
+      - name: Remove node_modules
+        run: rmdir /s /q node_modules
+
       - name: Install project dependencies
         run: |
           npm ci --verbose
