@@ -32,12 +32,14 @@ env:
   npm_config_audit: false
   npm_config_fund: false
   PYTHON: python
-  MSVS-VERSION: 2022
-  GYP-MSVS-VERSION: 2022
+  MSVS_VERSION: 2022
 
 jobs:
   typecheck:
     runs-on: windows-latest
+    env:
+      PYTHON: python
+      MSVS_VERSION: 2022
     steps:
       - uses: actions/checkout@v5
 
@@ -55,7 +57,11 @@ jobs:
         with:
           python-version: "3.x"
 
-      # Modern Windows build environment summary (no direct node-gyp configure at repo root)
+      - name: Ensure .npmrc for node-gyp native modules
+        run: |
+          echo "msvs-version=2022" >> .npmrc
+          echo "python=python" >> .npmrc
+
       - name: Show build environment summary
         run: |
           echo "Node.js version: $(node --version)"
@@ -77,6 +83,9 @@ jobs:
 
   compile:
     runs-on: windows-latest
+    env:
+      PYTHON: python
+      MSVS_VERSION: 2022
     steps:
       - uses: actions/checkout@v5
 
@@ -94,7 +103,11 @@ jobs:
         with:
           python-version: "3.x"
 
-      # Environment summary (no node-gyp configure at repo root!)
+      - name: Ensure .npmrc for node-gyp native modules
+        run: |
+          echo "msvs-version=2022" >> .npmrc
+          echo "python=python" >> .npmrc
+
       - name: Show build environment summary
         run: |
           Write-Host "Node.js version: $(node --version)"
@@ -127,12 +140,10 @@ jobs:
       - name: Install dependencies (skip optional)
         run: npm install --no-optional
 
-        # Efficient native module rebuild first
       - name: Rebuild native modules
         run: npm rebuild
         shell: powershell
 
-      # Check for missing native modules (fast fail)
       - name: Verify native modules
         run: |
           $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
@@ -146,7 +157,6 @@ jobs:
           if ($missing) { exit 1 }
         shell: powershell
 
-      # Fallback: Clean install ONLY IF native modules missing or rebuild fails
       - name: Clean install if rebuild failed
         if: failure()
         run: |
@@ -156,14 +166,13 @@ jobs:
         shell: powershell
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
-      # Build Electron app
+
       - name: Build and compile Electron app (Windows only)
         run: npm run compile:win -- --publish never
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
           NODE_ENV: production
 
-      # Verify build output and ALL hardware native modules
       - name: Verify build output and hardware modules
         run: |
           if (Test-Path "dist") { 
@@ -186,7 +195,6 @@ jobs:
           if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { echo "No executables found" }
         shell: powershell
 
-      # Pre-test hardware module verification
       - name: Pre-test hardware module verification
         if: hashFiles('tests/**') != ''
         run: |
@@ -202,7 +210,6 @@ jobs:
           }
         shell: powershell
 
-      # Run main E2E tests
       - name: Run main E2E tests
         run: npm run test:all --if-present
         if: hashFiles('tests/**') != ''
@@ -219,7 +226,6 @@ jobs:
           MOCK_CARD_READER_ENABLED: true
           MOCK_SCANNER_ENABLED: true
 
-      # Run hardware integration tests
       - name: Run hardware integration tests
         run: npx playwright test ./tests/hardware-integration.spec.ts
         if: hashFiles('tests/hardware-integration.spec.ts') != ''
@@ -235,12 +241,10 @@ jobs:
           MOCK_CARD_READER_ENABLED: true
           MOCK_SCANNER_ENABLED: true
 
-      # Build provenance attestation (optional, keep if needed)
       - uses: actions/attest-build-provenance@v3
         with:
           subject-path: "dist/root*, dist/latest*.yml"
 
-      # Upload compiled app
       - name: Upload compiled app
         uses: actions/upload-artifact@v4
         with:
