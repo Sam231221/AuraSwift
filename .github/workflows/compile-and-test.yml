@@ -136,7 +136,7 @@ jobs:
             try {
               npm rebuild $module
             } catch {
-              Write-Host "Failed to rebuild $module: $_"
+              Write-Host "Failed to rebuild ${module}: ${_}"
             }
           }
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
