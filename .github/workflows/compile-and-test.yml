@@ -130,13 +130,27 @@ jobs:
       - name: Rebuild modules (PowerShell)
         shell: pwsh
         run: |
-          $modules = Get-ChildItem -Path "node_modules" -Directory | Select-Object -ExpandProperty Name
-          foreach ($module in $modules) {
-            Write-Host "Rebuilding $module..."
-            try {
-              npm rebuild $module
-            } catch {
-              Write-Host "Failed to rebuild ${module}: ${_}"
+          $moduleDirs = Get-ChildItem -Path "node_modules" -Directory
+          foreach ($dir in $moduleDirs) {
+            if ($dir.Name.StartsWith("@")) {
+              # For scoped packages, get all subdirectories
+              $scopedPkgs = Get-ChildItem -Path $dir.FullName -Directory
+              foreach ($pkg in $scopedPkgs) {
+                $fullPkgName = "$($dir.Name)/$($pkg.Name)"
+                Write-Host "Rebuilding $fullPkgName..."
+                try {
+                  npm rebuild $fullPkgName
+                } catch {
+                  Write-Host "Failed to rebuild $fullPkgName: ${_}"
+                }
+              }
+            } else {
+              Write-Host "Rebuilding $($dir.Name)..."
+              try {
+                npm rebuild $dir.Name
+              } catch {
+                Write-Host "Failed to rebuild $($dir.Name): ${_}"
+              }
             }
           }
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
