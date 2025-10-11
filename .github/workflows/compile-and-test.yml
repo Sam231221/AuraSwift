@@ -121,29 +121,25 @@ jobs:
           npm ci --verbose
         shell: powershell
 
-      # Clean and rebuild native modules with modern toolchain
-      - name: Clean and rebuild native modules for Electron
+      - name: Clean npm cache
+        run: npm cache clean --force
+
+      - name: Install dependencies (skip optional)
+        run: npm install --no-optional
+
+      - name: Rebuild modules (PowerShell)
+        shell: pwsh
         run: |
-          npm cache clean --force
-          $modules = @("better-sqlite3", "node-hid", "serialport", "usb", "node-addon-api")
+          $modules = Get-ChildItem -Path "node_modules" -Directory | Select-Object -ExpandProperty Name
           foreach ($module in $modules) {
-            $buildPath = "node_modules/$module/build"
-            if (Test-Path $buildPath) {
-              Remove-Item -Recurse -Force $buildPath
-              echo "Cleaned $module build directory"
+            Write-Host "Rebuilding $module..."
+            try {
+              npm rebuild $module
+            } catch {
+              Write-Host "Failed to rebuild $module: $_"
             }
           }
-          # Rebuild modules individually for better error tracking
-          foreach ($module in $modules) {
-            echo "Rebuilding $module..."
-            npm rebuild $module --verbose 2>&1
-          }
-          # Electron-rebuild for all modules
-          npx electron-rebuild --verbose --force
-        shell: powershell
-
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
-
       # Build Electron app
       - name: Build and compile Electron app (Windows only)
         run: npm run compile:win -- --publish never
