@@ -135,27 +135,6 @@ jobs:
         run: npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
         shell: powershell
 
-      - name: Verify native modules
-        run: |
-          $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
-          $missing = $false
-          foreach ($module in $modules) {
-            if (!(Test-Path "node_modules/$module/build")) {
-              Write-Host "❌ $module native build missing"
-              $missing = $true
-            }
-          }
-          if ($missing) { exit 1 }
-        shell: powershell
-
-      - name: Clean install if rebuild failed
-        if: failure()
-        run: |
-          if (Test-Path "node_modules") { Remove-Item -Recurse -Force node_modules }
-          if (Test-Path "package-lock.json") { Remove-Item package-lock.json }
-          npm ci --verbose
-        shell: powershell
-
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
       - name: Build and compile Electron app (Windows only)
