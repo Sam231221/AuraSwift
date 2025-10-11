@@ -130,7 +130,8 @@ jobs:
           renderer-template: ${{inputs.renderer-template}}
 
       - name: Remove node_modules
-        run: rmdir /s /q node_modules
+        run: Remove-Item -Recurse -Force node_modules
+        shell: pwsh
 
       - name: Install project dependencies
         run: |
