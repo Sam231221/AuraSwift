@@ -70,6 +70,18 @@ jobs:
         name: Setup boilerplate
         with:
           renderer-template: ${{inputs.renderer-template}}
+
+      - name: Install project dependencies
+        run: |
+          echo "Installing project dependencies with proper environment..."
+          npm ci --verbose
+          echo "Dependencies installed successfully"
+        shell: powershell
+        env:
+          PYTHON: python
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
+
       - run: npm run typecheck -ws --if-present
 
   compile:
@@ -98,16 +110,22 @@ jobs:
           echo "Python version: $(python --version)"
           echo "MSBuild version: $(msbuild -version 2>$null | Select-Object -First 1)"
 
-          # Verify node-gyp can find build tools (using environment variables)
-          npx node-gyp configure 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            echo "✅ node-gyp configuration successful"
-          } else {
-            echo "⚠️ node-gyp configuration had issues, but continuing..."
-          }
-
           echo "Modern Windows build environment configured successfully"
-          echo "Using environment variables for node-gyp configuration"
+          echo "Environment variables set for node-gyp configuration"
+        shell: powershell
+        env:
+          PYTHON: python
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
+
+      - name: Install and configure node-gyp
+        run: |
+          echo "Installing build tools for native module compilation..."
+          npm install --location=global node-gyp@latest
+          npm install --location=global electron-rebuild@latest
+          echo "node-gyp version: $(npx node-gyp --version)"
+          echo "electron-rebuild version: $(npx electron-rebuild --version)"
+          echo "Build tools installed successfully"
         shell: powershell
         env:
           PYTHON: python
@@ -150,6 +168,17 @@ jobs:
         name: Setup boilerplate
         with:
           renderer-template: ${{inputs.renderer-template}}
+
+      - name: Install project dependencies
+        run: |
+          echo "Installing project dependencies with proper environment..."
+          npm ci --verbose
+          echo "Dependencies installed successfully"
+        shell: powershell
+        env:
+          PYTHON: python
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
 
       - name: Clean and rebuild native modules with modern toolchain
         run: |
