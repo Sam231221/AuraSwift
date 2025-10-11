@@ -54,15 +54,14 @@ jobs:
 
       - name: Configure environment for Windows native modules
         run: |
-          echo "Setting up environment for Windows native module compilation..."
+          echo "Setting up modern Windows build environment..."
           echo "Node.js version: $(node --version)"
           echo "Python version: $(python --version)"
           echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
-          echo "Modern Windows build environment ready (Node.js 18+ includes necessary build tools)"
+          npm config set python python
+          npm config set msvs-version 2022
+          echo "Modern Windows build environment configured (Node.js 18+ with MSBuild 2022)"
         shell: powershell
-        env:
-          PYTHON: python
-          msvs_version: 2022
 
       - uses: ./.github/actions/init-template-with-renderer
         name: Setup boilerplate
@@ -96,8 +95,8 @@ jobs:
           echo "Python version: $(python --version)"
           echo "MSBuild version: $(msbuild -version 2>$null | Select-Object -First 1)"
 
-          # Configure npm to use MSBuild 2022
-          npm config set msvs_version 2022
+          # Configure npm with correct option names (use hyphens, not underscores)
+          npm config set msvs-version 2022
           npm config set python python
 
           # Verify node-gyp can find build tools
@@ -110,10 +109,6 @@ jobs:
 
           echo "Modern Windows build environment configured successfully"
         shell: powershell
-        env:
-          PYTHON: python
-          npm_config_msvs_version: 2022
-          npm_config_python: python
 
       - name: Install Windows hardware development dependencies
         run: |
@@ -169,10 +164,9 @@ jobs:
             }
           }
 
-          # Configure build environment for modern Node.js
-          $env:npm_config_msvs_version = "2022"
-          $env:npm_config_python = "python"
-          $env:npm_config_node_gyp = "node_modules/.bin/node-gyp"
+          # Configure build environment for modern Node.js (use correct environment variables)
+          $env:PYTHON = "python"
+          $env:MSVS_VERSION = "2022"
 
           # Rebuild each critical module individually for better error tracking
           echo "Rebuilding critical native modules individually..."
@@ -198,8 +192,7 @@ jobs:
         shell: powershell
         env:
           PYTHON: python
-          npm_config_msvs_version: 2022
-          npm_config_python: python
+          MSVS_VERSION: 2022
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
@@ -232,9 +225,9 @@ jobs:
 
           echo "Rebuilding ALL native modules for Electron with modern toolchain..."
 
-          # Set environment for electron-rebuild
-          $env:npm_config_msvs_version = "2022"
-          $env:npm_config_python = "python"
+          # Set environment for electron-rebuild (use correct environment variables)
+          $env:PYTHON = "python"
+          $env:MSVS_VERSION = "2022"
 
           # Rebuild each module individually for better error reporting
           $modules = @("better-sqlite3", "node-hid", "serialport", "usb", "node-addon-api")
@@ -314,7 +307,7 @@ jobs:
         env:
           NODE_ENV: production
           PYTHON: python
-          msvs_version: 2022
+          MSVS_VERSION: 2022
 
       - name: Build and compile Electron app (Windows only)
         run: npm run compile:win -- --publish never
@@ -504,7 +497,7 @@ jobs:
           MOCK_SCANNER_ENABLED: true
           # Native module paths
           PYTHON: python
-          msvs_version: 2022
+          MSVS_VERSION: 2022
 
       - name: Run hardware integration tests
         run: npx playwright test ./tests/hardware-integration.spec.ts
@@ -523,7 +516,7 @@ jobs:
           MOCK_SCANNER_ENABLED: true
           # Native module paths
           PYTHON: python
-          msvs_version: 2022
+          MSVS_VERSION: 2022
 
       - uses: actions/attest-build-provenance@v3
         with:

@@ -33,17 +33,30 @@
     python-version: "3.x"
 ```
 
-#### 2. Environment Configuration
+#### 2. NPM Configuration (.npmrc)
+
+**CRITICAL:** Use hyphens (not underscores) for npm v9+ compatibility:
+
+```ini
+# ✅ Correct format (hyphens)
+msvs-version=2022
+python=python
+
+# ❌ WRONG (causes npm errors in npm v9+)
+msvs_version=2022
+npm_config_python=python
+```
+
+#### 3. Environment Variables
 
 ```yaml
 - name: Configure environment for Windows native modules
   env:
     PYTHON: python
-    npm_config_msvs_version: 2022
-    npm_config_python: python
+    MSVS_VERSION: 2022 # Use standard env var names
 ```
 
-#### 3. Native Module Rebuild Process
+#### 4. Native Module Rebuild Process
 
 - **Clean npm cache** to avoid corruption
 - **Remove build directories** for fresh rebuild
@@ -69,9 +82,27 @@
 
 #### Common Issues:
 
+- **"npm error msvs_version is not a valid npm option"** - Using underscores instead of hyphens in npm config
+- **"npm error python is not a valid npm option"** - Invalid npm config format (npm v9+ compatibility issue)
 - **"Cannot find module"** - Usually a build path issue
 - **"Python not found"** - Environment variable issue
 - **"MSBuild not found"** - Missing Visual Studio components
+
+#### NPM Configuration Errors (npm v9+):
+
+❌ **These will fail:**
+
+```bash
+npm install --msvs_version=2022 --python=python
+```
+
+✅ **Use these instead:**
+
+```bash
+npm config set msvs-version 2022
+npm config set python python
+npm install
+```
 
 ### Migration from windows-build-tools
 
