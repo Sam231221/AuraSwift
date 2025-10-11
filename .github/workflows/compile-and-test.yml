@@ -105,18 +105,27 @@ jobs:
 
       - name: Configure environment for Windows native modules
         run: |
-          echo "Setting up modern Windows build environment..."
-          echo "Node.js version: $(node --version)"
-          echo "Python version: $(python --version)"
-          echo "MSBuild version: $(msbuild -version 2>$null | Select-Object -First 1)"
+          Write-Host "Setting up modern Windows build environment..."
+          Write-Host "Node.js version: $(node --version)"
+          Write-Host "Python version: $(python --version)"
+          $msbuild = Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+          Write-Host "MSBuild available: $msbuild"
+          Write-Host "Environment configured - using proper environment variables for node-gyp"
+          Write-Host "Modern Windows build environment ready (Node.js 18+ with MSBuild 2022)"
 
-          echo "Modern Windows build environment configured successfully"
-          echo "Environment variables set for node-gyp configuration"
-        shell: powershell
+          # Verify node-gyp can find build tools (using environment variables)
+          npx node-gyp configure
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ node-gyp configuration failed"
+            exit 1
+          } else {
+            Write-Host "✅ node-gyp configuration successful"
+          }
+        shell: pwsh
         env:
           PYTHON: python
-          MSVS-VERSION: 2022
-          GYP-MSVS-VERSION: 2022
+          MSVS_VERSION: 2022
+          GYP_MSVS_VERSION: 2022
 
       - name: Install and configure node-gyp
         run: |
