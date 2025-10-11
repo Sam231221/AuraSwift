@@ -32,14 +32,16 @@ env:
   npm_config_audit: false
   npm_config_fund: false
   PYTHON: python
-  MSVS_VERSION: 2022
+  MSVS-VERSION: 2022
+  GYP-MSVS-VERSION: 2022
 
 jobs:
   typecheck:
     runs-on: windows-latest
     env:
       PYTHON: python
-      MSVS_VERSION: 2022
+      MSVS-VERSION: 2022
+      GYP-MSVS-VERSION: 2022
     steps:
       - uses: actions/checkout@v5
 
@@ -56,11 +58,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-
-      - name: Ensure .npmrc for node-gyp native modules
-        run: |
-          echo "msvs-version=2022" >> .npmrc
-          echo "python=python" >> .npmrc
 
       - name: Show build environment summary
         run: |
@@ -85,7 +82,8 @@ jobs:
     runs-on: windows-latest
     env:
       PYTHON: python
-      MSVS_VERSION: 2022
+      MSVS-VERSION: 2022
+      GYP-MSVS-VERSION: 2022
     steps:
       - uses: actions/checkout@v5
 
@@ -102,11 +100,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-
-      - name: Ensure .npmrc for node-gyp native modules
-        run: |
-          echo "msvs-version=2022" >> .npmrc
-          echo "python=python" >> .npmrc
 
       - name: Show build environment summary
         run: |
@@ -138,14 +131,8 @@ jobs:
           npm ci --verbose
         shell: powershell
 
-      - name: Clean npm cache
-        run: npm cache clean --force
-
-      - name: Install dependencies (skip optional)
-        run: npm install --no-optional
-
-      - name: Rebuild native modules
-        run: npm rebuild
+      - name: Use electron-rebuild (fastest for Electron apps)
+        run: npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
         shell: powershell
 
       - name: Verify native modules
@@ -164,9 +151,9 @@ jobs:
       - name: Clean install if rebuild failed
         if: failure()
         run: |
-          rmdir /s /q node_modules
-          del package-lock.json
-          npm install --no-optional
+          if (Test-Path "node_modules") { Remove-Item -Recurse -Force node_modules }
+          if (Test-Path "package-lock.json") { Remove-Item package-lock.json }
+          npm ci --verbose
         shell: powershell
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
