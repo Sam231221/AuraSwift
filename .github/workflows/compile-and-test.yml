@@ -58,10 +58,13 @@ jobs:
           echo "Node.js version: $(node --version)"
           echo "Python version: $(python --version)"
           echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
-          npm config set python python
-          npm config set msvs-version 2022
-          echo "Modern Windows build environment configured (Node.js 18+ with MSBuild 2022)"
+          echo "Environment configured - using proper environment variables for node-gyp"
+          echo "Modern Windows build environment ready (Node.js 18+ with MSBuild 2022)"
         shell: powershell
+        env:
+          PYTHON: python
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
 
       - uses: ./.github/actions/init-template-with-renderer
         name: Setup boilerplate
@@ -95,11 +98,7 @@ jobs:
           echo "Python version: $(python --version)"
           echo "MSBuild version: $(msbuild -version 2>$null | Select-Object -First 1)"
 
-          # Configure npm with correct option names (use hyphens, not underscores)
-          npm config set msvs-version 2022
-          npm config set python python
-
-          # Verify node-gyp can find build tools
+          # Verify node-gyp can find build tools (using environment variables)
           npx node-gyp configure 2>$null
           if ($LASTEXITCODE -eq 0) {
             echo "✅ node-gyp configuration successful"
@@ -108,7 +107,12 @@ jobs:
           }
 
           echo "Modern Windows build environment configured successfully"
+          echo "Using environment variables for node-gyp configuration"
         shell: powershell
+        env:
+          PYTHON: python
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
 
       - name: Install Windows hardware development dependencies
         run: |
@@ -192,7 +196,8 @@ jobs:
         shell: powershell
         env:
           PYTHON: python
-          MSVS_VERSION: 2022
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
@@ -307,7 +312,8 @@ jobs:
         env:
           NODE_ENV: production
           PYTHON: python
-          MSVS_VERSION: 2022
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
 
       - name: Build and compile Electron app (Windows only)
         run: npm run compile:win -- --publish never
@@ -497,7 +503,8 @@ jobs:
           MOCK_SCANNER_ENABLED: true
           # Native module paths
           PYTHON: python
-          MSVS_VERSION: 2022
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
 
       - name: Run hardware integration tests
         run: npx playwright test ./tests/hardware-integration.spec.ts
@@ -516,7 +523,8 @@ jobs:
           MOCK_SCANNER_ENABLED: true
           # Native module paths
           PYTHON: python
-          MSVS_VERSION: 2022
+          MSVS-VERSION: 2022
+          GYP-MSVS-VERSION: 2022
 
       - uses: actions/attest-build-provenance@v3
         with:
