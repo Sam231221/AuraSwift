@@ -141,8 +141,7 @@ jobs:
                 try {
                   npm rebuild $fullPkgName
                 } catch {
-                Write-Host ("Failed to rebuild $fullPkgName: " + $_)
-               
+                Write-Host ("Failed to rebuild ${fullPkgName}: " + $_)
                 }
               }
             } else {
@@ -150,7 +149,7 @@ jobs:
               try {
                 npm rebuild $dir.Name
               } catch {
-                Write-Host ("Failed to rebuild $dir.Name: " + $_)
+                Write-Host ("Failed to rebuild ${dir.Name}: " + $_)
 
               }
             }
