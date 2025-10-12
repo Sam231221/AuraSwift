@@ -15,7 +15,7 @@ permissions:
 
 defaults:
   run:
-    shell: 'bash'
+    shell: "bash"
 
 env:
   NODE_NO_WARNINGS: 1
@@ -37,6 +37,52 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - run: gh release create v${{inputs.app-version}} dist/root* dist/latest*.yml --repo ${{github.repository}}
+      - name: Debug downloaded Windows artifacts
+        run: |
+          echo "Contents of dist directory:"
+          ls -la dist/
+          echo ""
+          echo "Looking for Windows executables:"
+          find dist/ -name "auraswift-*-win-*.exe" -type f || echo "No Windows executables found"
+          echo ""
+          echo "Looking for Windows update manifest:"
+          find dist/ -name "latest.yml" -type f || echo "No latest.yml found"
+
+      - name: Create GitHub release for Windows
+        run: |
+          # Check if Windows executables exist
+          if ls dist/auraswift-*-win-*.exe 1> /dev/null 2>&1; then
+            echo "Found Windows executables, creating release..."
+            
+            # Collect Windows release files
+            RELEASE_FILES=""
+            
+            # Add Windows executables
+            for exe in dist/auraswift-*-win-*.exe; do
+              if [ -f "$exe" ]; then
+                RELEASE_FILES="$RELEASE_FILES $exe"
+                echo "Adding Windows executable: $exe"
+              fi
+            done
+            
+            # Add Windows update manifest
+            if [ -f "dist/latest.yml" ]; then
+              RELEASE_FILES="$RELEASE_FILES dist/latest.yml"
+              echo "Adding Windows update manifest: dist/latest.yml"
+            fi
+            
+            if [ -n "$RELEASE_FILES" ]; then
+              echo "Creating release with Windows files: $RELEASE_FILES"
+              gh release create v${{inputs.app-version}} $RELEASE_FILES --repo ${{github.repository}} --title "AuraSwift v${{inputs.app-version}} (Windows)" --notes "Windows release for AuraSwift POS System v${{inputs.app-version}}"
+            else
+              echo "ERROR: No valid Windows release files found"
+              exit 1
+            fi
+          else
+            echo "ERROR: No Windows executables found in dist/"
+            echo "Available files:"
+            ls -la dist/ || echo "No dist directory found"
+            exit 1
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
