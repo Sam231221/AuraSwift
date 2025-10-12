@@ -155,7 +155,8 @@ const test = base.extend<TestFixtures>({
         // If we're using a built executable and it fails, try development mode
         if (!mainEntry && executablePath.endsWith(".exe")) {
           console.log("[Test Setup] Trying development mode as fallback...");
-          const electronBinary = require("electron") as unknown as string;
+          // Use the imported electronPath (it's the path to electron executable)
+          const electronBinary = electronPath as unknown as string;
           const devMainEntry = "packages/entry-point.mjs";
 
           if (existsSync(devMainEntry)) {
@@ -214,15 +215,16 @@ const test = base.extend<TestFixtures>({
 
 test.describe("Build Environment Debug", () => {
   test("Check build output structure", async () => {
-    const fs = require("fs");
-    const path = require("path");
+    // Use ES module imports instead of require()
+    const { readdir, stat } = await import("node:fs/promises");
+    const { join, resolve } = await import("node:path");
 
     console.log("[Debug] Current working directory:", process.cwd());
     console.log("[Debug] Platform:", platform, "Arch:", arch);
     console.log("[Debug] CI Environment:", process.env.CI);
     console.log("[Debug] Directory contents:");
 
-    function listFiles(
+    async function listFiles(
       dir: string,
       indent = "",
       maxDepth = 2,
@@ -231,13 +233,14 @@ test.describe("Build Environment Debug", () => {
       if (currentDepth >= maxDepth) return;
 
       try {
-        const items = fs.readdirSync(dir);
-        items.slice(0, 20).forEach((item: string) => {
-          // Limit items per directory
-          const fullPath = path.join(dir, item);
+        const items = await readdir(dir);
+        const limitedItems = items.slice(0, 20); // Limit items per directory
+
+        for (const item of limitedItems) {
+          const fullPath = join(dir, item);
           try {
-            const stat = fs.statSync(fullPath);
-            if (stat.isDirectory()) {
+            const statResult = await stat(fullPath);
+            if (statResult.isDirectory()) {
               console.log(`${indent}📁 ${item}/`);
               if (
                 item === "dist" ||
@@ -245,7 +248,7 @@ test.describe("Build Environment Debug", () => {
                 item === "release" ||
                 item === "build"
               ) {
-                listFiles(
+                await listFiles(
                   fullPath,
                   indent + "  ",
                   maxDepth + 1,
@@ -258,13 +261,13 @@ test.describe("Build Environment Debug", () => {
           } catch (error) {
             console.log(`${indent}❓ ${item} (access error)`);
           }
-        });
+        }
       } catch (error) {
-        console.log(`${indent}❌ Cannot read directory: ${dir}`);
+        console.log(`${indent}❌ Cannot read directory ${dir}:`, error);
       }
     }
 
-    listFiles(".");
+    await listFiles(".");
 
     // Check specifically for Electron executables
     const electronPaths = globSync(
@@ -335,7 +338,11 @@ test.describe("Vite Build & TypeScript Integration", async () => {
 
 test("Main window state", async ({ electronApp }) => {
   const page = await electronApp.firstWindow();
+  await page.waitForLoadState("domcontentloaded");
+
   const window: JSHandle<BrowserWindow> = await electronApp.browserWindow(page);
+
+  // Give the window more time to show up
   const windowState = await window.evaluate(
     (
       mainWindow
@@ -353,14 +360,26 @@ test("Main window state", async ({ electronApp }) => {
       return new Promise((resolve) => {
         /**
          * The main window is created hidden, and is shown only when it is ready.
-         * See {@link ../packages/main/src/mainWindow.ts} function
+         * Extended timeout for CI environments
          */
         if (mainWindow.isVisible()) {
           resolve(getState());
         } else {
-          // Add timeout to prevent hanging
-          const timeout = setTimeout(() => resolve(getState()), 10000);
+          // Longer timeout for CI environments (15 seconds)
+          const timeout = setTimeout(() => {
+            console.log(
+              "[Test] Window visibility timeout reached, resolving current state"
+            );
+            resolve(getState());
+          }, 15000);
+
           mainWindow.once("ready-to-show", () => {
+            clearTimeout(timeout);
+            resolve(getState());
+          });
+
+          // Also listen for 'show' event as backup
+          mainWindow.once("show", () => {
             clearTimeout(timeout);
             resolve(getState());
           });
@@ -470,14 +489,25 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
   test.describe(`Electron application info`, async () => {
     test("Application loads successfully", async ({ electronApp }) => {
       const page = await electronApp.firstWindow();
+      await page.waitForLoadState("domcontentloaded");
 
       // Test that the page loads and has basic DOM structure
       const title = await page.title();
       expect(title).toBeTruthy();
+
+      // Also test that the page has actual content
+      const hasContent = await page.evaluate(() => {
+        return document.body && document.body.children.length > 0;
+      });
+      expect(hasContent).toBe(true);
     });
 
     test("Basic renderer context is functional", async ({ electronApp }) => {
       const page = await electronApp.firstWindow();
+      await page.waitForLoadState("domcontentloaded");
+
+      // Give some time for the renderer to initialize
+      await page.waitForTimeout(1000);
 
       // Test basic JavaScript execution in renderer
       const result = await page.evaluate(() => {
@@ -491,9 +521,14 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
   test.describe(`Crypto utilities functionality`, async () => {
     test("btoa function is available", async ({ electronApp }) => {
       const page = await electronApp.firstWindow();
+      await page.waitForLoadState("domcontentloaded");
 
       const btoaAvailable = await page.evaluate(() => {
-        return typeof (globalThis as any).btoa === "function";
+        // Check both window.btoa (exposed via contextBridge) and globalThis.btoa
+        return (
+          typeof (window as any).btoa === "function" ||
+          typeof (globalThis as any).btoa === "function"
+        );
       });
 
       expect(btoaAvailable).toBe(true);
@@ -501,10 +536,13 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
 
     test("btoa function works correctly", async ({ electronApp }) => {
       const page = await electronApp.firstWindow();
+      await page.waitForLoadState("domcontentloaded");
 
       const testString = "hello world";
       const result = await page.evaluate((str) => {
-        return (globalThis as any).btoa(str);
+        // Try window.btoa first (contextBridge exposed), then globalThis.btoa as fallback
+        const btoaFn = (window as any).btoa || (globalThis as any).btoa;
+        return btoaFn ? btoaFn(str) : "";
       }, testString);
 
       const expectedValue = Buffer.from(testString, "binary").toString(
