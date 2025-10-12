@@ -6,7 +6,7 @@ This project uses different database locations for development and production en
 
 In development, the database is stored in the project directory for easy access:
 
-- **Location**: `./dev-data/pos_system.db`
+- **Location**: `./dev-data/pos_system.db`(hardcoded)
 - **Purpose**: Easy debugging, inspection, and version control exclusion
 - **Access**: You can open this file with any SQLite browser tool
 
