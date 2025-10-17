@@ -162,10 +162,16 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     }
   }, [user, loadProducts, loadCategories]);
 
-  // Close drawer when view changes
+  // Close drawer when view changes and reload categories
   useEffect(() => {
     setIsDrawerOpen(false);
-  }, [currentView]);
+
+    // Reload categories when returning from category management
+    // This ensures newly created categories appear in the dropdown
+    if (currentView === "productManagement" && user?.businessId) {
+      loadCategories();
+    }
+  }, [currentView, user?.businessId, loadCategories]);
 
   const productsPerPage = 10;
 
