@@ -341,6 +341,49 @@ test.describe("Vite Build & TypeScript Integration", async () => {
   });
 });
 
+// Clean up authentication state before each test to ensure tests start from clean state
+test.beforeEach(async ({ electronApp }) => {
+  console.log("[Test Setup] Cleaning authentication state...");
+  const page = await electronApp.firstWindow();
+  await page.waitForLoadState("domcontentloaded");
+
+  // Clear browser storage (localStorage, sessionStorage)
+  await page.evaluate(() => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      console.log("[Test Setup] Cleared localStorage and sessionStorage");
+    } catch (error) {
+      console.log("[Test Setup] Storage clear failed:", error);
+    }
+  });
+
+  // Logout via API if user is logged in
+  await page.evaluate(async () => {
+    try {
+      if ((window as any).authAPI?.logout) {
+        await (window as any).authAPI.logout();
+        console.log("[Test Setup] Logged out successfully");
+      }
+    } catch (error) {
+      console.log("[Test Setup] Logout not needed or failed:", error);
+    }
+  });
+
+  // Close DevTools if open (for clean test environment)
+  const window = await electronApp.browserWindow(page);
+  await window.evaluate((mainWindow) => {
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+      console.log("[Test Setup] Closed DevTools");
+    }
+  });
+
+  // Small delay to ensure state is cleared
+  await page.waitForTimeout(500);
+  console.log("[Test Setup] Cleanup complete");
+});
+
 test("Main window state", async ({ electronApp }) => {
   const page = await electronApp.firstWindow();
   await page.waitForLoadState("domcontentloaded");

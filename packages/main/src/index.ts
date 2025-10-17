@@ -62,7 +62,8 @@ export async function initApp(initConfig: AppInitConfig) {
     .init(
       createWindowManagerModule({
         initConfig,
-        openDevTools: import.meta.env.DEV,
+        // Only open DevTools in development mode, not in tests
+        openDevTools: import.meta.env.DEV && process.env.NODE_ENV !== "test",
       })
     )
     .init(disallowMultipleAppInstance())
