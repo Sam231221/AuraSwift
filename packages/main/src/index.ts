@@ -68,9 +68,17 @@ export async function initApp(initConfig: AppInitConfig) {
     )
     .init(disallowMultipleAppInstance())
     .init(terminateAppOnLastWindowClose())
-    .init(hardwareAccelerationMode({ enable: false }))
-    .init(autoUpdater())
+    .init(hardwareAccelerationMode({ enable: false }));
 
+  // Only enable auto-updater in production, not in test or development
+  if (
+    process.env.NODE_ENV !== "test" &&
+    !process.env.ELECTRON_UPDATER_DISABLED
+  ) {
+    moduleRunner.init(autoUpdater());
+  }
+
+  moduleRunner
     // Install DevTools extension if needed
     // .init(chromeDevToolsExtension({extension: 'VUEJS3_DEVTOOLS'}))
 
