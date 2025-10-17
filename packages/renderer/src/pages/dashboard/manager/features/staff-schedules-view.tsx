@@ -666,8 +666,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               </Button>
             </DrawerTrigger>
 
-            <DrawerContent className="max-h-[90vh]">
-              <DrawerHeader>
+            <DrawerContent className="max-h-[90vh] flex flex-col">
+              <DrawerHeader className="flex-shrink-0">
                 <DrawerTitle className="text-2xl">
                   {editingSchedule
                     ? "Edit Staff Schedule"
@@ -680,7 +680,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 </DrawerDescription>
               </DrawerHeader>
 
-              <div className="px-4 pb-4 space-y-6">
+              <div className="px-4 pb-4 space-y-6 overflow-y-auto flex-1">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="cashier">Staff Member</Label>
@@ -1089,21 +1089,21 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                     />
                   </div>
                 </div>
-
-                <DrawerFooter className="px-0">
-                  <Button
-                    onClick={handleSubmit}
-                    className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                  >
-                    {editingSchedule ? "Update Schedule" : "Create Schedule"}
-                  </Button>
-                  <DrawerClose asChild>
-                    <Button variant="outline" onClick={closeDrawer}>
-                      Cancel
-                    </Button>
-                  </DrawerClose>
-                </DrawerFooter>
               </div>
+
+              <DrawerFooter className="px-0 flex-shrink-0 border-t bg-white">
+                <Button
+                  onClick={handleSubmit}
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                >
+                  {editingSchedule ? "Update Schedule" : "Create Schedule"}
+                </Button>
+                <DrawerClose asChild>
+                  <Button variant="outline" onClick={closeDrawer}>
+                    Cancel
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
             </DrawerContent>
           </Drawer>
         </div>
