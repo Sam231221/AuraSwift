@@ -19,8 +19,8 @@ export async function initApp(initConfig: AppInitConfig) {
   console.log("Database initialized");
 
   // Initialize thermal printer service after database is ready
-  await import("./thermalPrinterService.js");
-  console.log("Thermal printer service initialized");
+  await import("./services/thermalPrinterService.js");
+  console.log("Real thermal printer service initialized");
 
   // Initialize payment service for BBPOS WisePad 3 and Stripe integration
   await import("./services/paymentService.js");

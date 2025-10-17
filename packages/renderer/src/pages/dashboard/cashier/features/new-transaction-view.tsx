@@ -29,9 +29,12 @@ import {
   ScanHistory,
 } from "@/components/scanner/ScannerStatusComponents";
 import { ScannerAudio } from "@/utils/scannerAudio";
-import { useReceiptPrintingFlow } from "@/hooks/useThermalPrinter";
+import {
+  useReceiptPrintingFlow,
+  useThermalPrinter,
+} from "@/hooks/useThermalPrinter";
 import { ReceiptPrinterStatus } from "@/components/printer/ReceiptPrinterComponents";
-import type { TransactionData } from "@/types/printer";
+import type { TransactionData, PrinterConfig } from "@/types/printer";
 import { useCardPayment } from "@/hooks/useStripeTerminal";
 import { PaymentStatusModal } from "@/components/payment/PaymentComponents";
 
@@ -71,7 +74,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   // Scanner state
   const [audioEnabled, setAudioEnabled] = useState(true);
 
-  // Thermal printer integration
+  // Thermal printer integration for printing flow
   const {
     isShowingStatus,
     printStatus,
@@ -83,6 +86,22 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     handleEmailReceipt,
     handleNewSale,
   } = useReceiptPrintingFlow();
+
+  // Separate hook for printer connection management
+  const { connectPrinter: connectPrinterInternal } = useThermalPrinter();
+
+  // Wrapper for connect printer with localStorage save
+  const connectPrinter = useCallback(
+    async (config: PrinterConfig): Promise<boolean> => {
+      const result = await connectPrinterInternal(config);
+      if (result) {
+        // Save config for auto-reconnect
+        localStorage.setItem("printer_config", JSON.stringify(config));
+      }
+      return result;
+    },
+    [connectPrinterInternal]
+  );
 
   // Card payment integration
   const {
@@ -96,8 +115,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   // Card payment modal state
   const [showCardPayment, setShowCardPayment] = useState(false);
-  // @ts-expect-error - cardPaymentResult is used via setCardPaymentResult but TypeScript doesn't detect it
-  const [cardPaymentResult, setCardPaymentResult] = useState<{
+  const [_cardPaymentResult, setCardPaymentResult] = useState<{
     success: boolean;
     paymentIntent?: {
       id: string;
@@ -217,6 +235,54 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
+
+  // Auto-connect to printer on component mount
+  useEffect(() => {
+    const initPrinter = async () => {
+      try {
+        // Check if printer config exists in local storage
+        const savedConfig = localStorage.getItem("printer_config");
+
+        if (savedConfig) {
+          const config = JSON.parse(savedConfig);
+          const status = await window.printerAPI.getStatus();
+
+          if (!status.connected) {
+            console.log("🖨️ Auto-connecting to saved printer configuration...");
+            const result = await connectPrinter(config);
+            if (result) {
+              console.log("✅ Printer auto-connected successfully");
+            } else {
+              console.warn("⚠️ Failed to auto-connect printer");
+            }
+          } else {
+            console.log("✅ Printer already connected");
+          }
+        } else {
+          console.log(
+            "ℹ️ No saved printer configuration. Manual setup required."
+          );
+          // Show a one-time info message
+          const hasSeenPrinterInfo = localStorage.getItem("printer_info_shown");
+          if (!hasSeenPrinterInfo) {
+            toast.info(
+              "💡 Tip: Configure your receipt printer in Settings → Hardware for automatic printing",
+              {
+                duration: 8000,
+              }
+            );
+            localStorage.setItem("printer_info_shown", "true");
+          }
+        }
+      } catch (error) {
+        console.error("❌ Printer auto-connect failed:", error);
+        // Don't show error toast on startup - it's not critical
+      }
+    };
+
+    initPrinter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount - connectPrinter is stable
 
   // Filtered products for search
   const filteredProducts = products.filter(
@@ -432,6 +498,35 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   };
 
   const completeTransaction = async (skipPaymentValidation = false) => {
+    // Check printer status before completing transaction
+    if (window.printerAPI) {
+      try {
+        const printerStatus = await window.printerAPI.getStatus();
+
+        if (!printerStatus.connected) {
+          const proceed = window.confirm(
+            "⚠️ Printer is not connected. Receipt cannot be printed.\n\n" +
+              "Do you want to complete the transaction without printing a receipt?\n" +
+              "You can manually print the receipt later from transaction history."
+          );
+
+          if (!proceed) {
+            toast.warning(
+              "Transaction cancelled. Please connect printer first."
+            );
+            return;
+          }
+
+          toast.warning("Transaction will complete without printed receipt.", {
+            duration: 5000,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to check printer status:", error);
+        // Continue anyway - don't block transaction on printer status check failure
+      }
+    }
+
     // Validate payment method (skip for card payments already processed)
     if (!skipPaymentValidation) {
       if (!paymentMethod) {
@@ -616,8 +711,24 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         receiptNumber,
       };
 
-      // Start thermal printing flow
-      await startPrintingFlow(receiptData);
+      // Start thermal printing flow with enhanced error handling
+      try {
+        const printResult = await startPrintingFlow(receiptData);
+
+        if (!printResult) {
+          // Print failed but transaction is already saved
+          toast.error(
+            "⚠️ Receipt failed to print. Transaction saved. You can reprint from transaction history.",
+            { duration: 10000 }
+          );
+        }
+      } catch (printError) {
+        console.error("Print error:", printError);
+        toast.error(
+          "⚠️ Receipt printing error. Transaction completed but receipt not printed. Check printer connection.",
+          { duration: 10000 }
+        );
+      }
 
       // Show success message with payment details
       if (skipPaymentValidation) {
