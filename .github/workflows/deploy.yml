@@ -1,7 +1,11 @@
-name: Deploy
+# ⚠️ DEPRECATED: This workflow has been replaced by semantic-release in ci.yml
+# Releases are now created automatically by semantic-release with proper versioning
+# This file is kept for reference only
+
+name: Deploy (Deprecated - Use Semantic Release)
 
 on:
-  workflow_call:
+  workflow_dispatch: # Manual trigger only if needed
     inputs:
       app-version:
         required: true

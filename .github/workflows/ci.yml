@@ -1,5 +1,5 @@
 # This workflow is the entry point for all CI processes.
-# It is from here that all other workflows are launched.
+# It handles building, testing, and semantic versioning releases.
 
 name: Entry CI
 on:
@@ -49,67 +49,129 @@ permissions:
   contents: write
   id-token: write
   attestations: write
+  issues: write
+  pull-requests: write
 
 jobs:
-  #Job1
+  #Job1: Determine version with semantic-release
   prepare:
-    name: Prepare shared data for multi-platform compilation
+    name: Prepare version and check for release
     runs-on: ubuntu-latest
     outputs:
-      #outputs three values for use in later jobs.
-      APP_VERSION: ${{ steps.APP_VERSION.outputs.APP_VERSION }}
+      APP_VERSION: ${{ steps.version.outputs.APP_VERSION }}
       COMMIT_TIMESTAMP: ${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}
-      APP_FULL_VERSION: ${{ steps.APP_FULL_VERSION.outputs.APP_FULL_VERSION }}
+      APP_FULL_VERSION: ${{ steps.version.outputs.APP_FULL_VERSION }}
+      SHOULD_RELEASE: ${{ steps.version.outputs.SHOULD_RELEASE }}
     steps:
-      #Step 1: Checks out your repository code.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN || github.token }}
 
-      #Step 2: Gets the commit timestamp and sets it as an output.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
       - id: COMMIT_TIMESTAMP
         run: echo "COMMIT_TIMESTAMP=$(git show -s --format=%ct ${{ github.sha }})" >> $GITHUB_OUTPUT
-      #Step 3: Reads the app version from package.json and sets it as an output.
-      - id: APP_VERSION
-        run: echo "APP_VERSION=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
 
-      #Step 4: Combines version, channel, and timestamp into a full version string.
-      - id: APP_FULL_VERSION
-        run: echo "APP_FULL_VERSION=${{ steps.APP_VERSION.outputs.APP_VERSION }}-${{ inputs.distribution-channel || 'main' }}.${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_OUTPUT
+      - id: version
+        name: Determine version with semantic-release
+        run: |
+          # For PRs and non-main pushes, use current version
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            CURRENT_VERSION=$(jq -r .version package.json)
+            echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_OUTPUT
+            echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ PR/branch build - version: $CURRENT_VERSION"
+          else
+            # For main branch, check semantic-release
+            OUTPUT=$(npx semantic-release --dry-run 2>&1 || true)
+            echo "$OUTPUT"
+            
+            if echo "$OUTPUT" | grep -q "The next release version is"; then
+              NEW_VERSION=$(echo "$OUTPUT" | grep -oP "The next release version is \K[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+              echo "APP_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+              echo "APP_FULL_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+              echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
+              echo "✅ New release will be created: v$NEW_VERSION"
+            else
+              CURRENT_VERSION=$(jq -r .version package.json)
+              echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+              echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_OUTPUT
+              echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
+              echo "ℹ️ No release needed - using current version: $CURRENT_VERSION"
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
 
-      #Step 5: Adds summary info to the workflow run for easy viewing.
-      - run: |
+      - name: Add version summary
+        run: |
           echo "- \`COMMIT_TIMESTAMP\`: ${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_STEP_SUMMARY
-          echo "- \`APP_VERSION\`: ${{ steps.APP_VERSION.outputs.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "- \`APP_FULL_VERSION\`: ${{ steps.APP_FULL_VERSION.outputs.APP_FULL_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- \`APP_VERSION\`: ${{ steps.version.outputs.APP_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- \`APP_FULL_VERSION\`: ${{ steps.version.outputs.APP_FULL_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- \`SHOULD_RELEASE\`: ${{ steps.version.outputs.SHOULD_RELEASE }}" >> $GITHUB_STEP_SUMMARY
 
-  #Job2
+  #Job2: Build and test
   compile-and-test:
-    #depends on prepare job
-    needs:
-      - prepare
+    needs: prepare
     permissions:
       contents: write
       id-token: write
       attestations: write
-
-    #Uses another workflow file (compile-and-test.yml)
     uses: ./.github/workflows/compile-and-test.yml
-    #Passes inputs and outputs to that workflow
     with:
       renderer-template: ${{ inputs.renderer-template }}
       app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
       distribution-channel: ${{ inputs.distribution-channel || 'main' }}
 
-  #Job3
-  deploy:
-    #Only runs on push to the main branch
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
+  #Job3: Semantic Release (only on main branch when there are releasable commits)
+  semantic-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.prepare.outputs.SHOULD_RELEASE == 'true'
     needs:
       - prepare
       - compile-and-test
-    uses: ./.github/workflows/deploy.yml
-    #Uses another workflow file (deploy.yml) passing required inputs.
-    with:
-      distribution-channel: ${{ inputs.distribution-channel || 'main' }}
-      app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: windows-${{ inputs.distribution-channel || 'main' }}
+          path: dist
+
+      - name: Run semantic-release
+        run: npx semantic-release
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
