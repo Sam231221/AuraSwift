@@ -74,8 +74,16 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install semantic-release dependencies only
+        run: |
+          # Install only semantic-release packages, skip native modules
+          npm install --no-save \
+            semantic-release \
+            @semantic-release/changelog \
+            @semantic-release/git \
+            @semantic-release/github \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator
 
       - id: COMMIT_TIMESTAMP
         run: echo "COMMIT_TIMESTAMP=$(git show -s --format=%ct ${{ github.sha }})" >> $GITHUB_OUTPUT
@@ -83,11 +91,14 @@ jobs:
       - id: version
         name: Determine version with semantic-release
         run: |
+          # Get timestamp for version string
+          TIMESTAMP="${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}"
+
           # For PRs and non-main pushes, use current version
           if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.ref }}" != "refs/heads/main" ]; then
             CURRENT_VERSION=$(jq -r .version package.json)
             echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-            echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_OUTPUT
+            echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
             echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
             echo "ℹ️ PR/branch build - version: $CURRENT_VERSION"
           else
@@ -95,16 +106,28 @@ jobs:
             OUTPUT=$(npx semantic-release --dry-run 2>&1 || true)
             echo "$OUTPUT"
             
-            if echo "$OUTPUT" | grep -q "The next release version is"; then
-              NEW_VERSION=$(echo "$OUTPUT" | grep -oP "The next release version is \K[0-9]+\.[0-9]+\.[0-9]+" | head -1)
-              echo "APP_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-              echo "APP_FULL_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-              echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
-              echo "✅ New release will be created: v$NEW_VERSION"
+            # Try multiple patterns to detect new version
+            if echo "$OUTPUT" | grep -qE "(The next release version is|Published release)"; then
+              # Extract version number
+              NEW_VERSION=$(echo "$OUTPUT" | grep -oP "(The next release version is|Published release) \K[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+              
+              if [ -n "$NEW_VERSION" ]; then
+                echo "APP_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+                echo "APP_FULL_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+                echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
+                echo "✅ New release will be created: v$NEW_VERSION"
+              else
+                # Fallback if version extraction fails
+                CURRENT_VERSION=$(jq -r .version package.json)
+                echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+                echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
+                echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
+                echo "⚠️ Could not extract version from semantic-release output"
+              fi
             else
               CURRENT_VERSION=$(jq -r .version package.json)
               echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-              echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${{ steps.COMMIT_TIMESTAMP.outputs.COMMIT_TIMESTAMP }}" >> $GITHUB_OUTPUT
+              echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
               echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
               echo "ℹ️ No release needed - using current version: $CURRENT_VERSION"
             fi
@@ -128,6 +151,7 @@ jobs:
       id-token: write
       attestations: write
     uses: ./.github/workflows/compile-and-test.yml
+    secrets: inherit
     with:
       renderer-template: ${{ inputs.renderer-template }}
       app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
@@ -157,8 +181,16 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install semantic-release dependencies only
+        run: |
+          # Install only semantic-release packages, skip native modules
+          npm install --no-save \
+            semantic-release \
+            @semantic-release/changelog \
+            @semantic-release/git \
+            @semantic-release/github \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator
 
       - name: Download build artifacts
         uses: actions/download-artifact@v5
