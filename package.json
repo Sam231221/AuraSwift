@@ -34,6 +34,8 @@
     "create-renderer": "cd packages && node ./integrate-renderer/create-renderer.js",
     "integrate-renderer": "npm start --workspace @app/integrate-renderer",
     "init": "npm run create-renderer && npm run integrate-renderer && npm install",
+    "semantic-release": "semantic-release",
+    "semantic-release:dry-run": "semantic-release --dry-run",
     "db:dev:clean": "rm -f dev-data/pos_system.db* && echo 'Development database cleaned'",
     "db:dev:backup": "cp dev-data/pos_system.db dev-data/pos_system_backup_$(date +%Y%m%d_%H%M%S).db 2>/dev/null && echo 'Database backed up' || echo 'No database to backup'",
     "db:dev:restore": "ls -la dev-data/pos_system_backup_*.db 2>/dev/null || echo 'No backup files found'",
@@ -43,15 +45,20 @@
     "db:copy-data": "node migrate-existing-db.mjs copy-data"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
     "@npmcli/map-workspaces": "5.0.0",
     "@playwright/test": "1.55.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.0",
     "@types/node": "24.5.2",
+    "conventional-changelog-cli": "^5.0.0",
     "create-vite": "7.1.2",
     "electron": "38.1.2",
     "electron-builder": "26.0.12",
-    "@electron/rebuild": "^4.0.1",
     "glob": "^11.0.3",
-    "playwright": "^1.55.0"
+    "playwright": "^1.55.0",
+    "semantic-release": "^25.0.1"
   },
   "dependencies": {
     "@app/main": "*",

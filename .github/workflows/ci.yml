@@ -107,8 +107,13 @@ jobs:
             echo "ℹ️ PR/branch build - version: $CURRENT_VERSION"
           else
             # For main branch, check semantic-release
+            echo "🔍 Running semantic-release dry-run to check for releasable commits..."
             OUTPUT=$(npx semantic-release --dry-run 2>&1 || true)
+            
+            # Show full output for debugging
+            echo "========== SEMANTIC-RELEASE OUTPUT =========="
             echo "$OUTPUT"
+            echo "============================================="
             
             # Try multiple patterns to detect new version
             if echo "$OUTPUT" | grep -qE "(The next release version is|Published release)"; then
@@ -133,7 +138,9 @@ jobs:
               echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
               echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
               echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
-              echo "ℹ️ No release needed - using current version: $CURRENT_VERSION"
+              echo "ℹ️ No releasable commits found"
+              echo "📝 Commits since last release must use: feat:, fix:, perf:, refactor:"
+              echo "📝 Current commits are likely: docs:, chore:, ci:, test: (non-releasable)"
             fi
           fi
         env:
