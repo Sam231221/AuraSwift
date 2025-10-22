@@ -76,14 +76,18 @@ jobs:
 
       - name: Install semantic-release dependencies only
         run: |
-          # Install only semantic-release packages, skip native modules
-          npm install --no-save \
+          # Only install the packages needed, ignore optional dependencies and scripts
+          npm install --ignore-scripts --no-optional --no-save \
             semantic-release \
             @semantic-release/changelog \
             @semantic-release/git \
             @semantic-release/github \
             @semantic-release/commit-analyzer \
             @semantic-release/release-notes-generator
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+          PUPPETEER_SKIP_DOWNLOAD: 1
 
       - id: COMMIT_TIMESTAMP
         run: echo "COMMIT_TIMESTAMP=$(git show -s --format=%ct ${{ github.sha }})" >> $GITHUB_OUTPUT
@@ -183,14 +187,18 @@ jobs:
 
       - name: Install semantic-release dependencies only
         run: |
-          # Install only semantic-release packages, skip native modules
-          npm install --no-save \
+          # Only install the packages needed, ignore optional dependencies and scripts
+          npm install --ignore-scripts --no-optional --no-save \
             semantic-release \
             @semantic-release/changelog \
             @semantic-release/git \
             @semantic-release/github \
             @semantic-release/commit-analyzer \
             @semantic-release/release-notes-generator
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+          PUPPETEER_SKIP_DOWNLOAD: 1
 
       - name: Download build artifacts
         uses: actions/download-artifact@v5
