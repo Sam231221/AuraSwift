@@ -1,5 +1,56 @@
 # Changelog
 
+All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
+
+# 1.0.0 (2025-10-23)
+
+
+### Bug Fixes
+
+* **tests:** correct btoa function exposure and improve Electron test visibility in CI ([f0babfd](https://github.com/Sam231221/AuraSwift/commit/f0babfd1e21de28fd533979bbe1491e8122c1f3f))
+* disable AutoUpdater during tests to prevent GitHub Actions failures ([1441612](https://github.com/Sam231221/AuraSwift/commit/1441612692bc98f8d2d92b58163570e95c9896a7))
+* **workflows:** ensure .npmrc configuration for native modules and streamline environment variables ([a25fd02](https://github.com/Sam231221/AuraSwift/commit/a25fd026ba8919589589456aa3c2a19a0e19e4d1))
+* **workflows:** ensure node_modules are removed before installing project dependencies ([7d18f87](https://github.com/Sam231221/AuraSwift/commit/7d18f878016eac5728262845e69183eec5233f1e))
+* **workflows:** improve error message formatting for module rebuild failures ([e55367a](https://github.com/Sam231221/AuraSwift/commit/e55367a211e6775266cb3f025749a3b2dc8d561c))
+* **workflows:** improve error message formatting for npm rebuild failures ([43fa339](https://github.com/Sam231221/AuraSwift/commit/43fa339026be291e69ec2f004044bd6eb9bd5a1b))
+* **ci:** prevent native module builds in semantic-release jobs ([d1baa40](https://github.com/Sam231221/AuraSwift/commit/d1baa406de65521509bf41dc83451c8fa53b49f1))
+* **workflows:** remove native module verification and clean install steps from compile process ([5b14ed5](https://github.com/Sam231221/AuraSwift/commit/5b14ed5613dcc105da1e774fa90de5ad2b9d7b9a))
+* **ci:** resolve multiple workflow issues ([ee70a7a](https://github.com/Sam231221/AuraSwift/commit/ee70a7a863805bd30fdd40d1abfee178ba75743c))
+* **workflows:** standardize environment variable naming and streamline native module rebuild process ([74705bc](https://github.com/Sam231221/AuraSwift/commit/74705bc9444d227f0f00431811907e314ea08d79))
+* **workflows:** streamline native module rebuild process and add verification step ([87a30ba](https://github.com/Sam231221/AuraSwift/commit/87a30ba0f87976b42c9ef763f125759f4853c47b))
+* **action:** update node version to 20.x in setup for Electron template ([bc63cf5](https://github.com/Sam231221/AuraSwift/commit/bc63cf54ff471d9b1a40cec3ccaea04086b24cfb))
+* **workflows:** update node_modules removal command to use PowerShell syntax ([49cd79c](https://github.com/Sam231221/AuraSwift/commit/49cd79c4ca78f4ac043d76cec57e7a4a32b55214))
+
+
+### Code Refactoring
+
+* **ci:** integrate semantic-release into unified workflow ([13c13a3](https://github.com/Sam231221/AuraSwift/commit/13c13a3699d23a9087edb4f1c7f149e6b30b226d))
+
+
+### Features
+
+* :fire: Added weight based products implementation. ([8ddf299](https://github.com/Sam231221/AuraSwift/commit/8ddf2996fc2fb29b8cdd8e063dec2d22a992b5e8))
+* **app:** :fire: Fixed DraweR Component,Product Management Functionality ([df0c0cf](https://github.com/Sam231221/AuraSwift/commit/df0c0cf11a57b9f0464ae833b3a0d2b5c487b579))
+* **app:** :fire: Project initiated with Some PreFunctionalities ([a0043e5](https://github.com/Sam231221/AuraSwift/commit/a0043e557e45bdaa7b46d7f9d28ef71600f3a611))
+* :fire: Refund transaction functionality, business logic readmes. ([1d8a772](https://github.com/Sam231221/AuraSwift/commit/1d8a77272a16f343338aa5e8a3a0e8c4fa057931))
+* :sparkles: Introduced shift functionality with date and calendar components ([582a0c5](https://github.com/Sam231221/AuraSwift/commit/582a0c541a8a83babaf06270ec7627f50c356ff7))
+* :sparkles: Refund transaction functionality completion ([f3c4bee](https://github.com/Sam231221/AuraSwift/commit/f3c4beedc61e8e1f18f762bc645394c6a21e7eca))
+* **workflows:** ✨ enhance compile job with additional system dependencies and rebuild step for Electron ([d1dd15d](https://github.com/Sam231221/AuraSwift/commit/d1dd15d44e739c811eee5d8aea113db0ccbe8880))
+* **workflows:** ✨ enhance module rebuilding process to support scoped packages ([47f2ce9](https://github.com/Sam231221/AuraSwift/commit/47f2ce92835343ca1cdf3a9476f4ef805520da0b))
+* **workflows:** ✨Update action.yml and compile-and-test.yml for improved setup and typechecking ([d5c5726](https://github.com/Sam231221/AuraSwift/commit/d5c5726fea98a33427d7f452119adccb38e56438))
+* **dashboard-layout:** 🔥 remove unused title prop and adjust layout styles ([f76ab99](https://github.com/Sam231221/AuraSwift/commit/f76ab99d7422536049f30d3baa06f4b5bb5c16e7))
+* **cashier:** enhance late shift notifications with detailed time formatting ([e301469](https://github.com/Sam231221/AuraSwift/commit/e3014699e73195df5efc922b0d59a2952cb4403c))
+* **test:** trigger release with correct permissions V2 ([70e1a18](https://github.com/Sam231221/AuraSwift/commit/70e1a181bae5ff21f2467e943a3178ef28d4a10e))
+* **test:** trigger release with correct permissions v4 ([6959dc9](https://github.com/Sam231221/AuraSwift/commit/6959dc9402bb35f7037771d1d4887f2f51f7230e))
+* **test:** trigger release with correct permissions ([8db5026](https://github.com/Sam231221/AuraSwift/commit/8db5026e79a889ef01093ab53e7326612ae5de7e))
+
+
+### BREAKING CHANGES
+
+* **ci:** workflow structure changed, old release.yml disabled
+
+# Changelog
+
 All notable changes to AuraSwift POS System will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
