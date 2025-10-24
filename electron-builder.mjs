@@ -10,6 +10,12 @@ export default /** @type import('electron-builder').Configuration */
     buildResources: 'buildResources',
   },
   generateUpdatesFilesForAllChannels: true,
+  publish: {
+    provider: 'github',
+    owner: 'Sam231221',
+    repo: 'AuraSwift',
+    releaseType: 'release'
+  },
   mac: {
     target: [
       {

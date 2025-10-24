@@ -1,6 +1,6 @@
 import type { AppModule } from "../AppModule.js";
 import { ModuleContext } from "../ModuleContext.js";
-import { BrowserWindow, Menu } from "electron";
+import { BrowserWindow, Menu, shell, app as electronApp } from "electron";
 import type { AppInitConfig } from "../AppInitConfig.js";
 import { join } from "node:path";
 
@@ -24,12 +24,119 @@ class WindowManager implements AppModule {
   async enable({ app }: ModuleContext): Promise<void> {
     await app.whenReady();
 
-    // Hide the application menu completely (removes File, Edit, View, etc.)
-    Menu.setApplicationMenu(null);
+    // Create minimal application menu with update checking
+    this.createApplicationMenu();
 
     await this.restoreOrCreateWindow(true);
     app.on("second-instance", () => this.restoreOrCreateWindow(true));
     app.on("activate", () => this.restoreOrCreateWindow(true));
+  }
+
+  private createApplicationMenu(): void {
+    const isMac = process.platform === "darwin";
+
+    const template: Electron.MenuItemConstructorOptions[] = [
+      // App menu (macOS only)
+      ...(isMac
+        ? [
+            {
+              label: electronApp.name,
+              submenu: [
+                { role: "about" as const },
+                { type: "separator" as const },
+                { role: "hide" as const },
+                { role: "hideOthers" as const },
+                { role: "unhide" as const },
+                { type: "separator" as const },
+                { role: "quit" as const },
+              ],
+            },
+          ]
+        : []),
+
+      // Help menu with update checker
+      {
+        label: "Help",
+        submenu: [
+          {
+            label: "Check for Updates...",
+            click: async () => {
+              // Dynamically import to avoid circular dependencies
+              const { autoUpdater } = await import("electron-updater");
+              const { dialog } = await import("electron");
+
+              try {
+                console.log("🔍 Manually checking for updates...");
+                const result = await autoUpdater.checkForUpdates();
+
+                // If no update found, show confirmation
+                if (
+                  result?.updateInfo &&
+                  result.updateInfo.version === electronApp.getVersion()
+                ) {
+                  dialog.showMessageBox({
+                    type: "info",
+                    title: "You're Up to Date",
+                    message: "AuraSwift is up to date!",
+                    detail: `You are running the latest version (${electronApp.getVersion()}).`,
+                    buttons: ["OK"],
+                  });
+                }
+              } catch (error) {
+                console.error("Error checking for updates:", error);
+
+                // Show user-friendly error
+                const errorMessage =
+                  error instanceof Error ? error.message : String(error);
+                if (!errorMessage.includes("No published versions")) {
+                  dialog.showMessageBox({
+                    type: "warning",
+                    title: "Unable to Check for Updates",
+                    message: "Could not connect to update server",
+                    detail:
+                      "Please check your internet connection and try again later.\n\nYou can also check for updates manually at:\nhttps://github.com/Sam231221/AuraSwift/releases",
+                    buttons: ["OK"],
+                  });
+                }
+              }
+            },
+          },
+          {
+            label: "View Release Notes",
+            click: () => {
+              shell.openExternal(
+                "https://github.com/Sam231221/AuraSwift/releases"
+              );
+            },
+          },
+          { type: "separator" as const },
+          {
+            label: "About AuraSwift",
+            click: () => {
+              const { dialog } = require("electron");
+              dialog
+                .showMessageBox({
+                  type: "info",
+                  title: "About AuraSwift",
+                  message: `AuraSwift POS System`,
+                  detail: `Version: ${electronApp.getVersion()}\n\nA modern point-of-sale system for retail businesses.\n\n© 2025 Sameer Shahi\n\nGitHub: github.com/Sam231221/AuraSwift`,
+                  buttons: ["OK", "Visit GitHub"],
+                })
+                .then((result: { response: number }) => {
+                  if (result.response === 1) {
+                    shell.openExternal(
+                      "https://github.com/Sam231221/AuraSwift"
+                    );
+                  }
+                });
+            },
+          },
+        ],
+      },
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
   }
 
   async createWindow(): Promise<BrowserWindow> {
