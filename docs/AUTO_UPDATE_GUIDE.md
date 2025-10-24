@@ -130,9 +130,12 @@ Location: `.releaserc.json` + `electron-builder.mjs` + `package.json`
 
 **What gets published:**
 
-- ✅ `AuraSwift-1.0.0-win-x64.exe` - Full installer for new users
+- ✅ `AuraSwift-1.0.0-win-x64.exe` - 64-bit NSIS installer (recommended for most users)
+- ✅ `AuraSwift-1.0.0-win-ia32.exe` - 32-bit NSIS installer (for older systems)
+- ✅ `AuraSwift-1.0.0-win-Portable-x64.exe` - Portable version (no installation required)
 - ✅ `latest.yml` - Update manifest (tells app about new version)
-- ✅ `AuraSwift-1.0.0-win-x64.exe.blockmap` - Differential update file
+- ✅ `*.exe.blockmap` - Differential update files (faster updates)
+
   owner: "Sam231221",
   repo: "AuraSwift",
   },
@@ -339,22 +342,32 @@ Installs: On next restart
 
 ```
 
-📦 AuraSwift v3.2.0
-├── AuraSwift-Setup-3.2.0.exe (200 MB) - Full installer
-├── AuraSwift-Setup-3.2.0.exe.blockmap (50 KB) - Differential update map
-└── latest.yml (1 KB) - Update manifest
+📦 AuraSwift v1.1.0
+├── AuraSwift-1.1.0-win-x64.exe (104 MB) - 64-bit NSIS installer
+├── AuraSwift-1.1.0-win-ia32.exe (110 MB) - 32-bit NSIS installer
+├── AuraSwift-1.1.0-win-Portable-x64.exe (214 MB) - Portable (no install)
+├── AuraSwift-1.1.0-win-x64.exe.blockmap (111 KB) - Update delta (64-bit)
+├── AuraSwift-1.1.0-win-ia32.exe.blockmap (116 KB) - Update delta (32-bit)
+├── AuraSwift-1.1.0-win-Portable-x64.exe.blockmap (220 KB) - Update delta (portable)
+├── latest.yml (660 B) - Update manifest
+└── latest-ia32.yml (660 B) - Update manifest (32-bit)
 
 ````
+
+**Which installer should users download?**
+- **Most users:** `AuraSwift-1.1.0-win-x64.exe` (64-bit NSIS)
+- **Older PCs (32-bit):** `AuraSwift-1.1.0-win-ia32.exe`
+- **No admin rights:** `AuraSwift-1.1.0-win-Portable-x64.exe`
 
 ### **latest.yml Example:**
 
 ```yaml
-version: 3.2.0
+version: 1.1.0
 files:
-  - url: AuraSwift-Setup-3.2.0.exe
+  - url: AuraSwift-1.1.0-win-x64.exe
     sha512: abc123...
-    size: 209715200
-path: AuraSwift-Setup-3.2.0.exe
+    size: 109051904
+path: AuraSwift-1.1.0-win-x64.exe
 sha512: abc123...
 releaseDate: "2025-10-24T10:30:00.000Z"
 ````
