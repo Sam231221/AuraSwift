@@ -57,10 +57,6 @@ export default /** @type import('electron-builder').Configuration */
     uninstallerIcon: 'buildResources/icon.png', // Uninstaller icon
     installerHeader: 'buildResources/icon.png', // Installer header image (optional)
     license: undefined,                 // Path to license.txt (optional)
-    warningsAsErrors: false,
-    displayLanguageSelector: false,     // Don't show language selector
-    installerLanguages: ['en_US'],     // English only
-    language: 'en_US'
   },
   linux: {
     target: ['deb'],
