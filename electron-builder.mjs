@@ -42,6 +42,26 @@ export default /** @type import('electron-builder').Configuration */
     ],
     icon: 'buildResources/icon.png'
   },
+  nsis: {
+    oneClick: false,                    // Show installation wizard (not one-click)
+    perMachine: true,                   // Install for all users (requires admin)
+    allowElevation: true,               // Request admin rights
+    allowToChangeInstallationDirectory: true,  // Let user choose install location
+    createDesktopShortcut: true,        // Create desktop shortcut
+    createStartMenuShortcut: true,      // Create Start Menu shortcut
+    shortcutName: 'AuraSwift',         // Shortcut name
+    deleteAppDataOnUninstall: false,    // Keep user data when uninstalling
+    menuCategory: true,                 // Create program group in Start Menu
+    runAfterFinish: true,              // Run app after installation completes
+    installerIcon: 'buildResources/icon.png',   // Installer icon
+    uninstallerIcon: 'buildResources/icon.png', // Uninstaller icon
+    installerHeader: 'buildResources/icon.png', // Installer header image (optional)
+    license: undefined,                 // Path to license.txt (optional)
+    warningsAsErrors: false,
+    displayLanguageSelector: false,     // Don't show language selector
+    installerLanguages: ['en_US'],     // English only
+    language: 'en_US'
+  },
   linux: {
     target: ['deb'],
   },

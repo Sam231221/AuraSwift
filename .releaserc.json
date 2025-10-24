@@ -55,12 +55,20 @@
       {
         "assets": [
           {
-            "path": "dist/*.exe",
-            "label": "Windows Installer"
+            "path": "dist/*-win-x64.exe",
+            "label": "Windows Installer (64-bit NSIS)"
+          },
+          {
+            "path": "dist/*-win-ia32.exe",
+            "label": "Windows Installer (32-bit NSIS)"
+          },
+          {
+            "path": "dist/*Portable*.exe",
+            "label": "Windows Portable (64-bit)"
           },
           {
             "path": "dist/*.exe.blockmap",
-            "label": "Windows Installer Blockmap"
+            "label": "Update Delta File"
           },
           {
             "path": "dist/latest*.yml",

@@ -87,27 +87,47 @@ export class AutoUpdater implements AppModule {
 
       // Check for updates (initial check on startup)
       console.log("🔍 Checking for updates on startup...");
-      return await updater.checkForUpdates();
+      const result = await updater.checkForUpdates();
+
+      if (result === null) {
+        console.log(
+          "ℹ️ No update check result - likely already on latest version"
+        );
+      }
+
+      return result;
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message.includes("No published versions")) {
+        const errorMessage = error.message;
+
+        // These are expected situations, not real errors
+        if (errorMessage.includes("No published versions")) {
           console.log(
             "ℹ️ No published versions found on GitHub - this is expected during development"
           );
           return null;
         }
+
+        if (errorMessage.includes("Cannot find latest")) {
+          console.log(
+            "ℹ️ No newer version available - you're already on the latest version"
+          );
+          return null;
+        }
+
         if (
-          error.message.includes("ENOTFOUND") ||
-          error.message.includes("ETIMEDOUT")
+          errorMessage.includes("ENOTFOUND") ||
+          errorMessage.includes("ETIMEDOUT") ||
+          errorMessage.includes("ECONNREFUSED")
         ) {
           console.log(
-            "⚠️ Network error while checking for updates - will retry later"
+            "⚠️ Network error while checking for updates - will retry during periodic checks"
           );
           return null;
         }
       }
 
-      // Re-throw other errors
+      // Re-throw other unexpected errors
       console.error("❌ Unexpected error in auto-updater:", error);
       throw error;
     }
@@ -226,17 +246,39 @@ export class AutoUpdater implements AppModule {
     updater.on("error", (error) => {
       console.error("❌ Auto-updater error:", error);
 
-      // Don't show error dialog in development or if it's just "no published versions"
-      if (
-        import.meta.env.PROD &&
-        !error.message.includes("No published versions")
-      ) {
+      // Don't show error dialog for these common non-error cases:
+      const errorMessage = error.message || String(error);
+      const shouldSkipDialog =
+        errorMessage.includes("No published versions") ||
+        errorMessage.includes("Cannot find latest") ||
+        errorMessage.includes("No updates available") ||
+        errorMessage.includes("net::ERR_INTERNET_DISCONNECTED") ||
+        !import.meta.env.PROD;
+
+      if (!shouldSkipDialog) {
+        // Check if it's a network-related error (non-critical)
+        const isNetworkError =
+          errorMessage.includes("ENOTFOUND") ||
+          errorMessage.includes("ETIMEDOUT") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("Network Error");
+
+        if (isNetworkError) {
+          // Network errors are common and expected - just log them
+          console.log(
+            "⚠️ Network error during update check - will retry later:",
+            errorMessage
+          );
+          return;
+        }
+
+        // Only show dialog for unexpected errors
         dialog
           .showMessageBox({
-            type: "error",
-            title: "Update Check Failed",
-            message: "Unable to check for updates",
-            detail: `An error occurred while checking for updates:\n\n${error.message}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nYou can:\n• Try again later from Help > Check for Updates\n• Check manually at GitHub\n\nIf this persists, your current version will continue to work normally.`,
+            type: "warning",
+            title: "Update Check Issue",
+            message: "Unable to check for updates at this time",
+            detail: `The update check encountered an issue:\n\n${errorMessage}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is not critical:\n• Your app will continue working normally\n• You can check manually later from Help menu\n• Automatic checks will retry in 4 hours\n\nWould you like to view releases on GitHub?`,
             buttons: ["OK", "Open GitHub Releases"],
             defaultId: 0,
             cancelId: 0,
