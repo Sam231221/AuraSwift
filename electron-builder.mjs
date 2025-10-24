@@ -40,7 +40,7 @@ export default /** @type import('electron-builder').Configuration */
         arch: ['x64']
       }
     ],
-    icon: 'buildResources/icon.png'
+    icon: 'buildResources/icon.ico'
   },
   nsis: {
     oneClick: false,                    // Show installation wizard (not one-click)
