@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.1.0](https://github.com/Sam231221/AuraSwift/compare/v1.0.0...v1.1.0) (2025-10-24)
+
+
+### Features
+
+* **auto-update:**  ✨ implement complete auto-update functionality with user dialogs, notifications, and error handling ([c99f247](https://github.com/Sam231221/AuraSwift/commit/c99f2474bc9d29f327be066098dbe4a3a9a51f04))
+
 # 1.0.0 (2025-10-23)
 
 
