@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.1](https://github.com/Sam231221/AuraSwift/compare/v1.2.0...v1.2.1) (2025-10-25)
+
+
+### Bug Fixes
+
+* 🐛 resolve auto-updater httpExecutor error and NSIS installer configuration ([aca6339](https://github.com/Sam231221/AuraSwift/commit/aca6339ed88506f6793e60fba519944be9bb74c7))
+
 # [1.2.0](https://github.com/Sam231221/AuraSwift/compare/v1.1.0...v1.2.0) (2025-10-25)
 
 
