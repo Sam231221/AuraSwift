@@ -64,7 +64,7 @@
           },
           {
             "path": "dist/*Portable*.exe",
-            "label": "Windows Portable (64-bit)"
+            "label": "Windows Portable (64-bit - No Installation Required)"
           },
           {
             "path": "dist/*.exe.blockmap",

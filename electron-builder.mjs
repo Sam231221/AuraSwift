@@ -55,9 +55,8 @@ export default /** @type import('electron-builder').Configuration */
     runAfterFinish: true,              // Run app after installation completes
     installerIcon: 'buildResources/icon.ico',
     uninstallerIcon: 'buildResources/icon.ico',
-   // installerHeader is usually a bitmap/header image. If you want to keep a small header image,
-   // supply a valid header image; otherwise remove it or use .bmp/.png supported by nsis.
-   installerHeader: 'buildResources/icon.ico',
+    // installerHeader requires .bmp format (150x57 pixels), not .ico
+    // Removing it to use default NSIS header
     license: undefined,                 // Path to license.txt (optional)
   },
   linux: {

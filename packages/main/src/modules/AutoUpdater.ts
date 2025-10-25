@@ -73,11 +73,6 @@ export class AutoUpdater implements AppModule {
       // Allow downgrade for testing (disable in production if needed)
       updater.allowDowngrade = false;
 
-      // Set update check timeout (30 seconds)
-      if ("requestHeaders" in updater) {
-        (updater as any).httpExecutor = undefined; // Use default with better timeout
-      }
-
       if (import.meta.env.VITE_DISTRIBUTION_CHANNEL) {
         updater.channel = import.meta.env.VITE_DISTRIBUTION_CHANNEL;
       }
@@ -275,7 +270,7 @@ export class AutoUpdater implements AppModule {
         // Only show dialog for unexpected errors
         dialog
           .showMessageBox({
-            type: "warning",
+            type: "info",
             title: "Update Check Issue",
             message: "Unable to check for updates at this time",
             detail: `The update check encountered an issue:\n\n${errorMessage}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is not critical:\n• Your app will continue working normally\n• You can check manually later from Help menu\n• Automatic checks will retry in 4 hours\n\nWould you like to view releases on GitHub?`,
