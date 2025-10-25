@@ -53,9 +53,11 @@ export default /** @type import('electron-builder').Configuration */
     deleteAppDataOnUninstall: false,    // Keep user data when uninstalling
     menuCategory: true,                 // Create program group in Start Menu
     runAfterFinish: true,              // Run app after installation completes
-    installerIcon: 'buildResources/icon.png',   // Installer icon
-    uninstallerIcon: 'buildResources/icon.png', // Uninstaller icon
-    installerHeader: 'buildResources/icon.png', // Installer header image (optional)
+    installerIcon: 'buildResources/icon.ico',
+    uninstallerIcon: 'buildResources/icon.ico',
+   // installerHeader is usually a bitmap/header image. If you want to keep a small header image,
+   // supply a valid header image; otherwise remove it or use .bmp/.png supported by nsis.
+   installerHeader: 'buildResources/icon.ico',
     license: undefined,                 // Path to license.txt (optional)
   },
   linux: {

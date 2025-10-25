@@ -144,7 +144,7 @@ class WindowManager implements AppModule {
     const iconPath =
       process.platform === "darwin"
         ? join(process.cwd(), "buildResources", "icon.icns")
-        : join(process.cwd(), "buildResources", "icon.png");
+        : join(process.cwd(), "buildResources", "icon.ico");
 
     const browserWindow = new BrowserWindow({
       show: false, // Use the 'ready-to-show' event to show the instantiated BrowserWindow.
