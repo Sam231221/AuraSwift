@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/Sam231221/AuraSwift/compare/v1.1.0...v1.2.0) (2025-10-25)
+
+
+### Features
+
+* **auto-updater:**  ✨ enhance update check handling and error notifications ([72dfd01](https://github.com/Sam231221/AuraSwift/commit/72dfd018cf2b1624540f7bb02af4a5bad148358f))
+* ✨ add new icon files and integrate png2icons for icon conversion ([d114efc](https://github.com/Sam231221/AuraSwift/commit/d114efc2dcdba7a3bf8acd1caa33f7d61fcaf6b2))
+* ✨ update installer and uninstaller icons to use ICO format ([5efeddb](https://github.com/Sam231221/AuraSwift/commit/5efeddbaca1a6f7992addb7a379d3c0238e84ac9))
+
 # [1.1.0](https://github.com/Sam231221/AuraSwift/compare/v1.0.0...v1.1.0) (2025-10-24)
 
 
