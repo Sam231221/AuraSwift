@@ -73,9 +73,9 @@ export class AutoUpdater implements AppModule {
       // Allow downgrade for testing (disable in production if needed)
       updater.allowDowngrade = false;
 
-      if (import.meta.env.VITE_DISTRIBUTION_CHANNEL) {
-        updater.channel = import.meta.env.VITE_DISTRIBUTION_CHANNEL;
-      }
+      // Set channel to 'latest' to match the yml filename (latest.yml, latest-mac.yml)
+      // This ensures electron-updater looks for the correct manifest file
+      updater.channel = import.meta.env.VITE_DISTRIBUTION_CHANNEL || "latest";
 
       // Set up event listeners for update flow
       this.setupUpdateListeners(updater);
