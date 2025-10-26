@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.3](https://github.com/Sam231221/AuraSwift/compare/v1.2.2...v1.2.3) (2025-10-26)
+
+
+### Bug Fixes
+
+*  🐛  force electron-builder to use 'latest' as channel name for YAML files ([82995a8](https://github.com/Sam231221/AuraSwift/commit/82995a8c7a005b465a3af86a8e9a77466159a205))
+
 ## [1.2.2](https://github.com/Sam231221/AuraSwift/compare/v1.2.1...v1.2.2) (2025-10-26)
 
 
