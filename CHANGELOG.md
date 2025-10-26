@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.2](https://github.com/Sam231221/AuraSwift/compare/v1.2.1...v1.2.2) (2025-10-26)
+
+
+### Bug Fixes
+
+* **app:**  🐛  ensure correct update channel is set for electron-updater ([c9cdd77](https://github.com/Sam231221/AuraSwift/commit/c9cdd77614e1d1c1b88d6b7b57700322f9c68632))
+* 🐛 prevent Portable build from overwriting NSIS installer (filename collision) ([7b0fc1f](https://github.com/Sam231221/AuraSwift/commit/7b0fc1ffea11503f18c86d7b585f4442b14579c8))
+
 ## [1.2.1](https://github.com/Sam231221/AuraSwift/compare/v1.2.0...v1.2.1) (2025-10-25)
 
 
