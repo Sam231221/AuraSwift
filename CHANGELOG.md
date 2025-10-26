@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/Sam231221/AuraSwift/compare/v1.2.4...v1.3.0) (2025-10-26)
+
+
+### Features
+
+* **window:** ✨ increase default window dimensions for improved layout ([8925b94](https://github.com/Sam231221/AuraSwift/commit/8925b94c824ff5af77e51f1a6174ccef640e9efd))
+
 ## [1.2.4](https://github.com/Sam231221/AuraSwift/compare/v1.2.3...v1.2.4) (2025-10-26)
 
 
