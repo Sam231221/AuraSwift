@@ -78,22 +78,12 @@ export default function AuthPage() {
 
           {/* Auth Card */}
           <Card className="border-0 shadow-2xl bg-card/80 backdrop-blur-sm">
-            <CardHeader className="space-y-4 pb-6">
+            <CardHeader className="space-y-4 ">
               <div className="flex items-center justify-between">
                 <Badge variant="secondary" className="text-xs font-medium">
                   <Shield className="w-3 h-3 mr-1" />
                   Secure Access
                 </Badge>
-              </div>
-              <div>
-                <CardTitle className="text-2xl font-bold text-balance">
-                  {"Welcome back to your store"}
-                </CardTitle>
-                <CardDescription className="text-pretty mt-2">
-                  {
-                    "Sign in to access your POS dashboard and manage your business operations"
-                  }
-                </CardDescription>
               </div>
             </CardHeader>
 
