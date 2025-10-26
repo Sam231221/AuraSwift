@@ -14,7 +14,8 @@ export default /** @type import('electron-builder').Configuration */
     provider: 'github',
     owner: 'Sam231221',
     repo: 'AuraSwift',
-    releaseType: 'release'
+    releaseType: 'release',
+    channel: 'latest'  // Force electron-builder to use 'latest' as channel name for yml files
   },
   mac: {
     target: [
