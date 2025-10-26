@@ -147,6 +147,8 @@ class WindowManager implements AppModule {
         : join(process.cwd(), "buildResources", "icon.ico");
 
     const browserWindow = new BrowserWindow({
+      width: 1100, // Increased window width
+      height: 600, // Optional: increase height for better layout
       show: false, // Use the 'ready-to-show' event to show the instantiated BrowserWindow.
       icon: iconPath, // Set the window icon
       title: "", // Set the window title
