@@ -9,13 +9,11 @@ export default /** @type import('electron-builder').Configuration */
     output: 'dist',
     buildResources: 'buildResources',
   },
-  generateUpdatesFilesForAllChannels: true,
   publish: {
     provider: 'github',
     owner: 'Sam231221',
     repo: 'AuraSwift',
-    releaseType: 'release',
-    channel: 'latest'  // Force electron-builder to use 'latest' as channel name for yml files
+    releaseType: 'release'
   },
   mac: {
     target: [
