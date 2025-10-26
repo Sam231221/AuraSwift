@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.4](https://github.com/Sam231221/AuraSwift/compare/v1.2.3...v1.2.4) (2025-10-26)
+
+
+### Bug Fixes
+
+*  🐛  remove explicit channel setting in AutoUpdater to prevent manifest file lookup issues ([12f5c7e](https://github.com/Sam231221/AuraSwift/commit/12f5c7e198d3331548f6c51f46d215bf9d74f515))
+
 ## [1.2.3](https://github.com/Sam231221/AuraSwift/compare/v1.2.2...v1.2.3) (2025-10-26)
 
 
