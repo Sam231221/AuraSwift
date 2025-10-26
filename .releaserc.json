@@ -63,7 +63,7 @@
             "label": "Windows Installer (32-bit NSIS)"
           },
           {
-            "path": "dist/*Portable*.exe",
+            "path": "dist/*-Portable.exe",
             "label": "Windows Portable (64-bit - No Installation Required)"
           },
           {

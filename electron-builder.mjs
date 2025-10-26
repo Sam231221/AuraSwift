@@ -42,6 +42,10 @@ export default /** @type import('electron-builder').Configuration */
     ],
     icon: 'buildResources/icon.ico'
   },
+  portable: {
+    // Custom artifact name for Portable to avoid collision with NSIS
+    artifactName: '${productName}-${version}-${os}-${arch}-Portable.${ext}'
+  },
   nsis: {
     oneClick: false,                    // Show installation wizard (not one-click)
     perMachine: true,                   // Install for all users (requires admin)
