@@ -12,13 +12,12 @@
 #set the name of workflow as codeQl advanced
 name: "CodeQL Advanced"
 
+# COST OPTIMIZATION: Only runs on schedule (weekly) and manual trigger
+# Removed push/PR triggers to save costs
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+  workflow_dispatch: # Manual trigger only
   schedule:
-    - cron: "18 15 * * 3"
+    - cron: "18 15 * * 0" # Weekly on Sunday at 15:18 UTC (was Wednesday, changed to reduce frequency)
 
 #only 1job "analyze"
 jobs:
