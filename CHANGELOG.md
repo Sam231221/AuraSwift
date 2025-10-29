@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.4.0](https://github.com/Sam231221/AuraSwift/compare/v1.3.0...v1.4.0) (2025-10-29)
+
+
+### Features
+
+* **updater:** ✨ explicitly set update channel to 'latest' and improve error handling in update checks ([8cdcdb3](https://github.com/Sam231221/AuraSwift/commit/8cdcdb3ac7b0d7df94348483a2f13a7287619dd8))
+
 # [1.3.0](https://github.com/Sam231221/AuraSwift/compare/v1.2.4...v1.3.0) (2025-10-26)
 
 
