@@ -67,6 +67,10 @@ class WindowManager implements AppModule {
 
               try {
                 console.log("🔍 Manually checking for updates...");
+
+                // Set channel explicitly
+                autoUpdater.channel = "latest";
+
                 const result = await autoUpdater.checkForUpdates();
 
                 // If no update found, show confirmation
@@ -76,9 +80,18 @@ class WindowManager implements AppModule {
                 ) {
                   dialog.showMessageBox({
                     type: "info",
-                    title: "You're Up to Date",
+                    title: "You're Up to Date ✅",
                     message: "AuraSwift is up to date!",
                     detail: `You are running the latest version (${electronApp.getVersion()}).`,
+                    buttons: ["OK"],
+                  });
+                } else if (!result) {
+                  // No result usually means already up to date
+                  dialog.showMessageBox({
+                    type: "info",
+                    title: "You're Up to Date ✅",
+                    message: "AuraSwift is up to date!",
+                    detail: `You are running version ${electronApp.getVersion()}, which is the latest available version.`,
                     buttons: ["OK"],
                   });
                 }
@@ -88,15 +101,37 @@ class WindowManager implements AppModule {
                 // Show user-friendly error
                 const errorMessage =
                   error instanceof Error ? error.message : String(error);
-                if (!errorMessage.includes("No published versions")) {
+
+                // Skip dialog for expected "no updates" scenarios
+                if (
+                  errorMessage.includes("No published versions") ||
+                  errorMessage.includes("Cannot find latest") ||
+                  errorMessage.includes("No updates available")
+                ) {
                   dialog.showMessageBox({
-                    type: "warning",
-                    title: "Unable to Check for Updates",
-                    message: "Could not connect to update server",
-                    detail:
-                      "Please check your internet connection and try again later.\n\nYou can also check for updates manually at:\nhttps://github.com/Sam231221/AuraSwift/releases",
+                    type: "info",
+                    title: "You're Up to Date ✅",
+                    message: "AuraSwift is up to date!",
+                    detail: `You are running version ${electronApp.getVersion()}, which is the latest available version.`,
                     buttons: ["OK"],
                   });
+                } else {
+                  // Show error dialog for real issues
+                  dialog
+                    .showMessageBox({
+                      type: "warning",
+                      title: "Unable to Check for Updates",
+                      message: "Could not connect to update server",
+                      detail: `Error: ${errorMessage}\n\nPlease check your internet connection and try again later.\n\nYou can also check for updates manually at:\nhttps://github.com/Sam231221/AuraSwift/releases`,
+                      buttons: ["OK", "Open GitHub Releases"],
+                    })
+                    .then((result: { response: number }) => {
+                      if (result.response === 1) {
+                        shell.openExternal(
+                          "https://github.com/Sam231221/AuraSwift/releases"
+                        );
+                      }
+                    });
                 }
               }
             },

@@ -73,11 +73,8 @@ export class AutoUpdater implements AppModule {
       // Allow downgrade for testing (disable in production if needed)
       updater.allowDowngrade = false;
 
-      // DON'T set updater.channel - let electron-updater use default 'latest.yml'
-      // Setting channel explicitly can cause it to look for channel-specific files
-      // if (import.meta.env.VITE_DISTRIBUTION_CHANNEL) {
-      //   updater.channel = import.meta.env.VITE_DISTRIBUTION_CHANNEL;
-      // }
+      // Explicitly set channel to 'latest' to match electron-builder config
+      updater.channel = "latest";
 
       // Set up event listeners for update flow
       this.setupUpdateListeners(updater);
@@ -299,13 +296,27 @@ export class AutoUpdater implements AppModule {
 
     // If releaseNotes is a string
     if (typeof info.releaseNotes === "string") {
-      // Parse the release notes and format them nicely
       let notes = info.releaseNotes;
 
-      // Remove HTML tags if present
-      notes = notes.replace(/<[^>]*>/g, "");
+      // Step 1: Decode HTML entities first (e.g., &lt; &gt; &amp; &quot;)
+      notes = notes
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, " ");
 
-      // Extract meaningful lines (skip headers, empty lines)
+      // Step 2: Remove all HTML tags (including multiline tags)
+      notes = notes.replace(/<[^>]*>/gs, "");
+
+      // Step 3: Clean up extra whitespace and normalize line breaks
+      notes = notes
+        .replace(/\r\n/g, "\n") // Normalize line endings
+        .replace(/\n{3,}/g, "\n\n") // Max 2 consecutive newlines
+        .trim();
+
+      // Step 4: Extract meaningful lines
       const lines = notes
         .split("\n")
         .map((line) => line.trim())
@@ -313,17 +324,19 @@ export class AutoUpdater implements AppModule {
           // Skip empty lines, markdown headers, and separator lines
           return (
             line &&
+            line.length > 3 &&
             !line.startsWith("#") &&
             !line.match(/^[-=_*]{3,}$/) &&
-            line.length > 3
+            !line.toLowerCase().includes("what's changed") &&
+            !line.toLowerCase().includes("full changelog")
           );
         })
-        .slice(0, 10); // Show first 10 meaningful lines
+        .slice(0, 15); // Show up to 15 meaningful lines
 
-      // Format as bullet points if not already
+      // Step 5: Format as bullet points
       const formattedLines = lines.map((line) => {
-        // If line already has a bullet or emoji, keep it
-        if (line.match(/^[•\-*✨🐛⚡🔥]/)) {
+        // If line already has a bullet, emoji, or markdown list marker, keep it
+        if (line.match(/^[•\-*✨🐛⚡🔥📦🎨♻️⬆️⬇️]/)) {
           return line;
         }
         // Otherwise add a bullet
@@ -332,17 +345,33 @@ export class AutoUpdater implements AppModule {
 
       const result = formattedLines.join("\n");
 
-      return result.length > 400
-        ? result.substring(0, 400) + "\n\n... see full release notes on GitHub"
-        : result || "• See full release notes on GitHub";
+      // Step 6: Truncate if too long
+      if (result.length > 500) {
+        return (
+          result.substring(0, 500) + "\n\n... see full release notes on GitHub"
+        );
+      }
+
+      return result || "• See full release notes on GitHub";
     }
 
     // If releaseNotes is an array
     if (Array.isArray(info.releaseNotes)) {
       const formatted = info.releaseNotes
-        .slice(0, 10)
+        .slice(0, 15)
         .map((note: any) => {
-          const text = note.note || note;
+          let text = note.note || note;
+
+          // Clean HTML from array items too
+          if (typeof text === "string") {
+            text = text
+              .replace(/&lt;/g, "<")
+              .replace(/&gt;/g, ">")
+              .replace(/&amp;/g, "&")
+              .replace(/<[^>]*>/gs, "")
+              .trim();
+          }
+
           // Add bullet if not present
           return text.match(/^[•\-*✨🐛⚡🔥]/) ? text : `• ${text}`;
         })
