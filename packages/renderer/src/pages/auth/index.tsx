@@ -91,9 +91,6 @@ export default function AuthPage() {
                     <strong>Admin:</strong> admin@store.com
                   </p>
                   <p className="text-xs mt-1">Password: admin123</p>
-                  <p className="text-xs mt-2 text-muted-foreground">
-                    Or create a new account using the Register tab
-                  </p>
                 </div>
               </div>
 
