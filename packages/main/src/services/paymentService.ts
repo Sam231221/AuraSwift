@@ -79,7 +79,7 @@ export class PaymentService {
   constructor() {
     // Initialize Stripe with secret key from environment
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_...", {
-      apiVersion: "2025-09-30.clover",
+      apiVersion: "2025-10-29.clover",
     });
 
     this.paymentState = {
