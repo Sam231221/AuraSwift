@@ -57,7 +57,7 @@ permissions:
 jobs:
   #Job1: Determine version with semantic-release
   prepare:
-    name: Prepare version and check for release
+    name: Prepare Version and Check for release
     runs-on: ubuntu-latest
     outputs:
       APP_VERSION: ${{ steps.version.outputs.APP_VERSION }}
@@ -158,12 +158,12 @@ jobs:
 
   #Job2: Build and test
   compile-and-test:
+    uses: ./.github/workflows/compile-and-test.yml
     needs: prepare
     permissions:
       contents: write
       id-token: write
       attestations: write
-    uses: ./.github/workflows/compile-and-test.yml
     secrets: inherit
     with:
       renderer-template: ${{ inputs.renderer-template }}
@@ -172,11 +172,13 @@ jobs:
 
   #Job3: Semantic Release (only on main branch when there are releasable commits)
   semantic-release:
+    name: Semantic Release with Electron Builder
+    runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.prepare.outputs.SHOULD_RELEASE == 'true'
     needs:
       - prepare
       - compile-and-test
-    runs-on: ubuntu-latest
+
     permissions:
       contents: write
       issues: write

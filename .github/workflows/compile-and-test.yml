@@ -1,4 +1,4 @@
-name: Compile and test
+name: Compile and test on Windows
 
 on:
   workflow_call:
