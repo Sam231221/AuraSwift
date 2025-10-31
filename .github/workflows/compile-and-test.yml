@@ -133,8 +133,10 @@ jobs:
             **/node_modules/node-hid/build
             **/node_modules/serialport/build
             **/node_modules/usb/build
-          key: node-deps-${{ runner.os }}-node18-${{ hashFiles('**/package-lock.json', '**/package.json') }}
+            node_modules/electron/dist
+          key: node-deps-${{ runner.os }}-node18-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
           restore-keys: |
+            node-deps-${{ runner.os }}-node18-electron-
             node-deps-${{ runner.os }}-node18-
 
       - name: Install project dependencies
@@ -144,7 +146,6 @@ jobs:
           npm ci --prefer-offline --no-audit --no-fund
         shell: powershell
         env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
       - name: Install dependencies (cache hit - verify only)
@@ -154,6 +155,14 @@ jobs:
           echo "Verifying node_modules..."
           if (Test-Path "node_modules") {
             echo "✅ node_modules directory exists"
+          }
+
+          echo "Verifying Electron installation..."
+          if (Test-Path "node_modules/electron/dist/electron.exe") {
+            echo "✅ Electron binary found"
+          } else {
+            echo "⚠️ Electron binary not found, installing..."
+            npm install electron --no-save
           }
         shell: powershell
 
@@ -178,6 +187,26 @@ jobs:
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
+      - name: Verify Electron is installed before build
+        run: |
+          echo "Checking Electron installation..."
+          if (Test-Path "node_modules/electron/dist/electron.exe") {
+            echo "✅ Electron binary found at: node_modules/electron/dist/electron.exe"
+            $electronVersion = & node -e "console.log(require('electron/package.json').version)"
+            echo "Electron version: $electronVersion"
+          } else {
+            echo "❌ ERROR: Electron binary not found!"
+            echo "Installing Electron now..."
+            npm install electron --no-save
+            if (Test-Path "node_modules/electron/dist/electron.exe") {
+              echo "✅ Electron successfully installed"
+            } else {
+              echo "❌ Failed to install Electron"
+              exit 1
+            }
+          }
+        shell: powershell
+
       # Cache Vite build outputs to speed up subsequent builds
       - name: Cache Vite build outputs
         uses: actions/cache@v4
@@ -197,34 +226,6 @@ jobs:
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
           NODE_ENV: production
-
-      - name: Verify build artifacts
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "Build Artifacts Summary"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-          if (Test-Path "dist") {
-            Get-ChildItem -Path "dist" -Recurse | ForEach-Object {
-              $size = if ($_.PSIsContainer) { "DIR" } else { "{0:N2} MB" -f ($_.Length / 1MB) }
-              $type = if ($_.Extension -match '\.(exe|nupkg|yml)$') { "✅ RELEASE" } else { "📦 BUILD" }
-              Write-Host "$type $($_.Name) - $size"
-            }
-            
-            echo ""
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "Expected Release Artifacts:"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "• NSIS Installers (x64, ia32)"
-            echo "• Squirrel Packages (x64, ia32)"
-            echo "• RELEASES files (for Squirrel)"
-            echo "• latest.yml (for electron-updater)"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          } else {
-            echo "❌ ERROR: dist folder not found!"
-            exit 1
-          }
-        shell: powershell
 
       - name: Verify build output and hardware modules
         run: |
@@ -309,16 +310,11 @@ jobs:
 
       - uses: actions/attest-build-provenance@v3
         with:
-          subject-path: "dist/*.exe, dist/*.nupkg, dist/RELEASES*, dist/latest*.yml"
+          subject-path: "dist/auraswift-*, dist/latest*.yml"
 
-      - name: Upload compiled app artifacts
+      - name: Upload compiled app
         uses: actions/upload-artifact@v4
         with:
           name: windows-${{inputs.distribution-channel}}
-          path: |
-            dist/*.exe
-            dist/*.nupkg
-            dist/RELEASES*
-            dist/latest*.yml
-            dist/builder-*.yml
+          path: dist
           retention-days: 7 # Reduce artifact retention to save storage costs
