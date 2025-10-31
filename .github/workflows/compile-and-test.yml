@@ -151,17 +151,17 @@ jobs:
       - name: Install dependencies (cache hit - verify only)
         if: steps.cache-deps.outputs.cache-hit == 'true'
         run: |
-          echo "✅ Cache hit! Skipping npm ci"
-          echo "Verifying node_modules..."
+          Write-Host "Cache hit! Skipping npm ci"
+          Write-Host "Verifying node_modules..."
           if (Test-Path "node_modules") {
-            echo "✅ node_modules directory exists"
+            Write-Host "node_modules directory exists"
           }
 
-          echo "Verifying Electron installation..."
+          Write-Host "Verifying Electron installation..."
           if (Test-Path "node_modules/electron/dist/electron.exe") {
-            echo "✅ Electron binary found"
+            Write-Host "Electron binary found"
           } else {
-            echo "⚠️ Electron binary not found, installing..."
+            Write-Host "WARNING: Electron binary not found, installing..."
             npm install electron --no-save
           }
         shell: powershell
@@ -169,7 +169,7 @@ jobs:
       - name: Rebuild native modules (only if not cached)
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
-          echo "Rebuilding native modules..."
+          Write-Host "Rebuilding native modules..."
           npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
         shell: powershell
 
@@ -178,9 +178,9 @@ jobs:
           $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
           foreach ($module in $modules) {
             if (Test-Path "node_modules/$module/build") {
-              echo "✅ $module native build found"
+              Write-Host "SUCCESS: $module native build found"
             } else {
-              echo "❌ WARNING: $module native build not found"
+              Write-Host "WARNING: $module native build not found"
             }
           }
         shell: powershell
@@ -189,19 +189,19 @@ jobs:
 
       - name: Verify Electron is installed before build
         run: |
-          echo "Checking Electron installation..."
+          Write-Host "Checking Electron installation..."
           if (Test-Path "node_modules/electron/dist/electron.exe") {
-            echo "✅ Electron binary found at: node_modules/electron/dist/electron.exe"
+            Write-Host "Electron binary found at: node_modules/electron/dist/electron.exe"
             $electronVersion = & node -e "console.log(require('electron/package.json').version)"
-            echo "Electron version: $electronVersion"
+            Write-Host "Electron version: $electronVersion"
           } else {
-            echo "❌ ERROR: Electron binary not found!"
-            echo "Installing Electron now..."
+            Write-Host "ERROR: Electron binary not found!"
+            Write-Host "Installing Electron now..."
             npm install electron --no-save
             if (Test-Path "node_modules/electron/dist/electron.exe") {
-              echo "✅ Electron successfully installed"
+              Write-Host "Electron successfully installed"
             } else {
-              echo "❌ Failed to install Electron"
+              Write-Host "Failed to install Electron"
               exit 1
             }
           }
@@ -241,21 +241,25 @@ jobs:
       - name: Verify build output and hardware modules
         run: |
           if (Test-Path "dist") { 
-            echo "✅ Dist directory found"
-            echo ""
-            echo "📦 All files in dist:"
+            Write-Host "Dist directory found"
+            Write-Host ""
+            Write-Host "All files in dist:"
             dir dist -Recurse -Name
-            echo ""
-            echo "🔍 Searching for executables and installers:"
+            Write-Host ""
+            Write-Host "Searching for executables and installers:"
             dir dist -Recurse -Include "*.exe", "*.nupkg", "RELEASES", "*.yml"
-            echo ""
-            echo "📊 File count by type:"
-            echo "EXE files: $((dir dist -Recurse -Include "*.exe" -ErrorAction SilentlyContinue).Count)"
-            echo "NUPKG files: $((dir dist -Recurse -Include "*.nupkg" -ErrorAction SilentlyContinue).Count)"
-            echo "RELEASES files: $((dir dist -Recurse -Include "RELEASES" -ErrorAction SilentlyContinue).Count)"
-            echo "YML files: $((dir dist -Recurse -Include "*.yml" -ErrorAction SilentlyContinue).Count)"
+            Write-Host ""
+            Write-Host "File count by type:"
+            $exeCount = (dir dist -Recurse -Include "*.exe" -ErrorAction SilentlyContinue).Count
+            $nupkgCount = (dir dist -Recurse -Include "*.nupkg" -ErrorAction SilentlyContinue).Count
+            $releasesCount = (dir dist -Recurse -Include "RELEASES" -ErrorAction SilentlyContinue).Count
+            $ymlCount = (dir dist -Recurse -Include "*.yml" -ErrorAction SilentlyContinue).Count
+            Write-Host "EXE files: $exeCount"
+            Write-Host "NUPKG files: $nupkgCount"
+            Write-Host "RELEASES files: $releasesCount"
+            Write-Host "YML files: $ymlCount"
           } else { 
-            echo "ERROR: No dist directory found after build!"
+            Write-Host "ERROR: No dist directory found after build!"
             exit 1
           }
         shell: powershell
@@ -278,8 +282,8 @@ jobs:
       - name: Debug build output structure
         if: steps.check-tests.outputs.tests-exist == 'true'
         run: |
-          if (Test-Path "dist") { dir dist -Recurse } else { echo "No dist directory found" }
-          if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { echo "No executables found" }
+          if (Test-Path "dist") { dir dist -Recurse } else { Write-Host "No dist directory found" }
+          if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { Write-Host "No executables found" }
         shell: powershell
 
       - name: Pre-test hardware module verification
@@ -289,9 +293,9 @@ jobs:
           $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
           foreach ($module in $modules) {
             if (Test-Path "node_modules/$module/build") {
-              echo "✅ $module native build ready for testing"
+              Write-Host "SUCCESS: $module native build ready for testing"
             } else {
-              echo "❌ WARNING: $module native build not found"
+              Write-Host "WARNING: $module native build not found"
               $testReady = $false
             }
           }
