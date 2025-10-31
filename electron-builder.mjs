@@ -37,20 +37,23 @@ export default /** @type import('electron-builder').Configuration */
         arch: ['x64', 'ia32']
       },
       {
-        target: 'portable',
-        arch: ['x64']
+        target: 'squirrel',
+        arch: ['x64', 'ia32']
       }
     ],
-    icon: 'buildResources/icon.ico'
+    icon: 'buildResources/icon.ico',
+    publisherName: 'AuraSwift',
+    verifyUpdateCodeSignature: false  // Set to true when you have code signing certificate
   },
-  portable: {
-    // Custom artifact name for Portable to avoid collision with NSIS
-    artifactName: '${productName}-${version}-${os}-${arch}-Portable.${ext}'
+  squirrelWindows: {
+    iconUrl: 'https://raw.githubusercontent.com/Sam231221/AuraSwift/main/buildResources/icon.ico',
+    // loadingGif: 'buildResources/install-spinner.gif',  // Optional: Add custom loading animation
+    name: 'AuraSwift'
   },
   nsis: {
     oneClick: false,                    // Show installation wizard (not one-click)
-    perMachine: true,                   // Install for all users (requires admin)
-    allowElevation: true,               // Request admin rights
+    perMachine: false,                  // Install per-user for better compatibility with Squirrel
+    allowElevation: true,               // Request admin rights if needed
     allowToChangeInstallationDirectory: true,  // Let user choose install location
     createDesktopShortcut: true,        // Create desktop shortcut
     createStartMenuShortcut: true,      // Create Start Menu shortcut
@@ -60,8 +63,7 @@ export default /** @type import('electron-builder').Configuration */
     runAfterFinish: true,              // Run app after installation completes
     installerIcon: 'buildResources/icon.ico',
     uninstallerIcon: 'buildResources/icon.ico',
-    // installerHeader requires .bmp format (150x57 pixels), not .ico
-    // Removing it to use default NSIS header
+    artifactName: '${productName}-Setup-${version}-${arch}.${ext}',  // Clear naming for NSIS
     license: undefined,                 // Path to license.txt (optional)
   },
   linux: {

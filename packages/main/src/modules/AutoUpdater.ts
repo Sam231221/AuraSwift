@@ -5,6 +5,8 @@ import electronUpdater, {
   type UpdateInfo,
 } from "electron-updater";
 import { app, dialog, Notification, shell } from "electron";
+import { spawn } from "child_process";
+import { resolve, basename, join } from "path";
 
 type DownloadNotification = Parameters<
   AppUpdater["checkForUpdatesAndNotify"]
@@ -27,8 +29,69 @@ export class AutoUpdater implements AppModule {
   }
 
   async enable(): Promise<void> {
+    // Handle Squirrel.Windows events first (for auto-updates)
+    if (this.handleSquirrelEvents()) {
+      return; // If Squirrel event handled, exit early
+    }
+
     await this.runAutoUpdater();
     this.schedulePeriodicChecks();
+  }
+
+  /**
+   * Handle Squirrel.Windows installation events
+   * Returns true if a Squirrel event was handled (app should quit)
+   */
+  private handleSquirrelEvents(): boolean {
+    if (process.platform !== "win32") {
+      return false;
+    }
+
+    // Squirrel events are passed via command line arguments
+    if (process.argv.length === 1) {
+      return false;
+    }
+
+    const appFolder = resolve(process.execPath, "..");
+    const rootAtomFolder = resolve(appFolder, "..");
+    const updateExe = resolve(join(rootAtomFolder, "Update.exe"));
+    const exeName = basename(process.execPath);
+
+    const squirrelEvent = process.argv[1];
+
+    switch (squirrelEvent) {
+      case "--squirrel-install":
+      case "--squirrel-updated":
+        console.log("🔧 Squirrel: Creating shortcuts...");
+        // Create desktop and start menu shortcuts
+        spawn(updateExe, ["--createShortcut", exeName], { detached: true });
+        setTimeout(() => {
+          app.quit();
+        }, 1000);
+        return true;
+
+      case "--squirrel-uninstall":
+        console.log("🗑️ Squirrel: Removing shortcuts...");
+        // Remove desktop and start menu shortcuts
+        spawn(updateExe, ["--removeShortcut", exeName], { detached: true });
+        setTimeout(() => {
+          app.quit();
+        }, 1000);
+        return true;
+
+      case "--squirrel-obsolete":
+        console.log("🔄 Squirrel: Obsolete version, quitting...");
+        // This version is being replaced, quit immediately
+        app.quit();
+        return true;
+
+      case "--squirrel-firstrun":
+        console.log("🎉 Squirrel: First run after installation");
+        // Optional: Show welcome screen or onboarding
+        return false; // Don't quit, continue with normal startup
+    }
+
+    return false;
   }
 
   async disable(): Promise<void> {
