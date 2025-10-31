@@ -222,7 +222,9 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-          PUPPETEER_SKIP_DOWNLOAD: 1      - name: Download build artifacts
+          PUPPETEER_SKIP_DOWNLOAD: 1
+
+      - name: Download build artifacts
         uses: actions/download-artifact@v5
         with:
           name: windows-${{ inputs.distribution-channel || 'main' }}
