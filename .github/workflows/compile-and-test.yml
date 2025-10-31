@@ -223,15 +223,15 @@ jobs:
 
       - name: Build and compile Electron app (Windows only)
         run: |
-          echo "🔨 Building Electron app with NSIS + Squirrel targets..."
+          Write-Host "Building Electron app with NSIS + Squirrel targets..."
           npm run build
 
-          echo ""
-          echo "📦 Building NSIS installer..."
+          Write-Host ""
+          Write-Host "Building NSIS installer..."
           npx electron-builder --win nsis --config electron-builder.mjs --publish never
 
-          echo ""
-          echo "📦 Building Squirrel packages..."
+          Write-Host ""
+          Write-Host "Building Squirrel packages..."
           npx electron-builder --win squirrel --config electron-builder.mjs --publish never
         shell: powershell
         env:
