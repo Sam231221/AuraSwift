@@ -298,6 +298,20 @@ jobs:
           name: windows-${{ inputs.distribution-channel || 'main' }}
           path: dist
 
+      - name: List downloaded artifacts
+        run: |
+          echo "📦 Contents of dist directory:"
+          ls -lah dist/
+          echo ""
+          echo "🔍 Searching for release files:"
+          find dist -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES" -o -name "*.yml" \)
+          echo ""
+          echo "📊 File count:"
+          echo "EXE files: $(find dist -name "*.exe" | wc -l)"
+          echo "NUPKG files: $(find dist -name "*.nupkg" | wc -l)"
+          echo "RELEASES files: $(find dist -name "RELEASES" | wc -l)"
+          echo "YML files: $(find dist -name "*.yml" | wc -l)"
+
       - name: Run semantic-release
         run: npx semantic-release
         env:

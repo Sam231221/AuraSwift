@@ -222,7 +222,18 @@ jobs:
             vite-build-${{ runner.os }}-
 
       - name: Build and compile Electron app (Windows only)
-        run: npm run compile:win -- --publish never
+        run: |
+          echo "🔨 Building Electron app with NSIS + Squirrel targets..."
+          npm run build
+
+          echo ""
+          echo "📦 Building NSIS installer..."
+          npx electron-builder --win nsis --config electron-builder.mjs --publish never
+
+          echo ""
+          echo "📦 Building Squirrel packages..."
+          npx electron-builder --win squirrel --config electron-builder.mjs --publish never
+        shell: powershell
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}
           NODE_ENV: production
@@ -231,7 +242,18 @@ jobs:
         run: |
           if (Test-Path "dist") { 
             echo "✅ Dist directory found"
-            dir dist -Recurse -Include "*.exe"
+            echo ""
+            echo "📦 All files in dist:"
+            dir dist -Recurse -Name
+            echo ""
+            echo "🔍 Searching for executables and installers:"
+            dir dist -Recurse -Include "*.exe", "*.nupkg", "RELEASES", "*.yml"
+            echo ""
+            echo "📊 File count by type:"
+            echo "EXE files: $((dir dist -Recurse -Include "*.exe" -ErrorAction SilentlyContinue).Count)"
+            echo "NUPKG files: $((dir dist -Recurse -Include "*.nupkg" -ErrorAction SilentlyContinue).Count)"
+            echo "RELEASES files: $((dir dist -Recurse -Include "RELEASES" -ErrorAction SilentlyContinue).Count)"
+            echo "YML files: $((dir dist -Recurse -Include "*.yml" -ErrorAction SilentlyContinue).Count)"
           } else { 
             echo "ERROR: No dist directory found after build!"
             exit 1
