@@ -55,15 +55,15 @@
       {
         "assets": [
           {
-            "path": "dist/*Setup*.exe",
+            "path": "dist/*-win-*.exe",
             "label": "Windows NSIS Installer"
           },
           {
-            "path": "dist/*.nupkg",
+            "path": "dist/squirrel-windows/*.nupkg",
             "label": "Windows Squirrel Package (Auto-update)"
           },
           {
-            "path": "dist/RELEASES",
+            "path": "dist/squirrel-windows/RELEASES",
             "label": "Squirrel Update Manifest"
           },
           {
