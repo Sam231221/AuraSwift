@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.2](https://github.com/Sam231221/AuraSwift/compare/v1.0.1...v1.0.2) (2025-10-31)
+
+
+### Bug Fixes
+
+* **ci:** enhance build process with detailed artifact listing and improved logging ([5db1aeb](https://github.com/Sam231221/AuraSwift/commit/5db1aeb8d27b39bd71aca16a1fdcdc5c9b5c9243))
+* **ci:** improve logging messages in CI workflows for better clarity and consistency ([516f6aa](https://github.com/Sam231221/AuraSwift/commit/516f6aa188cb2e9379e31d997cd6d92fa7c01637))
+* **ci:** update build output messages to use Write-Host for better readability in PowerShell ([1ad7ba9](https://github.com/Sam231221/AuraSwift/commit/1ad7ba930e19d14e4d19aebdeb3ebd4fb71c3c0d))
+
 ## [1.0.1](https://github.com/Sam231221/AuraSwift/compare/v1.0.0...v1.0.1) (2025-10-31)
 
 
