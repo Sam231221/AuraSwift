@@ -36,7 +36,8 @@ env:
   GYP-MSVS-VERSION: 2022
 
 jobs:
-  typecheck:
+  # Combine typecheck and compile into single job to avoid duplicate npm ci
+  build-and-test:
     runs-on: windows-latest
     env:
       PYTHON: python
@@ -66,53 +67,20 @@ jobs:
           echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
         shell: powershell
 
-      - uses: ./.github/actions/init-template-with-renderer
-        name: Setup boilerplate
+      # Cache global npm packages
+      - name: Cache global npm packages
+        uses: actions/cache@v4
         with:
-          renderer-template: ${{inputs.renderer-template}}
+          path: |
+            ${{ runner.temp }}/npm-cache
+            C:\Users\runneradmin\AppData\Roaming\npm
+          key: npm-global-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-global-${{ runner.os }}-
 
-      - name: Install project dependencies
+      - name: Install and configure node-gyp/electron-rebuild globally
         run: |
-          npm ci --verbose
-        shell: powershell
-
-      - run: npm run typecheck -ws --if-present
-
-  compile:
-    runs-on: windows-latest
-    env:
-      PYTHON: python
-      MSVS-VERSION: 2022
-      GYP-MSVS-VERSION: 2022
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Setup Node.js 18 for native module compatibility
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-          cache: "npm"
-
-      - name: Setup MSBuild (Windows)
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Setup Python for node-gyp
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Show build environment summary
-        run: |
-          Write-Host "Node.js version: $(node --version)"
-          Write-Host "Python version: $(python --version)"
-          $msbuild = Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-          Write-Host "MSBuild available: $msbuild"
-        shell: pwsh
-
-      - name: Install and configure node-gyp/electron-rebuild globally (before npm ci!)
-        run: |
-          npm install --location=global node-gyp@latest
-          npm install --location=global electron-rebuild@latest
+          npm install --location=global node-gyp@latest electron-rebuild@latest
           echo "node-gyp version: $(npx node-gyp --version)"
           echo "electron-rebuild version: $(npx electron-rebuild --version)"
         shell: powershell
@@ -122,18 +90,48 @@ jobs:
         with:
           renderer-template: ${{inputs.renderer-template}}
 
-      - name: Remove node_modules
-        run: Remove-Item -Recurse -Force node_modules
-        shell: pwsh
+      # Enhanced caching for node_modules including native modules
+      - name: Cache node_modules and native builds
+        id: cache-deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            **/node_modules/better-sqlite3/build
+            **/node_modules/node-hid/build
+            **/node_modules/serialport/build
+            **/node_modules/usb/build
+          key: node-deps-${{ runner.os }}-node18-${{ hashFiles('**/package-lock.json', '**/package.json') }}
+          restore-keys: |
+            node-deps-${{ runner.os }}-node18-
 
       - name: Install project dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           npm ci --verbose
         shell: powershell
 
-      - name: Use electron-rebuild (fastest for Electron apps)
+      - name: Rebuild native modules (only if not cached)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
         shell: powershell
+
+      - name: Verify native modules are ready
+        run: |
+          $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
+          foreach ($module in $modules) {
+            if (Test-Path "node_modules/$module/build") {
+              echo "✅ $module native build found"
+            } else {
+              echo "❌ WARNING: $module native build not found"
+            }
+          }
+        shell: powershell
+
+      # Run typecheck first (fast, no build artifacts)
+      - name: Run typecheck
+        run: npm run typecheck -ws --if-present
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
@@ -154,19 +152,30 @@ jobs:
           }
         shell: powershell
 
+      # Only install Playwright if tests exist (conditional)
+      - name: Check if tests exist
+        id: check-tests
+        run: |
+          if (Test-Path "tests") {
+            echo "tests-exist=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "tests-exist=false" >> $env:GITHUB_OUTPUT
+          }
+        shell: powershell
+
       - name: Install Playwright
+        if: steps.check-tests.outputs.tests-exist == 'true'
         run: npx playwright install --with-deps
-        if: hashFiles('tests/**') != ''
 
       - name: Debug build output structure
-        if: hashFiles('tests/**') != ''
+        if: steps.check-tests.outputs.tests-exist == 'true'
         run: |
           if (Test-Path "dist") { dir dist -Recurse } else { echo "No dist directory found" }
           if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { echo "No executables found" }
         shell: powershell
 
       - name: Pre-test hardware module verification
-        if: hashFiles('tests/**') != ''
+        if: steps.check-tests.outputs.tests-exist == 'true'
         run: |
           $testReady = $true
           $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
@@ -182,7 +191,7 @@ jobs:
 
       - name: Run main E2E tests
         run: npm run test:all --if-present
-        if: hashFiles('tests/**') != ''
+        if: steps.check-tests.outputs.tests-exist == 'true'
         env:
           CI: true
           NODE_ENV: test
@@ -200,7 +209,7 @@ jobs:
 
       - name: Run hardware integration tests
         run: npx playwright test ./tests/hardware-integration.spec.ts
-        if: hashFiles('tests/hardware-integration.spec.ts') != ''
+        if: steps.check-tests.outputs.tests-exist == 'true'
         env:
           CI: true
           NODE_ENV: test
@@ -222,3 +231,4 @@ jobs:
         with:
           name: windows-${{inputs.distribution-channel}}
           path: dist
+          retention-days: 7 # Reduce artifact retention to save storage costs

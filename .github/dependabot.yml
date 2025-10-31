@@ -4,11 +4,50 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly" # Changed from weekly to monthly
+    # Group all action updates together to reduce PR noise
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
   # Maintain dependencies for npm
   - package-ecosystem: "npm"
     versioning-strategy: increase
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly" # Changed from daily to weekly to reduce noise
+      day: "monday"
+      time: "09:00"
+    # Ignore dev dependencies that change frequently but aren't critical
+    ignore:
+      - dependency-name: "@types/*"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "eslint*"
+        update-types: ["version-update:semver-patch"]
+      - dependency-name: "prettier"
+        update-types: ["version-update:semver-patch"]
+    # Group updates to reduce PR count
+    groups:
+      # Group all Radix UI dependencies together
+      radix-ui:
+        patterns:
+          - "@radix-ui/*"
+      # Group all semantic-release dependencies
+      semantic-release:
+        patterns:
+          - "semantic-release*"
+          - "@semantic-release/*"
+      # Group all Electron dependencies
+      electron:
+        patterns:
+          - "electron*"
+          - "@electron/*"
+      # Group all dev dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "patch"
+          - "minor"
+    # Limit open PR count
+    open-pull-requests-limit: 5
