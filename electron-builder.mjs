@@ -42,7 +42,6 @@ export default /** @type import('electron-builder').Configuration */
       }
     ],
     icon: 'buildResources/icon.ico',
-    publisherName: 'AuraSwift',
     verifyUpdateCodeSignature: false  // Set to true when you have code signing certificate
   },
   squirrelWindows: {
