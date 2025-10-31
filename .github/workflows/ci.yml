@@ -125,6 +125,20 @@ jobs:
             # For main branch, check semantic-release
             echo "🔍 Running semantic-release dry-run to check for releasable commits..."
             
+            # First, manually check commits for debugging
+            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            echo "📌 Last tag: ${LAST_TAG:-none}"
+            if [ -n "$LAST_TAG" ]; then
+              echo "📝 Commits since ${LAST_TAG}:"
+              git log --pretty=format:"  - %s" ${LAST_TAG}..HEAD | head -20
+              
+              # Count releasable commits
+              FIX_COUNT=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD | grep -cE "^fix(\(.*\))?:" || echo "0")
+              FEAT_COUNT=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD | grep -cE "^feat(\(.*\))?:" || echo "0")
+              echo "🐛 fix commits: $FIX_COUNT"
+              echo "✨ feat commits: $FEAT_COUNT"
+            fi
+            
             # Run semantic-release and capture both stdout and stderr
             OUTPUT=$(npx semantic-release --dry-run --no-ci 2>&1 || true)
             
@@ -168,15 +182,36 @@ jobs:
                   COMMITS=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD)
                 fi
                 
-                # Check for feat or fix commits
-                if echo "$COMMITS" | grep -qE "^(feat|fix|perf|refactor|build)(\(.*\))?:"; then
+                echo "🔍 Checking commits for releasable types..."
+                echo "$COMMITS" | head -10
+                
+                # Count releasable commit types (with or without scope)
+                FIX_COUNT=$(echo "$COMMITS" | grep -cE "^fix(\([^)]*\))?:" || echo "0")
+                FEAT_COUNT=$(echo "$COMMITS" | grep -cE "^feat(\([^)]*\))?:" || echo "0")
+                PERF_COUNT=$(echo "$COMMITS" | grep -cE "^perf(\([^)]*\))?:" || echo "0")
+                REFACTOR_COUNT=$(echo "$COMMITS" | grep -cE "^refactor(\([^)]*\))?:" || echo "0")
+                BUILD_COUNT=$(echo "$COMMITS" | grep -cE "^build(\([^)]*\))?:" || echo "0")
+                
+                echo "📊 Releasable commits found:"
+                echo "  - fix: $FIX_COUNT"
+                echo "  - feat: $FEAT_COUNT"
+                echo "  - perf: $PERF_COUNT"
+                echo "  - refactor: $REFACTOR_COUNT"
+                echo "  - build: $BUILD_COUNT"
+                
+                # Check if we have any releasable commits
+                TOTAL_RELEASABLE=$((FIX_COUNT + FEAT_COUNT + PERF_COUNT + REFACTOR_COUNT + BUILD_COUNT))
+                
+                if [ "$TOTAL_RELEASABLE" -gt 0 ]; then
                   # Calculate next version
-                  if echo "$COMMITS" | grep -qE "^feat(\(.*\))?:"; then
+                  if [ "$FEAT_COUNT" -gt 0 ]; then
                     # Minor bump for feat
                     NEXT_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{$2=$2+1; $3=0; print $1"."$2"."$3}')
+                    echo "⬆️ MINOR bump (feat commits found)"
                   else
                     # Patch bump for fix/perf/refactor/build
                     NEXT_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{$3=$3+1; print $1"."$2"."$3}')
+                    echo "⬆️ PATCH bump (fix/perf/refactor/build commits found)"
                   fi
                   
                   echo "APP_VERSION=$NEXT_VERSION" >> $GITHUB_OUTPUT
@@ -188,6 +223,7 @@ jobs:
                   echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
                   echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
                   echo "ℹ️ No releasable commits since last tag"
+                  echo "📝 Found only: docs, chore, ci, test, or style commits"
                 fi
               fi
             else
