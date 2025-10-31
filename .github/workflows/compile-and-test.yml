@@ -91,13 +91,6 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Show build environment summary
-        run: |
-          echo "Node.js version: $(node --version)"
-          echo "Python version: $(python --version)"
-          echo "MSBuild available: $(Get-Command msbuild -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)"
-        shell: powershell
-
       # Cache global npm packages
       - name: Cache global npm packages
         uses: actions/cache@v4
@@ -110,10 +103,7 @@ jobs:
             npm-global-${{ runner.os }}-
 
       - name: Install and configure node-gyp/electron-rebuild globally
-        run: |
-          npm install --location=global node-gyp@latest electron-rebuild@latest
-          echo "node-gyp version: $(npx node-gyp --version)"
-          echo "electron-rebuild version: $(npx electron-rebuild --version)"
+        run: npm install --location=global node-gyp@latest electron-rebuild@latest
         shell: powershell
 
       - uses: ./.github/actions/init-template-with-renderer
@@ -141,9 +131,7 @@ jobs:
 
       - name: Install project dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: |
-          echo "Cache miss - installing dependencies..."
-          npm ci --prefer-offline --no-audit --no-fund
+        run: npm ci --prefer-offline --no-audit --no-fund
         shell: powershell
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
@@ -151,57 +139,23 @@ jobs:
       - name: Install dependencies (cache hit - verify only)
         if: steps.cache-deps.outputs.cache-hit == 'true'
         run: |
-          Write-Host "Cache hit! Skipping npm ci"
-          Write-Host "Verifying node_modules..."
-          if (Test-Path "node_modules") {
-            Write-Host "node_modules directory exists"
-          }
-
-          Write-Host "Verifying Electron installation..."
-          if (Test-Path "node_modules/electron/dist/electron.exe") {
-            Write-Host "Electron binary found"
-          } else {
-            Write-Host "WARNING: Electron binary not found, installing..."
+          if (!(Test-Path "node_modules/electron/dist/electron.exe")) {
             npm install electron --no-save
           }
         shell: powershell
 
       - name: Rebuild native modules (only if not cached)
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: |
-          Write-Host "Rebuilding native modules..."
-          npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
-        shell: powershell
-
-      - name: Verify native modules are ready
-        run: |
-          $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
-          foreach ($module in $modules) {
-            if (Test-Path "node_modules/$module/build") {
-              Write-Host "SUCCESS: $module native build found"
-            } else {
-              Write-Host "WARNING: $module native build not found"
-            }
-          }
+        run: npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
         shell: powershell
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
       - name: Verify Electron is installed before build
         run: |
-          Write-Host "Checking Electron installation..."
-          if (Test-Path "node_modules/electron/dist/electron.exe") {
-            Write-Host "Electron binary found at: node_modules/electron/dist/electron.exe"
-            $electronVersion = & node -e "console.log(require('electron/package.json').version)"
-            Write-Host "Electron version: $electronVersion"
-          } else {
-            Write-Host "ERROR: Electron binary not found!"
-            Write-Host "Installing Electron now..."
+          if (!(Test-Path "node_modules/electron/dist/electron.exe")) {
             npm install electron --no-save
-            if (Test-Path "node_modules/electron/dist/electron.exe") {
-              Write-Host "Electron successfully installed"
-            } else {
-              Write-Host "Failed to install Electron"
+            if (!(Test-Path "node_modules/electron/dist/electron.exe")) {
               exit 1
             }
           }
@@ -225,14 +179,48 @@ jobs:
         run: |
           Write-Host "Building Electron app with NSIS + Squirrel targets..."
           npm run build
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: npm build failed"
+            exit 1
+          }
 
           Write-Host ""
           Write-Host "Building NSIS installer..."
           npx electron-builder --win nsis --config electron-builder.mjs --publish never
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: NSIS build failed"
+            exit 1
+          }
 
           Write-Host ""
           Write-Host "Building Squirrel packages..."
           npx electron-builder --win squirrel --config electron-builder.mjs --publish never
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: Squirrel build failed"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "Verifying all build artifacts were created..."
+          $errors = @()
+
+          if (-not (Test-Path "dist/*Setup*.exe")) { $errors += "NSIS installer (Setup.exe)" }
+          if (-not (Test-Path "dist/*.nupkg")) { $errors += "Squirrel package (.nupkg)" }
+          if (-not (Test-Path "dist/RELEASES")) { $errors += "RELEASES file" }
+          if (-not (Test-Path "dist/latest*.yml")) { $errors += "latest.yml file" }
+
+          if ($errors.Count -gt 0) {
+            Write-Host "ERROR: Missing build artifacts:"
+            $errors | ForEach-Object { Write-Host "  - $_" }
+            Write-Host ""
+            Write-Host "Files in dist folder:"
+            if (Test-Path "dist") {
+              Get-ChildItem -Path dist -Recurse -File | ForEach-Object { Write-Host "  $($_.FullName)" }
+            }
+            exit 1
+          }
+
+          Write-Host "SUCCESS: All required build artifacts created"
         shell: powershell
         env:
           VITE_DISTRIBUTION_CHANNEL: ${{inputs.distribution-channel}}

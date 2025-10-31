@@ -78,8 +78,6 @@ jobs:
 
       - name: Install semantic-release dependencies
         run: |
-          # Install semantic-release and its plugins
-          # Use --no-save to avoid modifying package.json, but don't skip if cached
           npm install --ignore-scripts --no-optional \
             semantic-release \
             @semantic-release/changelog \
@@ -87,10 +85,6 @@ jobs:
             @semantic-release/github \
             @semantic-release/commit-analyzer \
             @semantic-release/release-notes-generator
-
-          # Verify installation
-          echo "Semantic-release installed at: $(which npx)"
-          npx semantic-release --version
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
@@ -111,36 +105,15 @@ jobs:
             echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
             echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
             echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
-            echo "INFO: PR/branch build - version: $CURRENT_VERSION"
           else
             # For main branch, check semantic-release
-            echo "Running semantic-release dry-run to check for releasable commits..."
-            
-            # First, manually check commits for debugging
             LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-            echo "Last tag: ${LAST_TAG:-none}"
-            if [ -n "$LAST_TAG" ]; then
-              echo "Commits since ${LAST_TAG}:"
-              git log --pretty=format:"  - %s" ${LAST_TAG}..HEAD | head -20
-              
-              # Count releasable commits
-              FIX_COUNT=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD | grep -cE "^fix(\(.*\))?:" || echo "0")
-              FEAT_COUNT=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD | grep -cE "^feat(\(.*\))?:" || echo "0")
-              echo "fix commits: $FIX_COUNT"
-              echo "feat commits: $FEAT_COUNT"
-            fi
             
             # Run semantic-release and capture both stdout and stderr
             OUTPUT=$(npx semantic-release --dry-run --no-ci 2>&1 || true)
             
-            # Show full output for debugging
-            echo "========== SEMANTIC-RELEASE OUTPUT =========="
-            echo "$OUTPUT"
-            echo "============================================="
-            
             # Check if semantic-release actually ran (not "not found")
             if echo "$OUTPUT" | grep -q "semantic-release: not found"; then
-              echo "WARNING: semantic-release binary not found, using manual detection"
               SEMANTIC_RELEASE_FAILED=true
             else
               SEMANTIC_RELEASE_FAILED=false
@@ -165,14 +138,12 @@ jobs:
                 echo "APP_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
                 echo "APP_FULL_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
                 echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
-                echo "SUCCESS: New release will be created: v$NEW_VERSION"
               fi
             fi
             
             # If we still don't have a version or semantic-release failed, use manual detection
             if [ -z "$NEW_VERSION" ] || [ "$SEMANTIC_RELEASE_FAILED" = "true" ]; then
               CURRENT_VERSION=$(jq -r .version package.json)
-              echo "Using manual version bump calculation..."
               
               # Get commits since last tag
               LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -182,22 +153,12 @@ jobs:
                 COMMITS=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD)
               fi
               
-              echo "Checking commits for releasable types..."
-              echo "$COMMITS" | head -10
-              
               # Count releasable commit types (with or without scope)
               FIX_COUNT=$(echo "$COMMITS" | grep -cE "^fix(\([^)]*\))?:" || echo "0")
               FEAT_COUNT=$(echo "$COMMITS" | grep -cE "^feat(\([^)]*\))?:" || echo "0")
               PERF_COUNT=$(echo "$COMMITS" | grep -cE "^perf(\([^)]*\))?:" || echo "0")
               REFACTOR_COUNT=$(echo "$COMMITS" | grep -cE "^refactor(\([^)]*\))?:" || echo "0")
               BUILD_COUNT=$(echo "$COMMITS" | grep -cE "^build(\([^)]*\))?:" || echo "0")
-              
-              echo "Releasable commits found:"
-              echo "  - fix: $FIX_COUNT"
-              echo "  - feat: $FEAT_COUNT"
-              echo "  - perf: $PERF_COUNT"
-              echo "  - refactor: $REFACTOR_COUNT"
-              echo "  - build: $BUILD_COUNT"
               
               # Check if we have any releasable commits
               TOTAL_RELEASABLE=$((FIX_COUNT + FEAT_COUNT + PERF_COUNT + REFACTOR_COUNT + BUILD_COUNT))
@@ -207,23 +168,18 @@ jobs:
                 if [ "$FEAT_COUNT" -gt 0 ]; then
                   # Minor bump for feat
                   NEXT_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{$2=$2+1; $3=0; print $1"."$2"."$3}')
-                  echo "MINOR bump (feat commits found)"
                 else
                   # Patch bump for fix/perf/refactor/build
                   NEXT_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{$3=$3+1; print $1"."$2"."$3}')
-                  echo "PATCH bump (fix/perf/refactor/build commits found)"
                 fi
                 
                 echo "APP_VERSION=$NEXT_VERSION" >> $GITHUB_OUTPUT
                 echo "APP_FULL_VERSION=$NEXT_VERSION" >> $GITHUB_OUTPUT
                 echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
-                echo "SUCCESS: Calculated next version (manual): v$NEXT_VERSION"
               else
                 echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
                 echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
                 echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
-                echo "INFO: No releasable commits since last tag"
-                echo "Found only: docs, chore, ci, test, or style commits"
               fi
             fi
           fi
@@ -297,20 +253,6 @@ jobs:
         with:
           name: windows-${{ inputs.distribution-channel || 'main' }}
           path: dist
-
-      - name: List downloaded artifacts
-        run: |
-          echo "📦 Contents of dist directory:"
-          ls -lah dist/
-          echo ""
-          echo "🔍 Searching for release files:"
-          find dist -type f \( -name "*.exe" -o -name "*.nupkg" -o -name "RELEASES" -o -name "*.yml" \)
-          echo ""
-          echo "📊 File count:"
-          echo "EXE files: $(find dist -name "*.exe" | wc -l)"
-          echo "NUPKG files: $(find dist -name "*.nupkg" | wc -l)"
-          echo "RELEASES files: $(find dist -name "RELEASES" | wc -l)"
-          echo "YML files: $(find dist -name "*.yml" | wc -l)"
 
       - name: Run semantic-release
         run: npx semantic-release
