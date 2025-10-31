@@ -36,7 +36,38 @@ env:
   GYP-MSVS-VERSION: 2022
 
 jobs:
-  # Combine typecheck and compile into single job to avoid duplicate npm ci
+  # Quick typecheck job - runs in parallel with build
+  typecheck:
+    runs-on: ubuntu-latest # Use faster/cheaper Linux for typecheck
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Cache node_modules for typecheck
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: typecheck-deps-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            typecheck-deps-${{ runner.os }}-
+
+      - name: Install dependencies (lightweight, no native builds needed)
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Run typecheck
+        run: npm run typecheck -ws --if-present
+
+  # Build and test job - Windows for native modules and building
   build-and-test:
     runs-on: windows-latest
     env:
@@ -109,12 +140,28 @@ jobs:
       - name: Install project dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
-          npm ci --verbose
+          echo "Cache miss - installing dependencies..."
+          npm ci --prefer-offline --no-audit --no-fund
+        shell: powershell
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Install dependencies (cache hit - verify only)
+        if: steps.cache-deps.outputs.cache-hit == 'true'
+        run: |
+          echo "✅ Cache hit! Skipping npm ci"
+          echo "Verifying node_modules..."
+          if (Test-Path "node_modules") {
+            echo "✅ node_modules directory exists"
+          }
         shell: powershell
 
       - name: Rebuild native modules (only if not cached)
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
+        run: |
+          echo "Rebuilding native modules..."
+          npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
         shell: powershell
 
       - name: Verify native modules are ready
@@ -129,11 +176,21 @@ jobs:
           }
         shell: powershell
 
-      # Run typecheck first (fast, no build artifacts)
-      - name: Run typecheck
-        run: npm run typecheck -ws --if-present
-
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
+
+      # Cache Vite build outputs to speed up subsequent builds
+      - name: Cache Vite build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/renderer/dist
+            packages/main/dist
+            packages/preload/dist
+            packages/renderer/node_modules/.vite
+            packages/main/node_modules/.vite
+          key: vite-build-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/tsconfig.json', 'packages/*/vite.config.*') }}
+          restore-keys: |
+            vite-build-${{ runner.os }}-
 
       - name: Build and compile Electron app (Windows only)
         run: npm run compile:win -- --publish never

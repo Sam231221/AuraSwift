@@ -210,38 +210,19 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Reuse cached semantic-release dependencies
-      - name: Restore semantic-release dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules/semantic-release
-            node_modules/@semantic-release
-            node_modules/.cache
-          key: semantic-release-${{ runner.os }}-${{ hashFiles('package.json') }}
-          restore-keys: |
-            semantic-release-${{ runner.os }}-
-
-      - name: Install semantic-release dependencies only (if not cached)
+      - name: Install semantic-release dependencies only
         run: |
-          # Only install if not already cached
-          if [ ! -d "node_modules/semantic-release" ]; then
-            npm install --ignore-scripts --no-optional --no-save \
-              semantic-release \
-              @semantic-release/changelog \
-              @semantic-release/git \
-              @semantic-release/github \
-              @semantic-release/commit-analyzer \
-              @semantic-release/release-notes-generator
-          else
-            echo "Using cached semantic-release dependencies"
-          fi
+          npm install --ignore-scripts --no-optional --no-save \
+            semantic-release \
+            @semantic-release/changelog \
+            @semantic-release/git \
+            @semantic-release/github \
+            @semantic-release/commit-analyzer \
+            @semantic-release/release-notes-generator
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-          PUPPETEER_SKIP_DOWNLOAD: 1
-
-      - name: Download build artifacts
+          PUPPETEER_SKIP_DOWNLOAD: 1      - name: Download build artifacts
         uses: actions/download-artifact@v5
         with:
           name: windows-${{ inputs.distribution-channel || 'main' }}
