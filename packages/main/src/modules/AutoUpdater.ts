@@ -5,8 +5,6 @@ import electronUpdater, {
   type UpdateInfo,
 } from "electron-updater";
 import { app, dialog, Notification, shell } from "electron";
-import { spawn } from "child_process";
-import { resolve, basename, join } from "path";
 
 type DownloadNotification = Parameters<
   AppUpdater["checkForUpdatesAndNotify"]
@@ -29,69 +27,14 @@ export class AutoUpdater implements AppModule {
   }
 
   async enable(): Promise<void> {
-    // Handle Squirrel.Windows events first (for auto-updates)
-    if (this.handleSquirrelEvents()) {
-      return; // If Squirrel event handled, exit early
+    // Handle Squirrel events FIRST (Windows only)
+    // This must run before any other app logic
+    if (await this.handleSquirrelEvents()) {
+      return; // Exit if Squirrel event was handled
     }
 
     await this.runAutoUpdater();
     this.schedulePeriodicChecks();
-  }
-
-  /**
-   * Handle Squirrel.Windows installation events
-   * Returns true if a Squirrel event was handled (app should quit)
-   */
-  private handleSquirrelEvents(): boolean {
-    if (process.platform !== "win32") {
-      return false;
-    }
-
-    // Squirrel events are passed via command line arguments
-    if (process.argv.length === 1) {
-      return false;
-    }
-
-    const appFolder = resolve(process.execPath, "..");
-    const rootAtomFolder = resolve(appFolder, "..");
-    const updateExe = resolve(join(rootAtomFolder, "Update.exe"));
-    const exeName = basename(process.execPath);
-
-    const squirrelEvent = process.argv[1];
-
-    switch (squirrelEvent) {
-      case "--squirrel-install":
-      case "--squirrel-updated":
-        console.log("🔧 Squirrel: Creating shortcuts...");
-        // Create desktop and start menu shortcuts
-        spawn(updateExe, ["--createShortcut", exeName], { detached: true });
-        setTimeout(() => {
-          app.quit();
-        }, 1000);
-        return true;
-
-      case "--squirrel-uninstall":
-        console.log("🗑️ Squirrel: Removing shortcuts...");
-        // Remove desktop and start menu shortcuts
-        spawn(updateExe, ["--removeShortcut", exeName], { detached: true });
-        setTimeout(() => {
-          app.quit();
-        }, 1000);
-        return true;
-
-      case "--squirrel-obsolete":
-        console.log("🔄 Squirrel: Obsolete version, quitting...");
-        // This version is being replaced, quit immediately
-        app.quit();
-        return true;
-
-      case "--squirrel-firstrun":
-        console.log("🎉 Squirrel: First run after installation");
-        // Optional: Show welcome screen or onboarding
-        return false; // Don't quit, continue with normal startup
-    }
-
-    return false;
   }
 
   async disable(): Promise<void> {
@@ -99,6 +42,100 @@ export class AutoUpdater implements AppModule {
       clearInterval(this.#updateCheckInterval);
       this.#updateCheckInterval = null;
       console.log("⏹️ Stopped periodic update checks");
+    }
+  }
+
+  /**
+   * Handle Squirrel.Windows installation events
+   * Must be called at app startup before any other logic
+   * Returns true if a Squirrel event was handled (app should quit)
+   */
+  private async handleSquirrelEvents(): Promise<boolean> {
+    // Only handle on Windows
+    if (process.platform !== "win32") {
+      return false;
+    }
+
+    // Check if running from Squirrel installer
+    const squirrelCommand = process.argv[1];
+    if (!squirrelCommand || !squirrelCommand.startsWith("--squirrel")) {
+      return false;
+    }
+
+    console.log("🔧 Handling Squirrel event:", squirrelCommand);
+
+    // Dynamically import modules to avoid loading them unnecessarily
+    const { spawn } = await import("node:child_process");
+    const path = await import("node:path");
+
+    // Get paths for Update.exe
+    const appFolder = path.dirname(process.execPath);
+    const rootFolder = path.resolve(appFolder, "..");
+    const updateExe = path.resolve(rootFolder, "Update.exe");
+    const exeName = path.basename(process.execPath);
+
+    // Helper to spawn Update.exe commands
+    const spawnUpdate = (args: string[]): Promise<void> => {
+      return new Promise<void>((resolve, reject) => {
+        try {
+          console.log(`  Running: ${updateExe} ${args.join(" ")}`);
+          const child = spawn(updateExe, args, { detached: true });
+
+          child.on("close", (code) => {
+            if (code === 0) {
+              console.log("  ✅ Squirrel command completed successfully");
+              resolve();
+            } else {
+              console.log(`  ⚠️ Squirrel command exited with code ${code}`);
+              resolve(); // Don't reject, just log
+            }
+          });
+
+          child.on("error", (error) => {
+            console.error("  ❌ Squirrel command error:", error);
+            resolve(); // Don't reject, just log
+          });
+        } catch (error) {
+          console.error("  ❌ Failed to spawn Update.exe:", error);
+          resolve(); // Don't reject, just log
+        }
+      });
+    };
+
+    try {
+      switch (squirrelCommand) {
+        case "--squirrel-install":
+          console.log("📦 Installing: Creating shortcuts...");
+          await spawnUpdate(["--createShortcut", exeName]);
+          break;
+
+        case "--squirrel-updated":
+          console.log("🔄 Updated: Creating shortcuts...");
+          await spawnUpdate(["--createShortcut", exeName]);
+          break;
+
+        case "--squirrel-uninstall":
+          console.log("🗑️ Uninstalling: Removing shortcuts...");
+          await spawnUpdate(["--removeShortcut", exeName]);
+          break;
+
+        case "--squirrel-obsolete":
+          console.log("📴 Obsolete: Old version shutting down...");
+          break;
+
+        default:
+          console.log("⚠️ Unknown Squirrel event:", squirrelCommand);
+          return false;
+      }
+
+      // All Squirrel events require the app to quit
+      console.log("👋 Quitting app after Squirrel event");
+      app.quit();
+      return true;
+    } catch (error) {
+      console.error("❌ Error handling Squirrel event:", error);
+      app.quit();
+      return true;
     }
   }
 

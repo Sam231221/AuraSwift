@@ -46,14 +46,15 @@ export default /** @type import('electron-builder').Configuration */
     verifyUpdateCodeSignature: false  // Set to true when you have code signing certificate
   },
   squirrelWindows: {
+    // iconUrl is required for Squirrel - must be a public URL
     iconUrl: 'https://raw.githubusercontent.com/Sam231221/AuraSwift/main/buildResources/icon.ico',
-    // loadingGif: 'buildResources/install-spinner.gif',  // Optional: Add custom loading animation
-    name: 'AuraSwift'
+    // Optional: Add a loading GIF during installation
+    // loadingGif: 'buildResources/install-spinner.gif'
   },
   nsis: {
     oneClick: false,                    // Show installation wizard (not one-click)
-    perMachine: false,                  // Install per-user for better compatibility with Squirrel
-    allowElevation: true,               // Request admin rights if needed
+    perMachine: true,                   // Install for all users (requires admin)
+    allowElevation: true,               // Request admin rights
     allowToChangeInstallationDirectory: true,  // Let user choose install location
     createDesktopShortcut: true,        // Create desktop shortcut
     createStartMenuShortcut: true,      // Create Start Menu shortcut
@@ -63,7 +64,8 @@ export default /** @type import('electron-builder').Configuration */
     runAfterFinish: true,              // Run app after installation completes
     installerIcon: 'buildResources/icon.ico',
     uninstallerIcon: 'buildResources/icon.ico',
-    artifactName: '${productName}-Setup-${version}-${arch}.${ext}',  // Clear naming for NSIS
+    // installerHeader requires .bmp format (150x57 pixels), not .ico
+    // Removing it to use default NSIS header
     license: undefined,                 // Path to license.txt (optional)
   },
   linux: {

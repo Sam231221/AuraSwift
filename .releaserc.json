@@ -63,7 +63,7 @@
             "label": "Windows Squirrel Package (Auto-update)"
           },
           {
-            "path": "dist/RELEASES*",
+            "path": "dist/RELEASES",
             "label": "Squirrel Update Manifest"
           },
           {
