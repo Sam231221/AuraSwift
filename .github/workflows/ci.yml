@@ -124,17 +124,29 @@ jobs:
           else
             # For main branch, check semantic-release
             echo "🔍 Running semantic-release dry-run to check for releasable commits..."
-            OUTPUT=$(npx semantic-release --dry-run 2>&1 || true)
+            
+            # Run semantic-release and capture both stdout and stderr
+            OUTPUT=$(npx semantic-release --dry-run --no-ci 2>&1 || true)
             
             # Show full output for debugging
             echo "========== SEMANTIC-RELEASE OUTPUT =========="
             echo "$OUTPUT"
             echo "============================================="
             
-            # Try multiple patterns to detect new version
-            if echo "$OUTPUT" | grep -qE "(The next release version is|Published release)"; then
-              # Extract version number
-              NEW_VERSION=$(echo "$OUTPUT" | grep -oP "(The next release version is|Published release) \K[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+            # Check if there will be a release (look for common success indicators)
+            if echo "$OUTPUT" | grep -qiE "(next release version|published release|creating tag|analysis of .* commits complete)"; then
+              # Try multiple extraction patterns (semantic-release output varies by version)
+              NEW_VERSION=$(echo "$OUTPUT" | grep -oP "(?:The next release version is|Published release|Creating tag) \K[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+              
+              # If direct extraction fails, try alternative patterns
+              if [ -z "$NEW_VERSION" ]; then
+                NEW_VERSION=$(echo "$OUTPUT" | grep -oP "version \K[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+              fi
+              
+              # If still no version, try JSON output pattern
+              if [ -z "$NEW_VERSION" ]; then
+                NEW_VERSION=$(echo "$OUTPUT" | grep -oP '"nextRelease".*?"version":\s*"\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+              fi
               
               if [ -n "$NEW_VERSION" ]; then
                 echo "APP_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -142,12 +154,41 @@ jobs:
                 echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
                 echo "✅ New release will be created: v$NEW_VERSION"
               else
-                # Fallback if version extraction fails
+                # Check if semantic-release found commits but couldn't determine version
                 CURRENT_VERSION=$(jq -r .version package.json)
-                echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-                echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
-                echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
-                echo "⚠️ Could not extract version from semantic-release output"
+                
+                # Manually determine next version based on commits
+                echo "⚙️ Attempting manual version bump calculation..."
+                
+                # Get commits since last tag
+                LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+                if [ -z "$LAST_TAG" ]; then
+                  COMMITS=$(git log --pretty=format:"%s" HEAD)
+                else
+                  COMMITS=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD)
+                fi
+                
+                # Check for feat or fix commits
+                if echo "$COMMITS" | grep -qE "^(feat|fix|perf|refactor|build)(\(.*\))?:"; then
+                  # Calculate next version
+                  if echo "$COMMITS" | grep -qE "^feat(\(.*\))?:"; then
+                    # Minor bump for feat
+                    NEXT_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{$2=$2+1; $3=0; print $1"."$2"."$3}')
+                  else
+                    # Patch bump for fix/perf/refactor/build
+                    NEXT_VERSION=$(echo "$CURRENT_VERSION" | awk -F. '{$3=$3+1; print $1"."$2"."$3}')
+                  fi
+                  
+                  echo "APP_VERSION=$NEXT_VERSION" >> $GITHUB_OUTPUT
+                  echo "APP_FULL_VERSION=$NEXT_VERSION" >> $GITHUB_OUTPUT
+                  echo "SHOULD_RELEASE=true" >> $GITHUB_OUTPUT
+                  echo "✅ Calculated next version (manual): v$NEXT_VERSION"
+                else
+                  echo "APP_VERSION=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+                  echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
+                  echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
+                  echo "ℹ️ No releasable commits since last tag"
+                fi
               fi
             else
               CURRENT_VERSION=$(jq -r .version package.json)
@@ -155,7 +196,7 @@ jobs:
               echo "APP_FULL_VERSION=$CURRENT_VERSION-${{ inputs.distribution-channel || 'main' }}.${TIMESTAMP}" >> $GITHUB_OUTPUT
               echo "SHOULD_RELEASE=false" >> $GITHUB_OUTPUT
               echo "ℹ️ No releasable commits found"
-              echo "📝 Commits since last release must use: feat:, fix:, perf:, refactor:"
+              echo "📝 Commits since last release must use: feat:, fix:, perf:, refactor:, build:"
               echo "📝 Current commits are likely: docs:, chore:, ci:, test: (non-releasable)"
             fi
           fi

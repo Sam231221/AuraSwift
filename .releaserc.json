@@ -55,24 +55,20 @@
       {
         "assets": [
           {
-            "path": "dist/*-win-x64.exe",
-            "label": "Windows Installer (64-bit NSIS)"
+            "path": "dist/*Setup*.exe",
+            "label": "Windows NSIS Installer"
           },
           {
-            "path": "dist/*-win-ia32.exe",
-            "label": "Windows Installer (32-bit NSIS)"
+            "path": "dist/*.nupkg",
+            "label": "Windows Squirrel Package (Auto-update)"
           },
           {
-            "path": "dist/*-Portable.exe",
-            "label": "Windows Portable (64-bit - No Installation Required)"
-          },
-          {
-            "path": "dist/*.exe.blockmap",
-            "label": "Update Delta File"
+            "path": "dist/RELEASES*",
+            "label": "Squirrel Update Manifest"
           },
           {
             "path": "dist/latest*.yml",
-            "label": "Auto-updater Manifest"
+            "label": "Auto-updater Configuration"
           }
         ],
         "successComment": false,
