@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.3](https://github.com/Sam231221/AuraSwift/compare/v1.0.2...v1.0.3) (2025-11-01)
+
+
+### Bug Fixes
+
+* **ci:** remove deprecated debug script for semantic-release version detection ([6819f5c](https://github.com/Sam231221/AuraSwift/commit/6819f5c5a13969f9ec72f2cc65fb4379eda0c5f7))
+* **ci:** streamline semantic-release installation and enhance build artifact verification ([a9844b4](https://github.com/Sam231221/AuraSwift/commit/a9844b45fa45d2edb8d16852251467abfa04f5cf))
+* **ci:** update artifact verification checks for Windows build outputs ([9d5ae68](https://github.com/Sam231221/AuraSwift/commit/9d5ae68c714798d3ab6639f9ec17ec342e56ac26))
+* **ci:** update asset paths for Windows installers in release configuration ([4842dd5](https://github.com/Sam231221/AuraSwift/commit/4842dd555bc862769fc0fbd21dfd24cde11b6378))
+
 ## [1.0.2](https://github.com/Sam231221/AuraSwift/compare/v1.0.1...v1.0.2) (2025-10-31)
 
 
