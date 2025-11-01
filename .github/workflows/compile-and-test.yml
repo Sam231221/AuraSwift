@@ -204,10 +204,10 @@ jobs:
           Write-Host "Verifying all build artifacts were created..."
           $errors = @()
 
-          if (-not (Test-Path "dist/*Setup*.exe")) { $errors += "NSIS installer (Setup.exe)" }
-          if (-not (Test-Path "dist/*.nupkg")) { $errors += "Squirrel package (.nupkg)" }
-          if (-not (Test-Path "dist/RELEASES")) { $errors += "RELEASES file" }
-          if (-not (Test-Path "dist/latest*.yml")) { $errors += "latest.yml file" }
+          if (-not (Test-Path "dist/*-win-*.exe")) { $errors += "NSIS installer" }
+          if (-not (Test-Path "dist/squirrel-windows/*.nupkg")) { $errors += "Squirrel package" }
+          if (-not (Test-Path "dist/squirrel-windows/RELEASES")) { $errors += "RELEASES file" }
+          if (-not (Test-Path "dist/latest*.yml")) { $errors += "latest.yml" }
 
           if ($errors.Count -gt 0) {
             Write-Host "ERROR: Missing build artifacts:"
