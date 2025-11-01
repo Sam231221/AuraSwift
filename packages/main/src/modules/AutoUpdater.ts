@@ -269,7 +269,7 @@ export class AutoUpdater implements AppModule {
         type: hasReachedLimit ? "warning" : "info",
         title: isReminder ? "Update Reminder" : "Update Available",
         message: `A new version of AuraSwift is available!`,
-        detail: `Current version: ${currentVersion}\nNew version: ${newVersion}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhat's New:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${releaseNotes}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reminderText}\n\nWould you like to download this update now?\nThe download will happen in the background.`,
+        detail: `Current version: ${currentVersion}\nNew version: ${newVersion}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhat's New:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n${releaseNotes}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reminderText}\n\nWould you like to download this update now?\n(The download will happen in the background.)`,
         buttons,
         defaultId: 0,
         cancelId: buttons.length - 1,
