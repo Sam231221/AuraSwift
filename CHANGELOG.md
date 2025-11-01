@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.1.0](https://github.com/Sam231221/AuraSwift/compare/v1.0.4...v1.1.0) (2025-11-01)
+
+
+### Bug Fixes
+
+* **autoUpdater:** 🚑 update dialog detail text for clarity on background download ([438a93e](https://github.com/Sam231221/AuraSwift/commit/438a93e2e3e9eebd23b41c221fe4cad176000b25))
+
+
+### Features
+
+* **autoUpdater:**  ✨ implement reminder notifications for postponed updates ([7cb2df1](https://github.com/Sam231221/AuraSwift/commit/7cb2df1aac9e3a1ac67dc6b345da671038022b83))
+
 ## [1.0.4](https://github.com/Sam231221/AuraSwift/compare/v1.0.3...v1.0.4) (2025-11-01)
 
 
