@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup Node.js 18
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "18"
           cache: "npm"
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup Node.js 18 for native module compatibility
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "18"
           cache: "npm"
@@ -87,7 +87,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Setup Python for node-gyp
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
 
@@ -327,7 +327,7 @@ jobs:
           subject-path: "dist/auraswift-*, dist/latest*.yml"
 
       - name: Upload compiled app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: windows-${{inputs.distribution-channel}}
           path: dist
