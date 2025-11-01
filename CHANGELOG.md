@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.4](https://github.com/Sam231221/AuraSwift/compare/v1.0.3...v1.0.4) (2025-11-01)
+
+
+### Bug Fixes
+
+* **auth:** simplify button text in login form ([c791e9a](https://github.com/Sam231221/AuraSwift/commit/c791e9aa054922b1dcdbfb579219dbc842b3bf56))
+
 ## [1.0.3](https://github.com/Sam231221/AuraSwift/compare/v1.0.2...v1.0.3) (2025-11-01)
 
 
