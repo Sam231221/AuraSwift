@@ -14,6 +14,13 @@ export class AutoUpdater implements AppModule {
   readonly #logger: Logger | null;
   readonly #notification: DownloadNotification;
   #updateCheckInterval: NodeJS.Timeout | null = null;
+  #postponedUpdateInfo: UpdateInfo | null = null;
+  #remindLaterTimeout: NodeJS.Timeout | null = null;
+
+  // Configurable reminder intervals (in milliseconds)
+  readonly #REMIND_LATER_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours (best practice)
+  readonly #MAX_POSTPONE_COUNT = 3; // Maximum times user can postpone before forcing notification
+  #postponeCount = 0;
 
   constructor({
     logger = null,
@@ -42,6 +49,12 @@ export class AutoUpdater implements AppModule {
       clearInterval(this.#updateCheckInterval);
       this.#updateCheckInterval = null;
       console.log("⏹️ Stopped periodic update checks");
+    }
+
+    if (this.#remindLaterTimeout) {
+      clearTimeout(this.#remindLaterTimeout);
+      this.#remindLaterTimeout = null;
+      console.log("⏹️ Cleared reminder timeout");
     }
   }
 
@@ -155,6 +168,169 @@ export class AutoUpdater implements AppModule {
     console.log("✅ Scheduled periodic update checks (every 4 hours)");
   }
 
+  /**
+   * Schedule a reminder notification for postponed updates
+   * Implements exponential backoff with max postpone limit
+   */
+  private scheduleReminder(updateInfo: UpdateInfo): void {
+    // Clear any existing reminder timeout
+    if (this.#remindLaterTimeout) {
+      clearTimeout(this.#remindLaterTimeout);
+      this.#remindLaterTimeout = null;
+    }
+
+    // Store the update info for later reference
+    this.#postponedUpdateInfo = updateInfo;
+    this.#postponeCount++;
+
+    const hours = this.#REMIND_LATER_INTERVAL / (60 * 60 * 1000);
+    console.log(
+      `⏰ Reminder scheduled in ${hours} hours (postpone count: ${
+        this.#postponeCount
+      }/${this.#MAX_POSTPONE_COUNT})`
+    );
+
+    // Schedule the reminder
+    this.#remindLaterTimeout = setTimeout(() => {
+      this.showReminderNotification(updateInfo);
+    }, this.#REMIND_LATER_INTERVAL);
+  }
+
+  /**
+   * Show reminder notification for postponed updates
+   * Uses native notifications for less intrusive UX
+   */
+  private showReminderNotification(updateInfo: UpdateInfo): void {
+    const newVersion = updateInfo.version;
+    const hasReachedLimit = this.#postponeCount >= this.#MAX_POSTPONE_COUNT;
+
+    console.log(
+      `🔔 Showing reminder for version ${newVersion} (attempt ${
+        this.#postponeCount
+      }/${this.#MAX_POSTPONE_COUNT})`
+    );
+
+    if (Notification.isSupported()) {
+      const title = hasReachedLimit
+        ? "Important: Update Available"
+        : "Update Reminder";
+      const body = hasReachedLimit
+        ? `AuraSwift ${newVersion} is ready. Please update to continue receiving updates.`
+        : `AuraSwift ${newVersion} is available. Click to download.`;
+
+      const notification = new Notification({
+        title,
+        body,
+        urgency: hasReachedLimit ? "critical" : "normal",
+        silent: false,
+      });
+
+      notification.on("click", () => {
+        console.log("🖱️ User clicked reminder notification");
+        this.showUpdateAvailableDialog(updateInfo, true);
+      });
+
+      notification.show();
+    } else {
+      // Fallback to dialog if notifications not supported
+      this.showUpdateAvailableDialog(updateInfo, true);
+    }
+  }
+
+  /**
+   * Show update available dialog
+   * Centralized dialog logic for initial notification and reminders
+   */
+  private showUpdateAvailableDialog(
+    info: UpdateInfo,
+    isReminder: boolean = false
+  ): void {
+    const currentVersion = app.getVersion();
+    const newVersion = info.version;
+    const releaseNotes = this.formatReleaseNotes(info);
+    const hasReachedLimit = this.#postponeCount >= this.#MAX_POSTPONE_COUNT;
+
+    const buttons = hasReachedLimit
+      ? ["Download Now", "View Release Notes"] // No more "Remind Later" after limit
+      : ["Download Now", "View Release Notes", "Remind Me Later"];
+
+    const reminderText = isReminder
+      ? `\n\n⏰ This is a reminder about the available update.\n${
+          hasReachedLimit
+            ? "⚠️ You've postponed this update multiple times. Please consider updating soon."
+            : `You can postpone ${
+                this.#MAX_POSTPONE_COUNT - this.#postponeCount
+              } more time(s).`
+        }`
+      : "";
+
+    dialog
+      .showMessageBox({
+        type: hasReachedLimit ? "warning" : "info",
+        title: isReminder ? "Update Reminder" : "Update Available",
+        message: `A new version of AuraSwift is available!`,
+        detail: `Current version: ${currentVersion}\nNew version: ${newVersion}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhat's New:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${releaseNotes}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${reminderText}\n\nWould you like to download this update now?\nThe download will happen in the background.`,
+        buttons,
+        defaultId: 0,
+        cancelId: buttons.length - 1,
+        noLink: true,
+      })
+      .then((result) => {
+        if (result.response === 0) {
+          // Download Update
+          console.log("📥 User initiated download for version", newVersion);
+          this.#postponeCount = 0; // Reset postpone count
+          this.#postponedUpdateInfo = null;
+
+          const updater = this.getAutoUpdater();
+          updater.downloadUpdate();
+
+          // Show notification that download started
+          if (Notification.isSupported()) {
+            const notification = new Notification({
+              title: "Downloading Update",
+              body: `AuraSwift ${newVersion} is downloading in the background...`,
+              silent: false,
+            });
+            notification.show();
+          }
+        } else if (result.response === 1) {
+          // View Release Notes
+          console.log("👁️ Opening release notes for version", newVersion);
+          shell.openExternal(
+            `https://github.com/Sam231221/AuraSwift/releases/tag/v${newVersion}`
+          );
+
+          // Re-show dialog after viewing release notes (non-blocking)
+          setTimeout(() => {
+            this.showUpdateAvailableDialog(info, isReminder);
+          }, 1000);
+        } else if (result.response === 2 && !hasReachedLimit) {
+          // Remind Me Later (only available if limit not reached)
+          console.log(
+            `⏰ User chose to be reminded later (${this.#postponeCount}/${
+              this.#MAX_POSTPONE_COUNT
+            })`
+          );
+          this.scheduleReminder(info);
+
+          // Show confirmation notification
+          if (Notification.isSupported()) {
+            const hours = this.#REMIND_LATER_INTERVAL / (60 * 60 * 1000);
+            const notification = new Notification({
+              title: "Reminder Set",
+              body: `We'll remind you about AuraSwift ${newVersion} in ${hours} hours.`,
+              silent: true,
+            });
+            notification.show();
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Error showing update dialog:", error);
+      });
+  }
+
   getAutoUpdater(): AppUpdater {
     // Using destructuring to access autoUpdater due to the CommonJS module of 'electron-updater'.
     // It is a workaround for ESM compatibility issues, see https://github.com/electron-userland/electron-builder/issues/7976.
@@ -232,49 +408,19 @@ export class AutoUpdater implements AppModule {
     updater.on("update-available", (info: UpdateInfo) => {
       console.log("✨ Update available:", info.version);
 
-      const currentVersion = app.getVersion();
-      const newVersion = info.version;
-      const releaseNotes = this.formatReleaseNotes(info);
+      // Check if this is the same update we already postponed
+      if (
+        this.#postponedUpdateInfo &&
+        this.#postponedUpdateInfo.version === info.version
+      ) {
+        console.log(
+          "ℹ️ Update already postponed, skipping duplicate notification"
+        );
+        return;
+      }
 
-      dialog
-        .showMessageBox({
-          type: "info",
-          title: "Update Available",
-          message: `A new version of AuraSwift is available!`,
-          detail: `Current version: ${currentVersion}\nNew version: ${newVersion}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhat's New:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${releaseNotes}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nWould you like to download this update now?\nThe download will happen in the background.`,
-          buttons: ["Download Now", "View Release Notes", "Remind Me Later"],
-          defaultId: 0,
-          cancelId: 2,
-          noLink: true,
-        })
-        .then((result) => {
-          if (result.response === 0) {
-            // Download Update
-            console.log("📥 User initiated download for version", newVersion);
-            updater.downloadUpdate();
-
-            // Show notification that download started
-            if (Notification.isSupported()) {
-              const notification = new Notification({
-                title: "Downloading Update",
-                body: `AuraSwift ${newVersion} is downloading in the background...`,
-                silent: false,
-              });
-              notification.show();
-            }
-          } else if (result.response === 1) {
-            // View Release Notes
-            console.log("👁️ Opening release notes for version", newVersion);
-            shell.openExternal(
-              `https://github.com/Sam231221/AuraSwift/releases/tag/v${newVersion}`
-            );
-          } else {
-            console.log("⏰ User chose to be reminded later");
-          }
-        })
-        .catch((error) => {
-          console.error("Error showing update dialog:", error);
-        });
+      // Show update dialog (initial notification)
+      this.showUpdateAvailableDialog(info, false);
     });
 
     // When update is not available
@@ -297,6 +443,14 @@ export class AutoUpdater implements AppModule {
     // When update is downloaded and ready to install
     updater.on("update-downloaded", (info: UpdateInfo) => {
       console.log("✅ Update downloaded successfully:", info.version);
+
+      // Clear any pending reminders since update is now downloaded
+      if (this.#remindLaterTimeout) {
+        clearTimeout(this.#remindLaterTimeout);
+        this.#remindLaterTimeout = null;
+      }
+      this.#postponedUpdateInfo = null;
+      this.#postponeCount = 0;
 
       const newVersion = info.version;
       const releaseNotes = this.formatReleaseNotes(info);
