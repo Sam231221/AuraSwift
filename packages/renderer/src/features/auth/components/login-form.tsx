@@ -110,7 +110,7 @@ export function LoginForm({ onSubmit, error, isLoading }: LoginFormProps) {
                 className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full"
               />
             ) : (
-              "Sign In to Dashboard"
+              "Sign In"
             )}
           </Button>
         </motion.div>
