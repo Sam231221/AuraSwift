@@ -115,7 +115,11 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         setIsLoadingCashiers(true);
         const response = await window.scheduleAPI.getCashierUsers(businessId);
         if (response.success && response.data) {
-          setCashiers(response.data as Cashier[]);
+          // Filter to only show cashiers, not managers or admins
+          const cashierUsers = (response.data as Cashier[]).filter(
+            (user) => user.role === "cashier"
+          );
+          setCashiers(cashierUsers);
         }
       } catch (error) {
         console.error("Error loading cashiers:", error);
