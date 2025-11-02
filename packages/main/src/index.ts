@@ -49,8 +49,8 @@ export async function initApp(initConfig: AppInitConfig) {
     .init(
       createWindowManagerModule({
         initConfig,
-        // Only open DevTools in development mode, not in tests
-        openDevTools: import.meta.env.DEV && process.env.NODE_ENV !== "test",
+        // DevTools disabled
+        openDevTools: false,
       })
     )
     .init(disallowMultipleAppInstance())
@@ -64,11 +64,10 @@ export async function initApp(initConfig: AppInitConfig) {
   ) {
     moduleRunner.init(autoUpdater());
   }
+  // Install DevTools extension if needed
+  // .init(chromeDevToolsExtension({extension: 'VUEJS3_DEVTOOLS'}))
 
   moduleRunner
-    // Install DevTools extension if needed
-    // .init(chromeDevToolsExtension({extension: 'VUEJS3_DEVTOOLS'}))
-
     // Security
     .init(
       allowInternalOrigins(
