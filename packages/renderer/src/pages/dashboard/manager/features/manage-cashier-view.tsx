@@ -89,6 +89,9 @@ export default function CashierManagementView({
     address: "",
   });
 
+  // Form validation errors
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   // Form state for editing user
   const [editUser, setEditUser] = useState({
     email: "",
@@ -142,29 +145,38 @@ export default function CashierManagementView({
   };
 
   const handleAddUser = async () => {
+    setFormErrors({});
     if (!user?.businessId) {
       toast.error("Business ID not found");
       return;
     }
 
     // Validation
-    if (
-      !newUser.email ||
-      !newUser.password ||
-      !newUser.firstName ||
-      !newUser.lastName
-    ) {
-      toast.error("Please fill in all required fields");
-      return;
+    const errors: Record<string, string> = {};
+    if (!newUser.firstName.trim()) {
+      errors.firstName = "First name is required";
     }
-
-    if (newUser.password !== newUser.confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
+    if (!newUser.lastName.trim()) {
+      errors.lastName = "Last name is required";
     }
-
-    if (newUser.password.length < 8) {
-      toast.error("Password must be at least 8 characters");
+    if (!newUser.email.trim()) {
+      errors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUser.email)) {
+      errors.email = "Please enter a valid email address";
+    }
+    if (!newUser.password) {
+      errors.password = "Password is required";
+    } else if (newUser.password.length < 8) {
+      errors.password = "Password must be at least 8 characters";
+    }
+    if (!newUser.confirmPassword) {
+      errors.confirmPassword = "Please confirm your password";
+    } else if (newUser.password !== newUser.confirmPassword) {
+      errors.confirmPassword = "Passwords do not match";
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error("Please fix the errors in the form");
       return;
     }
 
@@ -379,17 +391,15 @@ export default function CashierManagementView({
 
             <div className="space-y-4 py-4">
               {/* Avatar Upload */}
-              <div className="flex justify-center">
-                <AvatarUpload
-                  value={newUser.avatar}
-                  onChange={(avatar) =>
-                    setNewUser((prev) => ({ ...prev, avatar: avatar || "" }))
-                  }
-                  type="user"
-                  className="w-20 h-20"
-                  size="lg"
-                />
-              </div>
+
+              <AvatarUpload
+                value={newUser.avatar}
+                onChange={(avatar) =>
+                  setNewUser((prev) => ({ ...prev, avatar: avatar || "" }))
+                }
+                type="user"
+                size="md"
+              />
 
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-3">
@@ -398,28 +408,54 @@ export default function CashierManagementView({
                   <Input
                     id="firstName"
                     value={newUser.firstName}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setNewUser((prev) => ({
                         ...prev,
                         firstName: e.target.value,
-                      }))
-                    }
+                      }));
+                      if (formErrors.firstName) {
+                        setFormErrors((prev) => {
+                          const newErrors = { ...prev };
+                          delete newErrors.firstName;
+                          return newErrors;
+                        });
+                      }
+                    }}
                     placeholder="John"
+                    className={formErrors.firstName ? "border-red-500" : ""}
                   />
+                  {formErrors.firstName && (
+                    <p className="text-xs text-red-500">
+                      {formErrors.firstName}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name *</Label>
                   <Input
                     id="lastName"
                     value={newUser.lastName}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setNewUser((prev) => ({
                         ...prev,
                         lastName: e.target.value,
-                      }))
-                    }
+                      }));
+                      if (formErrors.lastName) {
+                        setFormErrors((prev) => {
+                          const newErrors = { ...prev };
+                          delete newErrors.lastName;
+                          return newErrors;
+                        });
+                      }
+                    }}
                     placeholder="Smith"
+                    className={formErrors.lastName ? "border-red-500" : ""}
                   />
+                  {formErrors.lastName && (
+                    <p className="text-xs text-red-500">
+                      {formErrors.lastName}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -430,11 +466,22 @@ export default function CashierManagementView({
                   id="email"
                   type="email"
                   value={newUser.email}
-                  onChange={(e) =>
-                    setNewUser((prev) => ({ ...prev, email: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    setNewUser((prev) => ({ ...prev, email: e.target.value }));
+                    if (formErrors.email) {
+                      setFormErrors((prev) => {
+                        const newErrors = { ...prev };
+                        delete newErrors.email;
+                        return newErrors;
+                      });
+                    }
+                  }}
                   placeholder="john.smith@example.com"
+                  className={formErrors.email ? "border-red-500" : ""}
                 />
+                {formErrors.email && (
+                  <p className="text-xs text-red-500">{formErrors.email}</p>
+                )}
               </div>
 
               {/* Address */}
@@ -458,14 +505,27 @@ export default function CashierManagementView({
                     id="password"
                     type="password"
                     value={newUser.password}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setNewUser((prev) => ({
                         ...prev,
                         password: e.target.value,
-                      }))
-                    }
+                      }));
+                      if (formErrors.password) {
+                        setFormErrors((prev) => {
+                          const newErrors = { ...prev };
+                          delete newErrors.password;
+                          return newErrors;
+                        });
+                      }
+                    }}
                     placeholder="Minimum 8 characters"
+                    className={formErrors.password ? "border-red-500" : ""}
                   />
+                  {formErrors.password && (
+                    <p className="text-xs text-red-500">
+                      {formErrors.password}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password *</Label>
@@ -473,14 +533,29 @@ export default function CashierManagementView({
                     id="confirmPassword"
                     type="password"
                     value={newUser.confirmPassword}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       setNewUser((prev) => ({
                         ...prev,
                         confirmPassword: e.target.value,
-                      }))
-                    }
+                      }));
+                      if (formErrors.confirmPassword) {
+                        setFormErrors((prev) => {
+                          const newErrors = { ...prev };
+                          delete newErrors.confirmPassword;
+                          return newErrors;
+                        });
+                      }
+                    }}
                     placeholder="Confirm password"
+                    className={
+                      formErrors.confirmPassword ? "border-red-500" : ""
+                    }
                   />
+                  {formErrors.confirmPassword && (
+                    <p className="text-xs text-red-500">
+                      {formErrors.confirmPassword}
+                    </p>
+                  )}
                 </div>
               </div>
 
