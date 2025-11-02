@@ -7,17 +7,17 @@ if (typeof btoa === "undefined") {
     Buffer.from(str, "binary").toString("base64");
 }
 
-// Expose btoa function to renderer for testing purposes
-contextBridge.exposeInMainWorld("btoa", (str: string) =>
-  Buffer.from(str, "binary").toString("base64")
-);
-
 const isExport = (key: string): key is keyof typeof exports =>
   Object.hasOwn(exports, key);
 
 for (const exportsKey in exports) {
   if (isExport(exportsKey)) {
-    contextBridge.exposeInMainWorld(exportsKey, exports[exportsKey]);
+    try {
+      contextBridge.exposeInMainWorld(exportsKey, exports[exportsKey]);
+    } catch (error) {
+      // Skip if already exposed (e.g., btoa might already exist)
+      console.warn(`Could not expose ${exportsKey}:`, error);
+    }
   }
 }
 
