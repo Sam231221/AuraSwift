@@ -441,13 +441,8 @@ export class AuthAPI {
 
       // Handle modifiers if provided
       if (modifiers && modifiers.length > 0) {
-        console.log("Processing modifiers for product:", product.id);
-        console.log("Modifiers data:", JSON.stringify(modifiers, null, 2));
-
         for (const modifier of modifiers) {
           try {
-            console.log(`Creating modifier: ${modifier.name}`);
-
             // Create the modifier
             const createdModifier = await db.createModifier({
               name: modifier.name,
@@ -456,18 +451,10 @@ export class AuthAPI {
               businessId: productData.businessId,
             });
 
-            console.log("Created modifier:", createdModifier);
-
             // Add modifier options
             if (modifier.options && modifier.options.length > 0) {
-              console.log(
-                `Adding ${modifier.options.length} options to modifier ${createdModifier.id}`
-              );
               for (const option of modifier.options) {
                 if (option.name.trim()) {
-                  console.log(
-                    `Creating option: ${option.name} - $${option.price}`
-                  );
                   const createdOption = await db.createModifierOption(
                     createdModifier.id,
                     {
@@ -475,23 +462,13 @@ export class AuthAPI {
                       price: option.price || 0,
                     }
                   );
-                  console.log("Created option:", createdOption);
                 }
               }
             }
 
             // Link modifier to product
-            console.log(
-              `Linking modifier ${createdModifier.id} to product ${product.id}`
-            );
-            db.addModifierToProduct(product.id, createdModifier.id);
 
-            console.log(
-              "Successfully created and linked modifier:",
-              createdModifier.id,
-              "to product:",
-              product.id
-            );
+            db.addModifierToProduct(product.id, createdModifier.id);
           } catch (modifierError: any) {
             console.error("Error creating modifier:", modifierError);
             console.error("Modifier data that failed:", modifier);
@@ -594,8 +571,6 @@ export class AuthAPI {
 
       // Handle modifiers if provided
       if (modifiers !== undefined) {
-        console.log("Updating modifiers for product:", id, modifiers);
-
         // Get current product modifiers
         const currentModifiers = db.getProductModifiers(id);
 
@@ -630,13 +605,6 @@ export class AuthAPI {
 
               // Link modifier to product
               db.addModifierToProduct(id, createdModifier.id);
-
-              console.log(
-                "Successfully updated modifier:",
-                createdModifier.id,
-                "for product:",
-                id
-              );
             } catch (modifierError: any) {
               console.error("Error updating modifier:", modifierError);
               // Continue with other modifiers even if one fails

@@ -117,8 +117,6 @@ export class ThermalPrinterService {
     config: PrinterConfig
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log("🖨️ Initializing thermal printer:", config);
-
       // Dynamically import the thermal printer library
       let thermalPrinterLib: ThermalPrinterLib;
 
@@ -126,7 +124,6 @@ export class ThermalPrinterService {
         // Try to import node-thermal-printer
         thermalPrinterLib = await import("node-thermal-printer");
       } catch (error) {
-        console.warn("node-thermal-printer not available, using fallback");
         return {
           success: false,
           error:
@@ -150,10 +147,8 @@ export class ThermalPrinterService {
       this.currentConfig = config;
       this.isInitialized = true;
 
-      console.log("✅ Thermal printer initialized successfully");
       return { success: true };
     } catch (error) {
-      console.error("❌ Failed to initialize thermal printer:", error);
       this.isInitialized = false;
       return {
         success: false,
@@ -185,8 +180,6 @@ export class ThermalPrinterService {
         );
       }
 
-      console.log(`🖨️ Printing receipt job ${jobId}...`);
-
       // Add to queue for processing
       const printRequest: PrintRequest = {
         data,
@@ -202,9 +195,7 @@ export class ThermalPrinterService {
       }
 
       response.success = true;
-      console.log(`✅ Receipt job ${jobId} queued successfully`);
     } catch (error) {
-      console.error(`❌ Failed to queue print job ${jobId}:`, error);
       response.error =
         error instanceof Error ? error.message : "Unknown print error";
     }
@@ -229,10 +220,7 @@ export class ThermalPrinterService {
       try {
         await this.executePrintJob(request);
       } catch (error) {
-        console.error(
-          `❌ Failed to process print job ${request.jobId}:`,
-          error
-        );
+        // Error already handled in executePrintJob
       }
 
       // Small delay between jobs
@@ -249,8 +237,6 @@ export class ThermalPrinterService {
     if (!this.printer) {
       throw new Error("Printer not available");
     }
-
-    console.log(`🖨️ Executing print job ${request.jobId}...`);
 
     // Send raw data to printer
     const printData = request.data.toString("latin1");
@@ -279,8 +265,6 @@ export class ThermalPrinterService {
     if (!success) {
       throw new Error("Printer execution failed");
     }
-
-    console.log(`✅ Print job ${request.jobId} completed successfully`);
   }
 
   /**
@@ -315,8 +299,6 @@ export class ThermalPrinterService {
         return { success: false, error: "Printer not initialized" };
       }
 
-      console.log("🧪 Testing thermal printer...");
-
       // Create test receipt
       this.printer.clear();
       this.printer.alignCenter();
@@ -335,14 +317,11 @@ export class ThermalPrinterService {
       const success = await this.printer.execute();
 
       if (success) {
-        console.log("✅ Printer test successful");
         return { success: true };
       } else {
-        console.log("❌ Printer test failed");
         return { success: false, error: "Test print execution failed" };
       }
     } catch (error) {
-      console.error("❌ Printer test error:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown test error",
@@ -361,10 +340,8 @@ export class ThermalPrinterService {
       this.printQueue = [];
       this.isProcessingQueue = false;
 
-      console.log("🔌 Printer disconnected");
       return { success: true };
     } catch (error) {
-      console.error("❌ Error disconnecting printer:", error);
       return { success: false };
     }
   }
@@ -408,7 +385,6 @@ export class ThermalPrinterService {
 
       return { success: true, interfaces };
     } catch (error) {
-      console.error("❌ Error getting printer interfaces:", error);
       return { success: false, interfaces: [] };
     }
   }

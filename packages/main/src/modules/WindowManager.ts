@@ -66,8 +66,6 @@ class WindowManager implements AppModule {
               const { dialog } = await import("electron");
 
               try {
-                console.log("🔍 Manually checking for updates...");
-
                 // Set channel explicitly
                 autoUpdater.channel = "latest";
 

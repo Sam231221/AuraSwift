@@ -152,14 +152,10 @@ export class PaymentService {
     config: CardReaderConfig
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log("🏦 Initializing BBPOS WisePad 3 card reader:", config);
-
       this.readerConfig = config;
       this.paymentState.readerStatus = "connecting";
 
       if (config.simulated) {
-        // Simulated reader for development
-        console.log("⚡ Using simulated card reader for development");
         this.isReaderConnected = true;
         this.paymentState.readerStatus = "ready";
         return { success: true };
@@ -186,15 +182,12 @@ export class PaymentService {
       this.isReaderConnected = true;
       this.paymentState.readerStatus = "connected";
 
-      console.log("✅ BBPOS WisePad 3 connected successfully");
-
       // Initialize the reader for payment processing
       await this.initializeReaderForPayments();
 
       this.paymentState.readerStatus = "ready";
       return { success: true };
     } catch (error) {
-      console.error("❌ Failed to initialize card reader:", error);
       this.paymentState.readerStatus = "error";
       return {
         success: false,
@@ -217,7 +210,6 @@ export class PaymentService {
     });
 
     this.cardReader.on("error", (error: Error) => {
-      console.error("❌ Card reader error:", error);
       this.paymentState.readerStatus = "error";
       this.emitEvent("error", { error: error.message });
     });
@@ -230,8 +222,6 @@ export class PaymentService {
     try {
       // Parse BBPOS protocol data
       const command = this.parseBBPOSData(data);
-
-      console.log("📊 Reader data received:", command);
 
       switch (command.type) {
         case "CARD_INSERTED":
@@ -252,10 +242,11 @@ export class PaymentService {
           this.emitEvent("payment_complete", command.data);
           break;
         default:
-          console.log("🔍 Unknown reader command:", command);
+          // Unknown reader command
+          break;
       }
     } catch (error) {
-      console.error("❌ Error handling reader data:", error);
+      // Error handling reader data
     }
   }
 
@@ -267,7 +258,6 @@ export class PaymentService {
     // Based on BBPOS WisePad 3 SDK documentation
 
     const dataStr = data.toString("hex");
-    console.log("📡 Raw reader data:", dataStr);
 
     // Example parsing logic (replace with actual BBPOS protocol)
     if (dataStr.startsWith("02")) {
@@ -296,7 +286,6 @@ export class PaymentService {
 
     // Send initialization commands to BBPOS WisePad 3
     // This would include setting up the reader for Stripe integration
-    console.log("🔧 Initializing reader for payment processing...");
 
     if (this.readerConfig?.simulated) {
       // Simulated initialization
@@ -317,8 +306,6 @@ export class PaymentService {
     data: PaymentIntentData
   ): Promise<{ success: boolean; clientSecret?: string; error?: string }> {
     try {
-      console.log("💳 Creating payment intent:", data);
-
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount: data.amount,
         currency: data.currency || "gbp",
@@ -330,14 +317,11 @@ export class PaymentService {
 
       this.currentPaymentIntent = paymentIntent;
 
-      console.log("✅ Payment intent created:", paymentIntent.id);
-
       return {
         success: true,
         clientSecret: paymentIntent.client_secret!,
       };
     } catch (error) {
-      console.error("❌ Failed to create payment intent:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -350,29 +334,23 @@ export class PaymentService {
    */
   async processCardPayment(paymentIntentId: string): Promise<PaymentResult> {
     try {
-      console.log("💰 Processing card payment:", paymentIntentId);
-
       this.paymentState.isProcessing = true;
       this.paymentState.currentStep = "waiting_for_card";
 
       // Check available payment options in order of preference:
       // 1. Physical card reader connected
       if (this.isReaderConnected) {
-        console.log("📱 Using physical card reader");
         return await this.processRealCardPayment(paymentIntentId);
       }
 
       // 2. Simulated reader for development/testing
       if (this.readerConfig?.simulated) {
-        console.log("🧪 Using simulated card reader for development");
         return await this.simulateCardPayment(paymentIntentId);
       }
 
       // 3. Fallback to regular card payment (no physical reader required)
-      console.log("💳 Using regular card payment (no physical reader)");
       return await this.processRegularCardPayment(paymentIntentId);
     } catch (error) {
-      console.error("❌ Card payment processing failed:", error);
       this.paymentState.isProcessing = false;
       return {
         success: false,
@@ -441,8 +419,6 @@ export class PaymentService {
   private async simulateCardPayment(
     paymentIntentId: string
   ): Promise<PaymentResult> {
-    console.log("⚡ Simulating card payment...");
-
     // Simulate card read delay
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -470,8 +446,6 @@ export class PaymentService {
       this.paymentState.isProcessing = false;
       this.paymentState.currentStep = "complete";
 
-      console.log("✅ Simulated payment complete:", paymentIntent.status);
-
       return {
         success: paymentIntent.status === "succeeded",
         paymentIntent,
@@ -493,8 +467,6 @@ export class PaymentService {
   private async processRegularCardPayment(
     paymentIntentId: string
   ): Promise<PaymentResult> {
-    console.log("💳 Processing regular card payment (no physical reader)...");
-
     this.paymentState.currentStep = "processing";
 
     try {
@@ -507,8 +479,6 @@ export class PaymentService {
         },
       });
 
-      console.log("💳 Created payment method:", paymentMethod.id);
-
       // Confirm the payment intent with the payment method
       const paymentIntent = await this.stripe.paymentIntents.confirm(
         paymentIntentId,
@@ -520,15 +490,12 @@ export class PaymentService {
       this.paymentState.isProcessing = false;
       this.paymentState.currentStep = "complete";
 
-      console.log("✅ Regular card payment complete:", paymentIntent.status);
-
       return {
         success: paymentIntent.status === "succeeded",
         paymentIntent,
         clientSecret: paymentIntent.client_secret || undefined,
       };
     } catch (error) {
-      console.error("❌ Regular card payment failed:", error);
       this.paymentState.isProcessing = false;
       return {
         success: false,
@@ -545,11 +512,8 @@ export class PaymentService {
    */
   private async processCardData(cardData: any): Promise<void> {
     if (!this.currentPaymentIntent) {
-      console.error("❌ No active payment intent");
       return;
     }
-
-    console.log("💳 Processing card data...", cardData);
     // Implementation would depend on BBPOS SDK for extracting card data
   }
 
@@ -621,7 +585,6 @@ export class PaymentService {
 
       return { success: true, readers };
     } catch (error) {
-      console.error("❌ Error discovering readers:", error);
       return { success: false, readers: [] };
     }
   }
@@ -633,7 +596,6 @@ export class PaymentService {
     try {
       if (this.currentPaymentIntent && this.paymentState.isProcessing) {
         await this.stripe.paymentIntents.cancel(this.currentPaymentIntent.id);
-        console.log("🚫 Payment cancelled:", this.currentPaymentIntent.id);
       }
 
       this.paymentState.isProcessing = false;
@@ -642,7 +604,6 @@ export class PaymentService {
 
       return { success: true };
     } catch (error) {
-      console.error("❌ Error cancelling payment:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Cancel failed",
@@ -659,8 +620,6 @@ export class PaymentService {
         return { success: false, error: "Reader not connected" };
       }
 
-      console.log("🧪 Testing card reader...");
-
       if (this.readerConfig?.simulated) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         return { success: true };
@@ -675,7 +634,6 @@ export class PaymentService {
 
       return { success: true };
     } catch (error) {
-      console.error("❌ Card reader test failed:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Test failed",
@@ -698,10 +656,8 @@ export class PaymentService {
       this.readerConfig = null;
       this.currentPaymentIntent = null;
 
-      console.log("🔌 Card reader disconnected");
       return { success: true };
     } catch (error) {
-      console.error("❌ Error disconnecting reader:", error);
       return { success: false };
     }
   }

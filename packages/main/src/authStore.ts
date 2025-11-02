@@ -401,11 +401,7 @@ ipcMain.handle("schedules:update", async (event, id, updates) => {
   try {
     if (!db) db = await getDatabase();
 
-    console.log("Updating schedule:", { id, updates });
-
     const updatedSchedule = db.updateSchedule(id, updates);
-
-    console.log("Schedule updated successfully:", updatedSchedule);
 
     return {
       success: true,
@@ -426,11 +422,7 @@ ipcMain.handle("schedules:delete", async (event, id) => {
   try {
     if (!db) db = await getDatabase();
 
-    console.log("Deleting schedule:", id);
-
     db.deleteSchedule(id);
-
-    console.log("Schedule deleted successfully:", id);
 
     return {
       success: true,
@@ -465,15 +457,12 @@ ipcMain.handle("schedules:updateStatus", async (event, id, status) => {
 
 ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
   try {
-    console.log("Getting cashier users for businessId:", businessId);
     if (!db) db = await getDatabase();
     const users = db.getUsersByBusiness(businessId);
-    console.log("All users for business:", users);
     // Filter for cashier and manager roles only
     const staffUsers = users.filter(
       (user) => user.role === "cashier" || user.role === "manager"
     );
-    console.log("Filtered staff users:", staffUsers);
     return {
       success: true,
       data: staffUsers,
@@ -490,22 +479,17 @@ ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
 // Shift management IPC handlers
 ipcMain.handle("shift:start", async (event, shiftData) => {
   try {
-    console.log("Starting shift for cashier:", shiftData.cashierId);
     if (!db) db = await getDatabase();
 
     // Clean up overdue and old unclosed shifts first to prevent conflicts
     const overdueCount = db.autoEndOverdueShiftsToday();
     if (overdueCount > 0) {
-      console.log(
-        `Auto-ended ${overdueCount} overdue shifts before starting new shift`
-      );
+      // auto-ended overdue shifts
     }
 
     const closedCount = db.autoCloseOldActiveShifts();
     if (closedCount > 0) {
-      console.log(
-        `Auto-closed ${closedCount} old active shifts before starting new shift`
-      );
+      // auto-closed old active shifts
     }
 
     // Check if cashier already has an active shift (only check today's shifts)
@@ -537,7 +521,6 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
       }
     }
 
-    console.log("Shift started successfully:", shift);
     return {
       success: true,
       message: "Shift started successfully",
@@ -554,7 +537,6 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
 
 ipcMain.handle("shift:end", async (event, shiftId, endData) => {
   try {
-    console.log("Ending shift:", shiftId);
     if (!db) db = await getDatabase();
 
     db.endShift(shiftId, {
@@ -585,19 +567,18 @@ ipcMain.handle("shift:end", async (event, shiftId, endData) => {
 
 ipcMain.handle("shift:getActive", async (event, cashierId) => {
   try {
-    console.log("Getting active shift for cashier:", cashierId);
     if (!db) db = await getDatabase();
 
     // First, auto-end any overdue shifts from today (more aggressive)
     const overdueCount = db.autoEndOverdueShiftsToday();
     if (overdueCount > 0) {
-      console.log(`Auto-ended ${overdueCount} overdue shifts from today`);
+      // auto-ended overdue shifts from today
     }
 
     // Then clean up old unclosed shifts (24+ hours old)
     const closedCount = db.autoCloseOldActiveShifts();
     if (closedCount > 0) {
-      console.log(`Auto-closed ${closedCount} old active shifts`);
+      // auto-closed old active shifts
     }
 
     // Use the new method that checks for today's active shift only
@@ -617,7 +598,6 @@ ipcMain.handle("shift:getActive", async (event, cashierId) => {
 
 ipcMain.handle("shift:getTodaySchedule", async (event, cashierId) => {
   try {
-    console.log("Getting today's schedule for cashier:", cashierId);
     if (!db) db = await getDatabase();
 
     const today = new Date();
@@ -644,7 +624,6 @@ ipcMain.handle("shift:getTodaySchedule", async (event, cashierId) => {
 
 ipcMain.handle("shift:getStats", async (event, shiftId) => {
   try {
-    console.log("Getting shift stats:", shiftId);
     if (!db) db = await getDatabase();
 
     const transactions = db.getTransactionsByShiftId(shiftId);
@@ -678,7 +657,6 @@ ipcMain.handle("shift:getStats", async (event, shiftId) => {
 
 ipcMain.handle("shift:getHourlyStats", async (event, shiftId) => {
   try {
-    console.log("Getting hourly stats for shift:", shiftId);
     if (!db) db = await getDatabase();
 
     const hourlyStats = db.getHourlyTransactionStats(shiftId);
@@ -698,7 +676,6 @@ ipcMain.handle("shift:getHourlyStats", async (event, shiftId) => {
 
 ipcMain.handle("shift:getCashDrawerBalance", async (event, shiftId) => {
   try {
-    console.log("Getting current cash drawer balance for shift:", shiftId);
     if (!db) db = await getDatabase();
 
     const cashBalance = db.getCurrentCashDrawerBalance(shiftId);
@@ -737,10 +714,8 @@ ipcMain.handle("transactions:create", async (event, transactionData) => {
 
 ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
   try {
-    console.log("Getting transactions for shift ID:", shiftId);
     const db = await getDatabase();
     const transactions = db.getTransactionsByShiftId(shiftId);
-    console.log("Found transactions:", transactions.length, transactions);
 
     return {
       success: true,
@@ -958,16 +933,12 @@ ipcMain.handle("voids:validateEligibility", async (event, transactionId) => {
 
 ipcMain.handle("voids:create", async (event, voidData) => {
   try {
-    console.log("Backend: Processing void request with data:", voidData);
     const db = await getDatabase();
 
     // Validate void eligibility first
-    console.log("Backend: Validating void eligibility...");
     const validation = db.validateVoidEligibility(voidData.transactionId);
-    console.log("Backend: Validation result:", validation);
 
     if (!validation.isValid) {
-      console.log("Backend: Void validation failed:", validation.errors);
       return {
         success: false,
         message: `Void not allowed: ${validation.errors.join(", ")}`,
@@ -977,7 +948,6 @@ ipcMain.handle("voids:create", async (event, voidData) => {
 
     // Check if manager approval is required but not provided
     if (validation.requiresManagerApproval && !voidData.managerApprovalId) {
-      console.log("Backend: Manager approval required but not provided");
       return {
         success: false,
         message: "Manager approval required for this void operation",
@@ -985,9 +955,7 @@ ipcMain.handle("voids:create", async (event, voidData) => {
       };
     }
 
-    console.log("Backend: Executing void transaction...");
     const result = db.voidTransaction(voidData);
-    console.log("Backend: Void transaction result:", result);
 
     return result;
   } catch (error) {
@@ -1061,7 +1029,6 @@ ipcMain.handle("cashDrawer:getExpectedCash", async (event, shiftId) => {
 
 ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
   try {
-    console.log("Backend: Processing cash count with data:", countData);
     const db = await getDatabase();
 
     // Get shift to determine business ID
@@ -1102,7 +1069,6 @@ ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
       });
     }
 
-    console.log("Backend: Cash count created successfully");
     return {
       success: true,
       data: cashDrawerCount,

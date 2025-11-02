@@ -60,29 +60,19 @@ const test = base.extend<TestFixtures>({
         "out/main.js",
       ].filter(Boolean) as string[];
 
-      console.log(`[Test Setup] Platform: ${platform}, CI: ${isCI}`);
-      console.log(`[Test Setup] Current working directory: ${process.cwd()}`);
-
       // Also check if we're in a packaged app scenario
       const appPaths = globSync(possiblePaths, { nodir: true });
 
       if (appPaths.length > 0) {
         executablePath = appPaths[0];
-        console.log(`[Test Setup] Found executable at: ${executablePath}`);
       } else {
         // If no built app found, try running from source (development mode)
-        console.log(
-          "[Test Setup] No built app found, checking for source execution..."
-        );
 
         // Check for the entry point file
         if (existsSync("packages/entry-point.mjs")) {
           // Use Electron directly with the entry point
           executablePath = electronPath as unknown as string;
           mainEntry = "packages/entry-point.mjs";
-          console.log(
-            `[Test Setup] Running from source with entry point: ${mainEntry}`
-          );
         } else {
           // Look for other main entry points
           const mainEntries = [
@@ -98,9 +88,6 @@ const test = base.extend<TestFixtures>({
             // Use Electron directly with the main entry point
             executablePath = electronPath as unknown as string;
             mainEntry = mainEntries[0];
-            console.log(
-              `[Test Setup] Running from source with main: ${mainEntry}`
-            );
           } else {
             // Debug information for troubleshooting
             const allFiles = globSync("**/*", { nodir: true }).slice(0, 50); // Limit output
@@ -124,15 +111,6 @@ const test = base.extend<TestFixtures>({
       if (isCI && platform === "win32") {
         launchArgs.push("--disable-dev-shm-usage", "--disable-extensions");
       }
-
-      // Remove --headless flag as it prevents window from being visible
-      console.log(
-        `[Test Setup] Removed --headless flag to allow window visibility`
-      );
-
-      console.log(
-        `[Test Setup] Launching Electron with args: ${launchArgs.join(" ")}`
-      );
 
       let electronApp;
       try {
@@ -158,16 +136,12 @@ const test = base.extend<TestFixtures>({
         console.error(`[Test Setup] Launch args: ${launchArgs.join(" ")}`);
 
         // If we're using a built executable and it fails, try development mode
-        if (!mainEntry && executablePath.endsWith(".exe")) {
-          console.log("[Test Setup] Trying development mode as fallback...");
+        if (!mainEntry && executablePath && executablePath.endsWith(".exe")) {
           // Use the imported electronPath (it's the path to electron executable)
           const electronBinary = electronPath as unknown as string;
           const devMainEntry = "packages/entry-point.mjs";
 
           if (existsSync(devMainEntry)) {
-            console.log(
-              `[Test Setup] Attempting to launch with development entry: ${devMainEntry}`
-            );
             electronApp = await electron.launch({
               executablePath: electronBinary,
               args: [devMainEntry, ...launchArgs],
@@ -224,11 +198,6 @@ test.describe("Build Environment Debug", () => {
     const { readdir, stat } = await import("node:fs/promises");
     const { join, resolve } = await import("node:path");
 
-    console.log("[Debug] Current working directory:", process.cwd());
-    console.log("[Debug] Platform:", platform, "Arch:", arch);
-    console.log("[Debug] CI Environment:", process.env.CI);
-    console.log("[Debug] Directory contents:");
-
     async function listFiles(
       dir: string,
       indent = "",
@@ -246,7 +215,6 @@ test.describe("Build Environment Debug", () => {
           try {
             const statResult = await stat(fullPath);
             if (statResult.isDirectory()) {
-              console.log(`${indent}📁 ${item}/`);
               if (
                 item === "dist" ||
                 item === "out" ||
@@ -261,14 +229,14 @@ test.describe("Build Environment Debug", () => {
                 );
               }
             } else {
-              console.log(`${indent}📄 ${item}`);
+              // no-op
             }
           } catch (error) {
-            console.log(`${indent}❓ ${item} (access error)`);
+            // no-op
           }
         }
       } catch (error) {
-        console.log(`${indent}❌ Cannot read directory ${dir}:`, error);
+        // no-op
       }
     }
 
@@ -284,8 +252,6 @@ test.describe("Build Environment Debug", () => {
       ],
       { nodir: true }
     );
-
-    console.log("[Debug] Found potential Electron paths:", electronPaths);
 
     // This test always passes - it's just for debugging
     expect(true).toBe(true);
@@ -343,7 +309,6 @@ test.describe("Vite Build & TypeScript Integration", async () => {
 
 // Clean up authentication state before each test to ensure tests start from clean state
 test.beforeEach(async ({ electronApp }) => {
-  console.log("[Test Setup] Cleaning authentication state...");
   const page = await electronApp.firstWindow();
   await page.waitForLoadState("domcontentloaded");
 
@@ -352,9 +317,8 @@ test.beforeEach(async ({ electronApp }) => {
     try {
       localStorage.clear();
       sessionStorage.clear();
-      console.log("[Test Setup] Cleared localStorage and sessionStorage");
     } catch (error) {
-      console.log("[Test Setup] Storage clear failed:", error);
+      // no-op
     }
   });
 
@@ -363,10 +327,9 @@ test.beforeEach(async ({ electronApp }) => {
     try {
       if ((window as any).authAPI?.logout) {
         await (window as any).authAPI.logout();
-        console.log("[Test Setup] Logged out successfully");
       }
     } catch (error) {
-      console.log("[Test Setup] Logout not needed or failed:", error);
+      // no-op
     }
   });
 
@@ -375,13 +338,11 @@ test.beforeEach(async ({ electronApp }) => {
   await window.evaluate((mainWindow) => {
     if (mainWindow.webContents.isDevToolsOpened()) {
       mainWindow.webContents.closeDevTools();
-      console.log("[Test Setup] Closed DevTools");
     }
   });
 
   // Small delay to ensure state is cleared
   await page.waitForTimeout(500);
-  console.log("[Test Setup] Cleanup complete");
 });
 
 test("Main window state", async ({ electronApp }) => {
@@ -393,7 +354,6 @@ test("Main window state", async ({ electronApp }) => {
   // Force show the window if it's not visible in CI
   await window.evaluate((mainWindow) => {
     if (!mainWindow.isVisible()) {
-      console.log("[Test] Force showing window for CI environment");
       mainWindow.show();
     }
   });
@@ -422,39 +382,27 @@ test("Main window state", async ({ electronApp }) => {
          * Extended timeout for CI environments (20 seconds)
          */
         if (mainWindow.isVisible()) {
-          console.log("[Test] Window is already visible");
           resolve(getState());
         } else {
-          console.log("[Test] Window not visible, waiting for events...");
-
           // Even longer timeout for CI environments (20 seconds)
           const timeout = setTimeout(() => {
-            console.log(
-              "[Test] Window visibility timeout reached after 20s, force showing"
-            );
             mainWindow.show();
             resolve(getState());
           }, 20000);
 
           mainWindow.once("ready-to-show", () => {
             clearTimeout(timeout);
-            console.log("[Test] Window ready-to-show event fired");
             resolve(getState());
           });
 
           // Also listen for 'show' event as backup
           mainWindow.once("show", () => {
             clearTimeout(timeout);
-            console.log("[Test] Window show event fired");
             resolve(getState());
           });
         }
       });
     }
-  );
-
-  console.log(
-    `[Test] Window state: visible=${windowState.isVisible}, crashed=${windowState.isCrashed}, devtools=${windowState.isDevToolsOpened}`
   );
 
   expect(windowState.isCrashed, "The app has crashed").toEqual(false);
@@ -618,11 +566,6 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
         };
       });
 
-      console.log(
-        "[Test] btoa debug info:",
-        JSON.stringify(debugInfo, null, 2)
-      );
-
       const btoaAvailable = await page.evaluate(() => {
         // Check both window.btoa (exposed via contextBridge) and globalThis.btoa
         return (
@@ -643,11 +586,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const result = await page.evaluate((str) => {
         // Try window.btoa first (contextBridge exposed), then globalThis.btoa as fallback
         const btoaFn = (window as any).btoa || (globalThis as any).btoa;
-        console.log("btoa function found:", typeof btoaFn);
         return btoaFn ? btoaFn(str) : "NO_BTOA_FUNCTION";
       }, testString);
-
-      console.log("[Test] btoa result:", result);
 
       const expectedValue = Buffer.from(testString, "binary").toString(
         "base64"
@@ -685,11 +625,6 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
           windowHasAuthAPI: "authAPI" in window,
         };
       });
-
-      console.log(
-        "[Test] IPC authAPI debug info:",
-        JSON.stringify(debugInfo, null, 2)
-      );
 
       const authAPIAvailable = await page.evaluate(() => {
         return typeof (globalThis as any).authAPI === "object";

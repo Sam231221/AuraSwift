@@ -49,8 +49,6 @@ test.describe("Hardware Integration Tests", () => {
       };
     });
 
-    console.log("Hardware API Status:", hardwareAPIs);
-
     // All APIs should be available (indicating native modules loaded successfully in main process)
     expect(hardwareAPIs.databaseAPI).toBe(true);
     expect(hardwareAPIs.printerAPI).toBe(true);

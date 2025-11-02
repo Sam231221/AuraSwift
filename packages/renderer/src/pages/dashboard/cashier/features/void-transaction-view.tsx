@@ -110,38 +110,20 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
 
   // Load recent transactions
   const loadRecentTransactions = useCallback(async () => {
-    console.log("Void Modal - Active Shift ID:", activeShiftId);
     if (!activeShiftId) return;
 
     try {
       setIsLoading(true);
       const response = await window.transactionAPI.getByShift(activeShiftId);
-      console.log("Void Modal - API Response:", response);
 
       if (response.success && response.data) {
         // Filter only completed sale transactions (not refunds or already voided)
         const transactions = response.data as Transaction[];
-        console.log("Void Modal - All transactions:", transactions);
-
-        // Debug each transaction
-        transactions.forEach((t, index) => {
-          console.log(`Transaction ${index + 1}:`, {
-            id: t.id,
-            type: t.type,
-            status: t.status,
-            receiptNumber: t.receiptNumber,
-            total: t.total,
-            timestamp: t.timestamp,
-          });
-        });
 
         const validTransactions = transactions.filter(
           (t: Transaction) => t.type === "sale" && t.status === "completed"
         );
-        console.log(
-          "Void Modal - Valid transactions for void:",
-          validTransactions
-        );
+
         setRecentTransactions(validTransactions);
       }
     } catch (error) {
@@ -257,15 +239,11 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
   // Execute void with or without manager approval
   const executeVoid = useCallback(
     async (managerApprovalId?: string) => {
-      console.log("executeVoid called with:", { managerApprovalId });
-
       if (!selectedTransaction || !user?.id) {
-        console.log("executeVoid: Missing required data");
         return;
       }
 
       const finalReason = voidReason === "Other" ? customReason : voidReason;
-      console.log("executeVoid: Using reason:", finalReason);
 
       try {
         setCurrentStep("processing");
@@ -278,16 +256,13 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
           managerApprovalId,
         };
 
-        console.log("executeVoid: Sending void request with data:", voidData);
         const response = await window.voidAPI.voidTransaction(voidData);
-        console.log("executeVoid: API response:", response);
 
         if (response.success) {
           toast.success("Transaction voided successfully");
           onVoidComplete();
           resetModal();
         } else {
-          console.error("executeVoid: API returned error:", response.message);
           toast.error(response.message || "Failed to void transaction");
           setCurrentStep("confirm");
         }
@@ -312,18 +287,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
 
   // Process void transaction
   const processVoid = useCallback(async () => {
-    console.log("processVoid called", {
-      selectedTransaction,
-      user: user?.id,
-      voidReason,
-      customReason,
-    });
-
     if (!selectedTransaction || !user?.id) {
-      console.log("Missing required data:", {
-        selectedTransaction: !!selectedTransaction,
-        userId: !!user?.id,
-      });
       return;
     }
 
@@ -333,25 +297,18 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
       return;
     }
 
-    console.log("Validating void eligibility...");
     // Validate void eligibility
     const isValid = await validateVoid(selectedTransaction.id);
     if (!isValid) {
-      console.log("Void validation failed");
       return;
     }
 
-    console.log(
-      "Void validation passed, requiresManagerApproval:",
-      requiresManagerApproval
-    );
     // Show manager approval dialog if needed
     if (requiresManagerApproval) {
       setShowManagerDialog(true);
       return;
     }
 
-    console.log("Executing void...");
     // Process the void
     await executeVoid();
   }, [

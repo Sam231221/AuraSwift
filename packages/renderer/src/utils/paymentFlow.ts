@@ -145,7 +145,7 @@ export class PaymentFlow {
     this.state.startTime = startTime;
 
     try {
-      console.log("💳 Starting payment flow:", {
+      console.log("Starting payment flow:", {
         amount: this.config.amount,
         currency: this.config.currency,
       });
@@ -166,7 +166,7 @@ export class PaymentFlow {
       const result = await this.stepComplete(paymentResult);
 
       const duration = Date.now() - startTime;
-      console.log(`✅ Payment flow completed in ${duration}ms`);
+      console.log(`Payment flow completed in ${duration}ms`);
 
       const finalResult: PaymentFlowResult = {
         ...result,
@@ -253,7 +253,7 @@ export class PaymentFlow {
     const paymentIntentId = intentResponse.clientSecret.split("_secret_")[0];
     this.state.paymentIntentId = paymentIntentId;
 
-    console.log("✅ Payment intent created:", paymentIntentId);
+    console.log("Payment intent created:", paymentIntentId);
   }
 
   /**
@@ -362,7 +362,7 @@ export class PaymentFlow {
    */
   public async cancel(): Promise<boolean> {
     try {
-      console.log("🚫 Cancelling payment flow");
+      console.log("Cancelling payment flow");
 
       if (this.state.paymentIntentId) {
         await window.paymentAPI.cancelPayment();
@@ -394,7 +394,7 @@ export class PaymentFlow {
     }
 
     this.retryCount++;
-    console.log(`🔄 Retrying payment (attempt ${this.retryCount})`);
+    console.log(`Retrying payment (attempt ${this.retryCount})`);
 
     // Reset state
     this.state = {

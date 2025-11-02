@@ -296,15 +296,15 @@ export class DatabaseManager {
       // Development: Store in project directory
       const projectRoot = path.join(__dirname, "..", "..", "..");
       const devDbPath = path.join(projectRoot, "dev-data", "pos_system.db");
-      console.log("🔧 Development mode: Using project directory for database");
-      console.log("📁 Database at:", devDbPath);
+      console.log("Development mode: Using project directory for database");
+      console.log("Database at:", devDbPath);
       return devDbPath;
     } else {
       // Production: Use proper user data directory based on platform
       const userDataPath = app.getPath("userData");
       const prodDbPath = path.join(userDataPath, "AuraSwift", "pos_system.db");
-      console.log("🚀 Production mode: Using user data directory for database");
-      console.log("📁 Database at:", prodDbPath);
+      console.log("Production mode: Using user data directory for database");
+      console.log("Database at:", prodDbPath);
       return prodDbPath;
     }
   }

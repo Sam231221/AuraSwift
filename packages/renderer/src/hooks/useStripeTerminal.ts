@@ -123,7 +123,7 @@ export const useStripeTerminal = () => {
           progress: 20,
         });
 
-        console.log("🏦 Initializing card reader:", config);
+        console.log("Initializing card reader:", config);
 
         const response = await window.paymentAPI.initializeReader(config);
 
@@ -141,13 +141,12 @@ export const useStripeTerminal = () => {
           });
 
           toast.success(`Card reader connected: ${config.type}`);
-          console.log("✅ Card reader initialized successfully");
+
           return true;
         } else {
           throw new Error(response.error || "Failed to initialize reader");
         }
       } catch (error) {
-        console.error("❌ Failed to initialize card reader:", error);
         const errorMessage =
           error instanceof Error ? error.message : "Connection failed";
 
@@ -168,16 +167,11 @@ export const useStripeTerminal = () => {
    */
   const discoverReaders = useCallback(async (): Promise<boolean> => {
     try {
-      console.log("🔍 Discovering card readers...");
-
       const response = await window.paymentAPI.discoverReaders();
 
       if (response.success) {
         setAvailableReaders(response.readers);
-        console.log(
-          `✅ Found ${response.readers.length} readers:`,
-          response.readers
-        );
+
         return true;
       } else {
         console.warn("⚠️ Reader discovery failed");
@@ -202,12 +196,6 @@ export const useStripeTerminal = () => {
         if (!isInitialized || !readerStatus?.connected) {
           throw new Error("Card reader not connected");
         }
-
-        console.log(
-          `💳 Processing payment: £${(amount / 100).toFixed(
-            2
-          )} ${currency.toUpperCase()}`
-        );
 
         // Step 1: Create payment intent
         setPaymentState({
@@ -257,7 +245,7 @@ export const useStripeTerminal = () => {
           });
 
           console.log(
-            "✅ Payment completed successfully:",
+            "Payment completed successfully:",
             paymentResult.paymentIntent?.id
           );
 
@@ -319,7 +307,7 @@ export const useStripeTerminal = () => {
     }
 
     try {
-      console.log("🚫 Cancelling payment:", currentPaymentRef.current);
+      console.log("Cancelling payment:", currentPaymentRef.current);
 
       const response = await window.paymentAPI.cancelPayment();
 
@@ -358,7 +346,7 @@ export const useStripeTerminal = () => {
    */
   const testReader = useCallback(async (): Promise<boolean> => {
     try {
-      console.log("🧪 Testing card reader...");
+      console.log("Testing card reader...");
 
       const response = await window.paymentAPI.testReader();
 
@@ -381,7 +369,7 @@ export const useStripeTerminal = () => {
    */
   const disconnectReader = useCallback(async (): Promise<boolean> => {
     try {
-      console.log("🔌 Disconnecting card reader...");
+      console.log("Disconnecting card reader...");
 
       // Stop status monitoring
       stopStatusMonitoring();

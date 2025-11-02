@@ -141,7 +141,7 @@ export const useProductionScanner = (options: UseProductionScannerOptions) => {
         }
 
         // Process the scan
-        console.log("🔍 Processing barcode scan:", barcode);
+
         const scanResult = await onScan(barcode);
 
         if (scanResult) {
@@ -153,7 +153,6 @@ export const useProductionScanner = (options: UseProductionScannerOptions) => {
             await ScannerAudio.success();
           }
 
-          console.log("✅ Barcode scan successful:", barcode);
           setScannerStatus("ready");
         } else {
           // Product not found or other error

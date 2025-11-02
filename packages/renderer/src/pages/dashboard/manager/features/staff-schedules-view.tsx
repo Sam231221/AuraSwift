@@ -107,21 +107,15 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   useEffect(() => {
     const loadCashiers = async () => {
       if (!businessId) {
-        console.log("No business ID available, skipping cashier load");
         setIsLoadingCashiers(false);
         return;
       }
 
       try {
         setIsLoadingCashiers(true);
-        console.log("Loading cashiers for businessId:", businessId);
         const response = await window.scheduleAPI.getCashierUsers(businessId);
-        console.log("Cashiers response:", response);
         if (response.success && response.data) {
           setCashiers(response.data as Cashier[]);
-          console.log("Loaded cashiers:", response.data);
-        } else {
-          console.error("Failed to load cashiers:", response.message);
         }
       } catch (error) {
         console.error("Error loading cashiers:", error);
@@ -137,7 +131,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   useEffect(() => {
     const loadSchedules = async () => {
       if (!businessId) {
-        console.log("No business ID available, skipping schedules load");
         setIsLoadingSchedules(false);
         return;
       }
@@ -147,8 +140,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         const response = await window.scheduleAPI.getByBusiness(businessId);
         if (response.success && response.data) {
           setSchedules(response.data as Schedule[]);
-        } else {
-          console.error("Failed to load schedules:", response.message);
         }
       } catch (error) {
         console.error("Error loading schedules:", error);
@@ -206,7 +197,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
 
   const openDrawer = (schedule?: Schedule, date?: Date) => {
     if (schedule) {
-      console.log("Opening drawer for editing schedule:", schedule);
       setEditingSchedule(schedule);
       const startDate = new Date(schedule.startTime);
       const endDate = new Date(schedule.endTime);
@@ -219,11 +209,9 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         notes: schedule.notes || "",
       };
 
-      console.log("Setting form data for editing:", formDataToSet);
       setFormData(formDataToSet);
       setSelectedDate(new Date(schedule.startTime.split("T")[0]));
     } else {
-      console.log("Opening drawer for creating new schedule");
       resetForm();
       if (date) {
         setSelectedDate(date);
@@ -462,20 +450,9 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       if (editingSchedule) {
         // Update existing schedule
         if (!editingSchedule.id) {
-          console.error("No schedule ID found for editing:", editingSchedule);
           alert("Error: Schedule ID is missing. Please try again.");
           return;
         }
-        console.log("Attempting to update schedule:", {
-          id: editingSchedule.id,
-          updateData: {
-            staffId: formData.staffId,
-            startTime: startDateTimeISO,
-            endTime: endDateTimeISO,
-            assignedRegister: formData.assignedRegister,
-            notes: formData.notes,
-          },
-        });
 
         const response = await window.scheduleAPI.update(editingSchedule.id, {
           staffId: formData.staffId,
@@ -485,11 +462,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           notes: formData.notes,
         });
 
-        console.log("Update response received:", response);
-
         if (response.success) {
-          console.log("Schedule update successful:", response);
-
           // Update local state with the response data if available, otherwise use form data
           const updatedSchedule: Schedule = response.data
             ? (response.data as Schedule)
@@ -509,8 +482,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             )
           );
 
-          console.log("Local schedules state updated");
-
           // Optional: Reload schedules from database to ensure consistency
           // This helps prevent issues where local state gets out of sync with database
           try {
@@ -518,18 +489,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               businessId
             );
             if (refreshResponse.success && refreshResponse.data) {
-              console.log("Refreshed schedules from database after update");
               setSchedules(refreshResponse.data as Schedule[]);
             }
           } catch (refreshError) {
-            console.warn(
-              "Failed to refresh schedules after update:",
+            console.error(
+              "Error refreshing schedules after update:",
               refreshError
             );
             // Don't fail the whole operation if refresh fails
           }
         } else {
-          console.error("Failed to update schedule:", response.message);
           alert("Failed to update schedule: " + response.message);
           return;
         }
@@ -548,7 +517,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           // Add to local state
           setSchedules([...schedules, response.data as Schedule]);
         } else {
-          console.error("Failed to create schedule:", response.message);
           alert("Failed to create schedule: " + response.message);
           return;
         }
@@ -556,7 +524,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
 
       closeDrawer();
     } catch (error) {
-      console.error("Error submitting schedule:", error);
+      console.error("Error saving schedule:", error);
       alert("An error occurred while saving the schedule.");
     }
   };
@@ -567,7 +535,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       if (response.success) {
         setSchedules(schedules.filter((schedule) => schedule.id !== id));
       } else {
-        console.error("Failed to delete schedule:", response.message);
         alert("Failed to delete schedule: " + response.message);
       }
     } catch (error) {
@@ -658,7 +625,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             <DrawerTrigger asChild>
               <Button
                 onClick={() => openDrawer()}
-                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                 size="lg"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -1091,10 +1058,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 </div>
               </div>
 
-              <DrawerFooter className="px-0 flex-shrink-0 border-t bg-white">
+              <DrawerFooter className="px-0 shrink-0 border-t bg-white">
                 <Button
                   onClick={handleSubmit}
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                  className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
                 >
                   {editingSchedule ? "Update Schedule" : "Create Schedule"}
                 </Button>

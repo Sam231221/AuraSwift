@@ -16,28 +16,20 @@ import { getDatabase } from "./database.js";
 export async function initApp(initConfig: AppInitConfig) {
   // Initialize database
   const db = await getDatabase();
-  console.log("Database initialized");
 
   // Initialize thermal printer service after database is ready
   await import("./services/thermalPrinterService.js");
-  console.log("Real thermal printer service initialized");
 
   // Initialize payment service for BBPOS WisePad 3 and Stripe integration
   await import("./services/paymentService.js");
-  console.log("Payment service initialized");
 
   // Set up periodic cleanup of old unclosed shifts
   // Run cleanup every 30 minutes
   const cleanupInterval = setInterval(() => {
     try {
-      const closedCount = db.autoCloseOldActiveShifts();
-      if (closedCount > 0) {
-        console.log(
-          `Periodic cleanup: Auto-closed ${closedCount} old active shifts`
-        );
-      }
+      db.autoCloseOldActiveShifts();
     } catch (error) {
-      console.error("Error during periodic shift cleanup:", error);
+      // Error during periodic shift cleanup
     }
   }, 30 * 60 * 1000); // 30 minutes
 
@@ -48,14 +40,9 @@ export async function initApp(initConfig: AppInitConfig) {
 
   // Run cleanup immediately on startup
   try {
-    const initialCleanupCount = db.autoCloseOldActiveShifts();
-    if (initialCleanupCount > 0) {
-      console.log(
-        `Startup cleanup: Auto-closed ${initialCleanupCount} old active shifts`
-      );
-    }
+    db.autoCloseOldActiveShifts();
   } catch (error) {
-    console.error("Error during startup shift cleanup:", error);
+    // Error during startup shift cleanup
   }
 
   const moduleRunner = createModuleRunner()

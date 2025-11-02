@@ -123,11 +123,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       setLoading(true);
       const response = await window.productAPI.getByBusiness(user!.businessId);
       if (response.success && response.products) {
-        console.log("Loaded products:", response.products);
-        console.log(
-          "First product modifiers:",
-          response.products[0]?.modifiers
-        );
         setProducts(response.products);
       } else {
         toast.error("Failed to load products");
@@ -281,17 +276,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         modifiers: validModifiers,
       };
 
-      console.log("Saving product data:", productData);
-      console.log("Product category:", productData.category);
-      console.log("Available categories:", categories);
-      console.log("Product modifiers count:", productData.modifiers.length);
-      console.log(
-        "Product modifiers detail:",
-        JSON.stringify(productData.modifiers, null, 2)
-      );
-      console.log("requiresWeight value:", productData.requiresWeight);
-      console.log("requiresWeight type:", typeof productData.requiresWeight);
-
       if (editingProduct) {
         // Update existing product
         const response = await window.productAPI.update(
@@ -299,8 +283,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           productData
         );
         if (response.success && response.product) {
-          console.log("Updated product response:", response.product);
-          console.log("Updated product modifiers:", response.product.modifiers);
           setProducts(
             products.map((p) =>
               p.id === editingProduct.id ? response.product! : p
@@ -310,23 +292,10 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
           // If there are modifiers, handle them separately if needed
           if (newProduct.modifiers && newProduct.modifiers.length > 0) {
-            console.log("Original modifiers sent:", newProduct.modifiers);
-            console.log(
-              "Modifiers in updated product:",
-              response.product.modifiers
-            );
             if (
               !response.product.modifiers ||
               response.product.modifiers.length === 0
             ) {
-              console.warn(
-                "WARNING: Modifiers were not saved to the database!"
-              );
-              console.log(
-                "This indicates the backend API needs to be updated to handle modifiers properly"
-              );
-              console.log("Expected modifiers:", validModifiers);
-              console.log("Received modifiers:", response.product.modifiers);
               toast.error(
                 "Product updated but modifiers were not saved. Please check the backend API."
               );
@@ -340,45 +309,28 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         // Create new product
         const response = await window.productAPI.create(productData);
         if (response.success && response.product) {
-          console.log("Created product response:", response.product);
-          console.log("Created product modifiers:", response.product.modifiers);
           setProducts([...products, response.product]);
           toast.success("Product created successfully");
 
           // If there are modifiers, handle them separately if needed
           if (newProduct.modifiers && newProduct.modifiers.length > 0) {
-            console.log("Original modifiers sent:", newProduct.modifiers);
-            console.log(
-              "Modifiers in created product:",
-              response.product.modifiers
-            );
             if (
               !response.product.modifiers ||
               response.product.modifiers.length === 0
             ) {
-              console.warn(
-                "WARNING: Modifiers were not saved to the database!"
-              );
-              console.log(
-                "This indicates the backend API needs to be updated to handle modifiers properly"
-              );
-              console.log("Expected modifiers:", validModifiers);
-              console.log("Received modifiers:", response.product.modifiers);
               toast.error(
                 "Product saved but modifiers were not saved. Please check the backend API."
               );
             }
           }
         } else {
-          console.error("Product creation failed:", response);
           toast.error(response.message || "Failed to create product");
         }
       }
 
       resetForm();
       setIsDrawerOpen(false);
-    } catch (error) {
-      console.error("Error saving product:", error);
+    } catch {
       toast.error("Failed to save product");
     } finally {
       setLoading(false);
@@ -386,11 +338,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   };
 
   const handleEditProduct = (product: Product) => {
-    console.log("Editing product:", product);
-    console.log("Product modifiers:", product.modifiers);
-    console.log("Product requiresWeight value:", product.requiresWeight);
-    console.log("Product requiresWeight type:", typeof product.requiresWeight);
-
     setEditingProduct(product);
     setNewProduct({
       name: product.name,
@@ -509,7 +456,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         },
       ],
     };
-    console.log("Adding new modifier:", newModifier);
+
     setNewProduct({
       ...newProduct,
       modifiers: [...newProduct.modifiers, newModifier],
@@ -523,10 +470,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       updatedAt: new Date().toISOString(),
       businessId: user?.businessId || modifier.businessId,
     };
-    console.log(
-      `Updating modifier at index ${index}:`,
-      updatedModifiers[index]
-    );
+
     setNewProduct({ ...newProduct, modifiers: updatedModifiers });
   };
 
@@ -539,7 +483,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   const handleInputChange = useCallback(
     (field: string, value: string | number) => {
-      console.log("handleInputChange called:", field, value);
       setNewProduct((prev) => ({ ...prev, [field]: value }));
     },
     []
@@ -1648,10 +1591,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                                 price: 0,
                                 createdAt: now,
                               };
-                              console.log(
-                                "Adding new option to modifier:",
-                                newOption
-                              );
+
                               updateModifier(index, {
                                 ...modifier,
                                 options: [...modifier.options, newOption],

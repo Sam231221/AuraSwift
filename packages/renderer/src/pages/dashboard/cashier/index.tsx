@@ -17,8 +17,7 @@ export default function CashierDashboard() {
 
   const { user } = useAuth();
   const navigate = useNavigate();
-  console.log(user);
-  console.log("adad");
+
   if (!user) {
     navigate("/");
     return;
