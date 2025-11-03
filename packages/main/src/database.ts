@@ -366,7 +366,8 @@ export class DatabaseManager {
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         FOREIGN KEY (businessId) REFERENCES businesses (id),
-        FOREIGN KEY (parentId) REFERENCES categories (id) ON DELETE SET NULL
+        FOREIGN KEY (parentId) REFERENCES categories (id) ON DELETE SET NULL,
+        UNIQUE(name, businessId)
       )
     `);
 
@@ -375,6 +376,127 @@ export class DatabaseManager {
       this.db.exec(`ALTER TABLE categories ADD COLUMN parentId TEXT;`);
     } catch (err) {
       // Column already exists, ignore error
+    }
+
+    // Migration: Add UNIQUE constraint on (name, businessId) for categories
+    // Check if the constraint already exists by trying to insert a duplicate
+    try {
+      const hasUniqueConstraint = this.db
+        .prepare(
+          `
+        SELECT sql FROM sqlite_master 
+        WHERE type='table' AND name='categories'
+      `
+        )
+        .get();
+
+      // Check if UNIQUE constraint exists in table definition
+      if (
+        !hasUniqueConstraint?.sql?.includes("UNIQUE") ||
+        !hasUniqueConstraint?.sql?.includes("name")
+      ) {
+        console.log(
+          "🔄 Migrating categories table to add UNIQUE constraint..."
+        );
+
+        // Find and resolve duplicate category names
+        const duplicates = this.db
+          .prepare(
+            `
+          SELECT name, businessId, GROUP_CONCAT(id) as ids, COUNT(*) as count
+          FROM categories
+          GROUP BY name, businessId
+          HAVING COUNT(*) > 1
+        `
+          )
+          .all() as Array<{
+          name: string;
+          businessId: string;
+          ids: string;
+          count: number;
+        }>;
+
+        if (duplicates.length > 0) {
+          console.log(
+            `   Found ${duplicates.length} duplicate category name(s), resolving...`
+          );
+
+          // Resolve duplicates by renaming
+          for (const dup of duplicates) {
+            const categoryIds = dup.ids.split(",");
+            // Keep first, rename others
+            for (let i = 1; i < categoryIds.length; i++) {
+              const newName = `${dup.name} (${i + 1})`;
+              this.db
+                .prepare(
+                  `UPDATE categories SET name = ?, updatedAt = datetime('now') WHERE id = ?`
+                )
+                .run(newName, categoryIds[i]);
+              console.log(
+                `   Renamed duplicate category to: "${newName}" (${categoryIds[i]})`
+              );
+            }
+          }
+        }
+
+        // Recreate table with UNIQUE constraint
+        this.db.exec("PRAGMA foreign_keys = OFF;");
+        this.db.exec("BEGIN TRANSACTION;");
+
+        try {
+          // Create new table with UNIQUE constraint
+          this.db.exec(`
+            CREATE TABLE categories_new (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              parentId TEXT,
+              description TEXT,
+              businessId TEXT NOT NULL,
+              isActive BOOLEAN DEFAULT 1,
+              sortOrder INTEGER DEFAULT 0,
+              createdAt TEXT NOT NULL,
+              updatedAt TEXT NOT NULL,
+              FOREIGN KEY (businessId) REFERENCES businesses (id),
+              FOREIGN KEY (parentId) REFERENCES categories_new (id) ON DELETE SET NULL,
+              UNIQUE(name, businessId)
+            )
+          `);
+
+          // Copy data
+          this.db.exec(`
+            INSERT INTO categories_new (id, name, parentId, description, businessId, isActive, sortOrder, createdAt, updatedAt)
+            SELECT 
+              id, 
+              name, 
+              parentId, 
+              description, 
+              businessId, 
+              COALESCE(isActive, 1), 
+              COALESCE(sortOrder, 0), 
+              COALESCE(createdAt, datetime('now')), 
+              COALESCE(updatedAt, datetime('now'))
+            FROM categories
+          `);
+
+          // Drop old and rename new
+          this.db.exec("DROP TABLE categories;");
+          this.db.exec("ALTER TABLE categories_new RENAME TO categories;");
+
+          this.db.exec("COMMIT;");
+          console.log("   ✅ Categories table migrated with UNIQUE constraint");
+        } catch (migrationError) {
+          this.db.exec("ROLLBACK;");
+          console.error("   ❌ Categories migration failed:", migrationError);
+          throw migrationError;
+        } finally {
+          this.db.exec("PRAGMA foreign_keys = ON;");
+        }
+      }
+    } catch (err) {
+      console.error(
+        "Error checking/migrating categories UNIQUE constraint:",
+        err
+      );
     }
 
     // Products table (includes weight-based product fields)
