@@ -23,6 +23,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
+import { validateCategory } from "@/schemas/category-schema";
 
 // Category type
 interface Category {
@@ -51,6 +52,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
   const [newCategory, setNewCategory] = useState({
     name: "",
@@ -94,11 +96,43 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       parentId: "",
     });
     setEditingCategory(null);
+    setFormErrors({});
   }, []);
 
   const handleAddCategory = async () => {
-    if (!newCategory.name || !user?.businessId) {
-      toast.error("Please enter a category name");
+    // Clear previous errors
+    setFormErrors({});
+
+    if (!user?.businessId) {
+      toast.error("Business ID not found");
+      return;
+    }
+
+    // Validate using Zod schema
+    const validationResult = validateCategory({
+      ...newCategory,
+      businessId: user.businessId,
+      ...(editingCategory && { id: editingCategory.id }),
+    });
+
+    // Show all errors if any exist
+    if (!validationResult.success && validationResult.errors) {
+      setFormErrors(validationResult.errors);
+
+      // Focus on the first error field after a short delay
+      const errorFields = Object.keys(validationResult.errors);
+      if (errorFields.length > 0) {
+        setTimeout(() => {
+          const firstErrorField = errorFields[0];
+          const element = document.getElementById(firstErrorField);
+          if (element) {
+            element.focus();
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 100);
+      }
+
+      toast.error("Please fix the errors in the form");
       return;
     }
 
@@ -106,8 +140,8 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       setLoading(true);
 
       const categoryData = {
-        name: newCategory.name,
-        description: newCategory.description,
+        name: newCategory.name.trim(),
+        description: newCategory.description.trim(),
         businessId: user.businessId,
         sortOrder: categories.length + 1, // Add to end by default
         parentId: newCategory.parentId || null,
@@ -126,8 +160,37 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
             )
           );
           toast.success("Category updated successfully");
+          resetForm();
+          setIsDrawerOpen(false);
         } else {
-          toast.error(response.message || "Failed to update category");
+          console.error("Category update failed:", response);
+          // Check if it's a duplicate error
+          const errorMsg = response.message || "Failed to update category";
+          console.log("Update error message:", errorMsg);
+          const lowerErrorMsg = errorMsg.toLowerCase();
+
+          if (
+            (lowerErrorMsg.includes("name") &&
+              lowerErrorMsg.includes("already exists")) ||
+            lowerErrorMsg.includes("unique constraint failed: categories.name")
+          ) {
+            setFormErrors({
+              name: "This category name already exists. Please use a different name.",
+            });
+            setTimeout(() => {
+              const nameField = document.getElementById("name");
+              if (nameField) {
+                nameField.focus();
+                nameField.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }, 100);
+            toast.error("Category name already exists");
+          } else {
+            toast.error(errorMsg);
+          }
         }
       } else {
         // Create new category
@@ -135,13 +198,40 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
         if (response.success && response.category) {
           setCategories([...categories, response.category]);
           toast.success("Category created successfully");
+          resetForm();
+          setIsDrawerOpen(false);
         } else {
-          toast.error(response.message || "Failed to create category");
+          // Check if it's a duplicate error
+          console.log("Create category failed. Full response:", response);
+          const errorMsg = response.message || "Failed to create category";
+          console.log("Error message:", errorMsg);
+          const lowerErrorMsg = errorMsg.toLowerCase();
+
+          if (
+            (lowerErrorMsg.includes("name") &&
+              lowerErrorMsg.includes("already exists")) ||
+            lowerErrorMsg.includes("unique constraint failed: categories.name")
+          ) {
+            setFormErrors({
+              name: "This category name already exists. Please use a different name.",
+            });
+            setTimeout(() => {
+              const nameField = document.getElementById("name");
+              if (nameField) {
+                nameField.focus();
+                nameField.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }, 100);
+            toast.error("Category name already exists");
+          } else {
+            toast.error(errorMsg);
+          }
         }
       }
 
-      resetForm();
-      setIsDrawerOpen(false);
       loadCategories(); // Reload to get updated order
     } catch (error) {
       console.error("Error saving category:", error);
@@ -231,6 +321,17 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       // Revert on error
       setCategories(categories);
       toast.error("Failed to reorder categories");
+    }
+  };
+
+  // Helper function to clear field-specific errors
+  const clearFieldError = (field: string) => {
+    if (formErrors[field]) {
+      setFormErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
 
@@ -498,44 +599,60 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
           <div className="p-6 overflow-y-auto flex-1">
             <div className="space-y-4">
               <div>
-                <Label htmlFor="categoryName">Category Name *</Label>
+                <Label htmlFor="name">Category Name *</Label>
                 <Input
-                  id="categoryName"
+                  id="name"
                   value={newCategory.name}
-                  onChange={(e) =>
-                    setNewCategory({ ...newCategory, name: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setNewCategory({ ...newCategory, name: e.target.value });
+                    clearFieldError("name");
+                  }}
                   placeholder="Enter category name"
+                  className={formErrors.name ? "border-red-500" : ""}
                 />
+                {formErrors.name && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>
+                )}
               </div>
 
               <div>
-                <Label htmlFor="categoryDescription">
-                  Description (Optional)
-                </Label>
+                <Label htmlFor="description">Description (Optional)</Label>
                 <Textarea
-                  id="categoryDescription"
+                  id="description"
                   value={newCategory.description}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setNewCategory({
                       ...newCategory,
                       description: e.target.value,
-                    })
-                  }
+                    });
+                    clearFieldError("description");
+                  }}
                   placeholder="Enter category description"
                   rows={3}
+                  className={formErrors.description ? "border-red-500" : ""}
                 />
+                {formErrors.description && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {formErrors.description}
+                  </p>
+                )}
               </div>
 
               <div>
-                <Label htmlFor="parentCategory">Parent Category</Label>
+                <Label htmlFor="parentId">Parent Category</Label>
                 <select
-                  id="parentCategory"
-                  className="w-full border rounded px-3 py-2 mt-1"
+                  id="parentId"
+                  className={`w-full border rounded px-3 py-2 mt-1 ${
+                    formErrors.parentId ? "border-red-500" : ""
+                  }`}
                   value={newCategory.parentId}
-                  onChange={(e) =>
-                    setNewCategory({ ...newCategory, parentId: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setNewCategory({
+                      ...newCategory,
+                      parentId: e.target.value,
+                    });
+                    clearFieldError("parentId");
+                  }}
                 >
                   <option value="">None (Top-level)</option>
                   {categories
@@ -548,6 +665,11 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                       </option>
                     ))}
                 </select>
+                {formErrors.parentId && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {formErrors.parentId}
+                  </p>
+                )}
               </div>
 
               {editingCategory && (
