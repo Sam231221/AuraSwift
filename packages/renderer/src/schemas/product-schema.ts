@@ -74,17 +74,30 @@ const modifierOptionSchema = z.object({
 });
 
 // Modifier schema
-const modifierSchema = z.object({
-  id: z.string().optional(),
-  name: requiredString("Modifier name"),
-  required: z.boolean(),
-  multiSelect: z.boolean(),
-  options: z
-    .array(modifierOptionSchema)
-    .min(1, "Modifier must have at least one option"),
-  businessId: z.string().optional(),
-  updatedAt: z.string().optional(),
-});
+const modifierSchema = z
+  .object({
+    id: z.string().optional(),
+    name: requiredString("Modifier name"),
+    required: z.boolean(),
+    // Support both old (type) and new (multiSelect) property formats
+    type: z.enum(["single", "multiple"]).optional(),
+    multiSelect: z.boolean().optional(),
+    options: z
+      .array(modifierOptionSchema)
+      .min(1, "Modifier must have at least one option"),
+    businessId: z.string().optional(),
+    updatedAt: z.string().optional(),
+    createdAt: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      // At least one of multiSelect or type must be present
+      return data.multiSelect !== undefined || data.type !== undefined;
+    },
+    {
+      message: "Modifier must have either 'multiSelect' or 'type' property",
+    }
+  );
 
 // Main product schema for regular products
 export const productSchema = z

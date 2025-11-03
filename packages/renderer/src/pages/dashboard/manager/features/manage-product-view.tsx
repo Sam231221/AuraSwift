@@ -254,6 +254,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     if (!validationResult.success && validationResult.errors) {
       setFormErrors(validationResult.errors);
 
+      // Log validation errors for debugging
+      console.log("Product validation failed:", validationResult.errors);
+
       // Determine which tab has the first error and switch to it
       const errorFields = Object.keys(validationResult.errors);
       const basicInfoFields = ["name", "sku", "plu", "category"];
@@ -278,8 +281,15 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           if (firstErrorField) {
             const element = document.getElementById(firstErrorField);
             if (element) {
-              element.focus();
+              // For Select components (like category), trigger click to open dropdown
+              if (firstErrorField === "category") {
+                element.click();
+              } else {
+                element.focus();
+              }
               element.scrollIntoView({ behavior: "smooth", block: "center" });
+            } else {
+              console.warn(`Element with id '${firstErrorField}' not found`);
             }
           }
         }, 100);
@@ -295,6 +305,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
             if (element) {
               element.focus();
               element.scrollIntoView({ behavior: "smooth", block: "center" });
+            } else {
+              console.warn(`Element with id '${firstErrorField}' not found`);
             }
           }
         }, 100);
@@ -496,6 +508,36 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
+
+    // Check if product's category still exists in the categories list
+    const categoryExists = categories.some(
+      (cat) => cat.id === product.category
+    );
+    const validCategory = categoryExists
+      ? product.category
+      : categories.length > 0
+      ? categories[0].id
+      : "";
+
+    // Show warning if category was changed
+    if (!categoryExists && product.category) {
+      toast.error(
+        "This product's category no longer exists. Please select a new category."
+      );
+    }
+
+    // Normalize modifiers to ensure they have all required properties
+    const normalizedModifiers = (product.modifiers || []).map((modifier) => ({
+      ...modifier,
+      // Ensure multiSelect property exists (derived from type if missing)
+      multiSelect:
+        "multiSelect" in modifier
+          ? Boolean((modifier as { multiSelect?: boolean }).multiSelect)
+          : modifier.type === "multiple",
+      // Ensure required property exists
+      required: modifier.required ?? false,
+    }));
+
     setNewProduct({
       name: product.name,
       description: product.description,
@@ -505,14 +547,20 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       sku: product.sku,
       plu: product.plu || "",
       image: product.image || "",
-      category: product.category,
+      category: validCategory,
       stockLevel: product.stockLevel,
       minStockLevel: product.minStockLevel,
-      modifiers: product.modifiers || [], // Ensure it's always an array
+      modifiers: normalizedModifiers,
       requiresWeight: Boolean(product.requiresWeight), // Ensure it's a proper boolean
       unit: product.unit || "each",
       pricePerUnit: product.pricePerUnit || 0,
     });
+
+    // If category was invalid, show the error
+    if (!validCategory) {
+      setFormErrors({ category: "Please select a category" });
+    }
+
     setIsDrawerOpen(true);
   };
 
@@ -614,9 +662,15 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       ],
     };
 
+    // Add multiSelect property for validation
+    const modifierWithMultiSelect = {
+      ...newModifier,
+      multiSelect: false,
+    };
+
     setNewProduct({
       ...newProduct,
-      modifiers: [...newProduct.modifiers, newModifier],
+      modifiers: [...newProduct.modifiers, modifierWithMultiSelect],
     });
   };
 
@@ -626,6 +680,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       ...modifier,
       updatedAt: new Date().toISOString(),
       businessId: user?.businessId || modifier.businessId,
+      // Sync multiSelect with type for validation
+      multiSelect: modifier.type === "multiple",
     };
 
     setNewProduct({ ...newProduct, modifiers: updatedModifiers });
@@ -1444,6 +1500,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                       }}
                     >
                       <SelectTrigger
+                        id="category"
                         className={formErrors.category ? "border-red-500" : ""}
                       >
                         <SelectValue

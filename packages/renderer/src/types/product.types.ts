@@ -9,6 +9,7 @@ export interface Modifier {
   id: string;
   name: string;
   type: "single" | "multiple";
+  multiSelect?: boolean; // Optional for backward compatibility
   options: ModifierOption[];
   required: boolean;
   businessId: string;
