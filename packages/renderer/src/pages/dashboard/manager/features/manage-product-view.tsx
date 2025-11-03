@@ -48,6 +48,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
 import type { Product, Modifier } from "@/types/product.types";
+import { validateProduct } from "@/schemas/product-schema";
 import ManageCategoriesView from "./manage-categories-view";
 
 // Category type
@@ -237,87 +238,24 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const handleAddProduct = async () => {
     // Clear previous errors
     setFormErrors({});
-    const errors: { [key: string]: string } = {};
-
-    // Required field validations
-    if (!newProduct.name.trim()) {
-      errors.name = "Product name is required";
-    }
-
-    if (!newProduct.sku.trim()) {
-      errors.sku = "SKU is required";
-    } else {
-      // SKU format validation (alphanumeric, dashes, underscores)
-      const skuRegex = /^[a-zA-Z0-9_-]+$/;
-      if (!skuRegex.test(newProduct.sku.trim())) {
-        errors.sku =
-          "SKU can only contain letters, numbers, dashes, and underscores";
-      }
-    }
-
-    if (!newProduct.category) {
-      errors.category = "Category is required";
-    } else if (!categories.find((cat) => cat.id === newProduct.category)) {
-      errors.category = "Please select a valid category";
-    }
 
     if (!user?.businessId) {
       toast.error("Business ID not found");
       return;
     }
 
-    // Price validations
-    if (newProduct.price <= 0 && !newProduct.requiresWeight) {
-      errors.price = "Price must be greater than 0";
-    }
-
-    if (newProduct.requiresWeight && newProduct.pricePerUnit <= 0) {
-      errors.pricePerUnit = "Price per unit must be greater than 0";
-    }
-
-    if (newProduct.costPrice < 0) {
-      errors.costPrice = "Cost price cannot be negative";
-    }
-
-    if (newProduct.costPrice > newProduct.price && !newProduct.requiresWeight) {
-      errors.costPrice = "Cost price cannot be higher than sale price";
-    }
-
-    // Tax rate validation
-    if (newProduct.taxRate < 0 || newProduct.taxRate > 100) {
-      errors.taxRate = "Tax rate must be between 0 and 100";
-    }
-
-    // Stock validations
-    if (newProduct.stockLevel < 0) {
-      errors.stockLevel = "Stock level cannot be negative";
-    }
-
-    if (newProduct.minStockLevel < 0) {
-      errors.minStockLevel = "Minimum stock level cannot be negative";
-    }
-
-    // PLU validation (if provided, should be numeric or alphanumeric)
-    if (newProduct.plu && newProduct.plu.trim()) {
-      const pluRegex = /^[a-zA-Z0-9]+$/;
-      if (!pluRegex.test(newProduct.plu.trim())) {
-        errors.plu = "PLU code can only contain letters and numbers";
-      }
-    }
-
-    // Weight-based product validations
-    if (newProduct.requiresWeight) {
-      if (!newProduct.unit || newProduct.unit === "each") {
-        errors.unit = "Please select a valid weight unit (lb, kg, oz, or g)";
-      }
-    }
+    // Validate using Zod schema
+    const validationResult = validateProduct({
+      ...newProduct,
+      businessId: user.businessId,
+    });
 
     // Show all errors if any exist
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
+    if (!validationResult.success && validationResult.errors) {
+      setFormErrors(validationResult.errors);
 
       // Determine which tab has the first error and switch to it
-      const errorFields = Object.keys(errors);
+      const errorFields = Object.keys(validationResult.errors);
       const basicInfoFields = ["name", "sku", "plu", "category"];
       const pricingFields = [
         "price",
