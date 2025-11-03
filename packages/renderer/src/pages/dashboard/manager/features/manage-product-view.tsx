@@ -936,7 +936,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
+      <div className="bg-white p-2 rounded-lg shadow-sm border">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
             <div className="relative">

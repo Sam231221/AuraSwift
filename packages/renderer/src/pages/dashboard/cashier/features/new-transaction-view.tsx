@@ -781,10 +781,13 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <>
-      <Button onClick={onBack}> Go to dashboard</Button>
+      <Button className="mb-2" onClick={onBack}>
+        {" "}
+        Go to dashboard
+      </Button>
 
       {/* Hardware Scanner Status Bar */}
-      <ScannerStatusBar
+      {/* <ScannerStatusBar
         scannerStatus={scannerStatus}
         audioEnabled={audioEnabled}
         onToggleAudio={() => {
@@ -793,26 +796,26 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }}
         onReset={resetScanner}
         className="mb-4"
-      />
+      /> */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Product Scanning & Selection */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="bg-white border-slate-200 shadow-sm">
-            <CardHeader className="bg-slate-50 py-3">
-              <CardTitle className="flex items-center gap-2 text-slate-700">
-                <ScanBarcode className="h-5 w-5 text-green-600" />
+            <CardHeader className="bg-slate-50 py-2">
+              <CardTitle className="flex text-sm items-center gap-2 text-slate-700">
+                <ScanBarcode className="h-4 w-4 text-green-600" />
                 Scan Products
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent className="pt-1">
               <div className="flex gap-2">
                 <Input
                   placeholder="Enter barcode or PLU code"
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleBarcodeScan()}
-                  className="bg-white border-slate-300"
+                  className="bg-white text-sm border-slate-300"
                 />
                 <Button
                   onClick={handleBarcodeScan}
@@ -822,17 +825,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Button>
               </div>
 
-              {/* Hardware Scanner Info */}
-              <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-green-800">
-                  <ScanBarcode className="h-4 w-4" />
-                  <span className="font-medium">Hardware Scanner Ready:</span>
-                  <span>Just scan any product barcode directly!</span>
-                </div>
-              </div>
-
               <div
-                className={`mt-3 flex items-center gap-2 p-2 rounded ${
+                className={`mt-1 flex items-center gap-2 p-2 rounded ${
                   selectedWeightProduct
                     ? "bg-blue-50 border border-blue-200"
                     : ""
@@ -916,13 +910,13 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </Card>
 
           <Card className="bg-white border-slate-200 shadow-sm">
-            <CardHeader className="bg-slate-50 py-3">
+            <CardHeader className="bg-slate-50 py-2">
               <CardTitle className="flex items-center gap-2 text-slate-700">
                 <Search className="h-5 w-5 text-green-600" />
                 Product Search
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent className="pt-2">
               <Input
                 placeholder="Search products by name or PLU"
                 value={searchQuery}
