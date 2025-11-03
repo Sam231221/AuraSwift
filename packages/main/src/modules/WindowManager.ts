@@ -192,24 +192,26 @@ class WindowManager implements AppModule {
         sandbox: false, // Sandbox disabled because the demo of preload script depend on the Node.js api
         webviewTag: false, // The webview tag is not recommended. Consider alternatives like an iframe or Electron's BrowserView. @see https://www.electronjs.org/docs/latest/api/webview-tag#warning
         preload: this.#preload.path,
-        devTools: false, // Disable DevTools completely
+        devTools: this.#openDevTools, // Enable DevTools based on config
       },
     });
 
     // Hide the menu bar completely
     browserWindow.setMenuBarVisibility(false);
 
-    // Prevent opening DevTools with keyboard shortcuts
-    browserWindow.webContents.on("before-input-event", (event, input) => {
-      // Block F12 and Ctrl+Shift+I (Cmd+Option+I on Mac)
-      if (
-        input.key === "F12" ||
-        (input.control && input.shift && input.key === "I") ||
-        (input.meta && input.alt && input.key === "I")
-      ) {
-        event.preventDefault();
-      }
-    });
+    // Prevent opening DevTools with keyboard shortcuts (only if DevTools disabled)
+    if (!this.#openDevTools) {
+      browserWindow.webContents.on("before-input-event", (event, input) => {
+        // Block F12 and Ctrl+Shift+I (Cmd+Option+I on Mac)
+        if (
+          input.key === "F12" ||
+          (input.control && input.shift && input.key === "I") ||
+          (input.meta && input.alt && input.key === "I")
+        ) {
+          event.preventDefault();
+        }
+      });
+    }
 
     // Ensure window shows when ready to prevent "main window not visible" test failures
     browserWindow.once("ready-to-show", () => {

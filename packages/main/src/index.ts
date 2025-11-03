@@ -50,7 +50,7 @@ export async function initApp(initConfig: AppInitConfig) {
       createWindowManagerModule({
         initConfig,
         // DevTools disabled
-        openDevTools: false,
+        openDevTools: true,
       })
     )
     .init(disallowMultipleAppInstance())
