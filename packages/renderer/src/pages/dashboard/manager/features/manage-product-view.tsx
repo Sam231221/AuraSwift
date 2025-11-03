@@ -97,6 +97,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [stockAdjustmentProduct, setStockAdjustmentProduct] =
     useState<Product | null>(null);
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [activeTab, setActiveTab] = useState<string>("basic");
 
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -218,6 +220,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       pricePerUnit: 0,
     });
     setEditingProduct(null);
+    setFormErrors({}); // Clear form errors
+    setActiveTab("basic"); // Reset to basic tab
   }, [categories]);
 
   const openAddProductDrawer = useCallback(() => {
@@ -231,21 +235,134 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   }, [categories, resetForm]);
 
   const handleAddProduct = async () => {
-    if (
-      !newProduct.name ||
-      !newProduct.sku ||
-      !newProduct.category ||
-      !user?.businessId
-    ) {
-      toast.error(
-        "Please fill in all required fields (name, SKU, and category)"
-      );
+    // Clear previous errors
+    setFormErrors({});
+    const errors: { [key: string]: string } = {};
+
+    // Required field validations
+    if (!newProduct.name.trim()) {
+      errors.name = "Product name is required";
+    }
+
+    if (!newProduct.sku.trim()) {
+      errors.sku = "SKU is required";
+    } else {
+      // SKU format validation (alphanumeric, dashes, underscores)
+      const skuRegex = /^[a-zA-Z0-9_-]+$/;
+      if (!skuRegex.test(newProduct.sku.trim())) {
+        errors.sku =
+          "SKU can only contain letters, numbers, dashes, and underscores";
+      }
+    }
+
+    if (!newProduct.category) {
+      errors.category = "Category is required";
+    } else if (!categories.find((cat) => cat.id === newProduct.category)) {
+      errors.category = "Please select a valid category";
+    }
+
+    if (!user?.businessId) {
+      toast.error("Business ID not found");
       return;
     }
 
-    // Additional validation for category
-    if (!categories.find((cat) => cat.id === newProduct.category)) {
-      toast.error("Please select a valid category");
+    // Price validations
+    if (newProduct.price <= 0 && !newProduct.requiresWeight) {
+      errors.price = "Price must be greater than 0";
+    }
+
+    if (newProduct.requiresWeight && newProduct.pricePerUnit <= 0) {
+      errors.pricePerUnit = "Price per unit must be greater than 0";
+    }
+
+    if (newProduct.costPrice < 0) {
+      errors.costPrice = "Cost price cannot be negative";
+    }
+
+    if (newProduct.costPrice > newProduct.price && !newProduct.requiresWeight) {
+      errors.costPrice = "Cost price cannot be higher than sale price";
+    }
+
+    // Tax rate validation
+    if (newProduct.taxRate < 0 || newProduct.taxRate > 100) {
+      errors.taxRate = "Tax rate must be between 0 and 100";
+    }
+
+    // Stock validations
+    if (newProduct.stockLevel < 0) {
+      errors.stockLevel = "Stock level cannot be negative";
+    }
+
+    if (newProduct.minStockLevel < 0) {
+      errors.minStockLevel = "Minimum stock level cannot be negative";
+    }
+
+    // PLU validation (if provided, should be numeric or alphanumeric)
+    if (newProduct.plu && newProduct.plu.trim()) {
+      const pluRegex = /^[a-zA-Z0-9]+$/;
+      if (!pluRegex.test(newProduct.plu.trim())) {
+        errors.plu = "PLU code can only contain letters and numbers";
+      }
+    }
+
+    // Weight-based product validations
+    if (newProduct.requiresWeight) {
+      if (!newProduct.unit || newProduct.unit === "each") {
+        errors.unit = "Please select a valid weight unit (lb, kg, oz, or g)";
+      }
+    }
+
+    // Show all errors if any exist
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+
+      // Determine which tab has the first error and switch to it
+      const errorFields = Object.keys(errors);
+      const basicInfoFields = ["name", "sku", "plu", "category"];
+      const pricingFields = [
+        "price",
+        "costPrice",
+        "taxRate",
+        "stockLevel",
+        "minStockLevel",
+        "unit",
+        "pricePerUnit",
+      ];
+
+      // Check which tab contains the first error
+      if (errorFields.some((field) => basicInfoFields.includes(field))) {
+        setActiveTab("basic");
+        // Focus on the first error field after a short delay
+        setTimeout(() => {
+          const firstErrorField = errorFields.find((field) =>
+            basicInfoFields.includes(field)
+          );
+          if (firstErrorField) {
+            const element = document.getElementById(firstErrorField);
+            if (element) {
+              element.focus();
+              element.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }
+        }, 100);
+      } else if (errorFields.some((field) => pricingFields.includes(field))) {
+        setActiveTab("pricing");
+        // Focus on the first error field after a short delay
+        setTimeout(() => {
+          const firstErrorField = errorFields.find((field) =>
+            pricingFields.includes(field)
+          );
+          if (firstErrorField) {
+            const element = document.getElementById(firstErrorField);
+            if (element) {
+              element.focus();
+              element.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }
+        }, 100);
+      }
+
+      toast.error("Please fix the errors in the form");
       return;
     }
 
@@ -262,7 +379,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       .map((modifier) => ({
         ...modifier,
         options: modifier.options.filter((option) => option.name.trim()),
-        businessId: user.businessId,
+        businessId: user!.businessId,
         updatedAt: new Date().toISOString(),
       }));
 
@@ -271,7 +388,12 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
       const productData = {
         ...newProduct,
-        businessId: user.businessId,
+        // Trim string fields
+        name: newProduct.name.trim(),
+        description: newProduct.description.trim(),
+        sku: newProduct.sku.trim(),
+        plu: newProduct.plu.trim() || undefined,
+        businessId: user!.businessId,
         // Include only valid modifiers
         modifiers: validModifiers,
       };
@@ -301,9 +423,58 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               );
             }
           }
+          resetForm();
+          setIsDrawerOpen(false);
         } else {
           console.error("Product update failed:", response);
-          toast.error(response.message || "Failed to update product");
+          // Check if it's a duplicate error
+          const errorMsg = response.message || "Failed to update product";
+          console.log("Update error message:", errorMsg);
+          const lowerErrorMsg = errorMsg.toLowerCase();
+
+          if (
+            (lowerErrorMsg.includes("sku") &&
+              lowerErrorMsg.includes("already exists")) ||
+            lowerErrorMsg.includes("unique constraint failed: products.sku")
+          ) {
+            setFormErrors({
+              sku: "This SKU already exists. Please use a different SKU.",
+            });
+            setActiveTab("basic");
+            setTimeout(() => {
+              const skuField = document.getElementById("sku");
+              if (skuField) {
+                skuField.focus();
+                skuField.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }, 100);
+            toast.error("SKU already exists");
+          } else if (
+            (lowerErrorMsg.includes("plu") &&
+              lowerErrorMsg.includes("already exists")) ||
+            lowerErrorMsg.includes("unique constraint failed: products.plu")
+          ) {
+            setFormErrors({
+              plu: "This PLU code already exists. Please use a different PLU.",
+            });
+            setActiveTab("basic");
+            setTimeout(() => {
+              const pluField = document.getElementById("plu");
+              if (pluField) {
+                pluField.focus();
+                pluField.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }, 100);
+            toast.error("PLU code already exists");
+          } else {
+            toast.error(errorMsg);
+          }
         }
       } else {
         // Create new product
@@ -323,14 +494,62 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               );
             }
           }
+          resetForm();
+          setIsDrawerOpen(false);
         } else {
-          toast.error(response.message || "Failed to create product");
+          // Check if it's a duplicate error
+          console.log("Create product failed. Full response:", response);
+          const errorMsg = response.message || "Failed to create product";
+          console.log("Error message:", errorMsg);
+          const lowerErrorMsg = errorMsg.toLowerCase();
+
+          if (
+            (lowerErrorMsg.includes("sku") &&
+              lowerErrorMsg.includes("already exists")) ||
+            lowerErrorMsg.includes("unique constraint failed: products.sku")
+          ) {
+            setFormErrors({
+              sku: "This SKU already exists. Please use a different SKU.",
+            });
+            setActiveTab("basic");
+            setTimeout(() => {
+              const skuField = document.getElementById("sku");
+              if (skuField) {
+                skuField.focus();
+                skuField.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }, 100);
+            toast.error("SKU already exists");
+          } else if (
+            (lowerErrorMsg.includes("plu") &&
+              lowerErrorMsg.includes("already exists")) ||
+            lowerErrorMsg.includes("unique constraint failed: products.plu")
+          ) {
+            setFormErrors({
+              plu: "This PLU code already exists. Please use a different PLU.",
+            });
+            setActiveTab("basic");
+            setTimeout(() => {
+              const pluField = document.getElementById("plu");
+              if (pluField) {
+                pluField.focus();
+                pluField.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              }
+            }, 100);
+            toast.error("PLU code already exists");
+          } else {
+            toast.error(errorMsg);
+          }
         }
       }
-
-      resetForm();
-      setIsDrawerOpen(false);
-    } catch {
+    } catch (error) {
+      console.error("Error saving product:", error);
       toast.error("Failed to save product");
     } finally {
       setLoading(false);
@@ -484,9 +703,26 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const handleInputChange = useCallback(
     (field: string, value: string | number) => {
       setNewProduct((prev) => ({ ...prev, [field]: value }));
+      // Clear error for this field when user starts typing
+      if (formErrors[field]) {
+        setFormErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors[field];
+          return newErrors;
+        });
+      }
     },
-    []
+    [formErrors]
   );
+
+  // Helper to clear specific field error
+  const clearFieldError = useCallback((field: string) => {
+    setFormErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[field];
+      return newErrors;
+    });
+  }, []);
 
   const ProductDashboardView = React.memo(() => (
     <div className="p-6 space-y-6">
@@ -1183,7 +1419,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           </DrawerHeader>
 
           <div className="p-6 overflow-y-auto flex-1">
-            <Tabs defaultValue="basic" className="w-full">
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-full"
+            >
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="basic">Basic Info</TabsTrigger>
                 <TabsTrigger value="pricing">Pricing & Stock</TabsTrigger>
@@ -1231,7 +1471,13 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         handleInputChange("name", e.target.value)
                       }
                       placeholder="Enter product name"
+                      className={formErrors.name ? "border-red-500" : ""}
                     />
+                    {formErrors.name && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.name}
+                      </p>
+                    )}
                   </div>
 
                   <div className="col-span-2">
@@ -1254,11 +1500,14 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                     <Label htmlFor="category">Category *</Label>
                     <Select
                       value={newProduct.category}
-                      onValueChange={(value) =>
-                        setNewProduct({ ...newProduct, category: value })
-                      }
+                      onValueChange={(value) => {
+                        setNewProduct({ ...newProduct, category: value });
+                        clearFieldError("category");
+                      }}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger
+                        className={formErrors.category ? "border-red-500" : ""}
+                      >
                         <SelectValue
                           placeholder={
                             categories.length === 0
@@ -1281,6 +1530,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         )}
                       </SelectContent>
                     </Select>
+                    {formErrors.category && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.category}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1288,11 +1542,18 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                     <Input
                       id="sku"
                       value={newProduct.sku}
-                      onChange={(e) =>
-                        setNewProduct({ ...newProduct, sku: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setNewProduct({ ...newProduct, sku: e.target.value });
+                        clearFieldError("sku");
+                      }}
                       placeholder="Enter SKU"
+                      className={formErrors.sku ? "border-red-500" : ""}
                     />
+                    {formErrors.sku && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.sku}
+                      </p>
+                    )}
                   </div>
 
                   <div className="col-span-2">
@@ -1300,11 +1561,18 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                     <Input
                       id="plu"
                       value={newProduct.plu}
-                      onChange={(e) =>
-                        setNewProduct({ ...newProduct, plu: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setNewProduct({ ...newProduct, plu: e.target.value });
+                        clearFieldError("plu");
+                      }}
                       placeholder="Enter PLU code"
+                      className={formErrors.plu ? "border-red-500" : ""}
                     />
+                    {formErrors.plu && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.plu}
+                      </p>
+                    )}
                   </div>
                 </div>
               </TabsContent>
@@ -1325,7 +1593,13 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         })
                       }
                       placeholder="0.00"
+                      className={formErrors.price ? "border-red-500" : ""}
                     />
+                    {formErrors.price && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.price}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1342,7 +1616,13 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         })
                       }
                       placeholder="0.00"
+                      className={formErrors.costPrice ? "border-red-500" : ""}
                     />
+                    {formErrors.costPrice && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.costPrice}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1359,7 +1639,13 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         })
                       }
                       placeholder="10"
+                      className={formErrors.taxRate ? "border-red-500" : ""}
                     />
+                    {formErrors.taxRate && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.taxRate}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1413,7 +1699,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                             })
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger
+                            className={formErrors.unit ? "border-red-500" : ""}
+                          >
                             <SelectValue placeholder="Select unit" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1423,6 +1711,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                             <SelectItem value="g">Grams (g)</SelectItem>
                           </SelectContent>
                         </Select>
+                        {formErrors.unit && (
+                          <p className="text-sm text-red-500 mt-1">
+                            {formErrors.unit}
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -1443,7 +1736,15 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                             })
                           }
                           placeholder="0.00"
+                          className={
+                            formErrors.pricePerUnit ? "border-red-500" : ""
+                          }
                         />
+                        {formErrors.pricePerUnit && (
+                          <p className="text-sm text-red-500 mt-1">
+                            {formErrors.pricePerUnit}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-500 mt-1">
                           This will be multiplied by the weight during checkout
                         </p>
@@ -1466,7 +1767,13 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         })
                       }
                       placeholder="0"
+                      className={formErrors.stockLevel ? "border-red-500" : ""}
                     />
+                    {formErrors.stockLevel && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.stockLevel}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1482,7 +1789,15 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                         })
                       }
                       placeholder="5"
+                      className={
+                        formErrors.minStockLevel ? "border-red-500" : ""
+                      }
                     />
+                    {formErrors.minStockLevel && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {formErrors.minStockLevel}
+                      </p>
+                    )}
                   </div>
                 </div>
               </TabsContent>
