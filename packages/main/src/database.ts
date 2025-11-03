@@ -387,7 +387,7 @@ export class DatabaseManager {
         costPrice REAL DEFAULT 0,
         taxRate REAL DEFAULT 0,
         sku TEXT UNIQUE NOT NULL,
-        plu TEXT,
+        plu TEXT UNIQUE,
         image TEXT,
         category TEXT NOT NULL,
         stockLevel INTEGER DEFAULT 0,
@@ -625,6 +625,7 @@ export class DatabaseManager {
       
       CREATE INDEX IF NOT EXISTS idx_products_businessId ON products(businessId);
       CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+      CREATE INDEX IF NOT EXISTS idx_products_plu ON products(plu);
       CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
       CREATE INDEX IF NOT EXISTS idx_modifiers_businessId ON modifiers(businessId);
       CREATE INDEX IF NOT EXISTS idx_stock_adjustments_productId ON stock_adjustments(productId);
@@ -1359,6 +1360,33 @@ export class DatabaseManager {
       `Retrieved ${modifiers.length} modifiers for product ${id}:`,
       modifiers
     );
+
+    return {
+      ...product,
+      isActive: Boolean(product.isActive),
+      requiresWeight: Boolean(product.requiresWeight),
+      modifiers,
+    };
+  }
+
+  /**
+   * Get product by PLU code
+   */
+  getProductByPLU(plu: string): Product {
+    const product = this.db
+      .prepare(
+        `
+      SELECT * FROM products WHERE plu = ? AND isActive = 1
+    `
+      )
+      .get(plu) as any;
+
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    // Get modifiers for this product
+    const modifiers = this.getProductModifiers(product.id);
 
     return {
       ...product,

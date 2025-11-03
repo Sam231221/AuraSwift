@@ -430,6 +430,21 @@ export class AuthAPI {
         // SKU doesn't exist, which is good
       }
 
+      // Check if PLU already exists (if PLU is provided)
+      if (productData.plu) {
+        try {
+          const existingProductByPLU = db.getProductByPLU(productData.plu);
+          if (existingProductByPLU) {
+            return {
+              success: false,
+              message: "A product with this PLU already exists",
+            };
+          }
+        } catch (error) {
+          // PLU doesn't exist, which is good
+        }
+      }
+
       // Extract modifiers from product data
       const { modifiers, ...productDataWithoutModifiers } = productData;
 
@@ -560,6 +575,21 @@ export class AuthAPI {
           }
         } catch (error) {
           // SKU doesn't exist, which is good
+        }
+      }
+
+      // If updating PLU, check it doesn't already exist
+      if (updates.plu) {
+        try {
+          const existingProductByPLU = db.getProductByPLU(updates.plu);
+          if (existingProductByPLU && existingProductByPLU.id !== id) {
+            return {
+              success: false,
+              message: "A product with this PLU already exists",
+            };
+          }
+        } catch (error) {
+          // PLU doesn't exist, which is good
         }
       }
 
