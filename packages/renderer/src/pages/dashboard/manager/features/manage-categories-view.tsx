@@ -1,9 +1,11 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Plus,
   Edit,
   Trash2,
   ChevronLeft,
+  ChevronRight,
+  ChevronDown,
   GripVertical,
   Tag,
   Settings,
@@ -38,6 +40,186 @@ interface Category {
   parentId?: string | null;
 }
 
+type CategoryWithChildren = Category & { children: CategoryWithChildren[] };
+
+// CategoryRow component for hierarchical display
+interface CategoryRowProps {
+  category: CategoryWithChildren;
+  level: number;
+  isExpanded: boolean;
+  onToggleExpand: (id: string) => void;
+  onEdit: (category: Category) => void;
+  onDelete: (id: string) => void;
+  allCategories: Category[];
+  onReorder: (id: string, direction: "up" | "down") => void;
+  expandedCategories: Set<string>;
+}
+
+const CategoryRow: React.FC<CategoryRowProps> = ({
+  category,
+  level,
+  isExpanded,
+  onToggleExpand,
+  onEdit,
+  onDelete,
+  allCategories,
+  onReorder,
+  expandedCategories,
+}) => {
+  const hasChildren = category.children && category.children.length > 0;
+  const paddingLeft = level * 24 + 16;
+
+  // Get siblings at the same level for reordering
+  const getSiblings = () => {
+    if (!category.parentId) {
+      // Top-level categories
+      return allCategories.filter((c) => !c.parentId);
+    } else {
+      // Child categories - same parent
+      return allCategories.filter((c) => c.parentId === category.parentId);
+    }
+  };
+
+  const siblings = getSiblings();
+  const currentIndex = siblings.findIndex((c) => c.id === category.id);
+  const isFirst = currentIndex === 0;
+  const isLast = currentIndex === siblings.length - 1;
+
+  return (
+    <>
+      <div
+        className="flex items-center justify-between hover:bg-gray-50 border-b border-gray-100"
+        style={{
+          paddingLeft: `${paddingLeft}px`,
+          paddingRight: "16px",
+          paddingTop: "12px",
+          paddingBottom: "12px",
+        }}
+      >
+        <div className="flex items-center space-x-3 flex-1">
+          {/* Expand/Collapse button */}
+          <button
+            onClick={() => hasChildren && onToggleExpand(category.id)}
+            className={`w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 ${
+              !hasChildren ? "invisible" : ""
+            }`}
+          >
+            {hasChildren &&
+              (isExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-600" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+              ))}
+          </button>
+
+          {/* Drag handle */}
+          <div className="cursor-grab">
+            <GripVertical className="w-5 h-5 text-gray-400" />
+          </div>
+
+          {/* Reorder buttons */}
+          <div className="flex flex-col space-y-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onReorder(category.id, "up")}
+              disabled={isFirst}
+              className="h-5 w-5 p-0 hover:bg-blue-100"
+              title="Move up"
+            >
+              <span className="text-xs">↑</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onReorder(category.id, "down")}
+              disabled={isLast}
+              className="h-5 w-5 p-0 hover:bg-blue-100"
+              title="Move down"
+            >
+              <span className="text-xs">↓</span>
+            </Button>
+          </div>
+
+          {/* Category info */}
+          <div className="flex-1">
+            <div className="flex items-center space-x-2">
+              <span className="font-medium text-gray-900">{category.name}</span>
+              {hasChildren && (
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                  {category.children.length}{" "}
+                  {category.children.length === 1
+                    ? "subcategory"
+                    : "subcategories"}
+                </span>
+              )}
+            </div>
+            {category.description && (
+              <div className="text-sm text-gray-500 mt-0.5">
+                {category.description}
+              </div>
+            )}
+            <div className="text-xs text-gray-400 mt-1">
+              Created: {new Date(category.createdAt).toLocaleDateString()}
+            </div>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center space-x-2">
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${
+              category.isActive
+                ? "bg-green-100 text-green-800"
+                : "bg-red-100 text-red-800"
+            }`}
+          >
+            {category.isActive ? "Active" : "Inactive"}
+          </span>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onEdit(category)}
+            title="Edit category"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onDelete(category.id)}
+            title="Delete category"
+          >
+            <Trash2 className="w-4 h-4 text-red-600" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Render children if expanded */}
+      {hasChildren && isExpanded && (
+        <>
+          {category.children.map((child) => (
+            <CategoryRow
+              key={child.id}
+              category={child}
+              level={level + 1}
+              isExpanded={expandedCategories.has(child.id)}
+              onToggleExpand={onToggleExpand}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              allCategories={allCategories}
+              onReorder={onReorder}
+              expandedCategories={expandedCategories}
+            />
+          ))}
+        </>
+      )}
+    </>
+  );
+};
+
 interface ManageCategoriesViewProps {
   onBack: () => void;
 }
@@ -53,12 +235,68 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set()
+  );
 
   const [newCategory, setNewCategory] = useState({
     name: "",
     description: "",
     parentId: "",
   });
+
+  // Build hierarchical category tree
+  const categoryTree = useMemo(() => {
+    type CategoryWithChildren = Category & { children: CategoryWithChildren[] };
+    const tree: CategoryWithChildren[] = [];
+    const categoryMap = new Map<string, CategoryWithChildren>();
+
+    // First pass: create map with children array
+    categories.forEach((cat) => {
+      categoryMap.set(cat.id, { ...cat, children: [] });
+    });
+
+    // Second pass: build tree structure
+    categories.forEach((cat) => {
+      const categoryWithChildren = categoryMap.get(cat.id)!;
+      if (cat.parentId) {
+        const parent = categoryMap.get(cat.parentId);
+        if (parent) {
+          parent.children.push(categoryWithChildren);
+        } else {
+          // Parent not found, treat as top-level
+          tree.push(categoryWithChildren);
+        }
+      } else {
+        tree.push(categoryWithChildren);
+      }
+    });
+
+    // Sort by sortOrder at each level
+    const sortTree = (items: CategoryWithChildren[]) => {
+      items.sort((a, b) => a.sortOrder - b.sortOrder);
+      items.forEach((item) => {
+        if (item.children.length > 0) {
+          sortTree(item.children);
+        }
+      });
+    };
+
+    sortTree(tree);
+    return tree;
+  }, [categories]);
+
+  const toggleExpand = (categoryId: string) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
 
   // Load categories
   const loadCategories = useCallback(async () => {
@@ -281,29 +519,53 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     categoryId: string,
     direction: "up" | "down"
   ) => {
-    const currentIndex = categories.findIndex((c) => c.id === categoryId);
+    // Find the category being moved
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category) return;
+
+    // Get siblings (categories with same parent)
+    const siblings = categories.filter((c) =>
+      category.parentId ? c.parentId === category.parentId : !c.parentId
+    );
+
+    // Sort siblings by sortOrder
+    siblings.sort((a, b) => a.sortOrder - b.sortOrder);
+
+    const currentIndex = siblings.findIndex((c) => c.id === categoryId);
     if (
       (direction === "up" && currentIndex === 0) ||
-      (direction === "down" && currentIndex === categories.length - 1)
+      (direction === "down" && currentIndex === siblings.length - 1)
     ) {
       return; // Can't move beyond boundaries
     }
 
     const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    const reorderedCategories = [...categories];
 
-    // Swap categories
-    [reorderedCategories[currentIndex], reorderedCategories[newIndex]] = [
-      reorderedCategories[newIndex],
-      reorderedCategories[currentIndex],
-    ];
+    // Create new array with swapped sortOrder values
+    const updatedSiblings = siblings.map((sibling, index) => {
+      if (index === currentIndex) {
+        return { ...sibling, sortOrder: siblings[newIndex].sortOrder };
+      } else if (index === newIndex) {
+        return { ...sibling, sortOrder: siblings[currentIndex].sortOrder };
+      }
+      return sibling;
+    });
+
+    // Update the categories array with new sortOrder values
+    const updatedCategories = categories.map((cat) => {
+      const updatedSibling = updatedSiblings.find((s) => s.id === cat.id);
+      return updatedSibling || cat;
+    });
 
     // Update local state immediately for better UX
-    setCategories(reorderedCategories);
+    setCategories(updatedCategories);
 
     try {
-      // Send new order to backend
-      const categoryIds = reorderedCategories.map((c) => c.id);
+      // Send new order to backend (all category IDs sorted by sortOrder)
+      const categoryIds = [...updatedCategories]
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((c) => c.id);
+
       const response = await window.categoryAPI.reorder(
         user!.businessId,
         categoryIds
@@ -314,7 +576,8 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
         setCategories(categories);
         toast.error("Failed to reorder categories");
       } else {
-        toast.success("Categories reordered successfully");
+        // Reload to ensure consistency
+        await loadCategories();
       }
     } catch (error) {
       console.error("Error reordering categories:", error);
@@ -456,7 +719,8 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
           <div className="p-4 border-b bg-gray-50">
             <h3 className="text-lg font-semibold text-gray-900">Categories</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Drag and drop to reorder categories
+              Use ↑↓ buttons to reorder, click ▶ to expand/collapse
+              subcategories
             </p>
           </div>
 
@@ -490,83 +754,19 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {categories.map((category, index) => (
-                <div
+              {categoryTree.map((category) => (
+                <CategoryRow
                   key={category.id}
-                  className="p-4 hover:bg-gray-50 flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className="flex flex-col space-y-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleReorderCategory(category.id, "up")}
-                        disabled={index === 0}
-                        className="h-6 w-6 p-0"
-                      >
-                        ↑
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          handleReorderCategory(category.id, "down")
-                        }
-                        disabled={index === categories.length - 1}
-                        className="h-6 w-6 p-0"
-                      >
-                        ↓
-                      </Button>
-                    </div>
-
-                    <div className="cursor-grab">
-                      <GripVertical className="w-5 h-5 text-gray-400" />
-                    </div>
-
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {category.name}
-                      </div>
-                      {category.description && (
-                        <div className="text-sm text-gray-500">
-                          {category.description}
-                        </div>
-                      )}
-                      <div className="text-xs text-gray-400 mt-1">
-                        Order: {category.sortOrder} • Created:{" "}
-                        {new Date(category.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        category.isActive
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {category.isActive ? "Active" : "Inactive"}
-                    </span>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEditCategory(category)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDeleteCategory(category.id)}
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </Button>
-                  </div>
-                </div>
+                  category={category}
+                  level={0}
+                  isExpanded={expandedCategories.has(category.id)}
+                  onToggleExpand={toggleExpand}
+                  onEdit={handleEditCategory}
+                  onDelete={handleDeleteCategory}
+                  allCategories={categories}
+                  onReorder={handleReorderCategory}
+                  expandedCategories={expandedCategories}
+                />
               ))}
             </div>
           )}
