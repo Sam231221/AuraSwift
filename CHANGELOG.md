@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.2.0](https://github.com/Sam231221/AuraSwift/compare/v1.1.0...v1.2.0) (2025-11-03)
+
+
+### Bug Fixes
+
+* **cashier-management:** ✨ improve form validation and error handling for cashier creation ([5699222](https://github.com/Sam231221/AuraSwift/commit/569922236b7af21b1a73690321bd8161050879f5))
+* **window-manager:** 🐛 enable DevTools based on configuration and prevent opening via keyboard shortcuts when disabled ([779c6bc](https://github.com/Sam231221/AuraSwift/commit/779c6bc081a3bf96ec2bfbfe2a5e327bfda11e55))
+* **product-management:** 🐛 enhance form validation and error handling for product creation ([98f2de4](https://github.com/Sam231221/AuraSwift/commit/98f2de4cb3c929c4a06a6e31925fdee3dbce93e3))
+* **staff-schedules-view:** 🐛 filter cashiers to exclude managers and admins from the list ([0718dee](https://github.com/Sam231221/AuraSwift/commit/0718deeefcfd7a0f225695a2a85a3867ce11044f))
+* **preload:** 🐛 handle errors when exposing exports in main world ([4c1a074](https://github.com/Sam231221/AuraSwift/commit/4c1a07436e5f9c0bd055361a047d810d00a793a1))
+* **user-management:** 🚑 improve form validation and error handling for user creation ([49dd79d](https://github.com/Sam231221/AuraSwift/commit/49dd79d5cfff0252cdeadf6f6ee3ac93a2d4f66b))
+* **window-manager:** 🚫 disable DevTools and prevent opening via keyboard shortcuts ([b5b8819](https://github.com/Sam231221/AuraSwift/commit/b5b8819539ad15e3fae0ef332e0edb6c914df4e4))
+* **main:** fix Toaster component for enhanced notification handling ([68113d0](https://github.com/Sam231221/AuraSwift/commit/68113d018013ef31fa00b6a98a95282d6c107518))
+
+
+### Features
+
+* **auth-api:**  ✨ add PLU uniqueness checks and migration script for existing duplicates ([b0f85f2](https://github.com/Sam231221/AuraSwift/commit/b0f85f2c017e89679ccf136030e9f4a56c599818))
+* **database:** ✨ add UNIQUE constraint on (name, businessId) for categories and handle duplicate names during migration ([ada668d](https://github.com/Sam231221/AuraSwift/commit/ada668dd807e2ddcbae215a5d5438f92ce94ea40))
+* **manage-categories:** ✨ implement category validation and error handling for form submissions ([b4e1e9b](https://github.com/Sam231221/AuraSwift/commit/b4e1e9b20cb835bb5933896a6ee81ba0dfd9cfac))
+* **product-management:** ✨ implement centralized product validation schema using Zod for improved error handling ([7579dba](https://github.com/Sam231221/AuraSwift/commit/7579dba64b3cb062b1050af4e2f6a5f80290dcf8))
+
 # [1.1.0](https://github.com/Sam231221/AuraSwift/compare/v1.0.4...v1.1.0) (2025-11-01)
 
 
