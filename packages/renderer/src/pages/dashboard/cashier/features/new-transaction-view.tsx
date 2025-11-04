@@ -18,6 +18,10 @@ import {
   Scale,
   AlertCircle,
   Loader2,
+  ChevronRight,
+  Home,
+  Grid3x3,
+  Package,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
@@ -49,6 +53,25 @@ interface PaymentMethod {
   amount?: number;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  businessId: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  parentId?: string | null;
+}
+
+type CategoryWithChildren = Category & { children: CategoryWithChildren[] };
+
+interface BreadcrumbItem {
+  id: string | null;
+  name: string;
+}
+
 const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   // State management
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -68,6 +91,15 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Categories from backend
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(
+    null
+  );
+  const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([
+    { id: null, name: "All Categories" },
+  ]);
 
   const { user } = useAuth();
 
@@ -231,10 +263,73 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   }, [user?.businessId]);
 
+  // Load categories from backend
+  const loadCategories = useCallback(async () => {
+    if (!user?.businessId) return;
+
+    try {
+      const response = await window.categoryAPI.getByBusiness(user.businessId);
+      if (response.success && response.categories) {
+        // Filter to only active categories
+        const activeCategories = response.categories.filter(
+          (cat) => cat.isActive
+        );
+        setCategories(activeCategories);
+      } else {
+        toast.error("Failed to load categories");
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      toast.error("Failed to load categories");
+    }
+  }, [user?.businessId]);
+
   // Load products on component mount
   useEffect(() => {
     loadProducts();
-  }, [loadProducts]);
+    loadCategories();
+  }, [loadProducts, loadCategories]);
+
+  // Category navigation functions
+  const handleCategoryClick = (category: Category) => {
+    setCurrentCategoryId(category.id);
+    setBreadcrumb([...breadcrumb, { id: category.id, name: category.name }]);
+  };
+
+  const handleBreadcrumbClick = (index: number) => {
+    const newBreadcrumb = breadcrumb.slice(0, index + 1);
+    setBreadcrumb(newBreadcrumb);
+    setCurrentCategoryId(newBreadcrumb[newBreadcrumb.length - 1].id);
+  };
+
+  // Get current level categories (top-level or children of current category)
+  const currentCategories = categories
+    .filter((cat) =>
+      currentCategoryId === null
+        ? !cat.parentId
+        : cat.parentId === currentCategoryId
+    )
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  // Get products for current category (including subcategories)
+  const getCurrentCategoryProducts = (): Product[] => {
+    if (currentCategoryId === null) {
+      // Show all products when at root
+      return products;
+    }
+
+    // Get all descendant category IDs
+    const getDescendantIds = (catId: string): string[] => {
+      const children = categories.filter((c) => c.parentId === catId);
+      return [
+        catId,
+        ...children.flatMap((child) => getDescendantIds(child.id)),
+      ];
+    };
+
+    const categoryIds = getDescendantIds(currentCategoryId);
+    return products.filter((p) => categoryIds.includes(p.category));
+  };
 
   // Auto-connect to printer on component mount
   useEffect(() => {
@@ -781,11 +876,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <>
-      <Button className="mb-2" onClick={onBack}>
-        {" "}
-        Go to dashboard
-      </Button>
-
       {/* Hardware Scanner Status Bar */}
       {/* <ScannerStatusBar
         scannerStatus={scannerStatus}
@@ -802,16 +892,239 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         {/* Left Column - Product Scanning & Selection */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="bg-white border-slate-200 shadow-sm">
-            <CardHeader className="bg-slate-50 py-2">
-              <CardTitle className="flex text-sm items-center gap-2 text-slate-700">
-                <ScanBarcode className="h-4 w-4 text-green-600" />
-                Scan Products
-              </CardTitle>
+            <CardHeader className="bg-slate-50 py-1">
+              <div className="flex items-center justify-between">
+                {/* Breadcrumb Navigation */}
+                <div className="flex items-center gap-2 text-sm">
+                  {breadcrumb.map((item, index) => (
+                    <React.Fragment key={item.id || "root"}>
+                      {index > 0 && (
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                      )}
+                      <button
+                        onClick={() => handleBreadcrumbClick(index)}
+                        className={`px-2 py-1 rounded transition-colors ${
+                          index === breadcrumb.length - 1
+                            ? "bg-sky-100 text-sky-700 font-medium"
+                            : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {index === 0 ? <Home className="h-4 w-4" /> : item.name}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
             </CardHeader>
+            <CardContent className="pt-4">
+              {/* Search Bar */}
+              <div className="mb-4 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search products by name, SKU, or PLU..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-white border-slate-300 pl-10"
+                />
+              </div>
+
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                  <span className="ml-2 text-slate-600">
+                    Loading products...
+                  </span>
+                </div>
+              ) : error ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+                  <p className="text-red-600 mb-4">Failed to load products</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      loadProducts();
+                      loadCategories();
+                    }}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Show Categories if no search query and categories exist at current level */}
+                  {!searchQuery && currentCategories.length > 0 && (
+                    <div>
+                      {/* <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">
+                        Categories
+                      </h3> */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {currentCategories.map((category) => {
+                          const childCount = categories.filter(
+                            (c) => c.parentId === category.id
+                          ).length;
+                          const productCount = products.filter(
+                            (p) => p.category === category.id
+                          ).length;
+
+                          return (
+                            <motion.button
+                              key={category.id}
+                              onClick={() => handleCategoryClick(category)}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              className="relative bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg p-6 shadow-md transition-all h-28 flex flex-col items-center justify-center"
+                            >
+                              <div className="text-center">
+                                <p className="font-bold text-lg uppercase tracking-wide mb-1">
+                                  {category.name}
+                                </p>
+                                <p className="text-xs opacity-90">
+                                  {childCount > 0
+                                    ? `${childCount} subcategories`
+                                    : `${productCount} items`}
+                                </p>
+                              </div>
+                              {childCount > 0 && (
+                                <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 opacity-75" />
+                              )}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show Products */}
+                  {(() => {
+                    const displayProducts = searchQuery
+                      ? filteredProducts
+                      : getCurrentCategoryProducts();
+
+                    if (
+                      displayProducts.length === 0 &&
+                      !searchQuery &&
+                      currentCategories.length === 0
+                    ) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <Package className="h-12 w-12 text-slate-300 mb-4" />
+                          <p className="text-slate-500 text-center">
+                            No products in this category
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    if (displayProducts.length === 0 && searchQuery) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <Search className="h-12 w-12 text-slate-300 mb-4" />
+                          <p className="text-slate-500 text-center">
+                            No products found for "{searchQuery}"
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    return displayProducts.length > 0 ? (
+                      <div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
+                          {displayProducts.map((product) => (
+                            <motion.div
+                              key={product.id}
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.97 }}
+                            >
+                              <Button
+                                variant="outline"
+                                className={`h-auto py-4 flex flex-col items-center w-full transition-all ${
+                                  selectedWeightProduct?.id === product.id
+                                    ? "bg-blue-50 border-blue-300 hover:bg-blue-100"
+                                    : "bg-white border-slate-200 hover:bg-slate-50"
+                                }`}
+                                onClick={() => {
+                                  if (product.requiresWeight) {
+                                    if (
+                                      selectedWeightProduct?.id ===
+                                        product.id &&
+                                      weightInput &&
+                                      parseFloat(weightInput) > 0
+                                    ) {
+                                      addToCart(
+                                        product,
+                                        parseFloat(weightInput)
+                                      );
+                                      setWeightInput("");
+                                      setSelectedWeightProduct(null);
+                                    } else {
+                                      setSelectedWeightProduct(product);
+                                      toast.warning(
+                                        `⚖️ Enter weight for ${product.name} (${product.unit})`
+                                      );
+                                    }
+                                  } else {
+                                    addToCart(product);
+                                  }
+                                }}
+                              >
+                                <div className="w-16 h-16 bg-slate-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
+                                  {product.image ? (
+                                    <img
+                                      src={product.image}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-2xl font-bold text-slate-400">
+                                      {product.name.charAt(0)}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-sm font-medium text-slate-900 text-center line-clamp-2 mb-1">
+                                  {product.name}
+                                </span>
+                                <span className="text-base font-bold text-green-600">
+                                  £
+                                  {product.requiresWeight &&
+                                  product.pricePerUnit
+                                    ? product.pricePerUnit.toFixed(2)
+                                    : product.price.toFixed(2)}
+                                  {product.requiresWeight && (
+                                    <span className="text-xs text-slate-500 ml-1">
+                                      /{product.unit}
+                                    </span>
+                                  )}
+                                </span>
+                                {product.requiresWeight && (
+                                  <Badge
+                                    variant="outline"
+                                    className="mt-1 text-xs bg-blue-50"
+                                  >
+                                    <Scale className="h-3 w-3 mr-1" />
+                                    Weighed
+                                  </Badge>
+                                )}
+                              </Button>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Cart & Payment */}
+        <div className="">
+          <div className="bg-white p-2 border-t-black-200  shadow-lg">
             <CardContent className="pt-1">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Enter barcode or PLU code"
+                  placeholder="Scan/Enter barcode or PLU code"
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && handleBarcodeScan()}
@@ -819,7 +1132,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 />
                 <Button
                   onClick={handleBarcodeScan}
-                  className="bg-green-600 hover:bg-green-700"
+                  className="bg-sky-600 hover:bg-sky-700"
                 >
                   Scan
                 </Button>
@@ -887,7 +1200,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                           setWeightInput("");
                           setSelectedWeightProduct(null);
                         }}
-                        className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
+                        className="h-8 px-3 bg-sky-600 hover:bg-sky-700 text-white"
                       >
                         Add to Cart
                       </Button>
@@ -907,145 +1220,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 )}
               </div>
             </CardContent>
-          </Card>
-
-          <Card className="bg-white border-slate-200 shadow-sm">
-            <CardHeader className="bg-slate-50 py-2">
-              <CardTitle className="flex items-center gap-2 text-slate-700">
-                <Search className="h-5 w-5 text-green-600" />
-                Product Search
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-2">
-              <Input
-                placeholder="Search products by name or PLU"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-white border-slate-300 mb-4"
-              />
-
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                  <span className="ml-2 text-slate-600">
-                    Loading products...
-                  </span>
-                </div>
-              ) : error ? (
-                <div className="flex items-center justify-center py-8">
-                  <AlertCircle className="h-8 w-8 text-red-500" />
-                  <div className="ml-2">
-                    <p className="text-red-600">Failed to load products</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={loadProducts}
-                      className="mt-2"
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                </div>
-              ) : filteredProducts.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <p className="text-slate-500">No products found</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-80 overflow-y-auto p-1">
-                  {filteredProducts.map((product) => (
-                    <motion.div
-                      key={product.id}
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                    >
-                      <Button
-                        variant="outline"
-                        className={`h-auto py-3 flex flex-col items-center w-full transition-all ${
-                          selectedWeightProduct?.id === product.id
-                            ? "bg-blue-50 border-blue-300 hover:bg-blue-100"
-                            : "bg-white border-slate-200 hover:bg-slate-50"
-                        }`}
-                        onClick={() => {
-                          if (product.requiresWeight) {
-                            if (weightInput && parseFloat(weightInput) > 0) {
-                              addToCart(product, parseFloat(weightInput));
-                              setWeightInput("");
-                              setSelectedWeightProduct(null);
-                            } else {
-                              setSelectedWeightProduct(product);
-                              toast.error(
-                                `Please enter weight in ${
-                                  product.unit || "units"
-                                } for ${product.name}`
-                              );
-                            }
-                          } else {
-                            addToCart(product);
-                          }
-                        }}
-                      >
-                        <span className="font-medium text-slate-800">
-                          {product.name}
-                        </span>
-                        <span className="text-sm text-green-600 font-semibold">
-                          {product.requiresWeight && product.pricePerUnit
-                            ? `£${product.pricePerUnit.toFixed(2)}/${
-                                product.unit
-                              }`
-                            : `£${product.price.toFixed(2)}`}
-                        </span>
-                        <div className="flex gap-1 mt-1 flex-wrap justify-center">
-                          {product.requiresWeight && (
-                            <Badge
-                              variant="outline"
-                              className="bg-blue-50 text-blue-700 border-blue-300 text-xs"
-                            >
-                              <Scale className="h-3 w-3 mr-1" />
-                              {product.unit || "weight"}
-                            </Badge>
-                          )}
-                          {product.plu && (
-                            <Badge
-                              variant="secondary"
-                              className="bg-slate-100 text-slate-600 text-xs"
-                            >
-                              PLU: {product.plu}
-                            </Badge>
-                          )}
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="mt-1 bg-slate-100 text-slate-600"
-                        >
-                          SKU: {product.sku}
-                        </Badge>
-                        {product.requiresWeight && (
-                          <div className="flex items-center mt-1 text-xs text-slate-500">
-                            <Scale className="h-3 w-3 mr-1" />
-                            Weight
-                          </div>
-                        )}
-                      </Button>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column - Cart & Payment */}
-        <div className="space-y-6">
-          <Card className="bg-white border-slate-200 shadow-sm">
-            <CardHeader className="bg-slate-50 py-3 flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-slate-700">
-                <ShoppingCart className="h-5 w-5 text-green-600" />
-                Shopping Cart
-              </CardTitle>
-              <Badge variant="outline" className="bg-green-100 text-green-800">
-                {cart.length} items
-              </Badge>
-            </CardHeader>
+          </div>
+          <div className="bg-white p-2 border-b-slate-200 shadow-sm">
             <CardContent className="pt-4">
               <AnimatePresence>
                 {cart.length === 0 ? (
@@ -1161,18 +1337,22 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   <span>Subtotal:</span>
                   <span>£{subtotal.toFixed(2)}</span>
                 </div>
+                <div className="flex justify-between mb-1 text-slate-700">
+                  <span>Items Count:</span>
+                  <span>{cart.length}</span>
+                </div>
                 <div className="flex justify-between mb-1 text-slate-500">
                   <span>Tax (8%):</span>
                   <span>£{tax.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-lg mt-3 pt-2 border-t border-slate-200 text-green-700">
+                <div className="flex justify-between font-bold text-lg mt-3 pt-2 border-t border-slate-200 text-sky-700">
                   <span>Total:</span>
                   <span>£{total.toFixed(2)}</span>
                 </div>
 
                 {!paymentStep ? (
                   <Button
-                    className="w-full mt-4 bg-green-600 hover:bg-green-700 h-11 text-lg"
+                    className="w-full mt-4 bg-sky-600 hover:bg-sky-700 h-11 text-lg"
                     onClick={() => setPaymentStep(true)}
                     disabled={cart.length === 0}
                   >
@@ -1189,8 +1369,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 )}
               </div>
             </CardContent>
-          </Card>
-
+          </div>
           {/* Hardware Scanner History */}
           {scanLog.length > 0 && (
             <ScanHistory
@@ -1199,7 +1378,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               maxVisible={3}
             />
           )}
-
           {/* Payment Section */}
           {paymentStep && (
             <motion.div
@@ -1329,7 +1507,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                           <div
                             className={`flex justify-between font-bold text-lg pt-2 border-t border-slate-200 ${
                               cashAmount >= total
-                                ? "text-green-700"
+                                ? "text-sky-700"
                                 : cashAmount > 0
                                 ? "text-red-600"
                                 : "text-slate-600"
@@ -1394,7 +1572,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         className={`w-full mt-4 h-11 text-lg ${
                           paymentMethod?.type === "cash" && cashAmount < total
                             ? "bg-slate-400 cursor-not-allowed"
-                            : "bg-green-600 hover:bg-green-700"
+                            : "bg-sky-600 hover:bg-sky-700"
                         }`}
                         onClick={handleCompleteTransaction}
                         disabled={
@@ -1413,7 +1591,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               </Card>
             </motion.div>
           )}
-
           {/* Transaction Complete Message */}
           {transactionComplete && (
             <motion.div
@@ -1437,7 +1614,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   Total: £{total.toFixed(2)}
                 </p>
                 <Button
-                  className="mt-4 bg-green-600 hover:bg-green-700"
+                  className="mt-4 bg-sky-600 hover:bg-sky-700"
                   onClick={() => setTransactionComplete(false)}
                 >
                   OK
