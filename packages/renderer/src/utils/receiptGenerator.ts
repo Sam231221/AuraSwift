@@ -88,7 +88,7 @@ export class ReceiptGenerator {
     receipt += this.formatLine("Receipt:", `#${data.receiptNumber}`) + "\n";
     receipt += this.formatLine("Date:", data.date) + "\n";
     receipt += this.formatLine("Time:", data.time) + "\n";
-    receipt += this.formatLine("Cashier:", data.cashierName) + "\n";
+
     receipt += this.SEPARATOR + "\n";
 
     // Items

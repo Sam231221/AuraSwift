@@ -172,6 +172,32 @@ ipcMain.handle("auth:createUser", async (event, userData) => {
   }
 });
 
+// Business Management IPC handlers
+ipcMain.handle("auth:getBusinessById", async (event, businessId) => {
+  try {
+    const db = await getDatabase();
+    const business = db.getBusinessById(businessId);
+
+    if (business) {
+      return {
+        success: true,
+        business: business,
+      };
+    } else {
+      return {
+        success: false,
+        message: "Business not found",
+      };
+    }
+  } catch (error) {
+    console.error("Get business IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get business details",
+    };
+  }
+});
+
 // Product Management IPC handlers
 ipcMain.handle("products:create", async (event, productData) => {
   try {

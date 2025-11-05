@@ -19,6 +19,10 @@ import {
   ChevronRight,
   Home,
   Package,
+  Printer,
+  Download,
+  Mail,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
@@ -139,6 +143,11 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
 
   // Card payment modal state
   const [showCardPayment, setShowCardPayment] = useState(false);
+
+  // Receipt options modal state (for cash payments)
+  const [showReceiptOptions, setShowReceiptOptions] = useState(false);
+  const [completedTransactionData, setCompletedTransactionData] =
+    useState<TransactionData | null>(null);
 
   // Hardware barcode scanner integration
   const handleHardwareScan = useCallback(
@@ -769,7 +778,26 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
         receiptNumber,
       };
 
-      // Start thermal printing flow with enhanced error handling
+      // For cash payments, show receipt options modal instead of auto-printing
+      if (!skipPaymentValidation && paymentMethod?.type === "cash") {
+        setCompletedTransactionData(receiptData);
+        setTransactionComplete(true);
+        setShowReceiptOptions(true);
+
+        // Show success message with payment details
+        const change = cashAmount - total;
+        if (change > 0) {
+          toast.success(`Transaction complete! Change: £${change.toFixed(2)}`);
+        } else {
+          toast.success("Transaction complete! Exact change received.");
+        }
+
+        // TODO: Update inventory levels for sold products
+        // TODO: Open cash drawer for cash payments
+        return; // Don't proceed with auto-printing
+      }
+
+      // Start thermal printing flow with enhanced error handling (for card/other payments)
       try {
         const printResult = await startPrintingFlow(receiptData);
 
@@ -821,6 +849,223 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
         setCashAmount(0);
         setShowCardPayment(false);
       }, 3000);
+    }
+  };
+
+  // Handler for downloading receipt as PDF
+  const handleDownloadReceipt = async () => {
+    if (!completedTransactionData) return;
+
+    // Show loading toast with ID so we can update it
+    const loadingToast = toast.loading("Generating PDF receipt...");
+
+    try {
+      // Fetch business details from database
+      let businessDetails = {
+        name: completedTransactionData.businessName || "AuraSwift POS",
+        address: "",
+        phone: "",
+        vatNumber: "",
+      };
+      // Then show a toast warning if fields are empty after fetch
+      if (user?.businessId) {
+        try {
+          const businessResponse = await window.authAPI.getBusinessById(
+            user.businessId
+          );
+          if (businessResponse.success && businessResponse.business) {
+            businessDetails = {
+              name: businessResponse.business.name,
+              address:
+                businessResponse.business.address ||
+                "123 Main Street, London, W1A 1AA",
+              phone: businessResponse.business.phone || "+44 20 1234 5678",
+              vatNumber: businessResponse.business.vatNumber || "GB123456789",
+            };
+          }
+        } catch (error) {
+          console.warn(
+            "Failed to fetch business details, using defaults:",
+            error
+          );
+        }
+      }
+
+      // Prepare receipt data for PDF generation
+      const receiptData = {
+        // Store Information
+        storeName: businessDetails.name,
+        storeAddress: businessDetails.address,
+        storePhone: businessDetails.phone,
+        vatNumber: businessDetails.vatNumber,
+
+        // Transaction Details
+        receiptNumber: completedTransactionData.receiptNumber,
+        transactionId:
+          completedTransactionData.id || completedTransactionData.receiptNumber,
+        date: new Date(completedTransactionData.timestamp).toLocaleDateString(
+          "en-GB"
+        ),
+        time: new Date(completedTransactionData.timestamp).toLocaleTimeString(
+          "en-GB",
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          }
+        ),
+        cashierId: user?.id || "unknown",
+        cashierName: completedTransactionData.cashierName || "Unknown",
+
+        // Items
+        items: completedTransactionData.items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          totalPrice: item.total,
+          sku: item.sku || "",
+        })),
+
+        // Financial
+        subtotal: completedTransactionData.subtotal,
+        tax: completedTransactionData.tax,
+        total: completedTransactionData.total,
+        paymentMethod: "cash" as const,
+        cashAmount: completedTransactionData.amountPaid,
+        change: completedTransactionData.change,
+      };
+
+      // Generate PDF via IPC bridge (main process)
+      const result = await window.pdfReceiptAPI.generatePDF(receiptData);
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Failed to generate PDF");
+      }
+
+      // Decode base64 string to binary data
+      const binaryString = atob(result.data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      // Create blob from binary data
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+
+      // Create anchor element to trigger download with save dialog
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Receipt_${completedTransactionData.receiptNumber}.pdf`;
+
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      // Update loading toast to success
+      toast.success("PDF receipt downloaded successfully!", {
+        id: loadingToast,
+      });
+
+      // Don't automatically close the modal - let user decide
+      // They can click close icon or skip button to continue
+      // This way if they cancel the save dialog, they can try again
+
+      // Cleanup blob URL after a delay to ensure download completes
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      console.error("Error generating PDF receipt:", error);
+      toast.error("Failed to generate PDF receipt. Please try again.", {
+        id: loadingToast,
+      });
+    }
+  };
+
+  // Handler for printing receipt
+  const handlePrintReceipt = async () => {
+    if (!completedTransactionData) return;
+
+    try {
+      toast.info("Printing receipt...");
+      const printResult = await startPrintingFlow(completedTransactionData);
+
+      if (printResult) {
+        toast.success("Receipt printed successfully!");
+
+        // Close modal and reset after successful print
+        setTimeout(() => {
+          handleCloseReceiptOptions();
+        }, 1500);
+      } else {
+        toast.error(
+          "Failed to print receipt. Please check printer connection."
+        );
+      }
+    } catch (error) {
+      console.error("Print error:", error);
+      toast.error("Failed to print receipt");
+    }
+  };
+
+  // Handler for emailing receipt
+  const handleEmailReceiptOption = async () => {
+    if (!completedTransactionData) return;
+
+    try {
+      // For now, just show info - implement email functionality later
+      toast.info("Email receipt feature coming soon!");
+
+      // You can also call the existing email receipt handler
+      // handleEmailReceipt();
+
+      // Close modal after a delay
+      setTimeout(() => {
+        handleCloseReceiptOptions();
+      }, 2000);
+    } catch (error) {
+      console.error("Email error:", error);
+      toast.error("Failed to send receipt email");
+    }
+  };
+
+  // Handler for closing receipt options modal (skip receipt)
+  const handleCloseReceiptOptions = () => {
+    setShowReceiptOptions(false);
+
+    // Reset for next customer
+    setCart([]);
+    setPaymentStep(false);
+    setPaymentMethod(null);
+    setTransactionComplete(false);
+    setCashAmount(0);
+    setCompletedTransactionData(null);
+
+    toast.success("Ready for next customer!");
+  };
+
+  // Handler for canceling payment from receipt modal
+  const handleCancelPayment = () => {
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      "⚠️ Cancel Receipt?\n\n" +
+        "The transaction has already been completed and saved.\n" +
+        "Are you sure you want to skip the receipt?\n\n" +
+        "You can print it later from transaction history."
+    );
+
+    if (confirmed) {
+      setShowReceiptOptions(false);
+      setCompletedTransactionData(null);
+      setTransactionComplete(false);
+
+      // Reset for next customer
+      setCart([]);
+      setPaymentStep(false);
+      setPaymentMethod(null);
+      setCashAmount(0);
+
+      toast.info("Receipt skipped. Transaction saved in history.");
     }
   };
 
@@ -1553,8 +1798,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
               </Card>
             </motion.div>
           )}
-          {/* Transaction Complete Message */}
-          {transactionComplete && (
+          {/* Transaction Complete Message - Only show for non-cash payments */}
+          {transactionComplete && !showReceiptOptions && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1636,6 +1881,165 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
             setPaymentStep(false);
           }}
         />
+      )}
+
+      {/* Receipt Options Modal (for Cash Payments) */}
+      {showReceiptOptions && completedTransactionData && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={(e) => {
+            // Prevent closing when clicking on the modal content
+            if (e.target === e.currentTarget) {
+              // Don't auto-close on backdrop click - force user to use buttons
+              toast.warning(
+                "Please select an option or click the X to skip receipt"
+              );
+            }
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+            transition={{ type: "spring", duration: 0.5 }}
+            className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden"
+          >
+            {/* Header */}
+            <div className="bg-linear-to-r from-green-500 to-emerald-600 p-6 relative">
+              <button
+                onClick={handleCancelPayment}
+                className="absolute top-4 right-4 p-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition-all hover:rotate-90 duration-200"
+                aria-label="Skip receipt"
+                title="Skip receipt"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              <div className="flex items-center gap-4 text-white pr-12">
+                <div className="p-3 bg-white/20 rounded-full">
+                  <CheckCircle className="h-8 w-8" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">Payment Successful!</h2>
+                  <p className="text-green-100 text-sm mt-1">
+                    Receipt #{completedTransactionData.receiptNumber}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              {/* Transaction Summary */}
+              <div className="bg-linear-to-br from-slate-50 to-slate-100 rounded-xl p-5 mb-6 border border-slate-200">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-slate-600 font-medium">
+                    Total Paid:
+                  </span>
+                  <span className="text-3xl font-bold text-slate-900">
+                    £{completedTransactionData.total.toFixed(2)}
+                  </span>
+                </div>
+                <div className="pt-3 border-t border-slate-200 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Cash Received:</span>
+                    <span className="font-semibold text-slate-700">
+                      £{completedTransactionData.amountPaid.toFixed(2)}
+                    </span>
+                  </div>
+                  {completedTransactionData.change > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600">Change Given:</span>
+                      <span className="font-bold text-green-600 text-lg">
+                        £{completedTransactionData.change.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Receipt Options */}
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600 font-medium mb-4 text-center">
+                  How would you like to receive the receipt?
+                </p>
+
+                {/* Print Receipt Button */}
+                <Button
+                  onClick={handlePrintReceipt}
+                  className="w-full h-16 bg-linear-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white flex items-center justify-between px-6 text-base font-semibold shadow-md hover:shadow-lg transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <Printer className="h-5 w-5" />
+                    </div>
+                    <span>Print Receipt</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
+
+                {/* Download Receipt Button */}
+                <Button
+                  onClick={handleDownloadReceipt}
+                  variant="outline"
+                  className="w-full h-16 border-2 border-slate-300 hover:border-sky-400 hover:bg-sky-50 flex items-center justify-between px-6 text-base font-semibold transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-sky-100 rounded-lg">
+                      <Download className="h-5 w-5 text-sky-600" />
+                    </div>
+                    <span className="text-slate-700">Download PDF</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-slate-400" />
+                </Button>
+
+                {/* Email Receipt Button */}
+                <Button
+                  onClick={handleEmailReceiptOption}
+                  variant="outline"
+                  className="w-full h-16 border-2 border-slate-300 hover:border-purple-400 hover:bg-purple-50 flex items-center justify-between px-6 text-base font-semibold transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Mail className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <span className="text-slate-700">Email Receipt</span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-slate-400" />
+                </Button>
+
+                {/* Divider */}
+                <div className="relative py-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-white px-3 text-slate-500">or</span>
+                  </div>
+                </div>
+
+                {/* Skip / Complete Button */}
+                <Button
+                  onClick={handleCloseReceiptOptions}
+                  variant="ghost"
+                  className="w-full h-14 text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-sm font-medium transition-all"
+                >
+                  No Receipt - Continue to Next Customer
+                </Button>
+              </div>
+
+              {/* Footer Note */}
+              <div className="mt-6 pt-4 border-t border-slate-200">
+                <p className="text-xs text-center text-slate-500">
+                  Transaction saved. You can print this receipt later from{" "}
+                  <span className="font-semibold">Transaction History</span>
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
       )}
     </>
   );

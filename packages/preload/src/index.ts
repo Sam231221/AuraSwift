@@ -62,6 +62,9 @@ contextBridge.exposeInMainWorld("authAPI", {
     ipcRenderer.invoke("auth:getUsersByBusiness", businessId),
 
   deleteUser: (userId: string) => ipcRenderer.invoke("auth:deleteUser", userId),
+
+  getBusinessById: (businessId: string) =>
+    ipcRenderer.invoke("auth:getBusinessById", businessId),
 });
 
 // Product Management API
@@ -444,6 +447,12 @@ contextBridge.exposeInMainWorld("paymentAPI", {
 
   // Connection Token (for Stripe Terminal)
   getConnectionToken: () => ipcRenderer.invoke("payment:connection-token"),
+});
+
+// PDF Receipt Generation API
+contextBridge.exposeInMainWorld("pdfReceiptAPI", {
+  generatePDF: (receiptData: any) =>
+    ipcRenderer.invoke("receipt:generate-pdf", receiptData),
 });
 
 // Generic IPC send function for testing and general IPC communication

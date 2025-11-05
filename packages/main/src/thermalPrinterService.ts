@@ -316,7 +316,6 @@ class ThermalPrinterService {
     printer.println(
       `Date: ${new Date(transaction.timestamp).toLocaleString()}`
     );
-    printer.println(`Cashier: ${transaction.cashierName}`);
     printer.println("--------------------------------");
 
     // Items

@@ -93,6 +93,20 @@ declare global {
       ) => Promise<APIResponse>;
       getUsersByBusiness: (businessId: string) => Promise<APIResponse>;
       deleteUser: (userId: string) => Promise<APIResponse>;
+      getBusinessById: (businessId: string) => Promise<{
+        success: boolean;
+        business?: {
+          id: string;
+          name: string;
+          ownerId: string;
+          address?: string;
+          phone?: string;
+          vatNumber?: string;
+          createdAt: string;
+          updatedAt: string;
+        };
+        message?: string;
+      }>;
     };
     scheduleAPI: {
       create: (scheduleData: {
@@ -356,6 +370,14 @@ declare global {
       getConnectionToken: () => Promise<{
         success: boolean;
         secret?: string;
+        error?: string;
+      }>;
+    };
+
+    pdfReceiptAPI: {
+      generatePDF: (receiptData: Record<string, unknown>) => Promise<{
+        success: boolean;
+        data?: string;
         error?: string;
       }>;
     };

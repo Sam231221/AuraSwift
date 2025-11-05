@@ -23,6 +23,9 @@ export async function initApp(initConfig: AppInitConfig) {
   // Initialize office printer service for HP LaserJet and similar printers
   await import("./services/officePrinterService.js");
 
+  // Initialize PDF receipt generation service
+  await import("./services/pdfReceiptService.js");
+
   // Initialize payment service for BBPOS WisePad 3 and Stripe integration
   await import("./services/paymentService.js");
 

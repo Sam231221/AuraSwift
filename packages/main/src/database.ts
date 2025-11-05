@@ -321,6 +321,27 @@ export class DatabaseManager {
       )
     `);
 
+    // Migration: Add address, phone, and vatNumber columns to businesses table
+    try {
+      this.db.exec(
+        `ALTER TABLE businesses ADD COLUMN address TEXT DEFAULT '';`
+      );
+    } catch (error) {
+      // Column might already exist, ignore error
+    }
+    try {
+      this.db.exec(`ALTER TABLE businesses ADD COLUMN phone TEXT DEFAULT '';`);
+    } catch (error) {
+      // Column might already exist, ignore error
+    }
+    try {
+      this.db.exec(
+        `ALTER TABLE businesses ADD COLUMN vatNumber TEXT DEFAULT '';`
+      );
+    } catch (error) {
+      // Column might already exist, ignore error
+    }
+
     // Then create users table with foreign key to businesses
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (

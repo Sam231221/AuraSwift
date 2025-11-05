@@ -127,10 +127,6 @@ export async function generatePDFReceipt(data: ReceiptData): Promise<Buffer> {
       doc.text(data.time, 350, currentY);
 
       currentY = doc.y + 5;
-      doc.text("Cashier:", 50, currentY);
-      doc.text(data.cashierName, 150, currentY);
-
-      currentY = doc.y + 5;
       doc.text("Transaction ID:", 50, currentY);
       doc.text(data.transactionId, 150, currentY);
 
