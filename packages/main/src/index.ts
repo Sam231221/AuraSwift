@@ -20,6 +20,9 @@ export async function initApp(initConfig: AppInitConfig) {
   // Initialize thermal printer service after database is ready
   await import("./services/thermalPrinterService.js");
 
+  // Initialize office printer service for HP LaserJet and similar printers
+  await import("./services/officePrinterService.js");
+
   // Initialize payment service for BBPOS WisePad 3 and Stripe integration
   await import("./services/paymentService.js");
 

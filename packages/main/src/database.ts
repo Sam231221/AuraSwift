@@ -735,6 +735,45 @@ export class DatabaseManager {
       )
     `);
 
+    // Office printer print jobs table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS print_jobs (
+        job_id TEXT PRIMARY KEY,
+        printer_name TEXT NOT NULL,
+        document_path TEXT,
+        document_type TEXT NOT NULL CHECK (document_type IN ('pdf', 'image', 'text', 'raw')),
+        status TEXT NOT NULL CHECK (status IN ('pending', 'queued', 'printing', 'completed', 'failed', 'cancelled', 'retrying')),
+        options TEXT,
+        metadata TEXT,
+        created_by TEXT,
+        business_id TEXT,
+        created_at TEXT NOT NULL,
+        started_at TEXT,
+        completed_at TEXT,
+        last_retry_at TEXT,
+        retry_count INTEGER DEFAULT 0,
+        progress INTEGER DEFAULT 0,
+        pages_total INTEGER,
+        pages_printed INTEGER,
+        error TEXT,
+        FOREIGN KEY (created_by) REFERENCES users (id),
+        FOREIGN KEY (business_id) REFERENCES businesses (id)
+      )
+    `);
+
+    // Print job retry attempts table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS print_job_retries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id TEXT NOT NULL,
+        attempt INTEGER NOT NULL,
+        error TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        next_retry_at TEXT NOT NULL,
+        FOREIGN KEY (job_id) REFERENCES print_jobs (job_id) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes for better performance
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -788,6 +827,16 @@ export class DatabaseManager {
       
       -- Additional indexes for refund functionality
       CREATE INDEX IF NOT EXISTS idx_transactions_originalTransactionId ON transactions(originalTransactionId);
+      
+      -- Indexes for print jobs
+      CREATE INDEX IF NOT EXISTS idx_print_jobs_status ON print_jobs(status);
+      CREATE INDEX IF NOT EXISTS idx_print_jobs_printer_name ON print_jobs(printer_name);
+      CREATE INDEX IF NOT EXISTS idx_print_jobs_created_at ON print_jobs(created_at);
+      CREATE INDEX IF NOT EXISTS idx_print_jobs_business_id ON print_jobs(business_id);
+      CREATE INDEX IF NOT EXISTS idx_print_jobs_created_by ON print_jobs(created_by);
+      
+      CREATE INDEX IF NOT EXISTS idx_print_job_retries_job_id ON print_job_retries(job_id);
+      CREATE INDEX IF NOT EXISTS idx_print_job_retries_timestamp ON print_job_retries(timestamp);
     `);
 
     // Insert default admin user if no users exist

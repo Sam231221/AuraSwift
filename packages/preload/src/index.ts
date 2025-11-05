@@ -379,6 +379,41 @@ contextBridge.exposeInMainWorld("printerAPI", {
     ipcRenderer.invoke("printer:getAvailableInterfaces"),
 });
 
+// Office Printer API (HP LaserJet, Canon, Epson, Brother, etc.)
+contextBridge.exposeInMainWorld("officePrinterAPI", {
+  // Printer Discovery
+  list: () => ipcRenderer.invoke("office-printer:list"),
+  getDefault: () => ipcRenderer.invoke("office-printer:get-default"),
+
+  // Print Operations
+  print: (config: {
+    jobId: string;
+    printerName: string;
+    documentPath?: string;
+    documentData?: Buffer;
+    documentType: "pdf" | "image" | "text" | "raw";
+    options?: any;
+    metadata?: any;
+    createdBy?: string;
+    businessId?: string;
+  }) => ipcRenderer.invoke("office-printer:print", config),
+
+  // Job Management
+  getJobStatus: (jobId: string) =>
+    ipcRenderer.invoke("office-printer:job-status", jobId),
+  cancel: (jobId: string) => ipcRenderer.invoke("office-printer:cancel", jobId),
+  retry: (jobId: string) => ipcRenderer.invoke("office-printer:retry", jobId),
+  getFailedJobs: () => ipcRenderer.invoke("office-printer:failed-jobs"),
+
+  // Health & Monitoring
+  getHealth: (printerName: string) =>
+    ipcRenderer.invoke("office-printer:health", printerName),
+  getMetrics: () => ipcRenderer.invoke("office-printer:metrics"),
+
+  // Queue Management
+  clearQueue: () => ipcRenderer.invoke("office-printer:clear-queue"),
+});
+
 // Payment API for BBPOS WisePad 3 card reader integration
 contextBridge.exposeInMainWorld("paymentAPI", {
   // Card Reader Operations
