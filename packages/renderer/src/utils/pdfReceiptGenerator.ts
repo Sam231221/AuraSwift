@@ -513,10 +513,12 @@ export function createReceiptData(
  * In renderer, use IPC to send buffer to main process for file operations
  */
 export function savePDFToFile(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _buffer: Buffer,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _filePath: string
 ): Promise<void> {
-  return new Promise((_resolve, reject) => {
+  return new Promise((_, reject) => {
     // This function is intended for main process use
     // In renderer, you should:
     // 1. Generate PDF buffer
