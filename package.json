@@ -56,6 +56,7 @@
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^12.0.0",
     "@types/node": "24.5.2",
+    "@types/pdfkit": "^0.17.3",
     "conventional-changelog-cli": "^5.0.0",
     "create-vite": "7.1.2",
     "electron": "38.1.2",
