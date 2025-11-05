@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.3.0](https://github.com/Sam231221/AuraSwift/compare/v1.2.0...v1.3.0) (2025-11-05)
+
+
+### Bug Fixes
+
+* **new-transaction-view:** 💡 format cash amount input to two decimal places ([3bdbdd0](https://github.com/Sam231221/AuraSwift/commit/3bdbdd07644ed2d00ce9a7ea6a64d4a80f035c95))
+* **pdf-receipt-generator:** 💡 suppress unused variable warnings in savePDFToFile function ([22ccf67](https://github.com/Sam231221/AuraSwift/commit/22ccf670ac46fb1684a4f469baaa2d6d1b7670a2))
+
+
+### Features
+
+*  ✨ implement office printer management hooks and types ([73fcf17](https://github.com/Sam231221/AuraSwift/commit/73fcf170bf7cfcd0fc1aad1e4f8eccb1cf7b4784))
+* **manage-categories:** ✨ enhance category management with hierarchical display, reordering, and expand/collapse functionality ([1e50ec1](https://github.com/Sam231221/AuraSwift/commit/1e50ec1363b06dcd124dfec0632f3013cc8269aa))
+* **product-management:** ✨ enhance product validation and error handling, add multiSelect support for modifiers ([d48c037](https://github.com/Sam231221/AuraSwift/commit/d48c037a609731053cf35847327aaba345af18f9))
+* **new-transaction-view:** ✨ implement category management with breadcrumb navigation and load categories from backend ([ea433f5](https://github.com/Sam231221/AuraSwift/commit/ea433f59c15f6a3a586cb4b9052724dc27ab5d12))
+* **pdf-receipt-generator:** ✨ implement PDF receipt generation with customizable layout and data structure ([febd84c](https://github.com/Sam231221/AuraSwift/commit/febd84cc945e152a82e63456a216495985676135))
+* **pdf-receipt-generator:** ✨ implement PDF receipt generation with options for printing, downloading, and emailing ([c2cdb75](https://github.com/Sam231221/AuraSwift/commit/c2cdb7518aac9daebe8a85b901e0695f62a54965))
+* **new-transaction-view:** ✨ improve layout and styling for buttons and input fields ([11c3bbe](https://github.com/Sam231221/AuraSwift/commit/11c3bbe9dd647165275fbbe261390fac97d0ec9f))
+
 # [1.2.0](https://github.com/Sam231221/AuraSwift/compare/v1.1.0...v1.2.0) (2025-11-03)
 
 
