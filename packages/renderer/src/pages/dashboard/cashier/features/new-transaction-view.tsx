@@ -1486,7 +1486,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                               type="number"
                               step="0.01"
                               placeholder="Enter cash amount"
-                              value={cashAmount || ""}
+                              value={cashAmount ? cashAmount.toFixed(2) : ""}
                               onChange={(e) =>
                                 setCashAmount(parseFloat(e.target.value) || 0)
                               }
