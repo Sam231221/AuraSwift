@@ -6,8 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  ScanBarcode,
-  ShoppingCart,
   Calculator,
   CreditCard,
   CheckCircle,
@@ -20,7 +18,6 @@ import {
   Loader2,
   ChevronRight,
   Home,
-  Grid3x3,
   Package,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -28,10 +25,7 @@ import { useAuth } from "@/shared/hooks/use-auth";
 import type { Product } from "@/types/product.types";
 import { toast } from "sonner";
 import { useProductionScanner } from "@/hooks/useProductionScanner";
-import {
-  ScannerStatusBar,
-  ScanHistory,
-} from "@/components/scanner/ScannerStatusComponents";
+import { ScanHistory } from "@/components/scanner/ScannerStatusComponents";
 import { ScannerAudio } from "@/utils/scannerAudio";
 import {
   useReceiptPrintingFlow,
@@ -65,14 +59,12 @@ interface Category {
   parentId?: string | null;
 }
 
-type CategoryWithChildren = Category & { children: CategoryWithChildren[] };
-
 interface BreadcrumbItem {
   id: string | null;
   name: string;
 }
 
-const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
   // State management
   const [cart, setCart] = useState<CartItem[]>([]);
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -104,7 +96,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { user } = useAuth();
 
   // Scanner state
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [audioEnabled] = useState(true);
 
   // Thermal printer integration for printing flow
   const {
@@ -147,16 +139,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   // Card payment modal state
   const [showCardPayment, setShowCardPayment] = useState(false);
-  const [_cardPaymentResult, setCardPaymentResult] = useState<{
-    success: boolean;
-    paymentIntent?: {
-      id: string;
-      amount: number;
-      currency: string;
-      status: string;
-    };
-    error?: string;
-  } | null>(null);
 
   // Hardware barcode scanner integration
   const handleHardwareScan = useCallback(
@@ -211,12 +193,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 
   // Initialize scanner hook
-  const {
-    scannerStatus,
-    scanLog,
-    clearScanLog,
-    reset: resetScanner,
-  } = useProductionScanner({
+  const { scanLog, clearScanLog } = useProductionScanner({
     onScan: handleHardwareScan,
     enableAudio: audioEnabled,
     minBarcodeLength: 4, // Allow shorter codes for PLU
@@ -518,7 +495,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const handlePayment = async (method: PaymentMethod["type"]) => {
     // Reset any previous payment state before starting new payment
-    setCardPaymentResult(null);
     setShowCardPayment(false);
 
     setPaymentMethod({ type: method });
@@ -551,13 +527,11 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
       const result = await processQuickPayment(amountInCents, "gbp");
 
-      setCardPaymentResult(result);
-
       if (result.success) {
         toast.success("Card payment successful!");
 
         // Automatically complete the transaction
-        await completeTransactionWithCardPayment(result);
+        await completeTransactionWithCardPayment();
       } else {
         toast.error(`Card payment failed: ${result.error}`);
         // Reset payment state on failure
@@ -572,21 +546,10 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       setShowCardPayment(false);
       setPaymentMethod(null);
       setPaymentStep(false);
-      setCardPaymentResult({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
     }
   };
 
-  const completeTransactionWithCardPayment = async (_cardResult: {
-    paymentIntent?: {
-      id: string;
-      amount: number;
-      currency: string;
-      status: string;
-    };
-  }) => {
+  const completeTransactionWithCardPayment = async () => {
     // Continue with the existing transaction completion logic
     // but skip the payment validation since card payment is already processed
     await completeTransaction(true);
@@ -857,7 +820,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         setTransactionComplete(false);
         setCashAmount(0);
         setShowCardPayment(false);
-        setCardPaymentResult(null);
       }, 3000);
     }
   };
@@ -973,7 +935,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                               onClick={() => handleCategoryClick(category)}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
-                              className="relative bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg p-6 shadow-md transition-all h-28 flex flex-col items-center justify-center"
+                              className="relative bg-linear-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg p-6 shadow-md transition-all h-28 flex flex-col items-center justify-center"
                             >
                               <div className="text-center">
                                 <p className="font-bold text-lg uppercase tracking-wide mb-1">
@@ -1662,17 +1624,14 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             }
             // Fully reset payment state
             setShowCardPayment(false);
-            setCardPaymentResult(null);
             setPaymentMethod(null);
             setPaymentStep(false);
           }}
           onRetry={async () => {
-            setCardPaymentResult(null);
             await handleCardPayment();
           }}
           onClose={() => {
             setShowCardPayment(false);
-            setCardPaymentResult(null);
             setPaymentMethod(null);
             setPaymentStep(false);
           }}
