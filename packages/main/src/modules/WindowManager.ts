@@ -135,6 +135,37 @@ class WindowManager implements AppModule {
             },
           },
           {
+            label: "View Update Error...",
+            click: async () => {
+              // Get the autoUpdater instance
+              const { getAutoUpdaterInstance } = await import("../index.js");
+              const updaterInstance = getAutoUpdaterInstance();
+
+              if (updaterInstance) {
+                updaterInstance.showLastErrorDialog();
+              } else {
+                const { dialog } = await import("electron");
+                dialog
+                  .showMessageBox({
+                    type: "info",
+                    title: "Auto-Updater Not Available",
+                    message: "Auto-updater is not enabled",
+                    detail:
+                      "The auto-updater is not available in development mode.\n\nTo check for updates manually, visit:\nhttps://github.com/Sam231221/AuraSwift/releases",
+                    buttons: ["OK", "Open GitHub Releases"],
+                  })
+                  .then((result: { response: number }) => {
+                    if (result.response === 1) {
+                      shell.openExternal(
+                        "https://github.com/Sam231221/AuraSwift/releases"
+                      );
+                    }
+                  });
+              }
+            },
+          },
+          { type: "separator" as const },
+          {
             label: "View Release Notes",
             click: () => {
               shell.openExternal(

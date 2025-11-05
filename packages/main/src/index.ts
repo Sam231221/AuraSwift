@@ -13,6 +13,14 @@ import { allowInternalOrigins } from "./modules/BlockNotAllowdOrigins.js";
 import { allowExternalUrls } from "./modules/ExternalUrls.js";
 import "./authStore.js"; // Initialize auth handlers
 import { getDatabase } from "./database.js";
+
+// Global reference to autoUpdater instance for menu access
+let autoUpdaterInstance: ReturnType<typeof autoUpdater> | null = null;
+
+export function getAutoUpdaterInstance() {
+  return autoUpdaterInstance;
+}
+
 export async function initApp(initConfig: AppInitConfig) {
   // Initialize database
   const db = await getDatabase();
@@ -68,7 +76,8 @@ export async function initApp(initConfig: AppInitConfig) {
     process.env.NODE_ENV !== "test" &&
     !process.env.ELECTRON_UPDATER_DISABLED
   ) {
-    moduleRunner.init(autoUpdater());
+    autoUpdaterInstance = autoUpdater();
+    moduleRunner.init(autoUpdaterInstance);
   }
   // Install DevTools extension if needed
   // .init(chromeDevToolsExtension({extension: 'VUEJS3_DEVTOOLS'}))

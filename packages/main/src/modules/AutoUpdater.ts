@@ -16,6 +16,9 @@ export class AutoUpdater implements AppModule {
   #updateCheckInterval: NodeJS.Timeout | null = null;
   #postponedUpdateInfo: UpdateInfo | null = null;
   #remindLaterTimeout: NodeJS.Timeout | null = null;
+  #isDownloading = false;
+  #downloadStartTime: number | null = null;
+  #lastError: { message: string; timestamp: Date; type: string } | null = null;
 
   readonly #REMIND_LATER_INTERVAL = 2 * 60 * 60 * 1000;
   readonly #MAX_POSTPONE_COUNT = 3;
@@ -204,6 +207,8 @@ export class AutoUpdater implements AppModule {
         if (result.response === 0) {
           this.#postponeCount = 0;
           this.#postponedUpdateInfo = null;
+          this.#isDownloading = true;
+          this.#downloadStartTime = Date.now();
 
           const updater = this.getAutoUpdater();
           updater.downloadUpdate();
@@ -244,6 +249,99 @@ export class AutoUpdater implements AppModule {
   getAutoUpdater(): AppUpdater {
     const { autoUpdater } = electronUpdater;
     return autoUpdater;
+  }
+
+  /**
+   * Get the last update error if any
+   */
+  getLastError(): { message: string; timestamp: Date; type: string } | null {
+    return this.#lastError;
+  }
+
+  /**
+   * Show the last error dialog if there is one
+   */
+  showLastErrorDialog(): void {
+    if (!this.#lastError) {
+      dialog
+        .showMessageBox({
+          type: "info",
+          title: "No Recent Errors",
+          message: "No recent update errors",
+          detail:
+            "There are no recent update errors to display.\n\nIf you're experiencing issues, you can:\n• Check for updates from the Help menu\n• View release notes on GitHub\n• Check your internet connection",
+          buttons: ["OK", "Check for Updates"],
+        })
+        .then((result) => {
+          if (result.response === 1) {
+            const updater = this.getAutoUpdater();
+            updater.checkForUpdates().catch(() => {});
+          }
+        });
+      return;
+    }
+
+    const { message, timestamp, type } = this.#lastError;
+    const timeAgo = this.formatTimeAgo(timestamp);
+
+    const isDownloadError = type === "download";
+    const title = isDownloadError
+      ? "Update Download Failed"
+      : "Update Check Issue";
+    const mainMessage = isDownloadError
+      ? "Failed to download the update"
+      : "Unable to check for updates";
+
+    const detail = isDownloadError
+      ? `Last error occurred ${timeAgo}\n\n${message}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n⚠️ Possible causes:\n• Network connection interrupted during download\n• Download file was corrupted\n• Insufficient disk space\n• Firewall or antivirus blocking the download\n\n💡 What you can do:\n• Check your internet connection\n• Try downloading manually from GitHub\n• Ensure you have enough disk space\n• Temporarily disable antivirus/firewall\n• Try checking for updates again\n\nWould you like to download manually from GitHub?`
+      : `Last error occurred ${timeAgo}\n\n${message}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is not critical:\n• Your app will continue working normally\n• You can check manually later from Help menu\n• Automatic checks will retry periodically\n\nWould you like to view releases on GitHub?`;
+
+    dialog
+      .showMessageBox({
+        type: isDownloadError ? "warning" : "info",
+        title,
+        message: mainMessage,
+        detail,
+        buttons: [
+          "OK",
+          isDownloadError ? "Download from GitHub" : "Open GitHub Releases",
+          "Try Again",
+        ],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      })
+      .then((result) => {
+        if (result.response === 1) {
+          shell.openExternal("https://github.com/Sam231221/AuraSwift/releases");
+        } else if (result.response === 2) {
+          // Clear the error and try again
+          this.#lastError = null;
+          const updater = this.getAutoUpdater();
+          updater.checkForUpdates().catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }
+
+  /**
+   * Format timestamp to human-readable "time ago" string
+   */
+  private formatTimeAgo(date: Date): string {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+    if (seconds < 60) return "just now";
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days} day${days > 1 ? "s" : ""} ago`;
+
+    return date.toLocaleDateString();
   }
 
   async runAutoUpdater() {
@@ -302,9 +400,45 @@ export class AutoUpdater implements AppModule {
 
     updater.on("update-not-available", () => {});
 
-    updater.on("download-progress", () => {});
+    updater.on("download-progress", (progressInfo) => {
+      // Log progress for debugging
+      if (this.#logger) {
+        this.#logger.info(
+          `Download progress: ${progressInfo.percent.toFixed(2)}% (${
+            progressInfo.transferred
+          }/${progressInfo.total})`
+        );
+      }
+
+      // Show a notification at 50% completion
+      if (
+        progressInfo.percent > 50 &&
+        progressInfo.percent < 55 &&
+        Notification.isSupported()
+      ) {
+        const notification = new Notification({
+          title: "Download In Progress",
+          body: `Update download is ${progressInfo.percent.toFixed(
+            0
+          )}% complete...`,
+          silent: true,
+        });
+        notification.show();
+      }
+    });
 
     updater.on("update-downloaded", (info: UpdateInfo) => {
+      this.#isDownloading = false;
+      const downloadDuration = this.#downloadStartTime
+        ? ((Date.now() - this.#downloadStartTime) / 1000).toFixed(0)
+        : "unknown";
+      this.#downloadStartTime = null;
+
+      if (this.#logger) {
+        this.#logger.info(
+          `Update downloaded successfully in ${downloadDuration}s`
+        );
+      }
       if (this.#remindLaterTimeout) {
         clearTimeout(this.#remindLaterTimeout);
         this.#remindLaterTimeout = null;
@@ -345,6 +479,35 @@ export class AutoUpdater implements AppModule {
 
     updater.on("error", (error) => {
       const errorMessage = error.message || String(error);
+
+      // Reset download state on error
+      const wasDownloading = this.#isDownloading;
+      this.#isDownloading = false;
+      this.#downloadStartTime = null;
+
+      // Check if this is a download error
+      const isDownloadError =
+        wasDownloading ||
+        errorMessage.includes("download") ||
+        errorMessage.includes("Downloaded file") ||
+        errorMessage.includes("sha512") ||
+        errorMessage.includes("checksum") ||
+        errorMessage.includes("verification failed") ||
+        errorMessage.toLowerCase().includes("corrupt");
+
+      // Store the error for later viewing
+      this.#lastError = {
+        message: errorMessage,
+        timestamp: new Date(),
+        type: isDownloadError ? "download" : "check",
+      };
+
+      if (this.#logger) {
+        this.#logger.error(
+          `Update error (${this.#lastError.type}): ${errorMessage}`
+        );
+      }
+
       const shouldSkipDialog =
         errorMessage.includes("No published versions") ||
         errorMessage.includes("Cannot find latest") ||
@@ -359,17 +522,49 @@ export class AutoUpdater implements AppModule {
           errorMessage.includes("ECONNREFUSED") ||
           errorMessage.includes("Network Error");
 
-        if (isNetworkError) {
+        if (isNetworkError && !isDownloadError) {
+          // For network check errors, show a persistent notification instead of dialog
+          if (Notification.isSupported()) {
+            const notification = new Notification({
+              title: "Update Check Failed",
+              body: "Couldn't check for updates. Click to view details or check Help menu.",
+              silent: false,
+              urgency: "low",
+              timeoutType: "never", // Keep notification visible
+            });
+
+            notification.on("click", () => {
+              this.showLastErrorDialog();
+            });
+
+            notification.show();
+          }
           return;
         }
 
+        // Show different dialog based on error type
+        const title = isDownloadError
+          ? "Update Download Failed"
+          : "Update Check Issue";
+        const message = isDownloadError
+          ? "Failed to download the update"
+          : "Unable to check for updates at this time";
+
+        const detail = isDownloadError
+          ? `The update download encountered an issue:\n\n${errorMessage}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n⚠️ Possible causes:\n• Network connection interrupted during download\n• Download file was corrupted\n• Insufficient disk space\n• Firewall or antivirus blocking the download\n\n💡 What you can do:\n• Check your internet connection\n• Try downloading manually from GitHub\n• Ensure you have enough disk space\n• Temporarily disable antivirus/firewall\n• View this error later from Help → View Update Error\n• The app will retry on next launch\n\nWould you like to download manually from GitHub?`
+          : `The update check encountered an issue:\n\n${errorMessage}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is not critical:\n• Your app will continue working normally\n• You can check manually later from Help menu\n• View this error later from Help → View Update Error\n• Automatic checks will retry in 4 hours\n\nWould you like to view releases on GitHub?`;
+
+        // Show the dialog
         dialog
           .showMessageBox({
-            type: "info",
-            title: "Update Check Issue",
-            message: "Unable to check for updates at this time",
-            detail: `The update check encountered an issue:\n\n${errorMessage}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis is not critical:\n• Your app will continue working normally\n• You can check manually later from Help menu\n• Automatic checks will retry in 4 hours\n\nWould you like to view releases on GitHub?`,
-            buttons: ["OK", "Open GitHub Releases"],
+            type: isDownloadError ? "warning" : "info",
+            title,
+            message,
+            detail,
+            buttons: [
+              "OK",
+              isDownloadError ? "Download from GitHub" : "Open GitHub Releases",
+            ],
             defaultId: 0,
             cancelId: 0,
             noLink: true,
@@ -380,7 +575,28 @@ export class AutoUpdater implements AppModule {
                 "https://github.com/Sam231221/AuraSwift/releases"
               );
             }
+          })
+          .catch(() => {});
+
+        // Also show a persistent notification for download errors
+        if (isDownloadError && Notification.isSupported()) {
+          const errorNotification = new Notification({
+            title: "⚠️ Update Download Failed",
+            body: "Click here to view error details and solutions, or check Help → View Update Error",
+            silent: false,
+            urgency: "critical",
+            timeoutType: "never", // Keep notification visible until clicked
           });
+
+          errorNotification.on("click", () => {
+            this.showLastErrorDialog();
+          });
+
+          // Show notification after a brief delay so it doesn't conflict with dialog
+          setTimeout(() => {
+            errorNotification.show();
+          }, 500);
+        }
       }
     });
   }
