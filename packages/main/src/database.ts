@@ -3,6 +3,11 @@ import path from "path";
 import fs from "fs";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
+import {
+  runMigrations,
+  getCurrentVersion,
+  verifyIntegrity,
+} from "./migrations/index.js";
 
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
@@ -270,10 +275,23 @@ export class DatabaseManager {
       }
 
       this.db = new Database(dbPath);
+
+      // Initialize base tables (for new databases)
       this.initializeTables();
+
+      // Run migrations (for existing databases)
+      console.log("\n🔄 Checking for database migrations...");
+      runMigrations(this.db, dbPath);
+
+      // Verify database integrity
+      if (!verifyIntegrity(this.db)) {
+        throw new Error("Database integrity check failed after migrations");
+      }
+
       this.initialized = true;
+      console.log("✅ Database initialized successfully\n");
     } catch (error) {
-      console.error("Database initialization error:", error);
+      console.error("❌ Database initialization error:", error);
       throw error;
     }
   }
