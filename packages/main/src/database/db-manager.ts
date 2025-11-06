@@ -2,6 +2,11 @@ import path from "path";
 import fs from "fs";
 import { app } from "electron";
 import { createRequire } from "module";
+import {
+  initializeVersioning,
+  getCurrentVersion,
+  getLatestVersion,
+} from "./versioning/index.js";
 
 const require = createRequire(import.meta.url);
 
@@ -25,11 +30,24 @@ export class DBManager {
 
       this.db = new Database(dbPath);
 
-      // Initialize all tables
+      // Initialize all tables (baseline schema)
       this.initializeTables();
 
+      // Run database versioning and migrations
+      const versioningSuccess = initializeVersioning(this.db, dbPath);
+
+      if (!versioningSuccess) {
+        throw new Error("Database versioning initialization failed");
+      }
+
       this.initialized = true;
-      console.log("✅ Database initialized successfully\n");
+
+      // Log final version
+      const currentVersion = getCurrentVersion(this.db);
+      const latestVersion = getLatestVersion();
+      console.log(
+        `✅ Database initialized successfully (v${currentVersion}/${latestVersion})\n`
+      );
     } catch (error) {
       console.error("❌ Database initialization error:", error);
       throw error;
