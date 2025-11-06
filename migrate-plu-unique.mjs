@@ -16,7 +16,7 @@ const getUserDataPath = () => {
   const isDev = process.env.NODE_ENV === "development";
 
   if (isDev) {
-    return join(process.cwd(), "dev-data");
+    return join(process.cwd(), "data");
   }
 
   // Production paths by platform

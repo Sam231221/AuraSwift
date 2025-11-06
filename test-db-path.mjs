@@ -28,7 +28,7 @@ function simulateDatabasePath(isPackaged, nodeEnv, electronIsDev, customPath) {
 
   if (isDev) {
     const projectRoot = path.join(__dirname, "..");
-    const devDbPath = path.join(projectRoot, "dev-data", "pos_system.db");
+    const devDbPath = path.join(projectRoot, "data", "pos_system.db");
     console.log(`🔧 Result: Development path - ${devDbPath}`);
     return devDbPath;
   } else {

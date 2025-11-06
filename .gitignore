@@ -61,6 +61,6 @@ packages/renderer/docs/
 /.idea/csv-plugin.xml
 
 # Development database files
-dev-data/*.db
-dev-data/*.db-wal
-dev-data/*.db-shm
+data/*.db
+data/*.db-wal
+data/*.db-shm

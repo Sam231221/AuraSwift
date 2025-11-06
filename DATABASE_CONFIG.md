@@ -6,7 +6,7 @@ This project uses different database locations for development and production en
 
 In development, the database is stored in the project directory for easy access:
 
-- **Location**: `./dev-data/pos_system.db`(hardcoded)
+- **Location**: `./data/pos_system.db`(hardcoded)
 - **Purpose**: Easy debugging, inspection, and version control exclusion
 - **Access**: You can open this file with any SQLite browser tool
 
@@ -52,7 +52,7 @@ export POS_DB_PATH="/custom/path/to/database.db"
 
 ### Development
 
-1. Navigate to `./dev-data/`
+1. Navigate to `./data/`
 2. Open `pos_system.db` with:
    - [DB Browser for SQLite](https://sqlitebrowser.org/)
    - [SQLite Viewer](https://inloop.github.io/sqlite-viewer/)
@@ -72,9 +72,9 @@ console.log(info.data.path);
 The `.gitignore` already excludes development database files:
 
 ```
-dev-data/*.db
-dev-data/*.db-wal
-dev-data/*.db-shm
+data/*.db
+data/*.db-wal
+data/*.db-shm
 ```
 
 ## Migration Between Environments
@@ -130,11 +130,11 @@ POS_DB_PATH="/path/to/your/existing/database.db"
 Copy your existing database to the development data directory:
 
 ```bash
-# Create the dev-data directory if it doesn't exist
-mkdir -p ./dev-data
+# Create the data directory if it doesn't exist
+mkdir -p ./data
 
 # Copy your existing database
-cp "/path/to/your/existing/database.db" "./dev-data/pos_system.db"
+cp "/path/to/your/existing/database.db" "./data/pos_system.db"
 
 # Start the application normally
 npm start

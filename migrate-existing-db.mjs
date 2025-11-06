@@ -94,7 +94,7 @@ function getProductionDbPath() {
 }
 
 function getDevelopmentDbPath() {
-  return path.join(__dirname, "dev-data", "pos_system.db");
+  return path.join(__dirname, "data", "pos_system.db");
 }
 
 function showPaths() {

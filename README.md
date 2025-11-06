@@ -492,7 +492,7 @@ ELECTRON_UPDATER_DISABLED=1
 
 This POS system uses **environment-aware database storage**:
 
-- **Development**: Database stored in `./dev-data/pos_system.db` (project directory)
+- **Development**: Database stored in `./data/pos_system.db` (project directory)
 - **Production**: Database stored in OS-specific user data directory
   - **Windows**: `%APPDATA%/AuraSwift/pos_system.db`
   - **macOS**: `~/Library/Application Support/AuraSwift/pos_system.db`
@@ -536,7 +536,7 @@ npm run db:paths
 
 ```bash
 # For development
-cp "/path/to/your/database.db" "./dev-data/pos_system.db"
+cp "/path/to/your/database.db" "./data/pos_system.db"
 
 # For production (macOS)
 cp "/path/to/your/database.db" "$HOME/Library/Application Support/AuraSwift/pos_system.db"
