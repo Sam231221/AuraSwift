@@ -538,6 +538,46 @@ export class DatabaseManager {
       )
     `);
 
+    // Discounts table for managing promotional discounts
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS discounts (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        type TEXT NOT NULL CHECK (type IN ('percentage', 'fixed_amount', 'buy_x_get_y')),
+        value REAL NOT NULL,
+        businessId TEXT NOT NULL,
+        applicableTo TEXT NOT NULL CHECK (applicableTo IN ('all', 'category', 'product', 'transaction')),
+        categoryIds TEXT,
+        productIds TEXT,
+        buyQuantity INTEGER,
+        getQuantity INTEGER,
+        getDiscountType TEXT CHECK (getDiscountType IN ('free', 'percentage', 'fixed')),
+        getDiscountValue REAL,
+        minPurchaseAmount REAL,
+        minQuantity INTEGER,
+        maxDiscountAmount REAL,
+        startDate TEXT,
+        endDate TEXT,
+        isActive BOOLEAN DEFAULT 1,
+        usageLimit INTEGER,
+        usageCount INTEGER DEFAULT 0,
+        perCustomerLimit INTEGER,
+        priority INTEGER DEFAULT 0,
+        daysOfWeek TEXT,
+        timeStart TEXT,
+        timeEnd TEXT,
+        requiresCouponCode BOOLEAN DEFAULT 0,
+        couponCode TEXT,
+        combinableWithOthers BOOLEAN DEFAULT 1,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        createdBy TEXT NOT NULL,
+        FOREIGN KEY (businessId) REFERENCES businesses (id),
+        FOREIGN KEY (createdBy) REFERENCES users (id)
+      )
+    `);
+
     // Audit logs table for tracking sensitive operations
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS audit_logs (
@@ -638,6 +678,13 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_businessId ON cash_drawer_counts(businessId);
       CREATE INDEX IF NOT EXISTS idx_cash_drawer_counts_countType ON cash_drawer_counts(countType);
 
+      CREATE INDEX IF NOT EXISTS idx_discounts_businessId ON discounts(businessId);
+      CREATE INDEX IF NOT EXISTS idx_discounts_isActive ON discounts(isActive);
+      CREATE INDEX IF NOT EXISTS idx_discounts_type ON discounts(type);
+      CREATE INDEX IF NOT EXISTS idx_discounts_applicableTo ON discounts(applicableTo);
+      CREATE INDEX IF NOT EXISTS idx_discounts_couponCode ON discounts(couponCode);
+      CREATE INDEX IF NOT EXISTS idx_discounts_priority ON discounts(priority);
+
       CREATE INDEX IF NOT EXISTS idx_audit_logs_userId ON audit_logs(userId);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
@@ -656,6 +703,36 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_print_job_retries_job_id ON print_job_retries(job_id);
       CREATE INDEX IF NOT EXISTS idx_print_job_retries_timestamp ON print_job_retries(timestamp);
     `);
+
+    // Migration: Add discount columns to transactions and transaction_items
+    try {
+      this.db.exec(
+        `ALTER TABLE transactions ADD COLUMN discountAmount REAL DEFAULT 0;`
+      );
+    } catch (error) {
+      // Column might already exist, ignore error
+    }
+    try {
+      this.db.exec(
+        `ALTER TABLE transactions ADD COLUMN appliedDiscounts TEXT;`
+      );
+    } catch (error) {
+      // Column might already exist, ignore error
+    }
+    try {
+      this.db.exec(
+        `ALTER TABLE transaction_items ADD COLUMN discountAmount REAL DEFAULT 0;`
+      );
+    } catch (error) {
+      // Column might already exist, ignore error
+    }
+    try {
+      this.db.exec(
+        `ALTER TABLE transaction_items ADD COLUMN appliedDiscounts TEXT;`
+      );
+    } catch (error) {
+      // Column might already exist, ignore error
+    }
 
     // Insert default admin user if no users exist
     this.createDefaultAdmin();

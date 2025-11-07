@@ -103,6 +103,58 @@ export interface Category {
   updatedAt: string;
 }
 
+export interface Discount {
+  id: string;
+  name: string;
+  description?: string;
+  type: "percentage" | "fixed_amount" | "buy_x_get_y";
+  value: number; // Percentage (0-100) or fixed amount
+  businessId: string;
+  // Applicability
+  applicableTo: "all" | "category" | "product" | "transaction";
+  categoryIds?: string[]; // For category-based discounts
+  productIds?: string[]; // For product-specific discounts
+  // Buy X Get Y specifics
+  buyQuantity?: number; // Buy X items
+  getQuantity?: number; // Get Y items
+  getDiscountType?: "free" | "percentage" | "fixed"; // Discount on Y items
+  getDiscountValue?: number; // Value of discount on Y items
+  // Conditions
+  minPurchaseAmount?: number; // Minimum transaction amount
+  minQuantity?: number; // Minimum quantity required
+  maxDiscountAmount?: number; // Cap on discount amount
+  // Validity
+  startDate?: string;
+  endDate?: string;
+  isActive: boolean;
+  // Usage tracking
+  usageLimit?: number; // Maximum number of times this discount can be used
+  usageCount: number; // Current usage count
+  perCustomerLimit?: number; // Max uses per customer
+  // Priority (higher number = higher priority when multiple discounts apply)
+  priority: number;
+  // Restrictions
+  daysOfWeek?: number[]; // 0-6 (Sunday-Saturday), empty means all days
+  timeStart?: string; // HH:MM format
+  timeEnd?: string; // HH:MM format
+  requiresCouponCode?: boolean;
+  couponCode?: string;
+  combinableWithOthers: boolean; // Can be combined with other discounts
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string; // userId
+}
+
+export interface AppliedDiscount {
+  discountId: string;
+  discountName: string;
+  discountType: "percentage" | "fixed_amount" | "buy_x_get_y";
+  discountValue: number;
+  discountAmount: number; // Actual amount discounted
+  appliedTo: "transaction" | "item"; // Where the discount was applied
+  itemId?: string; // If applied to specific item
+}
+
 export interface Schedule {
   id: string;
   staffId: string;
@@ -155,6 +207,9 @@ export interface Transaction {
   receiptNumber: string;
   timestamp: string;
   createdAt: string;
+  // Discount fields
+  discountAmount?: number; // Total discount amount
+  appliedDiscounts?: AppliedDiscount[]; // All discounts applied to this transaction
   // Refund-specific fields
   originalTransactionId?: string; // For refunds, links to original sale
   refundReason?: string; // Why the refund was processed
@@ -171,6 +226,9 @@ export interface TransactionItem {
   unitPrice: number;
   totalPrice: number;
   appliedModifiers?: AppliedModifier[];
+  // Discount fields
+  discountAmount?: number; // Discount amount for this item
+  appliedDiscounts?: AppliedDiscount[]; // Discounts applied to this item
   // Refund support
   refundedQuantity?: number; // How many of this item have been refunded
   weight?: number; // For weight-based products
