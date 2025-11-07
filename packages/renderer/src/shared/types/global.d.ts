@@ -271,6 +271,9 @@ declare global {
     };
     databaseAPI: {
       getInfo: () => Promise<APIResponse>;
+      backup: () => Promise<APIResponse>;
+      empty: () => Promise<APIResponse>;
+      import: () => Promise<APIResponse>;
     };
     printerAPI: {
       getStatus: () => Promise<{
@@ -380,6 +383,10 @@ declare global {
         data?: string;
         error?: string;
       }>;
+    };
+
+    appAPI: {
+      restart: () => Promise<{ success: boolean; message?: string }>;
     };
   }
 }

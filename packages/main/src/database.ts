@@ -3164,6 +3164,93 @@ export class DatabaseManager {
     };
   }
 
+  // Method to empty all tables in the database
+  async emptyAllTables(): Promise<{
+    success: boolean;
+    tablesEmptied: string[];
+    rowsDeleted: number;
+    error?: string;
+  }> {
+    try {
+      const tablesEmptied: string[] = [];
+      let totalRowsDeleted = 0;
+
+      // Get list of all tables (excluding sqlite internal tables)
+      const tables = this.db
+        .prepare(
+          `
+        SELECT name FROM sqlite_master 
+        WHERE type='table' 
+        AND name NOT LIKE 'sqlite_%'
+      `
+        )
+        .all() as { name: string }[];
+
+      // Disable foreign key constraints temporarily
+      this.db.exec("PRAGMA foreign_keys = OFF;");
+
+      // Begin transaction for atomic operation
+      this.db.exec("BEGIN TRANSACTION;");
+
+      try {
+        // Delete from each table
+        for (const table of tables) {
+          const tableName = table.name;
+
+          // Get row count before deletion
+          const countResult = this.db
+            .prepare(`SELECT COUNT(*) as count FROM ${tableName}`)
+            .get() as { count: number };
+          const rowCount = countResult.count;
+
+          if (rowCount > 0) {
+            // Delete all rows
+            this.db.prepare(`DELETE FROM ${tableName}`).run();
+            tablesEmptied.push(tableName);
+            totalRowsDeleted += rowCount;
+
+            console.log(`Emptied table ${tableName}: ${rowCount} rows deleted`);
+          }
+        }
+
+        // Reset autoincrement counters
+        this.db.exec("DELETE FROM sqlite_sequence;");
+
+        // Commit transaction
+        this.db.exec("COMMIT;");
+
+        // Re-enable foreign key constraints
+        this.db.exec("PRAGMA foreign_keys = ON;");
+
+        // Run VACUUM to reclaim space
+        this.db.exec("VACUUM;");
+
+        console.log(
+          `Database emptied successfully. ${tablesEmptied.length} tables emptied, ${totalRowsDeleted} rows deleted.`
+        );
+
+        return {
+          success: true,
+          tablesEmptied,
+          rowsDeleted: totalRowsDeleted,
+        };
+      } catch (error) {
+        // Rollback on error
+        this.db.exec("ROLLBACK;");
+        this.db.exec("PRAGMA foreign_keys = ON;");
+        throw error;
+      }
+    } catch (error) {
+      console.error("Error emptying database:", error);
+      return {
+        success: false,
+        tablesEmptied: [],
+        rowsDeleted: 0,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
   close(): void {
     this.db.close();
   }

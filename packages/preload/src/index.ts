@@ -367,6 +367,9 @@ contextBridge.exposeInMainWorld("cashDrawerAPI", {
 // Database Information API (for debugging)
 contextBridge.exposeInMainWorld("databaseAPI", {
   getInfo: () => ipcRenderer.invoke("database:getInfo"),
+  backup: () => ipcRenderer.invoke("database:backup"),
+  empty: () => ipcRenderer.invoke("database:empty"),
+  import: () => ipcRenderer.invoke("database:import"),
 });
 
 // Thermal Printer API
@@ -453,6 +456,11 @@ contextBridge.exposeInMainWorld("paymentAPI", {
 contextBridge.exposeInMainWorld("pdfReceiptAPI", {
   generatePDF: (receiptData: any) =>
     ipcRenderer.invoke("receipt:generate-pdf", receiptData),
+});
+
+// App API - Application level operations
+contextBridge.exposeInMainWorld("appAPI", {
+  restart: () => ipcRenderer.invoke("app:restart"),
 });
 
 // Generic IPC send function for testing and general IPC communication
