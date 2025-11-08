@@ -33,6 +33,7 @@ export class DatabaseManager {
   private bcrypt: any;
   private uuid: any;
   private initialized: boolean = false;
+  private readonly SCHEMA_VERSION = 2; // Increment this when adding new migrations
 
   constructor() {
     // Don't initialize here, wait for explicit initialization
@@ -107,37 +108,24 @@ export class DatabaseManager {
   }
 
   private initializeTables() {
+    // ========================================
+    // FINAL SCHEMA DEFINITIONS
+    // This is what fresh installations get
+    // ========================================
+
     // First create businesses table (no foreign keys)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS businesses (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         ownerId TEXT NOT NULL,
+        address TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
+        vatNumber TEXT DEFAULT '',
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL
       )
     `);
-
-    // Migration: Add address, phone, and vatNumber columns to businesses table
-    try {
-      this.db.exec(
-        `ALTER TABLE businesses ADD COLUMN address TEXT DEFAULT '';`
-      );
-    } catch (error) {
-      // Column might already exist, ignore error
-    }
-    try {
-      this.db.exec(`ALTER TABLE businesses ADD COLUMN phone TEXT DEFAULT '';`);
-    } catch (error) {
-      // Column might already exist, ignore error
-    }
-    try {
-      this.db.exec(
-        `ALTER TABLE businesses ADD COLUMN vatNumber TEXT DEFAULT '';`
-      );
-    } catch (error) {
-      // Column might already exist, ignore error
-    }
 
     // Then create users table with foreign key to businesses
     this.db.exec(`
@@ -477,6 +465,8 @@ export class DatabaseManager {
         refundMethod TEXT CHECK (refundMethod IN ('original', 'store_credit', 'cash', 'card')),
         managerApprovalId TEXT,
         isPartialRefund BOOLEAN DEFAULT 0,
+        discountAmount REAL DEFAULT 0,
+        appliedDiscounts TEXT,
         FOREIGN KEY (shiftId) REFERENCES shifts (id),
         FOREIGN KEY (businessId) REFERENCES businesses (id),
         FOREIGN KEY (originalTransactionId) REFERENCES transactions (id),
@@ -496,6 +486,8 @@ export class DatabaseManager {
         totalPrice REAL NOT NULL,
         refundedQuantity INTEGER DEFAULT 0,
         weight REAL,
+        discountAmount REAL DEFAULT 0,
+        appliedDiscounts TEXT,
         createdAt TEXT NOT NULL,
         FOREIGN KEY (transactionId) REFERENCES transactions (id),
         FOREIGN KEY (productId) REFERENCES products (id)
@@ -704,38 +696,154 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_print_job_retries_timestamp ON print_job_retries(timestamp);
     `);
 
-    // Migration: Add discount columns to transactions and transaction_items
+    // ========================================
+    // RUN MIGRATIONS FOR OLD DATABASES
+    // ========================================
+    this.runMigrations();
+
+    // Insert default admin user if no users exist
+    this.createDefaultAdmin();
+  }
+
+  /**
+   * Database migration system
+   * Tracks which migrations have been applied to avoid running them multiple times
+   */
+  private runMigrations() {
+    // Create schema_version table if it doesn't exist
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_version (
+        version INTEGER PRIMARY KEY,
+        migration_name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      )
+    `);
+
+    // Get current schema version
+    const result = this.db
+      .prepare(
+        `
+      SELECT COALESCE(MAX(version), 0) as version FROM schema_version
+    `
+      )
+      .get() as { version: number };
+
+    const currentVersion = result.version;
+
+    console.log(`📊 Current schema version: ${currentVersion}`);
+    console.log(`📊 Target schema version: ${this.SCHEMA_VERSION}`);
+
+    if (currentVersion >= this.SCHEMA_VERSION) {
+      console.log("✅ Database schema is up to date");
+      return;
+    }
+
+    console.log("🔄 Running database migrations...");
+
+    // Run migrations sequentially
+    if (currentVersion < 1) {
+      this.migration_v1_add_business_fields();
+    }
+
+    if (currentVersion < 2) {
+      this.migration_v2_add_discount_fields();
+    }
+
+    console.log("✅ All migrations completed successfully");
+  }
+
+  /**
+   * Migration v1: Add address, phone, vatNumber to businesses table
+   * These fields were added after initial release
+   */
+  private migration_v1_add_business_fields() {
+    console.log("  ⏳ Migration v1: Adding address fields to businesses...");
+
+    try {
+      this.db.exec(
+        `ALTER TABLE businesses ADD COLUMN address TEXT DEFAULT '';`
+      );
+    } catch (error) {
+      // Column already exists (fresh install), ignore
+    }
+
+    try {
+      this.db.exec(`ALTER TABLE businesses ADD COLUMN phone TEXT DEFAULT '';`);
+    } catch (error) {
+      // Column already exists
+    }
+
+    try {
+      this.db.exec(
+        `ALTER TABLE businesses ADD COLUMN vatNumber TEXT DEFAULT '';`
+      );
+    } catch (error) {
+      // Column already exists
+    }
+
+    // Record migration
+    this.db
+      .prepare(
+        `
+      INSERT INTO schema_version (version, migration_name, applied_at)
+      VALUES (?, ?, datetime('now'))
+    `
+      )
+      .run(1, "add_business_fields");
+
+    console.log("  ✅ Migration v1 completed");
+  }
+
+  /**
+   * Migration v2: Add discount-related fields to transactions and transaction_items
+   * Part of discount system feature
+   */
+  private migration_v2_add_discount_fields() {
+    console.log("  ⏳ Migration v2: Adding discount fields to transactions...");
+
     try {
       this.db.exec(
         `ALTER TABLE transactions ADD COLUMN discountAmount REAL DEFAULT 0;`
       );
     } catch (error) {
-      // Column might already exist, ignore error
+      // Column already exists
     }
+
     try {
       this.db.exec(
         `ALTER TABLE transactions ADD COLUMN appliedDiscounts TEXT;`
       );
     } catch (error) {
-      // Column might already exist, ignore error
+      // Column already exists
     }
+
     try {
       this.db.exec(
         `ALTER TABLE transaction_items ADD COLUMN discountAmount REAL DEFAULT 0;`
       );
     } catch (error) {
-      // Column might already exist, ignore error
+      // Column already exists
     }
+
     try {
       this.db.exec(
         `ALTER TABLE transaction_items ADD COLUMN appliedDiscounts TEXT;`
       );
     } catch (error) {
-      // Column might already exist, ignore error
+      // Column already exists
     }
 
-    // Insert default admin user if no users exist
-    this.createDefaultAdmin();
+    // Record migration
+    this.db
+      .prepare(
+        `
+      INSERT INTO schema_version (version, migration_name, applied_at)
+      VALUES (?, ?, datetime('now'))
+    `
+      )
+      .run(2, "add_discount_fields");
+
+    console.log("  ✅ Migration v2 completed");
   }
 
   private async createDefaultAdmin() {
