@@ -1,12 +1,27 @@
 import type { Product, Modifier, ModifierOption } from "../models/product.js";
+import type { DrizzleDB } from "../drizzle.js";
+import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
+import * as schema from "../schema.js";
 
 export class ProductManager {
   private db: any;
+  private drizzle: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, uuid: any) {
+  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
     this.db = db;
+    this.drizzle = drizzle;
     this.uuid = uuid;
+  }
+
+  /**
+   * Get Drizzle ORM instance
+   */
+  private getDrizzleInstance(): DrizzleDB {
+    if (!this.drizzle) {
+      throw new Error("Drizzle ORM not initialized");
+    }
+    return this.drizzle;
   }
 
   async createProduct(
@@ -270,5 +285,200 @@ export class ProductManager {
         `DELETE FROM product_modifiers WHERE productId = ? AND modifierId = ?`
       )
       .run(productId, modifierId);
+  }
+
+  // ============================================
+  // DRIZZLE ORM METHODS
+  // ============================================
+
+  /**
+   * Get products by business using Drizzle ORM (type-safe)
+   */
+  async getByBusinessDrizzle(businessId: string): Promise<Product[]> {
+    const drizzle = this.getDrizzleInstance();
+
+    const products = await drizzle
+      .select()
+      .from(schema.products)
+      .where(
+        and(
+          eq(schema.products.businessId, businessId),
+          eq(schema.products.isActive, true)
+        )
+      )
+      .orderBy(schema.products.name);
+
+    return products as Product[];
+  }
+
+  /**
+   * Search products by name or SKU using Drizzle ORM (type-safe)
+   */
+  async searchDrizzle(
+    businessId: string,
+    searchTerm: string
+  ): Promise<Product[]> {
+    const drizzle = this.getDrizzleInstance();
+    const searchPattern = `%${searchTerm}%`;
+
+    const products = await drizzle
+      .select()
+      .from(schema.products)
+      .where(
+        and(
+          eq(schema.products.businessId, businessId),
+          eq(schema.products.isActive, true),
+          drizzleSql`(
+            ${schema.products.name} LIKE ${searchPattern} OR 
+            ${schema.products.sku} LIKE ${searchPattern}
+          )`
+        )
+      )
+      .orderBy(schema.products.name);
+
+    return products as Product[];
+  }
+
+  /**
+   * Get products with category details using Drizzle JOIN (type-safe)
+   */
+  async getWithCategoryDrizzle(businessId: string) {
+    const drizzle = this.getDrizzleInstance();
+
+    const products = await drizzle
+      .select({
+        product: schema.products,
+        category: schema.categories,
+      })
+      .from(schema.products)
+      .leftJoin(
+        schema.categories,
+        eq(schema.products.category, schema.categories.id)
+      )
+      .where(
+        and(
+          eq(schema.products.businessId, businessId),
+          eq(schema.products.isActive, true)
+        )
+      )
+      .orderBy(schema.products.name);
+
+    return products;
+  }
+
+  /**
+   * Get low stock products using Drizzle ORM (type-safe)
+   */
+  async getLowStockDrizzle(businessId: string, threshold: number = 10) {
+    const drizzle = this.getDrizzleInstance();
+
+    const products = await drizzle
+      .select()
+      .from(schema.products)
+      .where(
+        and(
+          eq(schema.products.businessId, businessId),
+          eq(schema.products.isActive, true),
+          drizzleSql`${schema.products.stockLevel} <= ${threshold}`
+        )
+      )
+      .orderBy(schema.products.stockLevel);
+
+    return products as Product[];
+  }
+
+  /**
+   * Create product using Drizzle ORM (type-safe)
+   */
+  async createDrizzle(
+    productData: Omit<Product, "id" | "createdAt" | "updatedAt" | "modifiers">
+  ): Promise<Product> {
+    const drizzle = this.getDrizzleInstance();
+    const productId = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    // Validate required fields
+    if (!productData.category || productData.category.trim() === "") {
+      throw new Error("Category is required and cannot be empty");
+    }
+
+    await drizzle.insert(schema.products).values({
+      id: productId,
+      name: productData.name,
+      description: productData.description || null,
+      price: productData.price,
+      costPrice: productData.costPrice || 0,
+      taxRate: productData.taxRate || 0,
+      sku: productData.sku,
+      plu: productData.plu || null,
+      image: productData.image || null,
+      category: productData.category,
+      stockLevel: productData.stockLevel || 0,
+      minStockLevel: productData.minStockLevel || 0,
+      businessId: productData.businessId,
+      isActive: productData.isActive !== false,
+      requiresWeight: productData.requiresWeight || false,
+      unit: productData.unit || "each",
+      pricePerUnit: productData.pricePerUnit || null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Get the product with modifiers (use raw SQL method for now)
+    return this.getProductById(productId);
+  }
+
+  /**
+   * Update product using Drizzle ORM (type-safe)
+   */
+  async updateDrizzle(
+    id: string,
+    updates: Partial<
+      Omit<Product, "id" | "createdAt" | "updatedAt" | "modifiers">
+    >
+  ): Promise<Product> {
+    const drizzle = this.getDrizzleInstance();
+    const now = new Date().toISOString();
+
+    // Build the update object, converting booleans to integers for SQLite
+    const updateData: any = {
+      ...updates,
+      updatedAt: now,
+    };
+
+    // Ensure booleans are converted properly if present
+    if (updates.isActive !== undefined) {
+      updateData.isActive = updates.isActive;
+    }
+    if (updates.requiresWeight !== undefined) {
+      updateData.requiresWeight = updates.requiresWeight;
+    }
+
+    await drizzle
+      .update(schema.products)
+      .set(updateData)
+      .where(eq(schema.products.id, id));
+
+    return this.getProductById(id);
+  }
+
+  /**
+   * Delete product using Drizzle ORM (soft delete, type-safe)
+   */
+  async deleteDrizzle(id: string): Promise<boolean> {
+    const drizzle = this.getDrizzleInstance();
+    const now = new Date().toISOString();
+
+    const result = await drizzle
+      .update(schema.products)
+      .set({
+        isActive: false,
+        updatedAt: now,
+      })
+      .where(
+        and(eq(schema.products.id, id), eq(schema.products.isActive, true))
+      );
+
+    return result.changes > 0;
   }
 }

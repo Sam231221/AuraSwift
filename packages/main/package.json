@@ -20,6 +20,7 @@
     "@app/renderer": "*",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^12.4.1",
+    "drizzle-orm": "^0.44.7",
     "electron-store": "^10.1.0",
     "electron-updater": "6.6.2",
     "node-thermal-printer": "^4.5.0",
@@ -31,6 +32,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/uuid": "^10.0.0",
+    "drizzle-kit": "^0.31.6",
     "electron-devtools-installer": "4.0.0",
     "typescript": "5.9.2",
     "vite": "7.1.6"

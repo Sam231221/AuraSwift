@@ -484,7 +484,7 @@ ipcMain.handle("schedules:updateStatus", async (event, id, status) => {
 ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
   try {
     if (!db) db = await getDatabase();
-    const users = db.getUsersByBusiness(businessId);
+    const users = db.users.getUsersByBusiness(businessId);
     // Filter for cashier and manager roles only
     const staffUsers = users.filter(
       (user) => user.role === "cashier" || user.role === "manager"

@@ -1,12 +1,27 @@
 import type { Session } from "../models/session.js";
+import type { DrizzleDB } from "../drizzle.js";
+import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
+import * as schema from "../schema.js";
 
 export class SessionManager {
   private db: any;
+  private drizzle: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, uuid: any) {
+  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
     this.db = db;
+    this.drizzle = drizzle;
     this.uuid = uuid;
+  }
+
+  /**
+   * Get Drizzle ORM instance
+   */
+  private getDrizzleInstance(): DrizzleDB {
+    if (!this.drizzle) {
+      throw new Error("Drizzle ORM not initialized");
+    }
+    return this.drizzle;
   }
 
   createSession(userId: string, expiryDays: number = 7): Session {
@@ -96,5 +111,61 @@ export class SessionManager {
     this.db
       .prepare("DELETE FROM sessions WHERE expiresAt <= datetime('now')")
       .run();
+  }
+
+  // ============================================
+  // DRIZZLE ORM METHODS
+  // ============================================
+
+  /**
+   * Delete user sessions using Drizzle ORM (type-safe)
+   */
+  deleteUserSessionsDrizzle(userId: string): number {
+    const db = this.getDrizzleInstance();
+
+    const result = db
+      .delete(schema.sessions)
+      .where(eq(schema.sessions.userId, userId))
+      .run();
+
+    return result.changes;
+  }
+
+  /**
+   * Cleanup expired sessions using Drizzle ORM (type-safe)
+   * Maintenance task
+   */
+  cleanupExpiredSessionsDrizzle(): number {
+    const db = this.getDrizzleInstance();
+    const now = new Date().toISOString();
+
+    const result = db
+      .delete(schema.sessions)
+      .where(drizzleSql`${schema.sessions.expiresAt} <= ${now}`)
+      .run();
+
+    return result.changes;
+  }
+
+  /**
+   * Get active sessions using Drizzle ORM (type-safe)
+   */
+  getActiveSessionsDrizzle(userId: string): Session[] {
+    const db = this.getDrizzleInstance();
+    const now = new Date().toISOString();
+
+    const sessions = db
+      .select()
+      .from(schema.sessions)
+      .where(
+        and(
+          eq(schema.sessions.userId, userId),
+          drizzleSql`${schema.sessions.expiresAt} > ${now}`
+        )
+      )
+      .orderBy(desc(schema.sessions.createdAt))
+      .all();
+
+    return sessions as Session[];
   }
 }

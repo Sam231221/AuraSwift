@@ -137,7 +137,7 @@ export class AuthAPI {
       const db = await this.getDb();
 
       // Check if user already exists
-      const existingUser = db.getUserByEmail(data.email);
+      const existingUser = db.users.getUserByEmail(data.email);
       if (existingUser) {
         return {
           success: false,
@@ -146,7 +146,7 @@ export class AuthAPI {
       }
 
       // Create user
-      const user = await db.createUser(data);
+      const user = await db.users.createUser(data);
 
       // Create session using the correct userId
       const session = db.createSession(user.id);
@@ -231,7 +231,7 @@ export class AuthAPI {
         };
       }
 
-      const user = db.getUserById(session.userId);
+      const user = db.users.getUserById(session.userId);
       if (!user) {
         return {
           success: false,
@@ -276,7 +276,7 @@ export class AuthAPI {
   async getUserById(userId: string): Promise<AuthResponse> {
     try {
       const db = await this.getDb();
-      const user = db.getUserById(userId);
+      const user = db.users.getUserById(userId);
       if (!user) {
         return {
           success: false,
@@ -312,7 +312,7 @@ export class AuthAPI {
   ): Promise<AuthResponse> {
     try {
       const db = await this.getDb();
-      const success = db.updateUser(userId, updates);
+      const success = db.users.updateUser(userId, updates);
       if (!success) {
         return {
           success: false,
@@ -320,7 +320,7 @@ export class AuthAPI {
         };
       }
 
-      const user = db.getUserById(userId);
+      const user = db.users.getUserById(userId);
       if (!user) {
         return {
           success: false,
@@ -350,7 +350,7 @@ export class AuthAPI {
       const db = await this.getDb();
 
       // Check if user exists first
-      const user = db.getUserById(userId);
+      const user = db.users.getUserById(userId);
       if (!user) {
         return {
           success: false,
@@ -358,7 +358,7 @@ export class AuthAPI {
         };
       }
 
-      const success = db.deleteUser(userId);
+      const success = db.users.deleteUser(userId);
       if (!success) {
         return {
           success: false,
@@ -419,7 +419,7 @@ export class AuthAPI {
 
       // Check if SKU already exists
       try {
-        const existingProduct = db.getProductById(productData.sku);
+        const existingProduct = db.products.getProductById(productData.sku);
         if (existingProduct) {
           return {
             success: false,
@@ -433,7 +433,7 @@ export class AuthAPI {
       // Check if PLU already exists (if PLU is provided)
       if (productData.plu) {
         try {
-          const existingProductByPLU = db.getProductByPLU(productData.plu);
+          const existingProductByPLU = db.products.getProductByPLU(productData.plu);
           if (existingProductByPLU) {
             return {
               success: false,
@@ -449,7 +449,7 @@ export class AuthAPI {
       const { modifiers, ...productDataWithoutModifiers } = productData;
 
       // Create the product first
-      const product = await db.createProduct({
+      const product = await db.products.createProduct({
         ...productDataWithoutModifiers,
         isActive: true,
       });
@@ -459,7 +459,7 @@ export class AuthAPI {
         for (const modifier of modifiers) {
           try {
             // Create the modifier
-            const createdModifier = await db.createModifier({
+            const createdModifier = await db.products.createModifier({
               name: modifier.name,
               type: modifier.type,
               required: modifier.required,
@@ -470,7 +470,7 @@ export class AuthAPI {
             if (modifier.options && modifier.options.length > 0) {
               for (const option of modifier.options) {
                 if (option.name.trim()) {
-                  const createdOption = await db.createModifierOption(
+                  const createdOption = await db.products.createModifierOption(
                     createdModifier.id,
                     {
                       name: option.name,
@@ -493,7 +493,7 @@ export class AuthAPI {
       }
 
       // Fetch the complete product with modifiers
-      const completeProduct = db.getProductById(product.id);
+      const completeProduct = db.products.getProductById(product.id);
 
       return {
         success: true,
@@ -515,7 +515,7 @@ export class AuthAPI {
   async getProductsByBusiness(businessId: string): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
-      const products = db.getProductsByBusiness(businessId);
+      const products = db.products.getProductsByBusiness(businessId);
 
       return {
         success: true,
@@ -537,7 +537,7 @@ export class AuthAPI {
   async getProductById(id: string): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
-      const product = db.getProductById(id);
+      const product = db.products.getProductById(id);
 
       return {
         success: true,
@@ -566,7 +566,7 @@ export class AuthAPI {
       // If updating SKU, check it doesn't already exist
       if (updates.sku) {
         try {
-          const existingProduct = db.getProductById(updates.sku);
+          const existingProduct = db.products.getProductById(updates.sku);
           if (existingProduct && existingProduct.id !== id) {
             return {
               success: false,
@@ -581,7 +581,7 @@ export class AuthAPI {
       // If updating PLU, check it doesn't already exist
       if (updates.plu) {
         try {
-          const existingProductByPLU = db.getProductByPLU(updates.plu);
+          const existingProductByPLU = db.products.getProductByPLU(updates.plu);
           if (existingProductByPLU && existingProductByPLU.id !== id) {
             return {
               success: false,
@@ -597,16 +597,16 @@ export class AuthAPI {
       const { modifiers, ...updatesWithoutModifiers } = updates;
 
       // Update the product first
-      const product = await db.updateProduct(id, updatesWithoutModifiers);
+      const product = await db.products.updateProduct(id, updatesWithoutModifiers);
 
       // Handle modifiers if provided
       if (modifiers !== undefined) {
         // Get current product modifiers
-        const currentModifiers = db.getProductModifiers(id);
+        const currentModifiers = db.products.getProductModifiers(id);
 
         // Remove all existing modifiers for this product
         for (const modifier of currentModifiers) {
-          db.removeModifierFromProduct(id, modifier.id);
+          db.products.removeModifierFromProduct(id, modifier.id);
         }
 
         // Add new modifiers
@@ -614,7 +614,7 @@ export class AuthAPI {
           for (const modifier of modifiers) {
             try {
               // Create the modifier
-              const createdModifier = await db.createModifier({
+              const createdModifier = await db.products.createModifier({
                 name: modifier.name,
                 type: modifier.type,
                 required: modifier.required,
@@ -625,7 +625,7 @@ export class AuthAPI {
               if (modifier.options && modifier.options.length > 0) {
                 for (const option of modifier.options) {
                   if (option.name.trim()) {
-                    await db.createModifierOption(createdModifier.id, {
+                    await db.products.createModifierOption(createdModifier.id, {
                       name: option.name,
                       price: option.price || 0,
                     });
@@ -644,7 +644,7 @@ export class AuthAPI {
       }
 
       // Fetch the complete updated product with modifiers
-      const updatedProduct = db.getProductById(id);
+      const updatedProduct = db.products.getProductById(id);
 
       return {
         success: true,
@@ -666,7 +666,7 @@ export class AuthAPI {
   async deleteProduct(id: string): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
-      const deleted = db.deleteProduct(id);
+      const deleted = db.products.deleteProduct(id);
 
       if (!deleted) {
         return {
@@ -696,7 +696,7 @@ export class AuthAPI {
   async createCategory(categoryData: any): Promise<any> {
     try {
       const db = await this.getDb();
-      const category = await db.createCategory(categoryData);
+      const category = await db.categories.createCategory(categoryData);
 
       return {
         success: true,
@@ -718,7 +718,7 @@ export class AuthAPI {
   async getCategoriesByBusiness(businessId: string): Promise<any> {
     try {
       const db = await this.getDb();
-      const categories = await db.getCategoriesByBusiness(businessId);
+      const categories = await db.categories.getCategoriesByBusiness(businessId);
 
       return {
         success: true,
@@ -767,7 +767,7 @@ export class AuthAPI {
   async updateCategory(id: string, updates: any): Promise<any> {
     try {
       const db = await this.getDb();
-      const category = await db.updateCategory(id, updates);
+      const category = await db.categories.updateCategory(id, updates);
 
       if (!category) {
         return {
@@ -796,7 +796,7 @@ export class AuthAPI {
   async deleteCategory(id: string): Promise<any> {
     try {
       const db = await this.getDb();
-      const deleted = await db.deleteCategory(id);
+      const deleted = await db.categories.deleteCategory(id);
 
       if (!deleted) {
         return {
@@ -851,7 +851,7 @@ export class AuthAPI {
     try {
       const db = await this.getDb();
 
-      const modifier = await db.createModifier({
+      const modifier = await db.products.createModifier({
         name: modifierData.name,
         type: modifierData.type,
         required: modifierData.required,
@@ -860,7 +860,7 @@ export class AuthAPI {
 
       // Add options
       for (const option of modifierData.options) {
-        db.createModifierOption(modifier.id, {
+        db.products.createModifierOption(modifier.id, {
           name: option.name,
           price: option.price,
         });
@@ -934,7 +934,7 @@ export class AuthAPI {
   async getUsersByBusiness(businessId: string): Promise<AuthResponse> {
     try {
       const db = await this.getDb();
-      const users = db.getUsersByBusiness(businessId);
+      const users = db.users.getUsersByBusiness(businessId);
 
       return {
         success: true,
@@ -971,7 +971,7 @@ export class AuthAPI {
         };
       }
 
-      const user = await db.createUser({
+      const user = await db.users.createUser({
         ...userData,
         businessName: business.name,
       });

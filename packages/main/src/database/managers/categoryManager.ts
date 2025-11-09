@@ -1,12 +1,27 @@
 import type { Category } from "../models/category.js";
+import type { DrizzleDB } from "../drizzle.js";
+import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
+import * as schema from "../schema.js";
 
 export class CategoryManager {
   private db: any;
+  private drizzle: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, uuid: any) {
+  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
     this.db = db;
+    this.drizzle = drizzle;
     this.uuid = uuid;
+  }
+
+  /**
+   * Get Drizzle ORM instance
+   */
+  private getDrizzleInstance(): DrizzleDB {
+    if (!this.drizzle) {
+      throw new Error("Drizzle ORM not initialized");
+    }
+    return this.drizzle;
   }
 
   async createCategory(categoryData: {
@@ -207,5 +222,229 @@ export class CategoryManager {
     });
 
     transaction();
+  }
+
+  // ============================================
+  // DRIZZLE ORM METHODS
+  // ============================================
+
+  /**
+   * Get category by ID using Drizzle ORM (type-safe)
+   */
+  async getByIdDrizzle(id: string): Promise<Category> {
+    const drizzle = this.getDrizzleInstance();
+
+    const [category] = await drizzle
+      .select()
+      .from(schema.categories)
+      .where(eq(schema.categories.id, id))
+      .limit(1);
+
+    if (!category) {
+      throw new Error(`Category with ID ${id} not found`);
+    }
+
+    return {
+      ...category,
+      isActive: Boolean(category.isActive),
+    } as Category;
+  }
+
+  /**
+   * Get all categories for a business using Drizzle ORM (type-safe)
+   */
+  async getByBusinessDrizzle(businessId: string): Promise<Category[]> {
+    const drizzle = this.getDrizzleInstance();
+
+    const categories = await drizzle
+      .select()
+      .from(schema.categories)
+      .where(
+        and(
+          eq(schema.categories.businessId, businessId),
+          eq(schema.categories.isActive, true)
+        )
+      )
+      .orderBy(schema.categories.sortOrder, schema.categories.name);
+
+    return categories.map((cat) => ({
+      ...cat,
+      isActive: Boolean(cat.isActive),
+    })) as Category[];
+  }
+
+  /**
+   * Search categories by name using Drizzle ORM (type-safe)
+   */
+  async searchDrizzle(
+    businessId: string,
+    searchTerm: string
+  ): Promise<Category[]> {
+    const drizzle = this.getDrizzleInstance();
+    const searchPattern = `%${searchTerm}%`;
+
+    const categories = await drizzle
+      .select()
+      .from(schema.categories)
+      .where(
+        and(
+          eq(schema.categories.businessId, businessId),
+          eq(schema.categories.isActive, true),
+          drizzleSql`(
+            ${schema.categories.name} LIKE ${searchPattern} OR 
+            ${schema.categories.description} LIKE ${searchPattern}
+          )`
+        )
+      )
+      .orderBy(schema.categories.name);
+
+    return categories.map((cat) => ({
+      ...cat,
+      isActive: Boolean(cat.isActive),
+    })) as Category[];
+  }
+
+  /**
+   * Get category hierarchy (parent categories with subcategories)
+   */
+  async getHierarchyDrizzle(businessId: string) {
+    const drizzle = this.getDrizzleInstance();
+
+    // Get all categories for the business
+    const categories = await drizzle
+      .select()
+      .from(schema.categories)
+      .where(
+        and(
+          eq(schema.categories.businessId, businessId),
+          eq(schema.categories.isActive, true)
+        )
+      )
+      .orderBy(schema.categories.sortOrder, schema.categories.name);
+
+    // Build hierarchy (categories with parentId null are top-level)
+    const categoryMap = new Map();
+    const topLevel: any[] = [];
+
+    categories.forEach((cat) => {
+      categoryMap.set(cat.id, {
+        ...cat,
+        children: [],
+        isActive: Boolean(cat.isActive),
+      });
+    });
+
+    categories.forEach((cat) => {
+      const category = categoryMap.get(cat.id);
+      if (cat.parentId) {
+        const parent = categoryMap.get(cat.parentId);
+        if (parent) {
+          parent.children.push(category);
+        }
+      } else {
+        topLevel.push(category);
+      }
+    });
+
+    return topLevel;
+  }
+
+  /**
+   * Create category using Drizzle ORM (type-safe)
+   */
+  async createDrizzle(categoryData: {
+    name: string;
+    description?: string;
+    businessId: string;
+    sortOrder?: number;
+    parentId?: string | null;
+  }): Promise<Category> {
+    const drizzle = this.getDrizzleInstance();
+    const categoryId = this.uuid.v4();
+    const now = new Date().toISOString();
+
+    // Get the next sort order if not provided
+    const nextSortOrder =
+      categoryData.sortOrder !== undefined
+        ? categoryData.sortOrder
+        : this.getNextCategorySortOrder(categoryData.businessId);
+
+    await drizzle.insert(schema.categories).values({
+      id: categoryId,
+      name: categoryData.name,
+      parentId: categoryData.parentId || null,
+      description: categoryData.description || null,
+      businessId: categoryData.businessId,
+      sortOrder: nextSortOrder,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return this.getByIdDrizzle(categoryId);
+  }
+
+  /**
+   * Update category using Drizzle ORM (type-safe)
+   */
+  async updateDrizzle(
+    id: string,
+    updates: Partial<{
+      name: string;
+      description: string;
+      parentId: string | null;
+      sortOrder: number;
+      isActive: boolean;
+    }>
+  ): Promise<Category> {
+    const drizzle = this.getDrizzleInstance();
+    const now = new Date().toISOString();
+
+    await drizzle
+      .update(schema.categories)
+      .set({
+        ...updates,
+        updatedAt: now,
+      })
+      .where(eq(schema.categories.id, id));
+
+    return this.getByIdDrizzle(id);
+  }
+
+  /**
+   * Delete category using Drizzle ORM (soft delete, type-safe)
+   */
+  async deleteDrizzle(id: string): Promise<boolean> {
+    const drizzle = this.getDrizzleInstance();
+    const now = new Date().toISOString();
+
+    // Check if category is being used by any products
+    const productsUsingCategory = await drizzle
+      .select({ count: drizzleSql<number>`COUNT(*)` })
+      .from(schema.products)
+      .where(
+        and(
+          eq(schema.products.category, id),
+          eq(schema.products.isActive, true)
+        )
+      );
+
+    const count = productsUsingCategory[0]?.count || 0;
+
+    if (count > 0) {
+      throw new Error(
+        `Cannot delete category: ${count} active product(s) are using this category`
+      );
+    }
+
+    const result = await drizzle
+      .update(schema.categories)
+      .set({
+        isActive: false,
+        updatedAt: now,
+      })
+      .where(eq(schema.categories.id, id));
+
+    return result.changes > 0;
   }
 }
