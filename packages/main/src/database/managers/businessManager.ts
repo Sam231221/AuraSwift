@@ -1,18 +1,38 @@
 import type { Business } from "../models/business.js";
+import type { DrizzleDB } from "../drizzle.js";
+import { eq } from "drizzle-orm";
+import * as schema from "../schema.js";
 
 export class BusinessManager {
   private db: any;
+  private drizzle: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, uuid: any) {
+  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
     this.db = db;
+    this.drizzle = drizzle;
     this.uuid = uuid;
   }
 
+  /**
+   * Get Drizzle ORM instance
+   */
+  private getDrizzleInstance(): DrizzleDB {
+    if (!this.drizzle) {
+      throw new Error("Drizzle ORM not initialized");
+    }
+    return this.drizzle;
+  }
+
   getBusinessById(id: string): Business | null {
-    return this.db
-      .prepare("SELECT * FROM businesses WHERE id = ?")
-      .get(id) as Business | null;
+    const drizzle = this.getDrizzleInstance();
+    const result = drizzle
+      .select()
+      .from(schema.businesses)
+      .where(eq(schema.businesses.id, id))
+      .get();
+
+    return result as Business | null;
   }
 
   createBusiness(businessData: {
@@ -24,24 +44,21 @@ export class BusinessManager {
   }): Business {
     const businessId = this.uuid.v4();
     const now = new Date().toISOString();
+    const drizzle = this.getDrizzleInstance();
 
-    this.db
-      .prepare(
-        `
-      INSERT INTO businesses (id, name, ownerId, address, phone, vatNumber, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `
-      )
-      .run(
-        businessId,
-        businessData.name,
-        businessData.ownerId,
-        businessData.address || "",
-        businessData.phone || "",
-        businessData.vatNumber || "",
-        now,
-        now
-      );
+    drizzle
+      .insert(schema.businesses)
+      .values({
+        id: businessId,
+        name: businessData.name,
+        ownerId: businessData.ownerId,
+        address: businessData.address || "",
+        phone: businessData.phone || "",
+        vatNumber: businessData.vatNumber || "",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
 
     const business = this.getBusinessById(businessId);
     if (!business) {
@@ -59,23 +76,17 @@ export class BusinessManager {
       vatNumber: string;
     }>
   ): boolean {
-    const setClause = Object.keys(updates)
-      .map((key) => `${key} = ?`)
-      .join(", ");
+    const drizzle = this.getDrizzleInstance();
+    const now = new Date().toISOString();
 
-    const values = Object.values(updates);
-    values.push(new Date().toISOString()); // updatedAt
-    values.push(id);
-
-    const result = this.db
-      .prepare(
-        `
-      UPDATE businesses 
-      SET ${setClause}, updatedAt = ?
-      WHERE id = ?
-    `
-      )
-      .run(...values);
+    const result = drizzle
+      .update(schema.businesses)
+      .set({
+        ...updates,
+        updatedAt: now,
+      })
+      .where(eq(schema.businesses.id, id))
+      .run();
 
     return result.changes > 0;
   }

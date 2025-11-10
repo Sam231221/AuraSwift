@@ -6,9 +6,28 @@ import type {
   Transaction,
   TransactionItem,
 } from "../../../../../types/database.d.ts";
+import type { DrizzleDB } from "../drizzle.js";
+import { eq, and, desc, lte, gte, lt, sql as drizzleSql } from "drizzle-orm";
+import * as schema from "../schema.js";
 
 export class DiscountManager {
-  constructor(private db: Database) {}
+  private drizzle: DrizzleDB;
+  private uuid: any;
+
+  constructor(db: Database, drizzle: DrizzleDB, uuid: any) {
+    this.drizzle = drizzle;
+    this.uuid = uuid;
+  }
+
+  /**
+   * Get Drizzle ORM instance
+   */
+  private getDrizzleInstance(): DrizzleDB {
+    if (!this.drizzle) {
+      throw new Error("Drizzle ORM not initialized");
+    }
+    return this.drizzle;
+  }
 
   /**
    * Create a new discount
@@ -20,7 +39,8 @@ export class DiscountManager {
     >
   ): Discount {
     const now = new Date().toISOString();
-    const id = require("uuid").v4();
+    const id = this.uuid.v4();
+    const drizzle = this.getDrizzleInstance();
 
     const discount: Discount = {
       id,
@@ -41,66 +61,43 @@ export class DiscountManager {
       ? JSON.stringify(discountData.daysOfWeek)
       : null;
 
-    this.db
-      .prepare(
-        `
-      INSERT INTO discounts (
-        id, name, description, type, value, businessId,
-        applicableTo, categoryIds, productIds,
-        buyQuantity, getQuantity, getDiscountType, getDiscountValue,
-        minPurchaseAmount, minQuantity, maxDiscountAmount,
-        startDate, endDate, isActive,
-        usageLimit, usageCount, perCustomerLimit,
-        priority, daysOfWeek, timeStart, timeEnd,
-        requiresCouponCode, couponCode, combinableWithOthers,
-        createdAt, updatedAt, createdBy
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?
-      )
-    `
-      )
-      .run(
-        discount.id,
-        discount.name,
-        discount.description || null,
-        discount.type,
-        discount.value,
-        discount.businessId,
-        discount.applicableTo,
-        categoryIds,
-        productIds,
-        discount.buyQuantity || null,
-        discount.getQuantity || null,
-        discount.getDiscountType || null,
-        discount.getDiscountValue || null,
-        discount.minPurchaseAmount || null,
-        discount.minQuantity || null,
-        discount.maxDiscountAmount || null,
-        discount.startDate || null,
-        discount.endDate || null,
-        discount.isActive ? 1 : 0,
-        discount.usageLimit || null,
-        discount.usageCount,
-        discount.perCustomerLimit || null,
-        discount.priority,
-        daysOfWeek,
-        discount.timeStart || null,
-        discount.timeEnd || null,
-        discount.requiresCouponCode ? 1 : 0,
-        discount.couponCode || null,
-        discount.combinableWithOthers ? 1 : 0,
-        discount.createdAt,
-        discount.updatedAt,
-        discount.createdBy
-      );
+    drizzle
+      .insert(schema.discounts)
+      .values({
+        id: discount.id,
+        name: discount.name,
+        description: discount.description,
+        type: discount.type,
+        value: discount.value,
+        businessId: discount.businessId,
+        applicableTo: discount.applicableTo,
+        categoryIds: categoryIds,
+        productIds: productIds,
+        buyQuantity: discount.buyQuantity,
+        getQuantity: discount.getQuantity,
+        getDiscountType: discount.getDiscountType,
+        getDiscountValue: discount.getDiscountValue,
+        minPurchaseAmount: discount.minPurchaseAmount,
+        minQuantity: discount.minQuantity,
+        maxDiscountAmount: discount.maxDiscountAmount,
+        startDate: discount.startDate,
+        endDate: discount.endDate,
+        isActive: discount.isActive,
+        usageLimit: discount.usageLimit,
+        usageCount: discount.usageCount,
+        perCustomerLimit: discount.perCustomerLimit,
+        priority: discount.priority,
+        daysOfWeek: daysOfWeek,
+        timeStart: discount.timeStart,
+        timeEnd: discount.timeEnd,
+        requiresCouponCode: discount.requiresCouponCode,
+        couponCode: discount.couponCode,
+        combinableWithOthers: discount.combinableWithOthers,
+        createdAt: discount.createdAt,
+        updatedAt: discount.updatedAt,
+        createdBy: discount.createdBy,
+      })
+      .run();
 
     return discount;
   }
@@ -113,146 +110,61 @@ export class DiscountManager {
     updates: Partial<Omit<Discount, "id" | "createdAt" | "usageCount">>
   ): void {
     const now = new Date().toISOString();
-    const fields: string[] = [];
-    const values: any[] = [];
+    const drizzle = this.getDrizzleInstance();
 
-    // Build dynamic update query
-    if (updates.name !== undefined) {
-      fields.push("name = ?");
-      values.push(updates.name);
-    }
-    if (updates.description !== undefined) {
-      fields.push("description = ?");
-      values.push(updates.description || null);
-    }
-    if (updates.type !== undefined) {
-      fields.push("type = ?");
-      values.push(updates.type);
-    }
-    if (updates.value !== undefined) {
-      fields.push("value = ?");
-      values.push(updates.value);
-    }
-    if (updates.applicableTo !== undefined) {
-      fields.push("applicableTo = ?");
-      values.push(updates.applicableTo);
-    }
+    // Build update object, serializing arrays to JSON
+    const updateData: any = { updatedAt: now };
+
     if (updates.categoryIds !== undefined) {
-      fields.push("categoryIds = ?");
-      values.push(
-        updates.categoryIds ? JSON.stringify(updates.categoryIds) : null
-      );
+      updateData.categoryIds = updates.categoryIds
+        ? JSON.stringify(updates.categoryIds)
+        : null;
     }
     if (updates.productIds !== undefined) {
-      fields.push("productIds = ?");
-      values.push(
-        updates.productIds ? JSON.stringify(updates.productIds) : null
-      );
-    }
-    if (updates.buyQuantity !== undefined) {
-      fields.push("buyQuantity = ?");
-      values.push(updates.buyQuantity || null);
-    }
-    if (updates.getQuantity !== undefined) {
-      fields.push("getQuantity = ?");
-      values.push(updates.getQuantity || null);
-    }
-    if (updates.getDiscountType !== undefined) {
-      fields.push("getDiscountType = ?");
-      values.push(updates.getDiscountType || null);
-    }
-    if (updates.getDiscountValue !== undefined) {
-      fields.push("getDiscountValue = ?");
-      values.push(updates.getDiscountValue || null);
-    }
-    if (updates.minPurchaseAmount !== undefined) {
-      fields.push("minPurchaseAmount = ?");
-      values.push(updates.minPurchaseAmount || null);
-    }
-    if (updates.minQuantity !== undefined) {
-      fields.push("minQuantity = ?");
-      values.push(updates.minQuantity || null);
-    }
-    if (updates.maxDiscountAmount !== undefined) {
-      fields.push("maxDiscountAmount = ?");
-      values.push(updates.maxDiscountAmount || null);
-    }
-    if (updates.startDate !== undefined) {
-      fields.push("startDate = ?");
-      values.push(updates.startDate || null);
-    }
-    if (updates.endDate !== undefined) {
-      fields.push("endDate = ?");
-      values.push(updates.endDate || null);
-    }
-    if (updates.isActive !== undefined) {
-      fields.push("isActive = ?");
-      values.push(updates.isActive ? 1 : 0);
-    }
-    if (updates.usageLimit !== undefined) {
-      fields.push("usageLimit = ?");
-      values.push(updates.usageLimit || null);
-    }
-    if (updates.perCustomerLimit !== undefined) {
-      fields.push("perCustomerLimit = ?");
-      values.push(updates.perCustomerLimit || null);
-    }
-    if (updates.priority !== undefined) {
-      fields.push("priority = ?");
-      values.push(updates.priority);
+      updateData.productIds = updates.productIds
+        ? JSON.stringify(updates.productIds)
+        : null;
     }
     if (updates.daysOfWeek !== undefined) {
-      fields.push("daysOfWeek = ?");
-      values.push(
-        updates.daysOfWeek ? JSON.stringify(updates.daysOfWeek) : null
-      );
-    }
-    if (updates.timeStart !== undefined) {
-      fields.push("timeStart = ?");
-      values.push(updates.timeStart || null);
-    }
-    if (updates.timeEnd !== undefined) {
-      fields.push("timeEnd = ?");
-      values.push(updates.timeEnd || null);
-    }
-    if (updates.requiresCouponCode !== undefined) {
-      fields.push("requiresCouponCode = ?");
-      values.push(updates.requiresCouponCode ? 1 : 0);
-    }
-    if (updates.couponCode !== undefined) {
-      fields.push("couponCode = ?");
-      values.push(updates.couponCode || null);
-    }
-    if (updates.combinableWithOthers !== undefined) {
-      fields.push("combinableWithOthers = ?");
-      values.push(updates.combinableWithOthers ? 1 : 0);
+      updateData.daysOfWeek = updates.daysOfWeek
+        ? JSON.stringify(updates.daysOfWeek)
+        : null;
     }
 
-    fields.push("updatedAt = ?");
-    values.push(now);
+    // Add all other updates directly
+    Object.keys(updates).forEach((key) => {
+      if (!["categoryIds", "productIds", "daysOfWeek"].includes(key)) {
+        updateData[key] = (updates as any)[key];
+      }
+    });
 
-    if (fields.length === 0) return;
+    if (Object.keys(updateData).length === 1) return; // Only updatedAt
 
-    values.push(id);
-    this.db
-      .prepare(`UPDATE discounts SET ${fields.join(", ")} WHERE id = ?`)
-      .run(...values);
+    drizzle
+      .update(schema.discounts)
+      .set(updateData)
+      .where(eq(schema.discounts.id, id))
+      .run();
   }
 
   /**
    * Delete a discount
    */
   deleteDiscount(id: string): void {
-    this.db.prepare("DELETE FROM discounts WHERE id = ?").run(id);
+    const drizzle = this.getDrizzleInstance();
+    drizzle.delete(schema.discounts).where(eq(schema.discounts.id, id)).run();
   }
 
   /**
    * Get discount by ID
    */
   getDiscountById(id: string): Discount | null {
-    const row = this.db
-      .prepare("SELECT * FROM discounts WHERE id = ?")
-      .get(id) as any;
+    const drizzle = this.getDrizzleInstance();
+    const row = drizzle
+      .select()
+      .from(schema.discounts)
+      .where(eq(schema.discounts.id, id))
+      .get();
     return row ? this.deserializeDiscount(row) : null;
   }
 
@@ -260,11 +172,16 @@ export class DiscountManager {
    * Get all discounts for a business
    */
   getDiscountsByBusiness(businessId: string): Discount[] {
-    const rows = this.db
-      .prepare(
-        "SELECT * FROM discounts WHERE businessId = ? ORDER BY priority DESC, createdAt DESC"
+    const drizzle = this.getDrizzleInstance();
+    const rows = drizzle
+      .select()
+      .from(schema.discounts)
+      .where(eq(schema.discounts.businessId, businessId))
+      .orderBy(
+        desc(schema.discounts.priority),
+        desc(schema.discounts.createdAt)
       )
-      .all(businessId) as any[];
+      .all();
     return rows.map((row) => this.deserializeDiscount(row));
   }
 
@@ -273,19 +190,25 @@ export class DiscountManager {
    */
   getActiveDiscounts(businessId: string): Discount[] {
     const now = new Date().toISOString();
-    const rows = this.db
-      .prepare(
-        `
-      SELECT * FROM discounts 
-      WHERE businessId = ? 
-        AND isActive = 1
-        AND (startDate IS NULL OR startDate <= ?)
-        AND (endDate IS NULL OR endDate >= ?)
-        AND (usageLimit IS NULL OR usageCount < usageLimit)
-      ORDER BY priority DESC, createdAt DESC
-    `
+    const drizzle = this.getDrizzleInstance();
+
+    const rows = drizzle
+      .select()
+      .from(schema.discounts)
+      .where(
+        and(
+          eq(schema.discounts.businessId, businessId),
+          eq(schema.discounts.isActive, true),
+          drizzleSql`(${schema.discounts.startDate} IS NULL OR ${schema.discounts.startDate} <= ${now})`,
+          drizzleSql`(${schema.discounts.endDate} IS NULL OR ${schema.discounts.endDate} >= ${now})`,
+          drizzleSql`(${schema.discounts.usageLimit} IS NULL OR ${schema.discounts.usageCount} < ${schema.discounts.usageLimit})`
+        )
       )
-      .all(businessId, now, now) as any[];
+      .orderBy(
+        desc(schema.discounts.priority),
+        desc(schema.discounts.createdAt)
+      )
+      .all();
     return rows.map((row) => this.deserializeDiscount(row));
   }
 
@@ -382,26 +305,33 @@ export class DiscountManager {
    * Increment usage count
    */
   incrementUsageCount(discountId: string): void {
-    this.db
-      .prepare("UPDATE discounts SET usageCount = usageCount + 1 WHERE id = ?")
-      .run(discountId);
+    const drizzle = this.getDrizzleInstance();
+    drizzle
+      .update(schema.discounts)
+      .set({
+        usageCount: drizzleSql`${schema.discounts.usageCount} + 1`,
+      })
+      .where(eq(schema.discounts.id, discountId))
+      .run();
   }
 
   /**
    * Validate coupon code
    */
   validateCouponCode(businessId: string, couponCode: string): Discount | null {
-    const row = this.db
-      .prepare(
-        `
-      SELECT * FROM discounts 
-      WHERE businessId = ? 
-        AND couponCode = ? 
-        AND isActive = 1
-        AND requiresCouponCode = 1
-    `
+    const drizzle = this.getDrizzleInstance();
+    const row = drizzle
+      .select()
+      .from(schema.discounts)
+      .where(
+        and(
+          eq(schema.discounts.businessId, businessId),
+          eq(schema.discounts.couponCode, couponCode),
+          eq(schema.discounts.isActive, true),
+          eq(schema.discounts.requiresCouponCode, true)
+        )
       )
-      .get(businessId, couponCode) as any;
+      .get();
 
     if (!row) return null;
 

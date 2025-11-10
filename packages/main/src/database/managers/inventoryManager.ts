@@ -1,12 +1,27 @@
 import type { StockAdjustment } from "../models/inventory.js";
+import type { DrizzleDB } from "../drizzle.js";
+import { eq, desc, sql as drizzleSql } from "drizzle-orm";
+import * as schema from "../schema.js";
 
 export class InventoryManager {
   private db: any;
+  private drizzle: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, uuid: any) {
+  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
     this.db = db;
+    this.drizzle = drizzle;
     this.uuid = uuid;
+  }
+
+  /**
+   * Get Drizzle ORM instance
+   */
+  private getDrizzleInstance(): DrizzleDB {
+    if (!this.drizzle) {
+      throw new Error("Drizzle ORM not initialized");
+    }
+    return this.drizzle;
   }
 
   createStockAdjustment(
@@ -14,33 +29,38 @@ export class InventoryManager {
   ): StockAdjustment {
     const adjustmentId = this.uuid.v4();
     const now = new Date().toISOString();
+    const drizzle = this.getDrizzleInstance();
 
+    // Use raw SQL transaction for compatibility
     const transaction = this.db.transaction(() => {
-      this.db
-        .prepare(
-          `INSERT INTO stock_adjustments (id, productId, type, quantity, reason, userId, businessId, timestamp)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-        )
-        .run(
-          adjustmentId,
-          adjustmentData.productId,
-          adjustmentData.type,
-          adjustmentData.quantity,
-          adjustmentData.reason || "",
-          adjustmentData.userId,
-          adjustmentData.businessId,
-          now
-        );
+      // Insert stock adjustment using Drizzle
+      drizzle
+        .insert(schema.stockAdjustments)
+        .values({
+          id: adjustmentId,
+          productId: adjustmentData.productId,
+          type: adjustmentData.type,
+          quantity: adjustmentData.quantity,
+          reason: adjustmentData.reason || "",
+          userId: adjustmentData.userId,
+          businessId: adjustmentData.businessId,
+          timestamp: now,
+        })
+        .run();
 
-      const product = this.db
-        .prepare("SELECT stockLevel FROM products WHERE id = ?")
-        .get(adjustmentData.productId) as { stockLevel: number } | undefined;
+      // Get current stock level
+      const product = drizzle
+        .select({ stockLevel: schema.products.stockLevel })
+        .from(schema.products)
+        .where(eq(schema.products.id, adjustmentData.productId))
+        .get();
 
       if (!product) {
         throw new Error("Product not found");
       }
 
-      let newStockLevel = product.stockLevel;
+      // Calculate new stock level
+      let newStockLevel = product.stockLevel ?? 0;
       if (
         adjustmentData.type === "add" ||
         adjustmentData.type === "adjustment"
@@ -50,11 +70,15 @@ export class InventoryManager {
         newStockLevel -= adjustmentData.quantity;
       }
 
-      this.db
-        .prepare(
-          "UPDATE products SET stockLevel = ?, updatedAt = ? WHERE id = ?"
-        )
-        .run(newStockLevel, now, adjustmentData.productId);
+      // Update product stock level
+      drizzle
+        .update(schema.products)
+        .set({
+          stockLevel: newStockLevel,
+          updatedAt: now,
+        })
+        .where(eq(schema.products.id, adjustmentData.productId))
+        .run();
     });
 
     transaction();
@@ -67,18 +91,22 @@ export class InventoryManager {
   }
 
   getStockAdjustmentsByProduct(productId: string): StockAdjustment[] {
-    return this.db
-      .prepare(
-        "SELECT * FROM stock_adjustments WHERE productId = ? ORDER BY timestamp DESC"
-      )
-      .all(productId) as StockAdjustment[];
+    const drizzle = this.getDrizzleInstance();
+    return drizzle
+      .select()
+      .from(schema.stockAdjustments)
+      .where(eq(schema.stockAdjustments.productId, productId))
+      .orderBy(desc(schema.stockAdjustments.timestamp))
+      .all() as StockAdjustment[];
   }
 
   getStockAdjustmentsByBusiness(businessId: string): StockAdjustment[] {
-    return this.db
-      .prepare(
-        "SELECT * FROM stock_adjustments WHERE businessId = ? ORDER BY timestamp DESC"
-      )
-      .all(businessId) as StockAdjustment[];
+    const drizzle = this.getDrizzleInstance();
+    return drizzle
+      .select()
+      .from(schema.stockAdjustments)
+      .where(eq(schema.stockAdjustments.businessId, businessId))
+      .orderBy(desc(schema.stockAdjustments.timestamp))
+      .all() as StockAdjustment[];
   }
 }

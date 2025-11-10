@@ -63,6 +63,10 @@ import { ScheduleManager } from "./database/managers/scheduleManager.js";
 import { SessionManager } from "./database/managers/sessionManager.js";
 import { AuditLogManager } from "./database/managers/auditLogManager.js";
 import { ReportManager } from "./database/managers/reportManager.js";
+import { BusinessManager } from "./database/managers/businessManager.js";
+import { CashDrawerManager } from "./database/managers/cashDrawerManager.js";
+import { DiscountManager } from "./database/managers/discountManager.js";
+import { InventoryManager } from "./database/managers/inventoryManager.js";
 
 export class DatabaseManager {
   private db: any;
@@ -82,6 +86,10 @@ export class DatabaseManager {
   public sessions!: SessionManager;
   public auditLogs!: AuditLogManager;
   public reports!: ReportManager;
+  public businesses!: BusinessManager;
+  public cashDrawers!: CashDrawerManager;
+  public discounts!: DiscountManager;
+  public inventory!: InventoryManager;
 
   constructor() {
     // Don't initialize here, wait for explicit initialization
@@ -155,6 +163,10 @@ export class DatabaseManager {
     this.sessions = new SessionManager(this.db, this.drizzle, this.uuid);
     this.auditLogs = new AuditLogManager(this.db, this.drizzle, this.uuid);
     this.reports = new ReportManager(this.db, this.drizzle);
+    this.businesses = new BusinessManager(this.db, this.drizzle, this.uuid);
+    this.cashDrawers = new CashDrawerManager(this.db, this.drizzle, this.uuid);
+    this.discounts = new DiscountManager(this.db, this.drizzle, this.uuid);
+    this.inventory = new InventoryManager(this.db, this.drizzle, this.uuid);
 
     console.log("✅ All managers initialized successfully");
   }
