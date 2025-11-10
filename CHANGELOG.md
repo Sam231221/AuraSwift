@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.6.0](https://github.com/Sam231221/AuraSwift/compare/v1.5.0...v1.6.0) (2025-11-10)
+
+
+### Bug Fixes
+
+* **database:** Migration system fixes ([5c473cc](https://github.com/Sam231221/AuraSwift/commit/5c473cc8f9441c301af5ae4da716934f85ed17d6))
+* **database:** remove unused database migration scripts and add migration journal ([845d294](https://github.com/Sam231221/AuraSwift/commit/845d294473c71cf0601d5b3727befd2b7da7bd6d))
+* **database:** update manager constructors to include Drizzle ORM and refactor supplier query logic ([a45a86a](https://github.com/Sam231221/AuraSwift/commit/a45a86a593b1b4975544c86e1fd5eb32269cfdf5))
+
+
+### Features
+
+* **database:** integrate new managers for business, cash drawer, discount, and inventory with Drizzle ORM ([14d26eb](https://github.com/Sam231221/AuraSwift/commit/14d26ebae2e7f78e8cdde0e5a08799d63393bcfd))
+
 # [1.5.0](https://github.com/Sam231221/AuraSwift/compare/v1.4.0...v1.5.0) (2025-11-10)
 
 
