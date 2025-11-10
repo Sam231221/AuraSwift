@@ -98,12 +98,6 @@ export const MIGRATIONS: Migration[] = [
         }
       }
     },
-    down: (db) => {
-      // Optional: Add rollback logic here
-      console.log(
-        "      ⚠️  Rollback not implemented for '0001_add_suppliers.sql'"
-      );
-    },
   },
 ];
 

@@ -63,15 +63,15 @@ export async function initializeDatabase(): Promise<DatabaseManagers> {
 
   // Create all manager instances with drizzle support
   const users = new UserManager(db, drizzle, bcryptWrapper, uuid);
-  const businesses = new BusinessManager(db, uuid);
+  const businesses = new BusinessManager(db, drizzle, uuid);
   const sessions = new SessionManager(db, drizzle, uuid);
   const products = new ProductManager(db, drizzle, uuid);
   const categories = new CategoryManager(db, drizzle, uuid);
-  const inventory = new InventoryManager(db, uuid);
+  const inventory = new InventoryManager(db, drizzle, uuid);
   const schedules = new ScheduleManager(db, drizzle, uuid);
   const shifts = new ShiftManager(db, drizzle, uuid);
   const transactions = new TransactionManager(db, drizzle, uuid);
-  const cashDrawer = new CashDrawerManager(db, uuid);
+  const cashDrawer = new CashDrawerManager(db, drizzle, uuid);
   const reports = new ReportManager(db, drizzle);
   const auditLogs = new AuditLogManager(db, drizzle, uuid);
   const settings = new SettingsManager(db);

@@ -44,21 +44,23 @@ export class SupplierManager {
   getSuppliersByBusinessId(businessId: string, activeOnly = false): Supplier[] {
     const drizzle = this.getDrizzleInstance();
 
-    let query = drizzle
-      .select()
-      .from(schema.suppliers)
-      .where(eq(schema.suppliers.businessId, businessId));
+    let queryBuilder = drizzle.select().from(schema.suppliers);
 
     if (activeOnly) {
-      query = query.where(
-        and(
-          eq(schema.suppliers.businessId, businessId),
-          eq(schema.suppliers.isActive, true)
+      const results = queryBuilder
+        .where(
+          and(
+            eq(schema.suppliers.businessId, businessId),
+            eq(schema.suppliers.isActive, true)
+          )
         )
-      );
+        .all();
+      return results as Supplier[];
     }
 
-    const results = query.all();
+    const results = queryBuilder
+      .where(eq(schema.suppliers.businessId, businessId))
+      .all();
     return results as Supplier[];
   }
 
