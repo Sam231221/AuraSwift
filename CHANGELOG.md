@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.5.0](https://github.com/Sam231221/AuraSwift/compare/v1.4.0...v1.5.0) (2025-11-10)
+
+
+### Bug Fixes
+
+* **stock-management:** enhance stock adjustment functionality with input fields for quantity and reason ([a16b541](https://github.com/Sam231221/AuraSwift/commit/a16b541491be62653facbcfc92a1adf95521e39f))
+* **database:** implement database migration system for adding address and discount fields ([7577f5b](https://github.com/Sam231221/AuraSwift/commit/7577f5bd7807c0d58bc57107b1b2a8cc9870103f))
+* **database:** integrate Drizzle ORM into database initialization and manager instances ([aa2cd29](https://github.com/Sam231221/AuraSwift/commit/aa2cd29ecfd0213ce99596a5afa1f6da6f908182))
+
+
+### Features
+
+* **database:** ✨ add IPC handlers for database backup, emptying, and import functionality ([1dad607](https://github.com/Sam231221/AuraSwift/commit/1dad607b350c0ba435bb05686c028e70c078046b))
+* **database-migrations:** ✨ implement database migration system with version tracking and integrity checks ([0cab8ef](https://github.com/Sam231221/AuraSwift/commit/0cab8ef13843b738c03d6f21114b84ecea75a41d))
+* **gitignore:** enhance documentation directory patterns for better matching ([be4bf4a](https://github.com/Sam231221/AuraSwift/commit/be4bf4a1ce6ecc1a0e318132ae40365a0c4c06ec))
+* **database:** implement core data management with core refactors ([c2a09bf](https://github.com/Sam231221/AuraSwift/commit/c2a09bfcf5de2657918b61e2ea523ca6c761b619))
+* **database-versioning:** implement database versioning and migration system with backup and integrity checks ([62fdc5d](https://github.com/Sam231221/AuraSwift/commit/62fdc5dc4eb3647039a1b4ff0675e0f27e495e20))
+* **discounts:** implement discount management system with creation, updating, and retrieval functionalities ([f5ebf5b](https://github.com/Sam231221/AuraSwift/commit/f5ebf5b2664e6b48ed3fc2e9b18ac6c32ac464d2))
+* Integrate Drizzle ORM into UserManager and create schema definition ([55b06d7](https://github.com/Sam231221/AuraSwift/commit/55b06d7afeaba80cef3702643937df28375684fc))
+
 # [1.4.0](https://github.com/Sam231221/AuraSwift/compare/v1.3.0...v1.4.0) (2025-11-05)
 
 
