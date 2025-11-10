@@ -27,6 +27,28 @@ import type {
   CashDrawerCount,
   ShiftReport,
 } from "../../../types/database.d.ts";
+
+// Re-export types for use in other modules
+export type {
+  User,
+  Permission,
+  Business,
+  Session,
+  Product,
+  Modifier,
+  ModifierOption,
+  StockAdjustment,
+  Category,
+  Schedule,
+  Shift,
+  Transaction,
+  TransactionItem,
+  RefundItem,
+  AppliedModifier,
+  CashDrawerCount,
+  ShiftReport,
+};
+
 import { initializeDrizzle, type DrizzleDB } from "./database/drizzle.js";
 import { eq, and, like, desc, asc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "./database/schema.js";

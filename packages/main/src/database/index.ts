@@ -12,6 +12,7 @@ import { CashDrawerManager } from "./managers/cashDrawerManager.js";
 import { ReportManager } from "./managers/reportManager.js";
 import { AuditLogManager } from "./managers/auditLogManager.js";
 import { SettingsManager } from "./utils/settingsManager.js";
+import { initializeDrizzle } from "./drizzle.js";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -46,6 +47,9 @@ export async function initializeDatabase(): Promise<DatabaseManagers> {
 
   const db = dbManagerInstance.getDb();
 
+  // Initialize Drizzle ORM
+  const drizzle = initializeDrizzle(db);
+
   // Load dependencies
   const bcrypt = require("bcryptjs");
   const { v4: uuidv4 } = require("uuid");
@@ -57,19 +61,19 @@ export async function initializeDatabase(): Promise<DatabaseManagers> {
 
   const uuid = { v4: uuidv4 };
 
-  // Create all manager instances
-  const users = new UserManager(db, bcryptWrapper, uuid);
+  // Create all manager instances with drizzle support
+  const users = new UserManager(db, drizzle, bcryptWrapper, uuid);
   const businesses = new BusinessManager(db, uuid);
-  const sessions = new SessionManager(db, uuid);
-  const products = new ProductManager(db, uuid);
-  const categories = new CategoryManager(db, uuid);
+  const sessions = new SessionManager(db, drizzle, uuid);
+  const products = new ProductManager(db, drizzle, uuid);
+  const categories = new CategoryManager(db, drizzle, uuid);
   const inventory = new InventoryManager(db, uuid);
-  const schedules = new ScheduleManager(db, uuid);
-  const shifts = new ShiftManager(db, uuid);
-  const transactions = new TransactionManager(db, uuid);
+  const schedules = new ScheduleManager(db, drizzle, uuid);
+  const shifts = new ShiftManager(db, drizzle, uuid);
+  const transactions = new TransactionManager(db, drizzle, uuid);
   const cashDrawer = new CashDrawerManager(db, uuid);
-  const reports = new ReportManager(db);
-  const auditLogs = new AuditLogManager(db, uuid);
+  const reports = new ReportManager(db, drizzle);
+  const auditLogs = new AuditLogManager(db, drizzle, uuid);
   const settings = new SettingsManager(db);
 
   // Create default admin user if needed
