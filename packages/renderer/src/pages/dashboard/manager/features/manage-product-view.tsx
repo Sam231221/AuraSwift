@@ -98,6 +98,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [stockAdjustmentProduct, setStockAdjustmentProduct] =
     useState<Product | null>(null);
+  const [stockAdjustmentType, setStockAdjustmentType] = useState<
+    "add" | "remove"
+  >("add");
+  const [stockAdjustmentQuantity, setStockAdjustmentQuantity] = useState("");
+  const [stockAdjustmentReason, setStockAdjustmentReason] = useState("");
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [activeTab, setActiveTab] = useState<string>("basic");
 
@@ -1281,72 +1286,120 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               Adjust Stock: {stockAdjustmentProduct.name}
             </h3>
             <div className="space-y-4">
-              <div>
+              <div className="bg-gray-50 p-3 rounded-md">
                 <p className="text-sm text-gray-600">
                   Current Stock:{" "}
-                  <span className="font-medium">
+                  <span className="font-medium text-gray-900">
                     {stockAdjustmentProduct.stockLevel}
                   </span>
                 </p>
                 <p className="text-sm text-gray-600">
                   Minimum Level:{" "}
-                  <span className="font-medium">
+                  <span className="font-medium text-gray-900">
                     {stockAdjustmentProduct.minStockLevel}
                   </span>
                 </p>
               </div>
 
+              {/* Adjustment Type Tabs */}
               <div className="flex space-x-2">
                 <Button
+                  type="button"
                   className="flex-1"
+                  variant={
+                    stockAdjustmentType === "add" ? "default" : "outline"
+                  }
                   onClick={() => {
-                    const quantity = parseInt(
-                      prompt("Enter quantity to add:") || "0"
-                    );
-                    const reason =
-                      prompt("Reason for adjustment:") || "Stock received";
-                    if (quantity > 0) {
-                      handleStockAdjustment(
-                        stockAdjustmentProduct.id,
-                        "add",
-                        quantity,
-                        reason
-                      );
-                    }
+                    setStockAdjustmentType("add");
+                    setStockAdjustmentReason("Stock received");
                   }}
                 >
                   Add Stock
                 </Button>
                 <Button
-                  variant="outline"
+                  type="button"
                   className="flex-1"
+                  variant={
+                    stockAdjustmentType === "remove" ? "default" : "outline"
+                  }
                   onClick={() => {
-                    const quantity = parseInt(
-                      prompt("Enter quantity to remove:") || "0"
-                    );
-                    const reason =
-                      prompt("Reason for adjustment:") || "Stock adjustment";
-                    if (quantity > 0) {
-                      handleStockAdjustment(
-                        stockAdjustmentProduct.id,
-                        "remove",
-                        quantity,
-                        reason
-                      );
-                    }
+                    setStockAdjustmentType("remove");
+                    setStockAdjustmentReason("Stock adjustment");
                   }}
                 >
                   Remove Stock
                 </Button>
               </div>
 
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setStockAdjustmentProduct(null)}
-              >
-                Cancel
-              </Button>
+              {/* Quantity Input */}
+              <div>
+                <Label htmlFor="stock-quantity">
+                  Quantity to {stockAdjustmentType === "add" ? "Add" : "Remove"}
+                </Label>
+                <Input
+                  id="stock-quantity"
+                  type="number"
+                  min="1"
+                  placeholder="Enter quantity"
+                  value={stockAdjustmentQuantity}
+                  onChange={(e) => setStockAdjustmentQuantity(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              {/* Reason Input */}
+              <div>
+                <Label htmlFor="stock-reason">Reason</Label>
+                <Input
+                  id="stock-reason"
+                  type="text"
+                  placeholder="Reason for adjustment"
+                  value={stockAdjustmentReason}
+                  onChange={(e) => setStockAdjustmentReason(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-2 pt-2">
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={() => {
+                    const quantity = parseInt(stockAdjustmentQuantity);
+                    if (quantity > 0 && stockAdjustmentReason.trim()) {
+                      handleStockAdjustment(
+                        stockAdjustmentProduct.id,
+                        stockAdjustmentType,
+                        quantity,
+                        stockAdjustmentReason
+                      );
+                      // Reset form
+                      setStockAdjustmentProduct(null);
+                      setStockAdjustmentQuantity("");
+                      setStockAdjustmentReason("");
+                      setStockAdjustmentType("add");
+                    } else {
+                      toast.error("Please enter a valid quantity and reason");
+                    }
+                  }}
+                >
+                  Confirm Adjustment
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setStockAdjustmentProduct(null);
+                    setStockAdjustmentQuantity("");
+                    setStockAdjustmentReason("");
+                    setStockAdjustmentType("add");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
             </div>
           </div>
         </div>
