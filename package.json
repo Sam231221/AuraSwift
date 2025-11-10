@@ -46,7 +46,15 @@
     "db:info": "echo 'Database info available via: window.databaseAPI.getInfo() in the app console'",
     "db:migrate": "node migrate-existing-db.mjs",
     "db:paths": "node migrate-existing-db.mjs show-paths",
-    "db:copy-data": "node migrate-existing-db.mjs copy-data"
+    "db:copy-data": "node migrate-existing-db.mjs copy-data",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:pull": "drizzle-kit pull",
+    "db:drop": "drizzle-kit drop",
+    "db:check": "drizzle-kit check",
+    "db:studio": "drizzle-kit studio",
+    "db:introspect": "drizzle-kit introspect",
+    "db:bridge": "node scripts/bridge-migration.mjs"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
@@ -59,7 +67,7 @@
     "@types/pdfkit": "^0.17.3",
     "conventional-changelog-cli": "^5.0.0",
     "create-vite": "7.1.2",
-    "electron": "38.1.2",
+    "electron": "^38.1.2",
     "electron-builder": "26.0.12",
     "glob": "^11.0.3",
     "playwright": "^1.55.0",

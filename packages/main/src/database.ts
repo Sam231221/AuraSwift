@@ -17,6 +17,7 @@ import type {
   Modifier,
   ModifierOption,
   StockAdjustment,
+  Supplier,
   Category,
   Schedule,
   Shift,
@@ -38,6 +39,7 @@ export type {
   Modifier,
   ModifierOption,
   StockAdjustment,
+  Supplier,
   Category,
   Schedule,
   Shift,
@@ -67,6 +69,7 @@ import { BusinessManager } from "./database/managers/businessManager.js";
 import { CashDrawerManager } from "./database/managers/cashDrawerManager.js";
 import { DiscountManager } from "./database/managers/discountManager.js";
 import { InventoryManager } from "./database/managers/inventoryManager.js";
+import { SupplierManager } from "./database/managers/supplierManager.js";
 
 export class DatabaseManager {
   private db: any;
@@ -74,7 +77,6 @@ export class DatabaseManager {
   private bcrypt: any;
   private uuid: any;
   private initialized: boolean = false;
-  private readonly SCHEMA_VERSION = 2; // Increment this when adding new migrations
 
   // Manager instances - exposed as public properties
   public users!: UserManager;
@@ -90,6 +92,7 @@ export class DatabaseManager {
   public cashDrawers!: CashDrawerManager;
   public discounts!: DiscountManager;
   public inventory!: InventoryManager;
+  public suppliers!: SupplierManager;
 
   constructor() {
     // Don't initialize here, wait for explicit initialization
@@ -126,6 +129,16 @@ export class DatabaseManager {
 
       // Initialize base tables (for new databases)
       this.initializeTables();
+
+      // Run database versioning and migrations
+      const { initializeVersioning } = await import(
+        "./database/versioning/index.js"
+      );
+      const versioningSuccess = initializeVersioning(this.db, dbPath);
+
+      if (!versioningSuccess) {
+        throw new Error("Database versioning initialization failed");
+      }
 
       // Initialize all managers with drizzle support
       this.initializeManagers();
@@ -167,6 +180,7 @@ export class DatabaseManager {
     this.cashDrawers = new CashDrawerManager(this.db, this.drizzle, this.uuid);
     this.discounts = new DiscountManager(this.db, this.drizzle, this.uuid);
     this.inventory = new InventoryManager(this.db, this.drizzle, this.uuid);
+    this.suppliers = new SupplierManager(this.db, this.drizzle, this.uuid);
 
     console.log("✅ All managers initialized successfully");
   }
@@ -802,155 +816,25 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_print_job_retries_timestamp ON print_job_retries(timestamp);
     `);
 
-    // ========================================
-    // RUN MIGRATIONS FOR OLD DATABASES
-    // ========================================
-    this.runMigrations();
-
     // Insert default admin user if no users exist
     this.createDefaultAdmin();
   }
 
   /**
-   * Database migration system
-   * Tracks which migrations have been applied to avoid running them multiple times
+   * Migration System Notes:
+   *
+   * This class (DatabaseManager) creates the baseline database schema.
+   * The versioning system (packages/main/src/database/versioning/) handles
+   * all future schema changes using SQLite's PRAGMA user_version.
+   *
+   * The baseline schema includes all historical changes:
+   * - Business fields (address, phone, vatNumber)
+   * - Discount fields (discountAmount, appliedDiscounts)
+   * - All core tables and indexes
+   *
+   * Future migrations are defined in:
+   * packages/main/src/database/versioning/migrations.ts
    */
-  private runMigrations() {
-    // Create schema_version table if it doesn't exist
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS schema_version (
-        version INTEGER PRIMARY KEY,
-        migration_name TEXT NOT NULL,
-        applied_at TEXT NOT NULL
-      )
-    `);
-
-    // Get current schema version
-    const result = this.db
-      .prepare(
-        `
-      SELECT COALESCE(MAX(version), 0) as version FROM schema_version
-    `
-      )
-      .get() as { version: number };
-
-    const currentVersion = result.version;
-
-    console.log(`Current schema version: ${currentVersion}`);
-    console.log(`Target schema version: ${this.SCHEMA_VERSION}`);
-
-    if (currentVersion >= this.SCHEMA_VERSION) {
-      console.log("Database schema is up to date");
-      return;
-    }
-
-    console.log("Running database migrations...");
-
-    // Run migrations sequentially
-    if (currentVersion < 1) {
-      this.migration_v1_add_business_fields();
-    }
-
-    if (currentVersion < 2) {
-      this.migration_v2_add_discount_fields();
-    }
-
-    console.log("All migrations completed successfully");
-  }
-
-  /**
-   * Migration v1: Add address, phone, vatNumber to businesses table
-   * These fields were added after initial release
-   */
-  private migration_v1_add_business_fields() {
-    console.log("Migration v1: Adding address fields to businesses...");
-
-    try {
-      this.db.exec(
-        `ALTER TABLE businesses ADD COLUMN address TEXT DEFAULT '';`
-      );
-    } catch (error) {
-      // Column already exists (fresh install), ignore
-    }
-
-    try {
-      this.db.exec(`ALTER TABLE businesses ADD COLUMN phone TEXT DEFAULT '';`);
-    } catch (error) {
-      // Column already exists
-    }
-
-    try {
-      this.db.exec(
-        `ALTER TABLE businesses ADD COLUMN vatNumber TEXT DEFAULT '';`
-      );
-    } catch (error) {
-      // Column already exists
-    }
-
-    // Record migration
-    this.db
-      .prepare(
-        `
-      INSERT INTO schema_version (version, migration_name, applied_at)
-      VALUES (?, ?, datetime('now'))
-    `
-      )
-      .run(1, "add_business_fields");
-
-    console.log("  ✅ Migration v1 completed");
-  }
-
-  /**
-   * Migration v2: Add discount-related fields to transactions and transaction_items
-   * Part of discount system feature
-   */
-  private migration_v2_add_discount_fields() {
-    console.log("  ⏳ Migration v2: Adding discount fields to transactions...");
-
-    try {
-      this.db.exec(
-        `ALTER TABLE transactions ADD COLUMN discountAmount REAL DEFAULT 0;`
-      );
-    } catch (error) {
-      // Column already exists
-    }
-
-    try {
-      this.db.exec(
-        `ALTER TABLE transactions ADD COLUMN appliedDiscounts TEXT;`
-      );
-    } catch (error) {
-      // Column already exists
-    }
-
-    try {
-      this.db.exec(
-        `ALTER TABLE transaction_items ADD COLUMN discountAmount REAL DEFAULT 0;`
-      );
-    } catch (error) {
-      // Column already exists
-    }
-
-    try {
-      this.db.exec(
-        `ALTER TABLE transaction_items ADD COLUMN appliedDiscounts TEXT;`
-      );
-    } catch (error) {
-      // Column already exists
-    }
-
-    // Record migration
-    this.db
-      .prepare(
-        `
-      INSERT INTO schema_version (version, migration_name, applied_at)
-      VALUES (?, ?, datetime('now'))
-    `
-      )
-      .run(2, "add_discount_fields");
-
-    console.log("  ✅ Migration v2 completed");
-  }
 
   private async createDefaultAdmin() {
     const userCount = this.db

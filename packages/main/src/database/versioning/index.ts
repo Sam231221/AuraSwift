@@ -1,6 +1,24 @@
 /**
  * Database Versioning and Migration System for AuraSwift
- * Handles schema versioning, migrations, and automatic updates
+ *
+ * This system uses SQLite's PRAGMA user_version to track schema versions.
+ *
+ * Version 0 (Baseline):
+ * - Created by initializeTables() in db-manager.ts
+ * - Includes all core tables and historical migrations
+ * - Business fields (address, phone, vatNumber)
+ * - Discount fields (discountAmount, appliedDiscounts)
+ *
+ * Future Migrations:
+ * - Defined in migrations.ts
+ * - Start from version 1 onwards
+ * - Run automatically on app startup
+ * - Backed up before each migration
+ *
+ * NO OLD MIGRATION SYSTEM:
+ * - The old schema_version table is NOT used
+ * - Only PRAGMA user_version is used for tracking
+ * - Single source of truth for versioning
  */
 
 import type { Database } from "better-sqlite3";
@@ -210,12 +228,23 @@ export function verifyIntegrity(db: Database): boolean {
 
 /**
  * Initialize database versioning system
- * Should be called after database connection is established
+ * Should be called after database connection is established and tables are created
  */
 export function initializeVersioning(db: Database, dbPath: string): boolean {
   console.log("\n🗄️  Initializing Database Versioning System...");
 
   try {
+    const currentVersion = getCurrentVersion(db);
+
+    // If this is a new database (version 0) and we have no migrations,
+    // it means all tables were created by initializeTables()
+    // Set version to 0 to establish baseline
+    if (currentVersion === 0 && MIGRATIONS.length === 0) {
+      console.log("   📌 New database detected - establishing baseline (v0)");
+      console.log("   ✅ Baseline schema created by initializeTables()");
+      // Version is already 0, no need to set it
+    }
+
     // Run any pending migrations
     const success = runMigrations(db, dbPath);
 

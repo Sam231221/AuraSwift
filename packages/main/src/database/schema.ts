@@ -149,6 +149,26 @@ export const stockAdjustments = sqliteTable("stock_adjustments", {
   timestamp: text("timestamp").notNull(),
 });
 
+export const suppliers = sqliteTable("suppliers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  contactPerson: text("contactPerson"),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  city: text("city"),
+  country: text("country"),
+  taxId: text("taxId"),
+  paymentTerms: text("paymentTerms"),
+  businessId: text("businessId")
+    .notNull()
+    .references(() => businesses.id),
+  isActive: integer("isActive", { mode: "boolean" }).default(true),
+  notes: text("notes"),
+  createdAt: text("createdAt").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});
+
 // ============================================
 // OPERATIONS
 // ============================================

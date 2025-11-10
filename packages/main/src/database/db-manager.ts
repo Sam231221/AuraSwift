@@ -10,6 +10,25 @@ import {
 
 const require = createRequire(import.meta.url);
 
+/**
+ * Database Manager
+ *
+ * Handles low-level database initialization and schema creation.
+ *
+ * Initialization Flow:
+ * 1. Connect to SQLite database
+ * 2. Create baseline schema via initializeTables() (if needed)
+ * 3. Initialize versioning system (PRAGMA user_version)
+ * 4. Run any pending migrations
+ *
+ * Version Tracking:
+ * - Uses PRAGMA user_version (NOT schema_version table)
+ * - Version 0: Baseline schema (all tables created)
+ * - Version 1+: Future migrations from migrations.ts
+ *
+ * For database operations, use DatabaseManager from database.ts
+ * which provides manager classes for domain-specific operations.
+ */
 export class DBManager {
   private db: any;
   private initialized: boolean = false;
@@ -30,10 +49,12 @@ export class DBManager {
 
       this.db = new Database(dbPath);
 
-      // Initialize all tables (baseline schema)
+      // Step 1: Initialize all tables (baseline schema - version 0)
+      // This creates the complete database structure including all historical changes
       this.initializeTables();
 
-      // Run database versioning and migrations
+      // Step 2: Initialize versioning system and run pending migrations
+      // This will set PRAGMA user_version and apply any new schema changes
       const versioningSuccess = initializeVersioning(this.db, dbPath);
 
       if (!versioningSuccess) {
@@ -85,9 +106,22 @@ export class DBManager {
     }
   }
 
+  /**
+   * Initialize Baseline Database Schema (Version 0)
+   *
+   * Creates all tables with their complete structure including:
+   * - All core tables (users, businesses, products, transactions, etc.)
+   * - Historical migration fields already included:
+   *   * Business: address, phone, vatNumber
+   *   * Discount: discountAmount, appliedDiscounts
+   * - All indexes for performance
+   *
+   * This represents the baseline schema that all installations start with.
+   * Future changes are applied via the migration system (migrations.ts).
+   */
   private initializeTables() {
     // First create businesses table (no foreign keys)
-    // Includes migrated fields: address, phone, vatNumber
+    // Includes historical fields: address, phone, vatNumber
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS businesses (
         id TEXT PRIMARY KEY,
