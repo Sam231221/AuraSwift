@@ -7,8 +7,7 @@ export class SessionManager {
   private drizzle: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
-    // db parameter kept for backward compatibility but not used
+  constructor(drizzle: DrizzleDB, uuid: any) {
     this.drizzle = drizzle;
     this.uuid = uuid;
   }

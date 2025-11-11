@@ -4,12 +4,10 @@ import { eq, and, desc, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class TimeTrackingReportManager {
-  private db: any;
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
 
-  constructor(db: any, drizzle: DrizzleDB) {
-    this.db = db;
-    this.drizzle = drizzle;
+  constructor(drizzle: DrizzleDB) {
+    this.db = drizzle;
   }
 
   /**
@@ -21,40 +19,58 @@ export class TimeTrackingReportManager {
     endDate: string
   ): AttendanceReport {
     // Get user info
-    const user = this.db
-      .prepare("SELECT firstName, lastName FROM users WHERE id = ?")
-      .get(userId);
+    const [user] = this.db
+      .select({
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1)
+      .all();
 
     // Get all shifts in date range
     const shifts = this.db
-      .prepare(
-        `
-        SELECT ts.*, ce_in.timestamp as clockInTime, ce_out.timestamp as clockOutTime
-        FROM time_shifts ts
-        JOIN clock_events ce_in ON ts.clockInId = ce_in.id
-        LEFT JOIN clock_events ce_out ON ts.clockOutId = ce_out.id
-        WHERE ts.userId = ? 
-          AND ce_in.timestamp >= ? 
-          AND ce_in.timestamp <= ?
-        ORDER BY ce_in.timestamp DESC
-      `
+      .select({
+        shift: schema.timeShifts,
+        clockInTime: schema.clockEvents.timestamp,
+        clockOutTime: drizzleSql<string>`ce_out.timestamp`,
+      })
+      .from(schema.timeShifts)
+      .innerJoin(
+        schema.clockEvents,
+        eq(schema.timeShifts.clockInId, schema.clockEvents.id)
       )
-      .all(userId, startDate, endDate);
+      .leftJoin(
+        drizzleSql`clock_events ce_out`,
+        drizzleSql`${schema.timeShifts.clockOutId} = ce_out.id`
+      )
+      .where(
+        and(
+          eq(schema.timeShifts.userId, userId),
+          gte(schema.clockEvents.timestamp, startDate),
+          lte(schema.clockEvents.timestamp, endDate)
+        )
+      )
+      .orderBy(desc(schema.clockEvents.timestamp))
+      .all();
 
     // Calculate statistics
     const totalShifts = shifts.length;
-    const completedShifts = shifts.filter((s: any) => s.status === "completed");
+    const completedShifts = shifts.filter(
+      (s: any) => s.shift.status === "completed"
+    );
 
     const totalHours = completedShifts.reduce(
-      (sum: number, s: any) => sum + (s.totalHours || 0),
+      (sum: number, s: any) => sum + (s.shift.totalHours || 0),
       0
     );
     const regularHours = completedShifts.reduce(
-      (sum: number, s: any) => sum + (s.regularHours || 0),
+      (sum: number, s: any) => sum + (s.shift.regularHours || 0),
       0
     );
     const overtimeHours = completedShifts.reduce(
-      (sum: number, s: any) => sum + (s.overtimeHours || 0),
+      (sum: number, s: any) => sum + (s.shift.overtimeHours || 0),
       0
     );
 
@@ -62,15 +78,21 @@ export class TimeTrackingReportManager {
     let lateClockIns = 0;
     let tardinessMinutes = 0;
 
-    shifts.forEach((shift: any) => {
+    shifts.forEach((shiftData: any) => {
+      const shift = shiftData.shift;
       if (shift.scheduleId) {
-        const schedule = this.db
-          .prepare("SELECT startTime FROM schedules WHERE id = ?")
-          .get(shift.scheduleId);
+        const [schedule] = this.db
+          .select({
+            startTime: schema.schedules.startTime,
+          })
+          .from(schema.schedules)
+          .where(eq(schema.schedules.id, shift.scheduleId))
+          .limit(1)
+          .all();
 
         if (schedule) {
           const scheduledTime = new Date(schedule.startTime).getTime();
-          const actualTime = new Date(shift.clockInTime).getTime();
+          const actualTime = new Date(shiftData.clockInTime).getTime();
           const diff = (actualTime - scheduledTime) / (1000 * 60); // minutes
 
           if (diff > 7) {
@@ -84,7 +106,7 @@ export class TimeTrackingReportManager {
 
     // Count missed clock-outs
     const missedClockOuts = shifts.filter(
-      (s: any) => s.status === "active" || !s.clockOutId
+      (s: any) => s.shift.status === "active" || !s.shift.clockOutId
     ).length;
 
     return {
@@ -115,8 +137,17 @@ export class TimeTrackingReportManager {
   ): AttendanceReport[] {
     // Get all users in business
     const users = this.db
-      .prepare("SELECT id FROM users WHERE businessId = ? AND isActive = 1")
-      .all(businessId);
+      .select({
+        id: schema.users.id,
+      })
+      .from(schema.users)
+      .where(
+        and(
+          eq(schema.users.businessId, businessId),
+          eq(schema.users.isActive, true)
+        )
+      )
+      .all();
 
     return users.map((user: any) =>
       this.generateUserAttendanceReport(user.id, startDate, endDate)

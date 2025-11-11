@@ -385,10 +385,117 @@ export const auditLogs = sqliteTable("audit_logs", {
   action: text("action").notNull(),
   resource: text("resource").notNull(),
   resourceId: text("resourceId").notNull(),
+  entityType: text("entityType"),
+  entityId: text("entityId"),
   details: text("details"),
+  ipAddress: text("ipAddress"),
+  terminalId: text("terminalId"),
   timestamp: text("timestamp").notNull(),
   createdAt: text("createdAt").notNull(),
 });
+
+// ============================================
+// TIME TRACKING & CLOCK-IN/OUT SYSTEM
+// ============================================
+
+export const clockEvents = sqliteTable("clock_events", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id),
+  terminalId: text("terminalId").notNull(),
+  locationId: text("locationId"),
+  type: text("type", { enum: ["in", "out"] }).notNull(),
+  timestamp: text("timestamp").notNull(),
+  method: text("method", {
+    enum: ["login", "manual", "auto", "manager"],
+  }).notNull(),
+  status: text("status", { enum: ["pending", "confirmed", "disputed"] })
+    .notNull()
+    .default("confirmed"),
+  geolocation: text("geolocation"),
+  ipAddress: text("ipAddress"),
+  notes: text("notes"),
+  createdAt: text("createdAt").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});
+
+export const timeShifts = sqliteTable("time_shifts", {
+  id: text("id").primaryKey(),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id),
+  businessId: text("businessId")
+    .notNull()
+    .references(() => businesses.id),
+  clockInId: text("clockInId")
+    .notNull()
+    .references(() => clockEvents.id),
+  clockOutId: text("clockOutId").references(() => clockEvents.id),
+  scheduleId: text("scheduleId").references(() => schedules.id),
+  status: text("status", { enum: ["active", "completed", "pending_review"] })
+    .notNull()
+    .default("active"),
+  totalHours: real("totalHours"),
+  regularHours: real("regularHours"),
+  overtimeHours: real("overtimeHours"),
+  breakDuration: integer("breakDuration"),
+  notes: text("notes"),
+  createdAt: text("createdAt").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});
+
+export const breaks = sqliteTable("breaks", {
+  id: text("id").primaryKey(),
+  shiftId: text("shiftId")
+    .notNull()
+    .references(() => timeShifts.id),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id),
+  type: text("type", { enum: ["meal", "rest", "other"] })
+    .notNull()
+    .default("rest"),
+  startTime: text("startTime").notNull(),
+  endTime: text("endTime"),
+  duration: integer("duration"),
+  isPaid: integer("isPaid", { mode: "boolean" }).default(false),
+  status: text("status", { enum: ["active", "completed"] })
+    .notNull()
+    .default("active"),
+  notes: text("notes"),
+  createdAt: text("createdAt").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});
+
+export const timeCorrections = sqliteTable("time_corrections", {
+  id: text("id").primaryKey(),
+  clockEventId: text("clockEventId").references(() => clockEvents.id),
+  shiftId: text("shiftId").references(() => timeShifts.id),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id),
+  correctionType: text("correctionType", {
+    enum: ["clock_time", "break_time", "manual_entry"],
+  }).notNull(),
+  originalTime: text("originalTime"),
+  correctedTime: text("correctedTime").notNull(),
+  timeDifference: integer("timeDifference").notNull(),
+  reason: text("reason").notNull(),
+  requestedBy: text("requestedBy")
+    .notNull()
+    .references(() => users.id),
+  approvedBy: text("approvedBy").references(() => users.id),
+  status: text("status", { enum: ["pending", "approved", "rejected"] })
+    .notNull()
+    .default("pending"),
+  createdAt: text("createdAt").notNull(),
+  updatedAt: text("updatedAt").notNull(),
+});
+
+// ============================================
+// PRINTING SYSTEM
+// ============================================
 
 export const printJobs = sqliteTable("print_jobs", {
   jobId: text("job_id").primaryKey(),
@@ -491,6 +598,18 @@ export type NewAppSetting = typeof appSettings.$inferInsert;
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type NewAuditLog = typeof auditLogs.$inferInsert;
+
+export type ClockEvent = typeof clockEvents.$inferSelect;
+export type NewClockEvent = typeof clockEvents.$inferInsert;
+
+export type TimeShift = typeof timeShifts.$inferSelect;
+export type NewTimeShift = typeof timeShifts.$inferInsert;
+
+export type Break = typeof breaks.$inferSelect;
+export type NewBreak = typeof breaks.$inferInsert;
+
+export type TimeCorrection = typeof timeCorrections.$inferSelect;
+export type NewTimeCorrection = typeof timeCorrections.$inferInsert;
 
 export type PrintJob = typeof printJobs.$inferSelect;
 export type NewPrintJob = typeof printJobs.$inferInsert;

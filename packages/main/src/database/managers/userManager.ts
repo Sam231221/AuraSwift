@@ -4,27 +4,14 @@ import { eq, and, like, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class UserManager {
-  private db: any;
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
   private bcrypt: any;
   private uuid: any;
 
-  constructor(db: any, drizzle: DrizzleDB, bcrypt: any, uuid: any) {
-    this.db = db;
-    this.drizzle = drizzle;
+  constructor(drizzle: DrizzleDB, bcrypt: any, uuid: any) {
+    this.db = drizzle;
     this.bcrypt = bcrypt;
     this.uuid = uuid;
-  }
-
-  /**
-   * Get Drizzle ORM instance
-   * @throws Error if Drizzle hasn't been initialized
-   */
-  private getDrizzleInstance(): DrizzleDB {
-    if (!this.drizzle) {
-      throw new Error("Drizzle ORM has not been initialized");
-    }
-    return this.drizzle;
   }
 
   async createUser(userData: {
@@ -74,7 +61,7 @@ export class UserManager {
 
     // If businessId is provided, check that it exists
     if (userData.businessId) {
-      const [businessExists] = this.drizzle
+      const [businessExists] = this.db
         .select({ id: schema.businesses.id })
         .from(schema.businesses)
         .where(eq(schema.businesses.id, userData.businessId))
@@ -86,7 +73,7 @@ export class UserManager {
     }
 
     // Use Drizzle transaction
-    this.drizzle.transaction((tx) => {
+    this.db.transaction((tx) => {
       // 1. Create business if not provided
       if (!userData.businessId) {
         tx.insert(schema.businesses)
@@ -130,7 +117,7 @@ export class UserManager {
   }
 
   getUserByEmail(email: string): User | null {
-    const [user] = this.drizzle
+    const [user] = this.db
       .select()
       .from(schema.users)
       .where(
@@ -151,7 +138,7 @@ export class UserManager {
   }
 
   getUserById(id: string): User | null {
-    const [user] = this.drizzle
+    const [user] = this.db
       .select()
       .from(schema.users)
       .where(and(eq(schema.users.id, id), eq(schema.users.isActive, true)))
@@ -185,7 +172,7 @@ export class UserManager {
   }
 
   getUserByUsername(username: string): User | null {
-    const [user] = this.drizzle
+    const [user] = this.db
       .select()
       .from(schema.users)
       .where(
@@ -224,7 +211,7 @@ export class UserManager {
   }
 
   getUsersByBusiness(businessId: string): User[] {
-    const users = this.drizzle
+    const users = this.db
       .select()
       .from(schema.users)
       .where(
@@ -258,7 +245,7 @@ export class UserManager {
   ): { changes: number } {
     const now = new Date().toISOString();
 
-    const result = this.drizzle
+    const result = this.db
       .update(schema.users)
       .set({ ...updates, updatedAt: now })
       .where(eq(schema.users.id, id))
@@ -270,7 +257,7 @@ export class UserManager {
   deleteUser(id: string): { changes: number } {
     const now = new Date().toISOString();
 
-    const result = this.drizzle
+    const result = this.db
       .update(schema.users)
       .set({
         isActive: false,
@@ -283,7 +270,7 @@ export class UserManager {
   }
 
   deleteUserSessions(userId: string): void {
-    this.drizzle
+    this.db
       .delete(schema.sessions)
       .where(eq(schema.sessions.userId, userId))
       .run();
@@ -295,7 +282,7 @@ export class UserManager {
   async searchUsers(businessId: string, searchTerm: string): Promise<User[]> {
     const searchPattern = `%${searchTerm}%`;
 
-    const users = this.drizzle
+    const users = this.db
       .select()
       .from(schema.users)
       .where(
@@ -324,7 +311,7 @@ export class UserManager {
    * Get user with business details using JOIN (type-safe)
    */
   getUserWithBusiness(userId: string) {
-    const result = this.drizzle
+    const result = this.db
       .select({
         user: schema.users,
         business: schema.businesses,

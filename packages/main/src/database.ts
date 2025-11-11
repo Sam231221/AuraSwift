@@ -87,6 +87,7 @@ import { SupplierManager } from "./database/managers/supplierManager.js";
 import { TimeTrackingManager } from "./database/managers/timeTrackingManager.js";
 import { AuditManager } from "./database/managers/auditManager.js";
 import { TimeTrackingReportManager } from "./database/managers/timeTrackingReportManager.js";
+import { SettingsManager } from "./database/managers/settingsManager.js";
 
 export class DatabaseManager {
   private db: any;
@@ -113,6 +114,7 @@ export class DatabaseManager {
   public timeTracking!: TimeTrackingManager;
   public audit!: AuditManager;
   public timeTrackingReports!: TimeTrackingReportManager;
+  public settings!: SettingsManager;
 
   constructor() {
     // Don't initialize here, wait for explicit initialization
@@ -182,35 +184,25 @@ export class DatabaseManager {
 
     console.log("Initializing managers with Drizzle ORM support...");
 
-    // Initialize each manager with both raw DB and Drizzle instance
-    this.users = new UserManager(this.db, this.drizzle, this.bcrypt, this.uuid);
-    this.products = new ProductManager(this.db, this.drizzle, this.uuid);
-    this.transactions = new TransactionManager(
-      this.db,
-      this.drizzle,
-      this.uuid
-    );
-    this.categories = new CategoryManager(this.db, this.drizzle, this.uuid);
-    this.shifts = new ShiftManager(this.db, this.drizzle, this.uuid);
-    this.schedules = new ScheduleManager(this.db, this.drizzle, this.uuid);
-    this.sessions = new SessionManager(this.db, this.drizzle, this.uuid);
-    this.auditLogs = new AuditLogManager(this.db, this.drizzle, this.uuid);
-    this.reports = new ReportManager(this.db, this.drizzle);
-    this.businesses = new BusinessManager(this.db, this.drizzle, this.uuid);
-    this.cashDrawers = new CashDrawerManager(this.db, this.drizzle, this.uuid);
-    this.discounts = new DiscountManager(this.db, this.drizzle, this.uuid);
-    this.inventory = new InventoryManager(this.db, this.drizzle, this.uuid);
-    this.suppliers = new SupplierManager(this.db, this.drizzle, this.uuid);
-    this.timeTracking = new TimeTrackingManager(
-      this.db,
-      this.drizzle,
-      this.uuid
-    );
-    this.audit = new AuditManager(this.db, this.drizzle, this.uuid);
-    this.timeTrackingReports = new TimeTrackingReportManager(
-      this.db,
-      this.drizzle
-    );
+    // Initialize each manager with Drizzle instance only (pure Drizzle architecture)
+    this.users = new UserManager(this.drizzle, this.bcrypt, this.uuid);
+    this.products = new ProductManager(this.drizzle, this.uuid);
+    this.transactions = new TransactionManager(this.drizzle, this.uuid);
+    this.categories = new CategoryManager(this.drizzle, this.uuid);
+    this.shifts = new ShiftManager(this.drizzle, this.uuid);
+    this.schedules = new ScheduleManager(this.drizzle, this.uuid);
+    this.sessions = new SessionManager(this.drizzle, this.uuid);
+    this.auditLogs = new AuditLogManager(this.drizzle, this.uuid);
+    this.reports = new ReportManager(this.drizzle);
+    this.businesses = new BusinessManager(this.drizzle, this.uuid);
+    this.cashDrawers = new CashDrawerManager(this.drizzle, this.uuid);
+    this.discounts = new DiscountManager(this.drizzle, this.uuid);
+    this.inventory = new InventoryManager(this.drizzle, this.uuid);
+    this.suppliers = new SupplierManager(this.drizzle, this.uuid);
+    this.timeTracking = new TimeTrackingManager(this.drizzle, this.uuid);
+    this.audit = new AuditManager(this.drizzle, this.uuid);
+    this.timeTrackingReports = new TimeTrackingReportManager(this.drizzle); // ⚠️ Partially converted: 10 complex aggregation queries remain
+    this.settings = new SettingsManager(this.drizzle);
 
     console.log("✅ All managers initialized successfully");
   }
@@ -1022,22 +1014,6 @@ export class DatabaseManager {
     // Note: Demo users (john, sarah, emma) are created by migration v3
   }
 
-  /**
-   * Migration System Notes:
-   *
-   * This class (DatabaseManager) creates the baseline database schema.
-   * The versioning system (packages/main/src/database/versioning/) handles
-   * all future schema changes using SQLite's PRAGMA user_version.
-   *
-   * The baseline schema includes all historical changes:
-   * - Business fields (address, phone, vatNumber)
-   * - Discount fields (discountAmount, appliedDiscounts)
-   * - All core tables and indexes
-   *
-   * Future migrations are defined in:
-   * packages/main/src/database/versioning/migrations.ts
-   */
-
   private async createDefaultAdmin() {
     const userCount = this.db
       .prepare("SELECT COUNT(*) as count FROM users")
@@ -1199,119 +1175,6 @@ export class DatabaseManager {
     }
   }
 
-  // User management methods
-  async createUser(userData: {
-    username: string;
-    pin: string;
-    email?: string;
-    password?: string;
-    firstName: string;
-    lastName: string;
-    businessName: string;
-    role: "cashier" | "manager" | "admin";
-    businessId?: string;
-  }): Promise<User> {
-    const userId = this.uuid.v4();
-    const businessId = userData.businessId || this.uuid.v4();
-    const hashedPassword = userData.password
-      ? await this.bcrypt.hash(userData.password, 10)
-      : null;
-    const now = new Date().toISOString();
-
-    // Set permissions based on role
-    let permissions: Permission[];
-    switch (userData.role) {
-      case "cashier":
-        permissions = [
-          { action: "read", resource: "sales" },
-          { action: "create", resource: "transactions" },
-          { action: "read", resource: "products" },
-          { action: "read", resource: "basic_reports" },
-        ];
-        break;
-      case "manager":
-        permissions = [
-          { action: "read", resource: "sales" },
-          { action: "create", resource: "transactions" },
-          { action: "void", resource: "transactions" },
-          { action: "apply", resource: "discounts" },
-          { action: "read", resource: "products" },
-          { action: "update", resource: "inventory" },
-          { action: "read", resource: "all_reports" },
-          { action: "manage", resource: "staff_schedules" },
-        ];
-        break;
-      case "admin":
-        permissions = [{ action: "*", resource: "*" }];
-        break;
-    }
-
-    // If businessId is provided, check that it exists
-    if (userData.businessId) {
-      const businessExists = this.db
-        .prepare("SELECT id FROM businesses WHERE id = ?")
-        .get(userData.businessId);
-      if (!businessExists) {
-        throw new Error("Business does not exist for provided businessId");
-      }
-    }
-
-    // Temporarily disable foreign key constraints for user creation
-    this.db.exec("PRAGMA foreign_keys = OFF");
-
-    try {
-      // Create business if not provided
-      if (!userData.businessId) {
-        this.db
-          .prepare(
-            `
-          INSERT INTO businesses (id, name, ownerId, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?)
-        `
-          )
-          .run(businessId, userData.businessName, userId, now, now);
-
-        // Create default categories for new business
-        await this.createDefaultCategories(businessId);
-      }
-
-      // Create user
-      this.db
-        .prepare(
-          `
-        INSERT INTO users (id, username, pin, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-        )
-        .run(
-          userId,
-          userData.username,
-          userData.pin,
-          userData.email ?? null,
-          hashedPassword,
-          userData.firstName,
-          userData.lastName,
-          userData.businessName,
-          userData.role,
-          businessId,
-          JSON.stringify(permissions),
-          now,
-          now,
-          1,
-          "" // Default empty address
-        );
-    } finally {
-      // Re-enable foreign key constraints
-      this.db.exec("PRAGMA foreign_keys = ON");
-    }
-
-    const user = this.getUserById(userId);
-    if (!user) {
-      throw new Error("User not found after creation");
-    }
-    return user;
-  }
-
   // ============================================
   // FACADE METHODS - Delegate to managers
   // These methods maintain backward compatibility
@@ -1366,39 +1229,10 @@ export class DatabaseManager {
 
   // Business management methods
   getBusinessById(id: string): Business | null {
-    return this.db
-      .prepare("SELECT * FROM businesses WHERE id = ?")
-      .get(id) as Business | null;
+    return this.businesses.getBusinessById(id);
   }
 
-  /**
-   * Get business by ID using Drizzle ORM (type-safe)
-   * Alternative to getBusinessById() above
-   */
-  async getBusinessByIdDrizzle(id: string): Promise<Business | null> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [business] = await drizzle
-      .select()
-      .from(schema.businesses)
-      .where(eq(schema.businesses.id, id))
-      .limit(1);
-
-    if (!business) return null;
-
-    return {
-      ...business,
-      address: business.address ?? "",
-      phone: business.phone ?? "",
-      vatNumber: business.vatNumber ?? "",
-    } as Business;
-  }
-
-  /**
-   * Update business using Drizzle ORM (type-safe)
-   * NEW method - update business details
-   */
-  async updateBusinessDrizzle(
+  updateBusiness(
     id: string,
     updates: Partial<{
       name: string;
@@ -1406,19 +1240,8 @@ export class DatabaseManager {
       phone: string;
       vatNumber: string;
     }>
-  ): Promise<boolean> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const result = await drizzle
-      .update(schema.businesses)
-      .set({
-        ...updates,
-        updatedAt: now,
-      })
-      .where(eq(schema.businesses.id, id));
-
-    return result.changes > 0;
+  ): boolean {
+    return this.businesses.updateBusiness(id, updates);
   }
 
   getUsersByBusiness(businessId: string): User[] {
@@ -1438,387 +1261,10 @@ export class DatabaseManager {
     }));
   }
 
-  // Update user
-  updateUser(
-    id: string,
-    updates: Partial<{
-      firstName: string;
-      lastName: string;
-      businessName: string;
-      role: "cashier" | "manager" | "admin";
-      isActive: boolean;
-    }>
-  ): boolean {
-    const setClause = Object.keys(updates)
-      .map((key) => `${key} = ?`)
-      .join(", ");
-
-    const values = Object.values(updates);
-    values.push(new Date().toISOString()); // updatedAt
-    values.push(id);
-
-    const result = this.db
-      .prepare(
-        `
-      UPDATE users 
-      SET ${setClause}, updatedAt = ?
-      WHERE id = ?
-    `
-      )
-      .run(...values);
-
-    return result.changes > 0;
-  }
-
-  // Delete user (soft delete)
-  deleteUser(id: string): boolean {
-    const result = this.db
-      .prepare(
-        `
-      UPDATE users 
-      SET isActive = 0, updatedAt = ?
-      WHERE id = ?
-    `
-      )
-      .run(new Date().toISOString(), id);
-
-    return result.changes > 0;
-  }
-
   // ============================================
-  // DRIZZLE ORM TYPE-SAFE QUERY METHODS
-  // These methods demonstrate gradual migration
-  // from raw SQL to type-safe Drizzle queries
+  // CATEGORY METHODS - Delegate to CategoryManager
   // ============================================
 
-  /**
-   * Get user by email using Drizzle ORM (type-safe)
-   * Alternative to getUserByEmail() above
-   */
-  async getUserByEmailDrizzle(email: string): Promise<User | null> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [user] = await drizzle
-      .select()
-      .from(schema.users)
-      .where(
-        and(eq(schema.users.email, email), eq(schema.users.isActive, true))
-      )
-      .limit(1);
-
-    if (!user) return null;
-
-    return {
-      ...user,
-      email: user.email ?? undefined,
-      password: user.password ?? undefined,
-      username: user.username ?? user.email?.split("@")[0] ?? "",
-      pin: user.pin ?? "1234",
-      address: user.address ?? "",
-      permissions: JSON.parse(user.permissions),
-      isActive: Boolean(user.isActive),
-    };
-  }
-
-  /**
-   * Get user by ID using Drizzle ORM (type-safe)
-   * Alternative to getUserById() above
-   */
-  async getUserByIdDrizzle(id: string): Promise<User | null> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [user] = await drizzle
-      .select()
-      .from(schema.users)
-      .where(and(eq(schema.users.id, id), eq(schema.users.isActive, true)))
-      .limit(1);
-
-    if (!user) return null;
-
-    return {
-      ...user,
-      email: user.email ?? undefined,
-      password: user.password ?? undefined,
-      username: user.username ?? user.email?.split("@")[0] ?? "",
-      pin: user.pin ?? "1234",
-      address: user.address ?? "",
-      permissions: JSON.parse(user.permissions),
-      isActive: Boolean(user.isActive),
-    };
-  }
-
-  /**
-   * Get users by business using Drizzle ORM (type-safe)
-   * Alternative to getUsersByBusiness() above
-   */
-  async getUsersByBusinessDrizzle(businessId: string): Promise<User[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const users = await drizzle
-      .select()
-      .from(schema.users)
-      .where(
-        and(
-          eq(schema.users.businessId, businessId),
-          eq(schema.users.isActive, true)
-        )
-      )
-      .orderBy(desc(schema.users.createdAt));
-
-    return users.map((user) => ({
-      ...user,
-      email: user.email ?? undefined,
-      password: user.password ?? undefined,
-      username: user.username ?? user.email?.split("@")[0] ?? "",
-      pin: user.pin ?? "1234",
-      address: user.address ?? "",
-      permissions: JSON.parse(user.permissions),
-      isActive: Boolean(user.isActive),
-    }));
-  }
-
-  /**
-   * Search users by name or email using Drizzle ORM (type-safe)
-   * NEW method - demonstrates complex query building
-   */
-  async searchUsersDrizzle(
-    businessId: string,
-    searchTerm: string
-  ): Promise<User[]> {
-    const drizzle = this.getDrizzleInstance();
-    const searchPattern = `%${searchTerm}%`;
-
-    const users = await drizzle
-      .select()
-      .from(schema.users)
-      .where(
-        and(
-          eq(schema.users.businessId, businessId),
-          eq(schema.users.isActive, true),
-          drizzleSql`(
-            ${schema.users.email} LIKE ${searchPattern} OR 
-            ${schema.users.firstName} LIKE ${searchPattern} OR 
-            ${schema.users.lastName} LIKE ${searchPattern}
-          )`
-        )
-      )
-      .orderBy(desc(schema.users.createdAt));
-
-    return users.map((user) => ({
-      ...user,
-      email: user.email ?? undefined,
-      password: user.password ?? undefined,
-      username: user.username ?? user.email?.split("@")[0] ?? "",
-      pin: user.pin ?? "1234",
-      address: user.address ?? "",
-      permissions: JSON.parse(user.permissions),
-      isActive: Boolean(user.isActive),
-    }));
-  }
-
-  /**
-   * Get user with business details using Drizzle JOIN (type-safe)
-   * NEW method - demonstrates JOIN queries
-   */
-  async getUserWithBusinessDrizzle(userId: string) {
-    const drizzle = this.getDrizzleInstance();
-
-    const [result] = await drizzle
-      .select({
-        user: schema.users,
-        business: schema.businesses,
-      })
-      .from(schema.users)
-      .leftJoin(
-        schema.businesses,
-        eq(schema.users.businessId, schema.businesses.id)
-      )
-      .where(and(eq(schema.users.id, userId), eq(schema.users.isActive, true)))
-      .limit(1);
-
-    if (!result) return null;
-
-    return {
-      ...result.user,
-      permissions: JSON.parse(result.user.permissions),
-      isActive: Boolean(result.user.isActive),
-      business: result.business,
-    };
-  }
-
-  /**
-   * Update user using Drizzle ORM (type-safe)
-   * Alternative to updateUser() above
-   */
-  async updateUserDrizzle(
-    id: string,
-    updates: Partial<{
-      firstName: string;
-      lastName: string;
-      businessName: string;
-      role: "cashier" | "manager" | "admin";
-      isActive: boolean;
-      address: string;
-    }>
-  ): Promise<boolean> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const result = await drizzle
-      .update(schema.users)
-      .set({
-        ...updates,
-        updatedAt: now,
-      })
-      .where(eq(schema.users.id, id));
-
-    return result.changes > 0;
-  }
-
-  /**
-   * Delete user using Drizzle ORM (soft delete, type-safe)
-   * Alternative to deleteUser() above
-   */
-  async deleteUserDrizzle(id: string): Promise<boolean> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const result = await drizzle
-      .update(schema.users)
-      .set({
-        isActive: false,
-        updatedAt: now,
-      })
-      .where(eq(schema.users.id, id));
-
-    return result.changes > 0;
-  }
-
-  /**
-   * Create user with optional business creation (Drizzle)
-   * Complex operation with multi-entity creation and permission setup
-   * NEW method - replaces createUser()
-   */
-  async createUserDrizzle(userData: {
-    username: string;
-    pin: string;
-    email?: string;
-    password?: string;
-    firstName: string;
-    lastName: string;
-    businessName: string;
-    role: "cashier" | "manager" | "admin";
-    businessId?: string;
-  }): Promise<User> {
-    const db = this.getDrizzleInstance();
-    const userId = this.uuid.v4();
-    const businessId = userData.businessId || this.uuid.v4();
-    const hashedPassword = userData.password
-      ? await this.bcrypt.hash(userData.password, 10)
-      : null;
-    const now = new Date().toISOString();
-
-    // Set permissions based on role
-    let permissions: Permission[];
-    switch (userData.role) {
-      case "cashier":
-        permissions = [
-          { action: "read", resource: "sales" },
-          { action: "create", resource: "transactions" },
-          { action: "read", resource: "products" },
-          { action: "read", resource: "basic_reports" },
-        ];
-        break;
-      case "manager":
-        permissions = [
-          { action: "read", resource: "sales" },
-          { action: "create", resource: "transactions" },
-          { action: "void", resource: "transactions" },
-          { action: "apply", resource: "discounts" },
-          { action: "read", resource: "products" },
-          { action: "update", resource: "inventory" },
-          { action: "read", resource: "all_reports" },
-          { action: "manage", resource: "staff_schedules" },
-        ];
-        break;
-      case "admin":
-        permissions = [{ action: "*", resource: "*" }];
-        break;
-    }
-
-    // If businessId is provided, check that it exists
-    if (userData.businessId) {
-      const businessExists = await db
-        .select({ id: schema.businesses.id })
-        .from(schema.businesses)
-        .where(eq(schema.businesses.id, userData.businessId))
-        .get();
-
-      if (!businessExists) {
-        throw new Error("Business does not exist for provided businessId");
-      }
-    }
-
-    // Use Drizzle transaction for atomicity
-    db.transaction((tx) => {
-      // 1. Create business if not provided
-      if (!userData.businessId) {
-        tx.insert(schema.businesses)
-          .values({
-            id: businessId,
-            name: userData.businessName,
-            ownerId: userId,
-            address: null,
-            phone: null,
-            vatNumber: null,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .run();
-
-        // Note: createDefaultCategories would need to be called separately
-        // or converted to use the transaction context
-      }
-
-      // 2. Create user
-      tx.insert(schema.users)
-        .values({
-          id: userId,
-          username: userData.username,
-          pin: userData.pin,
-          email: userData.email,
-          password: hashedPassword,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          businessName: userData.businessName,
-          role: userData.role,
-          businessId,
-          permissions: JSON.stringify(permissions),
-          isActive: true,
-          address: "",
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run();
-    });
-
-    // Create default categories if new business
-    if (!userData.businessId) {
-      await this.createDefaultCategories(businessId);
-    }
-
-    const user = await this.getUserByIdDrizzle(userId);
-    if (!user) {
-      throw new Error("User not found after creation");
-    }
-    return user;
-  }
-
-  // Category CRUD operations
-
-  /**
-   * Create a new category
-   */
   async createCategory(categoryData: {
     name: string;
     description?: string;
@@ -1826,302 +1272,29 @@ export class DatabaseManager {
     sortOrder?: number;
     parentId?: string | null;
   }): Promise<Category> {
-    const categoryId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    // Get the next sort order if not provided
-    const nextSortOrder =
-      categoryData.sortOrder !== undefined
-        ? categoryData.sortOrder
-        : this.getNextCategorySortOrder(categoryData.businessId);
-
-    this.db
-      .prepare(
-        `
-        INSERT INTO categories (id, name, parentId, description, businessId, sortOrder, createdAt, updatedAt, isActive)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      )
-      .run(
-        categoryId,
-        categoryData.name,
-        categoryData.parentId || null,
-        categoryData.description || "",
-        categoryData.businessId,
-        nextSortOrder,
-        now,
-        now,
-        1
-      );
-
-    return this.getCategoryById(categoryId);
+    return this.categories.createCategory(categoryData);
   }
 
-  /**
-   * Get category by ID
-   */
-  getCategoryById(id: string): Category {
-    const category = this.db
-      .prepare("SELECT * FROM categories WHERE id = ?")
-      .get(id) as Category;
-
-    if (!category) {
-      throw new Error(`Category with ID ${id} not found`);
-    }
-
-    return category;
+  async getCategoryById(id: string): Promise<Category> {
+    return this.categories.getCategoryById(id);
   }
 
-  /**
-   * Get all categories for a business
-   */
-  getCategoriesByBusiness(businessId: string): Category[] {
-    // Return categories as a flat list, but you can build a tree in UI
-    return this.db
-      .prepare(
-        "SELECT * FROM categories WHERE businessId = ? AND isActive = 1 ORDER BY sortOrder ASC, name ASC"
-      )
-      .all(businessId) as Category[];
+  async getCategoriesByBusiness(businessId: string): Promise<Category[]> {
+    return this.categories.getCategoriesByBusiness(businessId);
   }
 
-  /**
-   * Update category
-   */
-  updateCategory(
-    id: string,
-    updates: Partial<Omit<Category, "id" | "businessId" | "createdAt">>
-  ): Category {
-    const now = new Date().toISOString();
-    const allowedFields = [
-      "name",
-      "description",
-      "sortOrder",
-      "isActive",
-      "parentId",
-    ];
-
-    const updateFields: string[] = [];
-    const updateValues: any[] = [];
-
-    Object.entries(updates).forEach(([key, value]) => {
-      if (allowedFields.includes(key) && value !== undefined) {
-        updateFields.push(`${key} = ?`);
-        updateValues.push(value);
-      }
-    });
-
-    if (updateFields.length === 0) {
-      return this.getCategoryById(id);
-    }
-
-    updateFields.push("updatedAt = ?");
-    updateValues.push(now, id);
-
-    this.db
-      .prepare(`UPDATE categories SET ${updateFields.join(", ")} WHERE id = ?`)
-      .run(...updateValues);
-
-    return this.getCategoryById(id);
-  }
-
-  /**
-   * Delete category (soft delete)
-   */
-  deleteCategory(id: string): boolean {
-    const now = new Date().toISOString();
-
-    // Check if category is being used by any products
-    const productsUsingCategory = this.db
-      .prepare(
-        "SELECT COUNT(*) as count FROM products WHERE category = ? AND isActive = 1"
-      )
-      .get(id) as { count: number };
-
-    if (productsUsingCategory.count > 0) {
-      throw new Error(
-        `Cannot delete category. ${productsUsingCategory.count} products are still using this category.`
-      );
-    }
-
-    const result = this.db
-      .prepare("UPDATE categories SET isActive = 0, updatedAt = ? WHERE id = ?")
-      .run(now, id);
-
-    return result.changes > 0;
-  }
-
-  // ============================================
-  // DRIZZLE ORM CATEGORY METHODS
-  // ============================================
-
-  /**
-   * Get category by ID using Drizzle ORM (type-safe)
-   * Alternative to getCategoryById() above
-   */
-  async getCategoryByIdDrizzle(id: string): Promise<Category> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [category] = await drizzle
-      .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.id, id))
-      .limit(1);
-
-    if (!category) {
-      throw new Error(`Category with ID ${id} not found`);
-    }
-
-    return {
-      ...category,
-      isActive: Boolean(category.isActive),
-    } as Category;
-  }
-
-  /**
-   * Get all categories for a business using Drizzle ORM (type-safe)
-   * Alternative to getCategoriesByBusiness() above
-   */
-  async getCategoriesByBusinessDrizzle(
-    businessId: string
-  ): Promise<Category[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const categories = await drizzle
-      .select()
-      .from(schema.categories)
-      .where(
-        and(
-          eq(schema.categories.businessId, businessId),
-          eq(schema.categories.isActive, true)
-        )
-      )
-      .orderBy(schema.categories.sortOrder, schema.categories.name);
-
-    return categories.map((cat) => ({
-      ...cat,
-      isActive: Boolean(cat.isActive),
-    })) as Category[];
-  }
-
-  /**
-   * Search categories by name using Drizzle ORM (type-safe)
-   * NEW method - search functionality
-   */
-  async searchCategoriesDrizzle(
+  async searchCategories(
     businessId: string,
     searchTerm: string
   ): Promise<Category[]> {
-    const drizzle = this.getDrizzleInstance();
-    const searchPattern = `%${searchTerm}%`;
-
-    const categories = await drizzle
-      .select()
-      .from(schema.categories)
-      .where(
-        and(
-          eq(schema.categories.businessId, businessId),
-          eq(schema.categories.isActive, true),
-          drizzleSql`(
-            ${schema.categories.name} LIKE ${searchPattern} OR 
-            ${schema.categories.description} LIKE ${searchPattern}
-          )`
-        )
-      )
-      .orderBy(schema.categories.name);
-
-    return categories.map((cat) => ({
-      ...cat,
-      isActive: Boolean(cat.isActive),
-    })) as Category[];
+    return this.categories.searchCategories(businessId, searchTerm);
   }
 
-  /**
-   * Get category hierarchy (parent categories with subcategories)
-   * NEW method - demonstrates self-join
-   */
-  async getCategoryHierarchyDrizzle(businessId: string) {
-    const drizzle = this.getDrizzleInstance();
-
-    // Get all categories for the business
-    const categories = await drizzle
-      .select()
-      .from(schema.categories)
-      .where(
-        and(
-          eq(schema.categories.businessId, businessId),
-          eq(schema.categories.isActive, true)
-        )
-      )
-      .orderBy(schema.categories.sortOrder, schema.categories.name);
-
-    // Build hierarchy (categories with parentId null are top-level)
-    const categoryMap = new Map();
-    const topLevel: any[] = [];
-
-    categories.forEach((cat) => {
-      categoryMap.set(cat.id, {
-        ...cat,
-        children: [],
-        isActive: Boolean(cat.isActive),
-      });
-    });
-
-    categories.forEach((cat) => {
-      const category = categoryMap.get(cat.id);
-      if (cat.parentId) {
-        const parent = categoryMap.get(cat.parentId);
-        if (parent) {
-          parent.children.push(category);
-        }
-      } else {
-        topLevel.push(category);
-      }
-    });
-
-    return topLevel;
+  async getCategoryHierarchy(businessId: string) {
+    return this.categories.getCategoryHierarchy(businessId);
   }
 
-  /**
-   * Create category using Drizzle ORM (type-safe)
-   * Alternative to createCategory() above
-   */
-  async createCategoryDrizzle(categoryData: {
-    name: string;
-    description?: string;
-    businessId: string;
-    sortOrder?: number;
-    parentId?: string | null;
-  }): Promise<Category> {
-    const drizzle = this.getDrizzleInstance();
-    const categoryId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    // Get the next sort order if not provided
-    const nextSortOrder =
-      categoryData.sortOrder !== undefined
-        ? categoryData.sortOrder
-        : this.getNextCategorySortOrder(categoryData.businessId);
-
-    await drizzle.insert(schema.categories).values({
-      id: categoryId,
-      name: categoryData.name,
-      parentId: categoryData.parentId || null,
-      description: categoryData.description || null,
-      businessId: categoryData.businessId,
-      sortOrder: nextSortOrder,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    return this.getCategoryByIdDrizzle(categoryId);
-  }
-
-  /**
-   * Update category using Drizzle ORM (type-safe)
-   * NEW method - type-safe updates
-   */
-  async updateCategoryDrizzle(
+  async updateCategory(
     id: string,
     updates: Partial<{
       name: string;
@@ -2131,898 +1304,108 @@ export class DatabaseManager {
       isActive: boolean;
     }>
   ): Promise<Category> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    await drizzle
-      .update(schema.categories)
-      .set({
-        ...updates,
-        updatedAt: now,
-      })
-      .where(eq(schema.categories.id, id));
-
-    return this.getCategoryByIdDrizzle(id);
+    return this.categories.updateCategory(id, updates);
   }
 
-  /**
-   * Delete category using Drizzle ORM (soft delete, type-safe)
-   * NEW method - type-safe soft delete
-   */
-  async deleteCategoryDrizzle(id: string): Promise<boolean> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    // Check if category is being used by any products
-    const productsUsingCategory = await drizzle
-      .select({ count: drizzleSql<number>`COUNT(*)` })
-      .from(schema.products)
-      .where(
-        and(
-          eq(schema.products.category, id),
-          eq(schema.products.isActive, true)
-        )
-      );
-
-    const count = productsUsingCategory[0]?.count || 0;
-    if (count > 0) {
-      throw new Error(
-        `Cannot delete category. ${count} products are still using this category.`
-      );
-    }
-
-    const result = await drizzle
-      .update(schema.categories)
-      .set({
-        isActive: false,
-        updatedAt: now,
-      })
-      .where(eq(schema.categories.id, id));
-
-    return result.changes > 0;
+  async deleteCategory(id: string): Promise<boolean> {
+    return this.categories.deleteCategory(id);
   }
 
-  /**
-   * Get next sort order for categories in a business
-   */
-  private getNextCategorySortOrder(businessId: string): number {
-    const maxOrder = this.db
-      .prepare(
-        "SELECT MAX(sortOrder) as maxOrder FROM categories WHERE businessId = ?"
-      )
-      .get(businessId) as { maxOrder: number | null };
-
-    return (maxOrder?.maxOrder || 0) + 1;
+  async reorderCategories(
+    businessId: string,
+    categoryIds: string[]
+  ): Promise<void> {
+    return this.categories.reorderCategories(businessId, categoryIds);
   }
 
-  /**
-   * Reorder categories
-   */
-  reorderCategories(businessId: string, categoryIds: string[]): void {
-    const transaction = this.db.transaction(() => {
-      categoryIds.forEach((categoryId, index) => {
-        this.db
-          .prepare(
-            "UPDATE categories SET sortOrder = ?, updatedAt = ? WHERE id = ? AND businessId = ?"
-          )
-          .run(index + 1, new Date().toISOString(), categoryId, businessId);
-      });
-    });
-
-    transaction();
+  async createDefaultCategories(businessId: string): Promise<void> {
+    return this.categories.createDefaultCategories(businessId);
   }
 
-  /**
-   * Create default categories for a new business
-   */
-  createDefaultCategories(businessId: string): void {
-    const defaultCategories = [
-      { name: "Fresh Produce", description: "Fresh fruits and vegetables" },
-      {
-        name: "Dairy & Eggs",
-        description: "Milk, cheese, eggs, and dairy products",
-      },
-      {
-        name: "Meat & Poultry",
-        description: "Fresh meat, chicken, and seafood",
-      },
-      { name: "Bakery", description: "Fresh bread, pastries, and baked goods" },
-      {
-        name: "Frozen Foods",
-        description: "Frozen meals, ice cream, and frozen vegetables",
-      },
-      {
-        name: "Pantry Essentials",
-        description: "Canned goods, pasta, rice, and cooking essentials",
-      },
-      {
-        name: "Snacks & Confectionery",
-        description: "Chips, candy, chocolates, and snacks",
-      },
-      {
-        name: "Beverages",
-        description: "Soft drinks, juices, water, and beverages",
-      },
-      {
-        name: "Health & Beauty",
-        description: "Personal care and health products",
-      },
-      {
-        name: "Household Items",
-        description: "Cleaning supplies and household necessities",
-      },
-    ];
+  // ============================================
+  // PRODUCT METHODS - Delegate to ProductManager
+  // ============================================
 
-    const transaction = this.db.transaction(() => {
-      defaultCategories.forEach((category, index) => {
-        this.createCategory({
-          name: category.name,
-          description: category.description,
-          businessId,
-          sortOrder: index + 1,
-        });
-      });
-    });
-
-    transaction();
-  }
-
-  // Product CRUD operations
-
-  /**
-   * Create a new product
-   */
   async createProduct(
     productData: Omit<Product, "id" | "createdAt" | "updatedAt" | "modifiers">
   ): Promise<Product> {
-    const productId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    // Debug logging
-    console.log("createProduct called with data:", {
-      name: productData.name,
-      category: productData.category,
-      categoryType: typeof productData.category,
-      categoryLength: productData.category ? productData.category.length : 0,
-      businessId: productData.businessId,
-    });
-
-    // Validate required fields
-    if (!productData.category || productData.category.trim() === "") {
-      throw new Error("Category is required and cannot be empty");
-    }
-
-    const result = this.db
-      .prepare(
-        `
-      INSERT INTO products (
-        id, name, description, price, costPrice, taxRate, sku, plu, 
-        image, category, stockLevel, minStockLevel, businessId, isActive, 
-        requiresWeight, unit, pricePerUnit, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
-      )
-      .run(
-        productId,
-        productData.name,
-        productData.description,
-        productData.price,
-        productData.costPrice,
-        productData.taxRate,
-        productData.sku,
-        productData.plu,
-        productData.image,
-        productData.category, // Use category field directly
-        productData.stockLevel,
-        productData.minStockLevel,
-        productData.businessId,
-        productData.isActive ? 1 : 0,
-        productData.requiresWeight ? 1 : 0,
-        productData.unit || "each",
-        productData.pricePerUnit || null,
-        now,
-        now
-      );
-
-    if (result.changes === 0) {
-      throw new Error("Failed to create product");
-    }
-
-    return this.getProductById(productId);
+    return this.products.createProduct(productData);
   }
 
-  /**
-   * Get product by ID with modifiers
-   */
-  getProductById(id: string): Product {
-    const product = this.db
-      .prepare(
-        `
-      SELECT * FROM products WHERE id = ? AND isActive = 1
-    `
-      )
-      .get(id) as any;
-
-    if (!product) {
-      throw new Error("Product not found");
-    }
-
-    // Get modifiers for this product
-    const modifiers = this.getProductModifiers(id);
-    console.log(
-      `Retrieved ${modifiers.length} modifiers for product ${id}:`,
-      modifiers
-    );
-
-    return {
-      ...product,
-      isActive: Boolean(product.isActive),
-      requiresWeight: Boolean(product.requiresWeight),
-      modifiers,
-    };
+  async getProductById(id: string): Promise<Product> {
+    return this.products.getProductById(id);
   }
 
-  /**
-   * Get product by PLU code
-   */
-  getProductByPLU(plu: string): Product {
-    const product = this.db
-      .prepare(
-        `
-      SELECT * FROM products WHERE plu = ? AND isActive = 1
-    `
-      )
-      .get(plu) as any;
-
-    if (!product) {
-      throw new Error("Product not found");
-    }
-
-    // Get modifiers for this product
-    const modifiers = this.getProductModifiers(product.id);
-
-    return {
-      ...product,
-      isActive: Boolean(product.isActive),
-      requiresWeight: Boolean(product.requiresWeight),
-      modifiers,
-    };
+  async getProductByPLU(plu: string): Promise<Product> {
+    return this.products.getProductByPLU(plu);
   }
 
-  /**
-   * Get all products for a business
-   */
-  getProductsByBusiness(businessId: string): Product[] {
-    const products = this.db
-      .prepare(
-        `
-      SELECT * FROM products 
-      WHERE businessId = ? AND isActive = 1 
-      ORDER BY name ASC
-    `
-      )
-      .all(businessId) as any[];
-
-    return products.map((product) => ({
-      ...product,
-      isActive: Boolean(product.isActive),
-      requiresWeight: Boolean(product.requiresWeight),
-      modifiers: this.getProductModifiers(product.id),
-    }));
+  async getProductsByBusiness(businessId: string): Promise<Product[]> {
+    return this.products.getProductsByBusiness(businessId);
   }
 
-  /**
-   * Update product
-   */
+  async searchProducts(
+    businessId: string,
+    searchTerm: string
+  ): Promise<Product[]> {
+    return this.products.searchProducts(businessId, searchTerm);
+  }
+
+  async getProductsWithCategory(businessId: string) {
+    return this.products.getProductsWithCategory(businessId);
+  }
+
+  async getLowStockProducts(
+    businessId: string,
+    threshold?: number
+  ): Promise<Product[]> {
+    return this.products.getLowStockProducts(businessId, threshold);
+  }
+
   async updateProduct(
     id: string,
     updates: Partial<Omit<Product, "id" | "createdAt" | "modifiers">>
   ): Promise<Product> {
-    const now = new Date().toISOString();
-
-    // Build dynamic SQL for updates
-    const fields = Object.keys(updates).filter((key) => key !== "modifiers");
-    const setClause = fields.map((field) => `${field} = ?`).join(", ");
-    const values = fields.map((field) => {
-      const value = updates[field as keyof typeof updates];
-      // Convert boolean values to integers for SQLite
-      if (typeof value === "boolean") {
-        return value ? 1 : 0;
-      }
-      // Ensure other values are primitive types
-      if (value === null || value === undefined) {
-        return null;
-      }
-      return value;
-    });
-
-    if (fields.length === 0) {
-      return this.getProductById(id);
-    }
-
-    const result = this.db
-      .prepare(
-        `
-      UPDATE products 
-      SET ${setClause}, updatedAt = ?
-      WHERE id = ? AND isActive = 1
-    `
-      )
-      .run(...values, now, id);
-
-    if (result.changes === 0) {
-      throw new Error("Product not found or update failed");
-    }
-
-    return this.getProductById(id);
+    return this.products.updateProduct(id, updates);
   }
 
-  /**
-   * Delete product (soft delete)
-   */
-  deleteProduct(id: string): boolean {
-    const result = this.db
-      .prepare(
-        `
-      UPDATE products 
-      SET isActive = 0, updatedAt = ?
-      WHERE id = ? AND isActive = 1
-    `
-      )
-      .run(new Date().toISOString(), id);
-
-    return result.changes > 0;
+  async deleteProduct(id: string): Promise<boolean> {
+    return this.products.deleteProduct(id);
   }
 
-  // ============================================
-  // DRIZZLE ORM PRODUCT METHODS
-  // ============================================
-
-  /**
-   * Get products by business using Drizzle ORM (type-safe)
-   * Alternative to getProductsByBusiness() above
-   */
-  async getProductsByBusinessDrizzle(businessId: string): Promise<Product[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const products = await drizzle
-      .select()
-      .from(schema.products)
-      .where(
-        and(
-          eq(schema.products.businessId, businessId),
-          eq(schema.products.isActive, true)
-        )
-      )
-      .orderBy(schema.products.name);
-
-    return products as Product[];
-  }
-
-  /**
-   * Search products by name or SKU using Drizzle ORM (type-safe)
-   * NEW method - demonstrates search capabilities
-   */
-  async searchProductsDrizzle(
-    businessId: string,
-    searchTerm: string
-  ): Promise<Product[]> {
-    const drizzle = this.getDrizzleInstance();
-    const searchPattern = `%${searchTerm}%`;
-
-    const products = await drizzle
-      .select()
-      .from(schema.products)
-      .where(
-        and(
-          eq(schema.products.businessId, businessId),
-          eq(schema.products.isActive, true),
-          drizzleSql`(
-            ${schema.products.name} LIKE ${searchPattern} OR 
-            ${schema.products.sku} LIKE ${searchPattern}
-          )`
-        )
-      )
-      .orderBy(schema.products.name);
-
-    return products as Product[];
-  }
-
-  /**
-   * Get products with category details using Drizzle JOIN (type-safe)
-   * NEW method - demonstrates JOIN queries with category
-   */
-  async getProductsWithCategoryDrizzle(businessId: string) {
-    const drizzle = this.getDrizzleInstance();
-
-    const products = await drizzle
-      .select({
-        product: schema.products,
-        category: schema.categories,
-      })
-      .from(schema.products)
-      .leftJoin(
-        schema.categories,
-        eq(schema.products.category, schema.categories.id)
-      )
-      .where(
-        and(
-          eq(schema.products.businessId, businessId),
-          eq(schema.products.isActive, true)
-        )
-      )
-      .orderBy(schema.products.name);
-
-    return products;
-  }
-
-  /**
-   * Get low stock products using Drizzle ORM (type-safe)
-   * NEW method - demonstrates conditional filtering
-   */
-  async getLowStockProductsDrizzle(businessId: string, threshold: number = 10) {
-    const drizzle = this.getDrizzleInstance();
-
-    const products = await drizzle
-      .select()
-      .from(schema.products)
-      .where(
-        and(
-          eq(schema.products.businessId, businessId),
-          eq(schema.products.isActive, true),
-          drizzleSql`${schema.products.stockLevel} <= ${threshold}`
-        )
-      )
-      .orderBy(schema.products.stockLevel);
-
-    return products as Product[];
-  }
-
-  /**
-   * Create product using Drizzle ORM (type-safe)
-   * Alternative to createProduct() above
-   */
-  async createProductDrizzle(
-    productData: Omit<Product, "id" | "createdAt" | "updatedAt" | "modifiers">
-  ): Promise<Product> {
-    const drizzle = this.getDrizzleInstance();
-    const productId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    // Validate required fields
-    if (!productData.category || productData.category.trim() === "") {
-      throw new Error("Category is required and cannot be empty");
-    }
-
-    await drizzle.insert(schema.products).values({
-      id: productId,
-      name: productData.name,
-      description: productData.description || null,
-      price: productData.price,
-      costPrice: productData.costPrice || 0,
-      taxRate: productData.taxRate || 0,
-      sku: productData.sku,
-      plu: productData.plu || null,
-      image: productData.image || null,
-      category: productData.category,
-      stockLevel: productData.stockLevel || 0,
-      minStockLevel: productData.minStockLevel || 0,
-      businessId: productData.businessId,
-      isActive: productData.isActive !== false,
-      requiresWeight: productData.requiresWeight || false,
-      unit: productData.unit || "each",
-      pricePerUnit: productData.pricePerUnit || null,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // Get the product with modifiers (use raw SQL method for now)
-    return this.getProductById(productId);
-  }
-
-  /**
-   * Update product using Drizzle ORM (type-safe)
-   * NEW method - type-safe product updates
-   */
-  async updateProductDrizzle(
-    id: string,
-    updates: Partial<
-      Omit<Product, "id" | "createdAt" | "updatedAt" | "modifiers">
-    >
-  ): Promise<Product> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    // Build the update object, converting booleans to integers for SQLite
-    const updateData: any = {
-      ...updates,
-      updatedAt: now,
-    };
-
-    // Ensure booleans are converted properly if present
-    if (updates.isActive !== undefined) {
-      updateData.isActive = updates.isActive;
-    }
-    if (updates.requiresWeight !== undefined) {
-      updateData.requiresWeight = updates.requiresWeight;
-    }
-
-    await drizzle
-      .update(schema.products)
-      .set(updateData)
-      .where(eq(schema.products.id, id));
-
-    return this.getProductById(id);
-  }
-
-  /**
-   * Delete product using Drizzle ORM (soft delete, type-safe)
-   * NEW method - type-safe soft delete
-   */
-  async deleteProductDrizzle(id: string): Promise<boolean> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const result = await drizzle
-      .update(schema.products)
-      .set({
-        isActive: false,
-        updatedAt: now,
-      })
-      .where(
-        and(eq(schema.products.id, id), eq(schema.products.isActive, true))
-      );
-
-    return result.changes > 0;
-  }
-
-  /**
-   * Create a modifier
-   */
   async createModifier(
     modifierData: Omit<Modifier, "id" | "createdAt" | "updatedAt" | "options">
   ): Promise<Modifier> {
-    const modifierId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    const result = this.db
-      .prepare(
-        `
-      INSERT INTO modifiers (id, name, type, required, businessId, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `
-      )
-      .run(
-        modifierId,
-        modifierData.name,
-        modifierData.type,
-        modifierData.required ? 1 : 0,
-        modifierData.businessId,
-        now,
-        now
-      );
-
-    if (result.changes === 0) {
-      throw new Error("Failed to create modifier");
-    }
-
-    return this.getModifierById(modifierId);
+    return this.products.createModifier(modifierData);
   }
 
-  /**
-   * Get modifier by ID with options
-   */
-  getModifierById(id: string): Modifier {
-    const modifier = this.db
-      .prepare(
-        `
-      SELECT * FROM modifiers WHERE id = ?
-    `
-      )
-      .get(id) as any;
-
-    if (!modifier) {
-      throw new Error("Modifier not found");
-    }
-
-    // Get options for this modifier
-    const options = this.db
-      .prepare(
-        `
-      SELECT * FROM modifier_options WHERE modifierId = ? ORDER BY name ASC
-    `
-      )
-      .all(id) as ModifierOption[];
-
-    return {
-      ...modifier,
-      required: Boolean(modifier.required),
-      options,
-    };
+  async getModifierById(id: string): Promise<Modifier> {
+    return this.products.getModifierById(id);
   }
 
-  /**
-   * Create modifier option
-   */
-  createModifierOption(
-    modifierId: string,
-    optionData: Omit<ModifierOption, "id" | "createdAt">
-  ): ModifierOption {
-    const optionId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    const result = this.db
-      .prepare(
-        `
-      INSERT INTO modifier_options (id, modifierId, name, price, createdAt)
-      VALUES (?, ?, ?, ?, ?)
-    `
-      )
-      .run(optionId, modifierId, optionData.name, optionData.price, now);
-
-    if (result.changes === 0) {
-      throw new Error("Failed to create modifier option");
-    }
-
-    return {
-      id: optionId,
-      name: optionData.name,
-      price: optionData.price,
-      createdAt: now,
-    };
-  }
-
-  /**
-   * Get modifiers for a specific product
-   */
-  getProductModifiers(productId: string): Modifier[] {
-    const modifiers = this.db
-      .prepare(
-        `
-      SELECT m.* FROM modifiers m
-      JOIN product_modifiers pm ON m.id = pm.modifierId
-      WHERE pm.productId = ?
-      ORDER BY m.name ASC
-    `
-      )
-      .all(productId) as any[];
-
-    return modifiers.map((modifier) => ({
-      ...modifier,
-      required: Boolean(modifier.required),
-      options: this.db
-        .prepare(
-          `
-        SELECT * FROM modifier_options WHERE modifierId = ? ORDER BY name ASC
-      `
-        )
-        .all(modifier.id) as ModifierOption[],
-    }));
-  }
-
-  /**
-   * Add modifier to product
-   */
-  addModifierToProduct(productId: string, modifierId: string): void {
-    this.db
-      .prepare(
-        `
-      INSERT OR IGNORE INTO product_modifiers (productId, modifierId)
-      VALUES (?, ?)
-    `
-      )
-      .run(productId, modifierId);
-  }
-
-  /**
-   * Remove modifier from product
-   */
-  removeModifierFromProduct(productId: string, modifierId: string): void {
-    this.db
-      .prepare(
-        `
-      DELETE FROM product_modifiers 
-      WHERE productId = ? AND modifierId = ?
-    `
-      )
-      .run(productId, modifierId);
-  }
-
-  // ============================================
-  // DRIZZLE ORM MODIFIER METHODS
-  // ============================================
-
-  /**
-   * Get modifier by ID using Drizzle ORM (type-safe)
-   * Alternative to getModifierById() above
-   */
-  async getModifierByIdDrizzle(id: string): Promise<Modifier> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [modifier] = await drizzle
-      .select()
-      .from(schema.modifiers)
-      .where(eq(schema.modifiers.id, id))
-      .limit(1);
-
-    if (!modifier) {
-      throw new Error("Modifier not found");
-    }
-
-    // Get options for this modifier
-    const options = await drizzle
-      .select()
-      .from(schema.modifierOptions)
-      .where(eq(schema.modifierOptions.modifierId, id))
-      .orderBy(schema.modifierOptions.name);
-
-    return {
-      ...modifier,
-      required: Boolean(modifier.required),
-      options: options as ModifierOption[],
-    };
-  }
-
-  /**
-   * Get modifiers for a business using Drizzle ORM (type-safe)
-   * NEW method - list all modifiers
-   */
-  async getModifiersByBusinessDrizzle(businessId: string): Promise<Modifier[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const modifiers = await drizzle
-      .select()
-      .from(schema.modifiers)
-      .where(eq(schema.modifiers.businessId, businessId))
-      .orderBy(schema.modifiers.name);
-
-    // Get options for each modifier
-    const modifiersWithOptions = await Promise.all(
-      modifiers.map(async (modifier) => {
-        const options = await drizzle
-          .select()
-          .from(schema.modifierOptions)
-          .where(eq(schema.modifierOptions.modifierId, modifier.id))
-          .orderBy(schema.modifierOptions.name);
-
-        return {
-          ...modifier,
-          required: Boolean(modifier.required),
-          options: options as ModifierOption[],
-        };
-      })
-    );
-
-    return modifiersWithOptions;
-  }
-
-  /**
-   * Get modifiers for a product using Drizzle ORM (type-safe with JOIN)
-   * Alternative to getProductModifiers() above
-   */
-  async getProductModifiersDrizzle(productId: string): Promise<Modifier[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    // Get modifiers linked to this product
-    const productModifiers = await drizzle
-      .select({
-        modifier: schema.modifiers,
-      })
-      .from(schema.productModifiers)
-      .innerJoin(
-        schema.modifiers,
-        eq(schema.productModifiers.modifierId, schema.modifiers.id)
-      )
-      .where(eq(schema.productModifiers.productId, productId))
-      .orderBy(schema.modifiers.name);
-
-    // Get options for each modifier
-    const modifiersWithOptions = await Promise.all(
-      productModifiers.map(async ({ modifier }) => {
-        const options = await drizzle
-          .select()
-          .from(schema.modifierOptions)
-          .where(eq(schema.modifierOptions.modifierId, modifier.id))
-          .orderBy(schema.modifierOptions.name);
-
-        return {
-          ...modifier,
-          required: Boolean(modifier.required),
-          options: options as ModifierOption[],
-        };
-      })
-    );
-
-    return modifiersWithOptions;
-  }
-
-  /**
-   * Create modifier using Drizzle ORM (type-safe)
-   * Alternative to createModifier() above
-   */
-  async createModifierDrizzle(
-    modifierData: Omit<Modifier, "id" | "createdAt" | "updatedAt" | "options">
-  ): Promise<Modifier> {
-    const drizzle = this.getDrizzleInstance();
-    const modifierId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    await drizzle.insert(schema.modifiers).values({
-      id: modifierId,
-      name: modifierData.name,
-      type: modifierData.type,
-      required: modifierData.required || false,
-      businessId: modifierData.businessId,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    return this.getModifierByIdDrizzle(modifierId);
-  }
-
-  /**
-   * Create modifier option using Drizzle ORM (type-safe)
-   * NEW method - add options to modifiers
-   */
-  async createModifierOptionDrizzle(
+  async createModifierOption(
     modifierId: string,
     optionData: Omit<ModifierOption, "id" | "createdAt">
   ): Promise<ModifierOption> {
-    const drizzle = this.getDrizzleInstance();
-    const optionId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    await drizzle.insert(schema.modifierOptions).values({
-      id: optionId,
-      modifierId,
-      name: optionData.name,
-      price: optionData.price || 0,
-      createdAt: now,
-    });
-
-    const [option] = await drizzle
-      .select()
-      .from(schema.modifierOptions)
-      .where(eq(schema.modifierOptions.id, optionId))
-      .limit(1);
-
-    return option as ModifierOption;
+    return this.products.createModifierOption(modifierId, optionData);
   }
 
-  /**
-   * Add modifier to product using Drizzle ORM (type-safe)
-   * NEW method - link modifier to product
-   */
-  async addModifierToProductDrizzle(
+  async getProductModifiers(productId: string): Promise<Modifier[]> {
+    return this.products.getProductModifiers(productId);
+  }
+
+  async addModifierToProduct(
     productId: string,
     modifierId: string
   ): Promise<void> {
-    const drizzle = this.getDrizzleInstance();
-
-    await drizzle.insert(schema.productModifiers).values({
-      productId,
-      modifierId,
-    });
+    return this.products.addModifierToProduct(productId, modifierId);
   }
 
-  /**
-   * Remove modifier from product using Drizzle ORM (type-safe)
-   * NEW method - unlink modifier from product
-   */
-  async removeModifierFromProductDrizzle(
+  async removeModifierFromProduct(
     productId: string,
     modifierId: string
   ): Promise<void> {
-    const drizzle = this.getDrizzleInstance();
-
-    await drizzle
-      .delete(schema.productModifiers)
-      .where(
-        and(
-          eq(schema.productModifiers.productId, productId),
-          eq(schema.productModifiers.modifierId, modifierId)
-        )
-      );
+    return this.products.removeModifierFromProduct(productId, modifierId);
   }
 
   /**
@@ -3080,221 +1463,43 @@ export class DatabaseManager {
     };
   }
 
-  /**
-   * Get stock adjustments for a product
-   */
-  getStockAdjustments(productId: string): StockAdjustment[] {
-    return this.db
-      .prepare(
-        `
-      SELECT * FROM stock_adjustments 
-      WHERE productId = ? 
-      ORDER BY timestamp DESC
-    `
-      )
-      .all(productId) as StockAdjustment[];
-  }
-
   // ============================================
-  // DRIZZLE ORM STOCK ADJUSTMENT METHODS
+  // Settings Management - Delegate to SettingsManager
   // ============================================
 
-  /**
-   * Create stock adjustment using Drizzle ORM (type-safe with transaction)
-   * Alternative to createStockAdjustment() above
-   */
-  async createStockAdjustmentDrizzle(
-    adjustmentData: Omit<StockAdjustment, "id" | "timestamp">
-  ): Promise<StockAdjustment> {
-    const drizzle = this.getDrizzleInstance();
-    const adjustmentId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    // Start transaction for atomic operation
-    await drizzle.transaction(async (tx) => {
-      // Create adjustment record
-      await tx.insert(schema.stockAdjustments).values({
-        id: adjustmentId,
-        productId: adjustmentData.productId,
-        type: adjustmentData.type,
-        quantity: adjustmentData.quantity,
-        reason: adjustmentData.reason || null,
-        userId: adjustmentData.userId,
-        businessId: adjustmentData.businessId,
-        timestamp: now,
-      });
-
-      // Update product stock level based on adjustment type
-      const currentProduct = await tx
-        .select({ stockLevel: schema.products.stockLevel })
-        .from(schema.products)
-        .where(eq(schema.products.id, adjustmentData.productId))
-        .limit(1);
-
-      if (currentProduct.length === 0) {
-        throw new Error("Product not found");
-      }
-
-      let newStockLevel = currentProduct[0].stockLevel ?? 0;
-      if (adjustmentData.type === "add") {
-        newStockLevel += adjustmentData.quantity;
-      } else if (
-        ["remove", "sale", "waste", "adjustment"].includes(adjustmentData.type)
-      ) {
-        newStockLevel -= adjustmentData.quantity;
-      }
-
-      // Update product stock
-      await tx
-        .update(schema.products)
-        .set({
-          stockLevel: newStockLevel,
-          updatedAt: now,
-        })
-        .where(eq(schema.products.id, adjustmentData.productId));
-    });
-
-    // Return the created adjustment
-    const [adjustment] = await drizzle
-      .select()
-      .from(schema.stockAdjustments)
-      .where(eq(schema.stockAdjustments.id, adjustmentId))
-      .limit(1);
-
-    return adjustment as StockAdjustment;
-  }
-
-  /**
-   * Get stock adjustments using Drizzle ORM (type-safe)
-   * Alternative to getStockAdjustments() above
-   */
-  async getStockAdjustmentsDrizzle(
-    productId: string
-  ): Promise<StockAdjustment[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const adjustments = await drizzle
-      .select()
-      .from(schema.stockAdjustments)
-      .where(eq(schema.stockAdjustments.productId, productId))
-      .orderBy(desc(schema.stockAdjustments.timestamp));
-
-    return adjustments as StockAdjustment[];
-  }
-
-  /**
-   * Get stock adjustment history for a business using Drizzle ORM
-   * NEW method - business-wide stock history
-   */
-  async getBusinessStockAdjustmentsDrizzle(
-    businessId: string,
-    limit: number = 100
-  ): Promise<StockAdjustment[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const adjustments = await drizzle
-      .select()
-      .from(schema.stockAdjustments)
-      .where(eq(schema.stockAdjustments.businessId, businessId))
-      .orderBy(desc(schema.stockAdjustments.timestamp))
-      .limit(limit);
-
-    return adjustments as StockAdjustment[];
-  }
-
-  // App Settings Management (for key-value storage like auth tokens, user preferences)
-
-  /**
-   * Set a key-value pair in app settings
-   */
   setSetting(key: string, value: string): void {
-    const now = new Date().toISOString();
-    this.db
-      .prepare(
-        `
-      INSERT OR REPLACE INTO app_settings (key, value, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?)
-    `
-      )
-      .run(key, value, now, now);
+    return this.settings.setSetting(key, value);
   }
 
-  /**
-   * Get a value from app settings
-   */
   getSetting(key: string): string | null {
-    const result = this.db
-      .prepare("SELECT value FROM app_settings WHERE key = ?")
-      .get(key);
-    return result ? result.value : null;
+    return this.settings.getSetting(key);
   }
 
-  /**
-   * Delete a setting
-   */
   deleteSetting(key: string): void {
-    this.db.prepare("DELETE FROM app_settings WHERE key = ?").run(key);
+    return this.settings.deleteSetting(key);
   }
 
-  /**
-   * Clear all settings
-   */
   clearAllSettings(): void {
-    this.db.prepare("DELETE FROM app_settings").run();
+    return this.settings.clearAllSettings();
   }
 
-  // Schedule Management Methods
+  // Schedule Management Methods - Delegate to ScheduleManager
   createSchedule(
     schedule: Omit<Schedule, "id" | "createdAt" | "updatedAt">
   ): Schedule {
-    const id = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    const stmt = this.db.prepare(`
-      INSERT INTO schedules (id, staffId, businessId, startTime, endTime, status, assignedRegister, notes, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      id,
-      schedule.staffId,
-      schedule.businessId,
-      schedule.startTime,
-      schedule.endTime,
-      schedule.status,
-      schedule.assignedRegister || null,
-      schedule.notes || null,
-      now,
-      now
-    );
-
-    return {
-      ...schedule,
-      id,
-      createdAt: now,
-      updatedAt: now,
-    };
+    return this.schedules.createSchedule(schedule);
   }
 
   getSchedulesByBusinessId(businessId: string): Schedule[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM schedules WHERE businessId = ? ORDER BY startTime ASC
-    `);
-    return stmt.all(businessId) as Schedule[];
+    return this.schedules.getSchedulesByBusiness(businessId);
   }
 
   getSchedulesByStaffId(staffId: string): Schedule[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM schedules WHERE staffId = ? ORDER BY startTime ASC
-    `);
-    return stmt.all(staffId) as Schedule[];
+    return this.schedules.getSchedulesByStaffId(staffId);
   }
 
   updateScheduleStatus(scheduleId: string, status: Schedule["status"]): void {
-    const stmt = this.db.prepare(`
-      UPDATE schedules SET status = ?, updatedAt = ? WHERE id = ?
-    `);
-    stmt.run(status, new Date().toISOString(), scheduleId);
+    return this.schedules.updateScheduleStatus(scheduleId, status);
   }
 
   updateSchedule(
@@ -3311,483 +1516,34 @@ export class DatabaseManager {
       >
     >
   ): Schedule {
-    const now = new Date().toISOString();
-
-    // Build dynamic UPDATE query based on provided fields
-    const fields = [];
-    const values = [];
-
-    if (updates.staffId !== undefined) {
-      fields.push("staffId = ?");
-      values.push(updates.staffId);
-    }
-    if (updates.startTime !== undefined) {
-      fields.push("startTime = ?");
-      values.push(updates.startTime);
-    }
-    if (updates.endTime !== undefined) {
-      fields.push("endTime = ?");
-      values.push(updates.endTime);
-    }
-    if (updates.assignedRegister !== undefined) {
-      fields.push("assignedRegister = ?");
-      values.push(updates.assignedRegister);
-    }
-    if (updates.notes !== undefined) {
-      fields.push("notes = ?");
-      values.push(updates.notes);
-    }
-    if (updates.status !== undefined) {
-      fields.push("status = ?");
-      values.push(updates.status);
-    }
-
-    // Always update the updatedAt timestamp
-    fields.push("updatedAt = ?");
-    values.push(now);
-    values.push(scheduleId);
-
-    if (fields.length === 1) {
-      // Only updatedAt was added
-      throw new Error("No fields to update");
-    }
-
-    const stmt = this.db.prepare(`
-      UPDATE schedules SET ${fields.join(", ")} WHERE id = ?
-    `);
-    stmt.run(...values);
-
-    // Return the updated schedule
-    const getStmt = this.db.prepare(`
-      SELECT * FROM schedules WHERE id = ?
-    `);
-    const updated = getStmt.get(scheduleId) as Schedule;
-
-    if (!updated) {
-      throw new Error("Schedule not found after update");
-    }
-
-    return updated;
+    return this.schedules.updateSchedule(scheduleId, updates);
   }
 
   deleteSchedule(scheduleId: string): void {
-    const stmt = this.db.prepare(`
-      DELETE FROM schedules WHERE id = ?
-    `);
-    const result = stmt.run(scheduleId);
-
-    if (result.changes === 0) {
-      throw new Error("Schedule not found");
-    }
+    return this.schedules.deleteSchedule(scheduleId);
   }
 
   // ============================================
-  // DRIZZLE ORM SCHEDULE METHODS
+  // Shift Management Methods - Delegate to ShiftManager
   // ============================================
-
-  /**
-   * Create schedule (Drizzle)
-   */
-  createScheduleDrizzle(
-    schedule: Omit<Schedule, "id" | "createdAt" | "updatedAt">
-  ): Schedule {
-    const db = this.getDrizzleInstance();
-    const id = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    db.insert(schema.schedules)
-      .values({
-        id,
-        staffId: schedule.staffId,
-        businessId: schedule.businessId,
-        startTime: schedule.startTime,
-        endTime: schedule.endTime,
-        status: schedule.status,
-        assignedRegister: schedule.assignedRegister ?? null,
-        notes: schedule.notes ?? null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-
-    return {
-      ...schedule,
-      id,
-      createdAt: now,
-      updatedAt: now,
-    };
-  }
-
-  /**
-   * Get schedules by business ID (Drizzle)
-   */
-  getSchedulesByBusinessIdDrizzle(businessId: string): Schedule[] {
-    const db = this.getDrizzleInstance();
-
-    const result = db
-      .select()
-      .from(schema.schedules)
-      .where(eq(schema.schedules.businessId, businessId))
-      .orderBy(asc(schema.schedules.startTime))
-      .all();
-
-    return result.map((s) => ({
-      ...s,
-      assignedRegister: s.assignedRegister ?? undefined,
-      notes: s.notes ?? undefined,
-    }));
-  }
-
-  /**
-   * Get schedules by staff ID (Drizzle)
-   */
-  getSchedulesByStaffIdDrizzle(staffId: string): Schedule[] {
-    const db = this.getDrizzleInstance();
-
-    const result = db
-      .select()
-      .from(schema.schedules)
-      .where(eq(schema.schedules.staffId, staffId))
-      .orderBy(asc(schema.schedules.startTime))
-      .all();
-
-    return result.map((s) => ({
-      ...s,
-      assignedRegister: s.assignedRegister ?? undefined,
-      notes: s.notes ?? undefined,
-    }));
-  }
-
-  /**
-   * Update schedule status (Drizzle)
-   */
-  updateScheduleStatusDrizzle(
-    scheduleId: string,
-    status: Schedule["status"]
-  ): void {
-    const db = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    db.update(schema.schedules)
-      .set({
-        status,
-        updatedAt: now,
-      })
-      .where(eq(schema.schedules.id, scheduleId))
-      .run();
-  }
-
-  /**
-   * Update schedule (Drizzle)
-   */
-  updateScheduleDrizzle(
-    scheduleId: string,
-    updates: Partial<
-      Pick<
-        Schedule,
-        | "staffId"
-        | "startTime"
-        | "endTime"
-        | "assignedRegister"
-        | "notes"
-        | "status"
-      >
-    >
-  ): Schedule {
-    const db = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    // Build update object
-    const updateData: any = { updatedAt: now };
-
-    if (updates.staffId !== undefined) updateData.staffId = updates.staffId;
-    if (updates.startTime !== undefined)
-      updateData.startTime = updates.startTime;
-    if (updates.endTime !== undefined) updateData.endTime = updates.endTime;
-    if (updates.assignedRegister !== undefined)
-      updateData.assignedRegister = updates.assignedRegister ?? null;
-    if (updates.notes !== undefined) updateData.notes = updates.notes ?? null;
-    if (updates.status !== undefined) updateData.status = updates.status;
-
-    if (Object.keys(updateData).length === 1) {
-      throw new Error("No fields to update");
-    }
-
-    db.update(schema.schedules)
-      .set(updateData)
-      .where(eq(schema.schedules.id, scheduleId))
-      .run();
-
-    // Return the updated schedule
-    const updated = db
-      .select()
-      .from(schema.schedules)
-      .where(eq(schema.schedules.id, scheduleId))
-      .get();
-
-    if (!updated) {
-      throw new Error("Schedule not found after update");
-    }
-
-    return {
-      ...updated,
-      assignedRegister: updated.assignedRegister ?? undefined,
-      notes: updated.notes ?? undefined,
-    };
-  }
-
-  /**
-   * Delete schedule (Drizzle)
-   */
-  deleteScheduleDrizzle(scheduleId: string): void {
-    const db = this.getDrizzleInstance();
-
-    const result = db
-      .delete(schema.schedules)
-      .where(eq(schema.schedules.id, scheduleId))
-      .run();
-
-    if (result.changes === 0) {
-      throw new Error("Schedule not found");
-    }
-  }
-
-  // Shift Management Methods
   createShift(shift: Omit<Shift, "id" | "createdAt" | "updatedAt">): Shift {
-    const id = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    const stmt = this.db.prepare(`
-      INSERT INTO shifts (
-        id, scheduleId, cashierId, businessId, startTime, endTime, status, 
-        startingCash, finalCashDrawer, expectedCashDrawer, cashVariance, 
-        totalSales, totalTransactions, totalRefunds, totalVoids, notes, 
-        createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      id,
-      shift.scheduleId || null,
-      shift.cashierId,
-      shift.businessId,
-      shift.startTime,
-      shift.endTime || null,
-      shift.status,
-      shift.startingCash,
-      shift.finalCashDrawer || null,
-      shift.expectedCashDrawer || null,
-      shift.cashVariance || null,
-      shift.totalSales || 0,
-      shift.totalTransactions || 0,
-      shift.totalRefunds || 0,
-      shift.totalVoids || 0,
-      shift.notes || null,
-      now,
-      now
-    );
-
-    return {
-      ...shift,
-      id,
-      createdAt: now,
-      updatedAt: now,
-    };
+    return this.shifts.createShift(shift);
   }
 
   getActiveShiftByCashier(cashierId: string): Shift | null {
-    const stmt = this.db.prepare(`
-      SELECT * FROM shifts WHERE cashierId = ? AND status = 'active' ORDER BY startTime DESC LIMIT 1
-    `);
-    return (stmt.get(cashierId) as Shift) || null;
+    return this.shifts.getActiveShift(cashierId);
   }
 
-  // Get active shift for cashier, but only if it started today or within the last 24 hours
-  // This prevents old unclosed shifts from interfering with new shifts
   getTodaysActiveShiftByCashier(cashierId: string): Shift | null {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(6, 0, 0, 0); // Consider shifts from 6 AM yesterday to account for night shifts
-
-    const stmt = this.db.prepare(`
-      SELECT * FROM shifts 
-      WHERE cashierId = ? 
-        AND status = 'active' 
-        AND startTime >= ? 
-      ORDER BY startTime DESC 
-      LIMIT 1
-    `);
-    return (stmt.get(cashierId, yesterday.toISOString()) as Shift) || null;
+    return this.shifts.getTodaysActiveShift(cashierId);
   }
 
-  // Auto-close old unclosed shifts that are more than 24 hours old
-  // This should be called periodically to clean up abandoned shifts
   autoCloseOldActiveShifts(): number {
-    const now = new Date();
-    const nowString = now.toISOString();
-
-    // 1. Close shifts older than 24 hours (basic cleanup)
-    const basicCutoffTime = new Date(now);
-    basicCutoffTime.setDate(basicCutoffTime.getDate() - 1);
-    basicCutoffTime.setHours(6, 0, 0, 0);
-
-    // 2. Get all active shifts to check individually
-    const activeShiftsStmt = this.db.prepare(`
-      SELECT s.*, sch.endTime as scheduledEndTime 
-      FROM shifts s
-      LEFT JOIN schedules sch ON s.scheduleId = sch.id
-      WHERE s.status = 'active'
-    `);
-    const activeShifts = activeShiftsStmt.all();
-
-    let closedCount = 0;
-
-    for (const shift of activeShifts) {
-      let shouldClose = false;
-      let closeReason = "";
-
-      const shiftStart = new Date(shift.startTime);
-
-      // Rule 1: Close shifts older than 24 hours
-      if (shiftStart < basicCutoffTime) {
-        shouldClose = true;
-        closeReason =
-          "Auto-closed - shift was left open for more than 24 hours";
-      }
-
-      // Rule 2: Close shifts that are way past their scheduled end time
-      else if (shift.scheduledEndTime) {
-        const scheduledEnd = new Date(shift.scheduledEndTime);
-        const hoursOverdue =
-          (now.getTime() - scheduledEnd.getTime()) / (1000 * 60 * 60);
-
-        // Close shifts that are more than 4 hours past scheduled end time
-        if (hoursOverdue > 4) {
-          shouldClose = true;
-          closeReason = `Auto-closed - shift was ${Math.round(
-            hoursOverdue
-          )} hours past scheduled end time`;
-        }
-      }
-
-      // Rule 3: Close shifts that started more than 16 hours ago (even without schedule)
-      else {
-        const hoursActive =
-          (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60);
-        if (hoursActive > 16) {
-          shouldClose = true;
-          closeReason = `Auto-closed - shift was active for ${Math.round(
-            hoursActive
-          )} hours without schedule`;
-        }
-      }
-
-      if (shouldClose) {
-        // Calculate estimated cash drawer based on sales
-        const estimatedCash = shift.startingCash + (shift.totalSales || 0);
-
-        const updateStmt = this.db.prepare(`
-          UPDATE shifts 
-          SET 
-            status = 'ended',
-            endTime = ?,
-            finalCashDrawer = ?,
-            expectedCashDrawer = ?,
-            notes = COALESCE(notes || '; ', '') || ?
-          WHERE id = ?
-        `);
-
-        updateStmt.run(
-          nowString,
-          estimatedCash,
-          estimatedCash,
-          closeReason,
-          shift.id
-        );
-
-        closedCount++;
-        console.log(`Auto-closed shift ${shift.id}: ${closeReason}`);
-      }
-    }
-
-    return closedCount;
+    return this.shifts.autoCloseOldActiveShifts();
   }
 
-  // Check for shifts that should be auto-ended today (more aggressive than the 24-hour cleanup)
-  // This is called when someone tries to start a new shift or when checking active shifts
   autoEndOverdueShiftsToday(): number {
-    const now = new Date();
-    const nowString = now.toISOString();
-
-    const activeShiftsStmt = this.db.prepare(`
-      SELECT s.*, sch.endTime as scheduledEndTime 
-      FROM shifts s
-      LEFT JOIN schedules sch ON s.scheduleId = sch.id
-      WHERE s.status = 'active'
-        AND DATE(s.startTime) = DATE(?)
-    `);
-    const activeShifts = activeShiftsStmt.all(nowString);
-
-    let closedCount = 0;
-
-    for (const shift of activeShifts) {
-      let shouldClose = false;
-      let closeReason = "";
-
-      if (shift.scheduledEndTime) {
-        const scheduledEnd = new Date(shift.scheduledEndTime);
-        const hoursOverdue =
-          (now.getTime() - scheduledEnd.getTime()) / (1000 * 60 * 60);
-
-        // More aggressive: Close shifts that are 2+ hours past scheduled end time
-        if (hoursOverdue > 2) {
-          shouldClose = true;
-          closeReason = `Auto-closed - shift was ${Math.round(
-            hoursOverdue
-          )} hours past scheduled end time`;
-        }
-      } else {
-        // No schedule - close if active for more than 12 hours
-        const shiftStart = new Date(shift.startTime);
-        const hoursActive =
-          (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60);
-        if (hoursActive > 12) {
-          shouldClose = true;
-          closeReason = `Auto-closed - shift was active for ${Math.round(
-            hoursActive
-          )} hours without schedule`;
-        }
-      }
-
-      if (shouldClose) {
-        const estimatedCash = shift.startingCash + (shift.totalSales || 0);
-
-        const updateStmt = this.db.prepare(`
-          UPDATE shifts 
-          SET 
-            status = 'ended',
-            endTime = ?,
-            finalCashDrawer = ?,
-            expectedCashDrawer = ?,
-            notes = COALESCE(notes || '; ', '') || ?
-          WHERE id = ?
-        `);
-
-        updateStmt.run(
-          nowString,
-          estimatedCash,
-          estimatedCash,
-          closeReason,
-          shift.id
-        );
-
-        closedCount++;
-        console.log(`Auto-ended overdue shift ${shift.id}: ${closeReason}`);
-      }
-    }
-
-    return closedCount;
+    return this.shifts.autoEndOverdueShiftsToday();
   }
 
   endShift(
@@ -3803,44 +1559,11 @@ export class DatabaseManager {
       notes?: string;
     }
   ): void {
-    const cashVariance = endData.finalCashDrawer - endData.expectedCashDrawer;
-
-    const stmt = this.db.prepare(`
-      UPDATE shifts SET 
-        endTime = ?, 
-        status = 'ended',
-        finalCashDrawer = ?,
-        expectedCashDrawer = ?,
-        cashVariance = ?,
-        totalSales = ?,
-        totalTransactions = ?,
-        totalRefunds = ?,
-        totalVoids = ?,
-        notes = ?,
-        updatedAt = ?
-      WHERE id = ?
-    `);
-
-    stmt.run(
-      endData.endTime,
-      endData.finalCashDrawer,
-      endData.expectedCashDrawer,
-      cashVariance,
-      endData.totalSales,
-      endData.totalTransactions,
-      endData.totalRefunds,
-      endData.totalVoids,
-      endData.notes || null,
-      new Date().toISOString(),
-      shiftId
-    );
+    return this.shifts.endShift(shiftId, endData);
   }
 
   getShiftsByBusinessId(businessId: string): Shift[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM shifts WHERE businessId = ? ORDER BY startTime DESC
-    `);
-    return stmt.all(businessId) as Shift[];
+    return this.shifts.getShiftsByBusiness(businessId);
   }
 
   getHourlyTransactionStats(shiftId: string): {
@@ -3848,322 +1571,17 @@ export class DatabaseManager {
     currentHour: number;
     averagePerHour: number;
   } {
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    const currentHourStart = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      now.getHours(),
-      0,
-      0
-    );
-
-    // Get transactions from the last hour
-    const lastHourStmt = this.db.prepare(`
-      SELECT COUNT(*) as count FROM transactions 
-      WHERE shiftId = ? 
-        AND timestamp >= ? 
-        AND timestamp <= ?
-        AND status = 'completed'
-    `);
-    const lastHourResult = lastHourStmt.get(
-      shiftId,
-      oneHourAgo.toISOString(),
-      now.toISOString()
-    ) as { count: number };
-
-    // Get transactions from current hour
-    const currentHourStmt = this.db.prepare(`
-      SELECT COUNT(*) as count FROM transactions 
-      WHERE shiftId = ? 
-        AND timestamp >= ?
-        AND status = 'completed'
-    `);
-    const currentHourResult = currentHourStmt.get(
-      shiftId,
-      currentHourStart.toISOString()
-    ) as { count: number };
-
-    // Get shift start time for average calculation
-    const shiftStmt = this.db.prepare(
-      `SELECT startTime FROM shifts WHERE id = ?`
-    );
-    const shift = shiftStmt.get(shiftId) as { startTime: string } | undefined;
-
-    let averagePerHour = 0;
-    if (shift) {
-      const shiftStart = new Date(shift.startTime);
-      const hoursWorked = Math.max(
-        (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60),
-        0.1
-      ); // Minimum 0.1 hour to avoid division by zero
-
-      const totalTransactionsStmt = this.db.prepare(`
-        SELECT COUNT(*) as count FROM transactions 
-        WHERE shiftId = ? AND status = 'completed'
-      `);
-      const totalResult = totalTransactionsStmt.get(shiftId) as {
-        count: number;
-      };
-      averagePerHour = totalResult.count / hoursWorked;
-    }
-
-    return {
-      lastHour: lastHourResult.count,
-      currentHour: currentHourResult.count,
-      averagePerHour: Math.round(averagePerHour * 10) / 10, // Round to 1 decimal place
-    };
+    return this.shifts.getHourlyTransactionStats(shiftId);
   }
 
   getShiftById(shiftId: string): Shift | null {
-    const stmt = this.db.prepare("SELECT * FROM shifts WHERE id = ?");
-    return (stmt.get(shiftId) as Shift) || null;
-  }
-
-  // ============================================
-  // DRIZZLE ORM SHIFT METHODS
-  // ============================================
-
-  /**
-   * Get shift by ID using Drizzle ORM (type-safe)
-   * Alternative to getShiftById() above
-   */
-  async getShiftByIdDrizzle(shiftId: string): Promise<Shift | null> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [shift] = await drizzle
-      .select()
-      .from(schema.shifts)
-      .where(eq(schema.shifts.id, shiftId))
-      .limit(1);
-
-    if (!shift) return null;
-
-    return {
-      ...shift,
-      scheduleId: shift.scheduleId ?? undefined,
-      endTime: shift.endTime ?? undefined,
-      finalCashDrawer: shift.finalCashDrawer ?? undefined,
-      expectedCashDrawer: shift.expectedCashDrawer ?? undefined,
-      cashVariance: shift.cashVariance ?? undefined,
-      notes: shift.notes ?? undefined,
-    } as Shift;
-  }
-
-  /**
-   * Get active shift by cashier using Drizzle ORM (type-safe)
-   * Alternative to getActiveShiftByCashier() above
-   */
-  async getActiveShiftByCashierDrizzle(
-    cashierId: string
-  ): Promise<Shift | null> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [shift] = await drizzle
-      .select()
-      .from(schema.shifts)
-      .where(
-        and(
-          eq(schema.shifts.cashierId, cashierId),
-          eq(schema.shifts.status, "active")
-        )
-      )
-      .orderBy(desc(schema.shifts.startTime))
-      .limit(1);
-
-    if (!shift) return null;
-
-    return {
-      ...shift,
-      scheduleId: shift.scheduleId ?? undefined,
-      endTime: shift.endTime ?? undefined,
-      finalCashDrawer: shift.finalCashDrawer ?? undefined,
-      expectedCashDrawer: shift.expectedCashDrawer ?? undefined,
-      cashVariance: shift.cashVariance ?? undefined,
-      notes: shift.notes ?? undefined,
-    } as Shift;
-  }
-
-  /**
-   * Get shifts by business using Drizzle ORM (type-safe)
-   * Alternative to getShiftsByBusinessId() above
-   */
-  async getShiftsByBusinessDrizzle(businessId: string): Promise<Shift[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const shifts = await drizzle
-      .select()
-      .from(schema.shifts)
-      .where(eq(schema.shifts.businessId, businessId))
-      .orderBy(desc(schema.shifts.startTime));
-
-    return shifts.map((shift) => ({
-      ...shift,
-      scheduleId: shift.scheduleId ?? undefined,
-      endTime: shift.endTime ?? undefined,
-      finalCashDrawer: shift.finalCashDrawer ?? undefined,
-      expectedCashDrawer: shift.expectedCashDrawer ?? undefined,
-      cashVariance: shift.cashVariance ?? undefined,
-      notes: shift.notes ?? undefined,
-    })) as Shift[];
-  }
-
-  /**
-   * Get shifts by date range using Drizzle ORM (type-safe)
-   * NEW method - date range filtering
-   */
-  async getShiftsByDateRangeDrizzle(
-    businessId: string,
-    startDate: string,
-    endDate: string
-  ): Promise<Shift[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const shifts = await drizzle
-      .select()
-      .from(schema.shifts)
-      .where(
-        and(
-          eq(schema.shifts.businessId, businessId),
-          drizzleSql`${schema.shifts.startTime} >= ${startDate}`,
-          drizzleSql`${schema.shifts.startTime} <= ${endDate}`
-        )
-      )
-      .orderBy(desc(schema.shifts.startTime));
-
-    return shifts.map((shift) => ({
-      ...shift,
-      scheduleId: shift.scheduleId ?? undefined,
-      endTime: shift.endTime ?? undefined,
-      finalCashDrawer: shift.finalCashDrawer ?? undefined,
-      expectedCashDrawer: shift.expectedCashDrawer ?? undefined,
-      cashVariance: shift.cashVariance ?? undefined,
-      notes: shift.notes ?? undefined,
-    })) as Shift[];
-  }
-
-  /**
-   * Get shift statistics using Drizzle ORM (type-safe)
-   * NEW method - shift analytics
-   */
-  async getShiftStatsDrizzle(shiftId: string) {
-    const drizzle = this.getDrizzleInstance();
-
-    // Get shift details
-    const [shift] = await drizzle
-      .select()
-      .from(schema.shifts)
-      .where(eq(schema.shifts.id, shiftId))
-      .limit(1);
-
-    if (!shift) return null;
-
-    // Get transaction count and totals
-    const stats = await drizzle
-      .select({
-        transactionCount: drizzleSql<number>`COUNT(*)`,
-        totalSales: drizzleSql<number>`COALESCE(SUM(${schema.transactions.total}), 0)`,
-        cashSales: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${schema.transactions.paymentMethod} = 'cash' THEN ${schema.transactions.total} ELSE 0 END), 0)`,
-        cardSales: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${schema.transactions.paymentMethod} = 'card' THEN ${schema.transactions.total} ELSE 0 END), 0)`,
-      })
-      .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.shiftId, shiftId),
-          eq(schema.transactions.status, "completed")
-        )
-      );
-
-    return {
-      shift,
-      stats: stats[0],
-    };
-  }
-
-  /**
-   * Create shift (Drizzle)
-   * NEW method - replaces createShift()
-   */
-  createShiftDrizzle(
-    shift: Omit<Shift, "id" | "createdAt" | "updatedAt">
-  ): Shift {
-    const db = this.getDrizzleInstance();
-    const id = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    db.insert(schema.shifts)
-      .values({
-        id,
-        scheduleId: shift.scheduleId ?? null,
-        cashierId: shift.cashierId,
-        businessId: shift.businessId,
-        startTime: shift.startTime,
-        endTime: shift.endTime ?? null,
-        status: shift.status,
-        startingCash: shift.startingCash,
-        finalCashDrawer: shift.finalCashDrawer ?? null,
-        expectedCashDrawer: shift.expectedCashDrawer ?? null,
-        cashVariance: shift.cashVariance ?? null,
-        totalSales: shift.totalSales ?? 0,
-        totalTransactions: shift.totalTransactions ?? 0,
-        totalRefunds: shift.totalRefunds ?? 0,
-        totalVoids: shift.totalVoids ?? 0,
-        notes: shift.notes ?? null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-
-    return {
-      ...shift,
-      id,
-      createdAt: now,
-      updatedAt: now,
-    };
-  }
-
-  /**
-   * End shift (Drizzle)
-   * Updates shift with final calculations
-   * NEW method - replaces endShift()
-   */
-  endShiftDrizzle(
-    shiftId: string,
-    endData: {
-      endTime: string;
-      finalCashDrawer: number;
-      expectedCashDrawer: number;
-      totalSales: number;
-      totalTransactions: number;
-      totalRefunds: number;
-      totalVoids: number;
-      notes?: string;
+    try {
+      return this.shifts.getShiftById(shiftId);
+    } catch {
+      return null;
     }
-  ): void {
-    const db = this.getDrizzleInstance();
-    const cashVariance = endData.finalCashDrawer - endData.expectedCashDrawer;
-    const now = new Date().toISOString();
-
-    db.update(schema.shifts)
-      .set({
-        endTime: endData.endTime,
-        status: "ended",
-        finalCashDrawer: endData.finalCashDrawer,
-        expectedCashDrawer: endData.expectedCashDrawer,
-        cashVariance,
-        totalSales: endData.totalSales,
-        totalTransactions: endData.totalTransactions,
-        totalRefunds: endData.totalRefunds,
-        totalVoids: endData.totalVoids,
-        notes: endData.notes ?? null,
-        updatedAt: now,
-      })
-      .where(eq(schema.shifts.id, shiftId))
-      .run();
   }
 
-  // Shift reconciliation methods for auto-ended shifts
   reconcileShift(
     shiftId: string,
     reconciliationData: {
@@ -4172,197 +1590,59 @@ export class DatabaseManager {
       managerId: string;
     }
   ): void {
-    const stmt = this.db.prepare(`
-      UPDATE shifts 
-      SET 
-        finalCashDrawer = ?,
-        notes = CASE 
-          WHEN notes IS NULL THEN ?
-          ELSE notes || ' | Manager Reconciliation: ' || ?
-        END,
-        updatedAt = ?
-      WHERE id = ?
-    `);
-
-    const reconciliationNote = `Reconciled by manager. Actual cash: £${reconciliationData.actualCashDrawer.toFixed(
-      2
-    )}. ${reconciliationData.managerNotes}`;
-
-    stmt.run(
-      reconciliationData.actualCashDrawer,
-      reconciliationNote,
-      reconciliationNote,
-      new Date().toISOString(),
-      shiftId
-    );
+    return this.shifts.reconcileShift(shiftId, reconciliationData);
   }
 
   getPendingReconciliationShifts(businessId: string): Shift[] {
-    const stmt = this.db.prepare(`
-      SELECT * FROM shifts 
-      WHERE businessId = ? 
-        AND status = 'ended'
-        AND notes LIKE '%Auto-ended%'
-        AND notes LIKE '%Requires manager approval%'
-      ORDER BY endTime DESC
-    `);
-    return stmt.all(businessId) as Shift[];
+    return this.shifts.getPendingReconciliationShifts(businessId);
   }
 
-  // Transaction Management Methods
-  createTransaction(
+  // Transaction Management Methods - Delegate to TransactionManager
+  async createTransaction(
     transaction: Omit<Transaction, "id" | "createdAt">
-  ): Transaction {
-    const id = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    const stmt = this.db.prepare(`
-      INSERT INTO transactions (
-        id, shiftId, businessId, type, subtotal, tax, total, 
-        paymentMethod, cashAmount, cardAmount, status, voidReason, 
-        customerId, receiptNumber, timestamp, createdAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      id,
-      transaction.shiftId,
-      transaction.businessId,
-      transaction.type,
-      transaction.subtotal,
-      transaction.tax,
-      transaction.total,
-      transaction.paymentMethod,
-      transaction.cashAmount || null,
-      transaction.cardAmount || null,
-      transaction.status,
-      transaction.voidReason || null,
-      transaction.customerId || null,
-      transaction.receiptNumber,
-      transaction.timestamp,
-      now
-    );
-
-    // Create transaction items
-    if (transaction.items && transaction.items.length > 0) {
-      for (const item of transaction.items) {
-        this.createTransactionItem(id, item);
-      }
-    }
-
-    return {
-      ...transaction,
-      id,
-      createdAt: now,
-    };
+  ): Promise<Transaction> {
+    return this.transactions.createTransaction(transaction);
   }
 
-  createTransactionItem(
+  async createTransactionItem(
     transactionId: string,
-    item: Omit<TransactionItem, "id">
-  ): void {
-    const itemId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    const stmt = this.db.prepare(`
-      INSERT INTO transaction_items (
-        id, transactionId, productId, productName, quantity, unitPrice, totalPrice, createdAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      itemId,
-      transactionId,
-      item.productId,
-      item.productName,
-      item.quantity,
-      item.unitPrice,
-      item.totalPrice,
-      now
-    );
-
-    // Create applied modifiers if any
-    if (item.appliedModifiers && item.appliedModifiers.length > 0) {
-      for (const modifier of item.appliedModifiers) {
-        this.createAppliedModifier(itemId, modifier);
-      }
-    }
+    item: Omit<TransactionItem, "id" | "createdAt">
+  ): Promise<string> {
+    return this.transactions.createTransactionItem(transactionId, item);
   }
 
-  createAppliedModifier(
+  async createAppliedModifier(
     transactionItemId: string,
-    modifier: AppliedModifier
-  ): void {
-    const id = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    const stmt = this.db.prepare(`
-      INSERT INTO applied_modifiers (
-        id, transactionItemId, modifierId, modifierName, optionId, optionName, price, createdAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      id,
-      transactionItemId,
-      modifier.modifierId,
-      modifier.modifierName,
-      modifier.optionId,
-      modifier.optionName,
-      modifier.price,
-      now
-    );
+    modifier: Omit<AppliedModifier, "id" | "createdAt">
+  ): Promise<void> {
+    return this.transactions.createAppliedModifier(transactionItemId, modifier);
   }
 
-  getTransactionsByShiftId(shiftId: string): Transaction[] {
-    // Get transactions
-    const transactionStmt = this.db.prepare(`
-      SELECT * FROM transactions WHERE shiftId = ? ORDER BY timestamp DESC
-    `);
-    const transactions = transactionStmt.all(shiftId) as Transaction[];
-
-    // Get items and modifiers for each transaction
-    for (const transaction of transactions) {
-      transaction.items = this.getTransactionItems(transaction.id);
-    }
-
-    return transactions;
+  async getTransactionsByShiftId(shiftId: string): Promise<Transaction[]> {
+    return this.transactions.getTransactionsByShift(shiftId);
   }
 
-  getTransactionItems(transactionId: string): TransactionItem[] {
-    const itemsStmt = this.db.prepare(`
-      SELECT * FROM transaction_items WHERE transactionId = ?
-    `);
-    const items = itemsStmt.all(transactionId) as TransactionItem[];
-
-    // Get applied modifiers for each item
-    for (const item of items) {
-      const modifiersStmt = this.db.prepare(`
-        SELECT * FROM applied_modifiers WHERE transactionItemId = ?
-      `);
-      item.appliedModifiers = modifiersStmt.all(item.id) as AppliedModifier[];
-    }
-
-    return items;
+  async getTransactionItems(transactionId: string): Promise<TransactionItem[]> {
+    return this.transactions.getTransactionItems(transactionId);
   }
 
-  voidTransaction(voidData: {
+  async voidTransaction(voidData: {
     transactionId: string;
     cashierId: string;
     reason: string;
     managerApprovalId?: string;
-  }): {
+  }): Promise<{
     success: boolean;
     message: string;
-  } {
-    const transaction = this.db.transaction(() => {
+  }> {
+    try {
       console.log(
         "Database: Starting void transaction for ID:",
         voidData.transactionId
       );
 
       // Get original transaction
-      const originalTransaction = this.getTransactionByIdAnyStatus(
+      const originalTransaction = await this.getTransactionByIdAnyStatus(
         voidData.transactionId
       );
       console.log("Database: Original transaction:", originalTransaction);
@@ -4450,12 +1730,6 @@ export class DatabaseManager {
         now_iso
       );
 
-      return voidData.transactionId;
-    });
-
-    try {
-      console.log("Database: Executing void transaction...");
-      transaction();
       console.log("Database: Void transaction completed successfully");
       return {
         success: true,
@@ -4600,107 +1874,43 @@ export class DatabaseManager {
     }
   }
 
-  // Refund Transaction Methods
-  getTransactionById(transactionId: string): Transaction | null {
-    const transactionStmt = this.db.prepare(`
-      SELECT * FROM transactions WHERE id = ? AND status = 'completed'
-    `);
-    const transaction = transactionStmt.get(transactionId) as
-      | Transaction
-      | undefined;
-
-    if (!transaction) return null;
-
-    // Get items for the transaction
-    transaction.items = this.getTransactionItems(transaction.id);
-    return transaction;
+  // Refund Transaction Methods - Delegate to TransactionManager
+  async getTransactionById(transactionId: string): Promise<Transaction | null> {
+    return this.transactions.getTransactionById(transactionId);
   }
 
-  // Get transaction by ID regardless of status (used for void operations)
-  getTransactionByIdAnyStatus(transactionId: string): Transaction | null {
-    const transactionStmt = this.db.prepare(`
-      SELECT * FROM transactions WHERE id = ?
-    `);
-    const transaction = transactionStmt.get(transactionId) as
-      | Transaction
-      | undefined;
-
-    if (!transaction) return null;
-
-    // Get items for the transaction
-    transaction.items = this.getTransactionItems(transaction.id);
-    return transaction;
+  async getTransactionByIdAnyStatus(
+    transactionId: string
+  ): Promise<Transaction | null> {
+    return this.transactions.getTransactionByIdAnyStatus(transactionId);
   }
 
-  getTransactionByReceiptNumber(receiptNumber: string): Transaction | null {
-    const transactionStmt = this.db.prepare(`
-      SELECT * FROM transactions WHERE receiptNumber = ? AND status = 'completed' ORDER BY timestamp DESC LIMIT 1
-    `);
-    const transaction = transactionStmt.get(receiptNumber) as
-      | Transaction
-      | undefined;
-
-    if (!transaction) return null;
-
-    // Get items for the transaction
-    transaction.items = this.getTransactionItems(transaction.id);
-    return transaction;
-  }
-
-  // Get transaction by receipt number regardless of status (used for void operations)
-  getTransactionByReceiptNumberAnyStatus(
+  async getTransactionByReceiptNumber(
     receiptNumber: string
-  ): Transaction | null {
-    const transactionStmt = this.db.prepare(`
-      SELECT * FROM transactions WHERE receiptNumber = ? ORDER BY timestamp DESC LIMIT 1
-    `);
-    const transaction = transactionStmt.get(receiptNumber) as
-      | Transaction
-      | undefined;
-
-    if (!transaction) return null;
-
-    // Get items for the transaction
-    transaction.items = this.getTransactionItems(transaction.id);
-    return transaction;
+  ): Promise<Transaction | null> {
+    return this.transactions.getTransactionByReceiptNumber(receiptNumber);
   }
 
-  getRecentTransactions(businessId: string, limit: number = 50): Transaction[] {
-    const transactionStmt = this.db.prepare(`
-      SELECT * FROM transactions 
-      WHERE businessId = ? AND status = 'completed'
-      ORDER BY timestamp DESC 
-      LIMIT ?
-    `);
-    const transactions = transactionStmt.all(
-      businessId,
-      limit
-    ) as Transaction[];
-
-    // Get items for each transaction
-    for (const transaction of transactions) {
-      transaction.items = this.getTransactionItems(transaction.id);
-    }
-
-    return transactions;
+  async getTransactionByReceiptNumberAnyStatus(
+    receiptNumber: string
+  ): Promise<Transaction | null> {
+    return this.transactions.getTransactionByReceiptNumberAnyStatus(
+      receiptNumber
+    );
   }
 
-  // Get transactions for current shift only
-  getShiftTransactions(shiftId: string, limit: number = 50): Transaction[] {
-    const transactionStmt = this.db.prepare(`
-      SELECT * FROM transactions 
-      WHERE shiftId = ? AND status = 'completed'
-      ORDER BY timestamp DESC 
-      LIMIT ?
-    `);
-    const transactions = transactionStmt.all(shiftId, limit) as Transaction[];
+  async getRecentTransactions(
+    businessId: string,
+    limit: number = 50
+  ): Promise<Transaction[]> {
+    return this.transactions.getRecentTransactions(businessId, limit);
+  }
 
-    // Get items for each transaction
-    for (const transaction of transactions) {
-      transaction.items = this.getTransactionItems(transaction.id);
-    }
-
-    return transactions;
+  async getShiftTransactions(
+    shiftId: string,
+    limit: number = 50
+  ): Promise<Transaction[]> {
+    return this.transactions.getShiftTransactions(shiftId, limit);
   }
 
   // ============================================
@@ -4730,7 +1940,7 @@ export class DatabaseManager {
     if (!transaction) return null;
 
     // Get items separately (raw SQL for now as items need complex handling)
-    const items = this.getTransactionItems(transaction.id);
+    const items = await this.getTransactionItems(transaction.id);
 
     return {
       ...transaction,
@@ -4764,13 +1974,15 @@ export class DatabaseManager {
       .limit(limit);
 
     // Get items for each transaction
-    const transactionsWithItems = transactions.map((transaction) => ({
-      ...transaction,
-      items: this.getTransactionItems(transaction.id),
-      appliedDiscounts: transaction.appliedDiscounts
-        ? JSON.parse(transaction.appliedDiscounts)
-        : undefined,
-    }));
+    const transactionsWithItems = await Promise.all(
+      transactions.map(async (transaction) => ({
+        ...transaction,
+        items: await this.getTransactionItems(transaction.id),
+        appliedDiscounts: transaction.appliedDiscounts
+          ? JSON.parse(transaction.appliedDiscounts)
+          : undefined,
+      }))
+    );
 
     return transactionsWithItems as Transaction[];
   }
@@ -4798,13 +2010,15 @@ export class DatabaseManager {
       .limit(limit);
 
     // Get items for each transaction
-    const transactionsWithItems = transactions.map((transaction) => ({
-      ...transaction,
-      items: this.getTransactionItems(transaction.id),
-      appliedDiscounts: transaction.appliedDiscounts
-        ? JSON.parse(transaction.appliedDiscounts)
-        : undefined,
-    }));
+    const transactionsWithItems = await Promise.all(
+      transactions.map(async (transaction) => ({
+        ...transaction,
+        items: await this.getTransactionItems(transaction.id),
+        appliedDiscounts: transaction.appliedDiscounts
+          ? JSON.parse(transaction.appliedDiscounts)
+          : undefined,
+      }))
+    );
 
     return transactionsWithItems as Transaction[];
   }
@@ -4872,13 +2086,15 @@ export class DatabaseManager {
       .orderBy(desc(schema.transactions.timestamp))
       .limit(limit);
 
-    const transactionsWithItems = transactions.map((transaction) => ({
-      ...transaction,
-      items: this.getTransactionItems(transaction.id),
-      appliedDiscounts: transaction.appliedDiscounts
-        ? JSON.parse(transaction.appliedDiscounts)
-        : undefined,
-    }));
+    const transactionsWithItems = await Promise.all(
+      transactions.map(async (transaction) => ({
+        ...transaction,
+        items: await this.getTransactionItems(transaction.id),
+        appliedDiscounts: transaction.appliedDiscounts
+          ? JSON.parse(transaction.appliedDiscounts)
+          : undefined,
+      }))
+    );
 
     return transactionsWithItems as Transaction[];
   }
@@ -4887,9 +2103,9 @@ export class DatabaseManager {
    * Get transaction by receipt number (Drizzle)
    * NEW method - receipt lookup
    */
-  getTransactionByReceiptNumberDrizzle(
+  async getTransactionByReceiptNumberDrizzle(
     receiptNumber: string
-  ): Transaction | null {
+  ): Promise<Transaction | null> {
     const db = this.getDrizzleInstance();
 
     const transaction = db
@@ -4909,7 +2125,7 @@ export class DatabaseManager {
 
     return {
       ...transaction,
-      items: this.getTransactionItems(transaction.id),
+      items: await this.getTransactionItems(transaction.id),
       appliedDiscounts: transaction.appliedDiscounts
         ? JSON.parse(transaction.appliedDiscounts)
         : undefined,
@@ -4920,9 +2136,9 @@ export class DatabaseManager {
    * Get transaction by receipt number (any status) - Drizzle
    * NEW method - receipt lookup for voids
    */
-  getTransactionByReceiptNumberAnyStatusDrizzle(
+  async getTransactionByReceiptNumberAnyStatusDrizzle(
     receiptNumber: string
-  ): Transaction | null {
+  ): Promise<Transaction | null> {
     const db = this.getDrizzleInstance();
 
     const transaction = db
@@ -4937,7 +2153,7 @@ export class DatabaseManager {
 
     return {
       ...transaction,
-      items: this.getTransactionItems(transaction.id),
+      items: await this.getTransactionItems(transaction.id),
       appliedDiscounts: transaction.appliedDiscounts
         ? JSON.parse(transaction.appliedDiscounts)
         : undefined,
@@ -5167,45 +2383,47 @@ export class DatabaseManager {
     refundMethod: "original" | "store_credit" | "cash" | "card";
     managerApprovalId?: string;
     cashierId: string;
-  }): Transaction {
-    // Get original transaction to validate refund
-    const originalTransaction = this.getTransactionById(
-      refundData.originalTransactionId
-    );
-    if (!originalTransaction) {
-      throw new Error("Original transaction not found");
-    }
+  }): Promise<Transaction> {
+    return (async () => {
+      // Get original transaction to validate refund
+      const originalTransaction = await this.getTransactionById(
+        refundData.originalTransactionId
+      );
+      if (!originalTransaction) {
+        throw new Error("Original transaction not found");
+      }
 
-    // Calculate refund totals
-    const refundSubtotal = refundData.refundItems.reduce(
-      (sum, item) => sum + item.refundAmount,
-      0
-    );
-    const refundTax =
-      refundSubtotal * (originalTransaction.tax / originalTransaction.subtotal); // Proportional tax
-    const refundTotal = refundSubtotal + refundTax;
+      // Calculate refund totals
+      const refundSubtotal = refundData.refundItems.reduce(
+        (sum, item) => sum + item.refundAmount,
+        0
+      );
+      const refundTax =
+        refundSubtotal *
+        (originalTransaction.tax / originalTransaction.subtotal); // Proportional tax
+      const refundTotal = refundSubtotal + refundTax;
 
-    // Create refund transaction
-    const refundId = this.uuid.v4();
-    const receiptNumber = `REF-${Date.now()}`;
-    const now = new Date().toISOString();
+      // Create refund transaction
+      const refundId = this.uuid.v4();
+      const receiptNumber = `REF-${Date.now()}`;
+      const now = new Date().toISOString();
 
-    // Determine payment method for refund
-    let paymentMethod: "cash" | "card" | "mixed";
-    if (refundData.refundMethod === "original") {
-      paymentMethod = originalTransaction.paymentMethod;
-    } else if (refundData.refundMethod === "cash") {
-      paymentMethod = "cash";
-    } else if (refundData.refundMethod === "card") {
-      paymentMethod = "card";
-    } else {
-      // For store credit, we'll treat it as cash for now
-      paymentMethod = "cash";
-    }
+      // Determine payment method for refund
+      let paymentMethod: "cash" | "card" | "mixed";
+      if (refundData.refundMethod === "original") {
+        paymentMethod = originalTransaction.paymentMethod;
+      } else if (refundData.refundMethod === "cash") {
+        paymentMethod = "cash";
+      } else if (refundData.refundMethod === "card") {
+        paymentMethod = "card";
+      } else {
+        // For store credit, we'll treat it as cash for now
+        paymentMethod = "cash";
+      }
 
-    const refundTransaction = this.db.transaction(() => {
-      // Create the refund transaction record
-      const transactionStmt = this.db.prepare(`
+      const refundTransaction = this.db.transaction(() => {
+        // Create the refund transaction record
+        const transactionStmt = this.db.prepare(`
         INSERT INTO transactions (
           id, shiftId, businessId, type, subtotal, tax, total, 
           paymentMethod, cashAmount, cardAmount, status, 
@@ -5214,106 +2432,111 @@ export class DatabaseManager {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      const isPartialRefund =
-        refundData.refundItems.length < originalTransaction.items.length ||
-        refundData.refundItems.some((refundItem) => {
-          const originalItem = originalTransaction.items.find(
-            (item) => item.id === refundItem.originalItemId
-          );
-          return (
-            originalItem && refundItem.refundQuantity < originalItem.quantity
-          );
-        });
+        const isPartialRefund =
+          refundData.refundItems.length < originalTransaction.items.length ||
+          refundData.refundItems.some((refundItem) => {
+            const originalItem = originalTransaction.items.find(
+              (item) => item.id === refundItem.originalItemId
+            );
+            return (
+              originalItem && refundItem.refundQuantity < originalItem.quantity
+            );
+          });
 
-      transactionStmt.run(
-        refundId,
-        refundData.shiftId,
-        refundData.businessId,
-        "refund",
-        -refundSubtotal, // Negative for refund
-        -refundTax,
-        -refundTotal,
-        paymentMethod,
-        paymentMethod === "cash" ? -refundTotal : null,
-        paymentMethod === "card" ? -refundTotal : null,
-        "completed",
-        receiptNumber,
-        now,
-        now,
-        refundData.originalTransactionId,
-        refundData.refundReason,
-        refundData.refundMethod,
-        refundData.managerApprovalId || null,
-        isPartialRefund ? 1 : 0
-      );
+        transactionStmt.run(
+          refundId,
+          refundData.shiftId,
+          refundData.businessId,
+          "refund",
+          -refundSubtotal, // Negative for refund
+          -refundTax,
+          -refundTotal,
+          paymentMethod,
+          paymentMethod === "cash" ? -refundTotal : null,
+          paymentMethod === "card" ? -refundTotal : null,
+          "completed",
+          receiptNumber,
+          now,
+          now,
+          refundData.originalTransactionId,
+          refundData.refundReason,
+          refundData.refundMethod,
+          refundData.managerApprovalId || null,
+          isPartialRefund ? 1 : 0
+        );
 
-      // Create refund transaction items
-      for (const refundItem of refundData.refundItems) {
-        const itemId = this.uuid.v4();
-        const itemStmt = this.db.prepare(`
+        // Create refund transaction items
+        for (const refundItem of refundData.refundItems) {
+          const itemId = this.uuid.v4();
+          const itemStmt = this.db.prepare(`
           INSERT INTO transaction_items (
             id, transactionId, productId, productName, quantity, 
             unitPrice, totalPrice, createdAt
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
-        itemStmt.run(
-          itemId,
-          refundId,
-          refundItem.productId,
-          refundItem.productName,
-          -refundItem.refundQuantity, // Negative for refund
-          refundItem.unitPrice,
-          -refundItem.refundAmount,
-          now
-        );
+          itemStmt.run(
+            itemId,
+            refundId,
+            refundItem.productId,
+            refundItem.productName,
+            -refundItem.refundQuantity, // Negative for refund
+            refundItem.unitPrice,
+            -refundItem.refundAmount,
+            now
+          );
 
-        // Update original item's refunded quantity
-        const updateOriginalStmt = this.db.prepare(`
+          // Update original item's refunded quantity
+          const updateOriginalStmt = this.db.prepare(`
           UPDATE transaction_items 
           SET refundedQuantity = COALESCE(refundedQuantity, 0) + ?
           WHERE id = ?
         `);
-        updateOriginalStmt.run(
-          refundItem.refundQuantity,
-          refundItem.originalItemId
-        );
+          updateOriginalStmt.run(
+            refundItem.refundQuantity,
+            refundItem.originalItemId
+          );
 
-        // Update inventory if item is restockable
-        if (refundItem.restockable) {
-          const updateInventoryStmt = this.db.prepare(`
+          // Update inventory if item is restockable
+          if (refundItem.restockable) {
+            const updateInventoryStmt = this.db.prepare(`
             UPDATE products 
             SET stockLevel = stockLevel + ?, updatedAt = ?
             WHERE id = ?
           `);
-          updateInventoryStmt.run(
-            refundItem.refundQuantity,
-            now,
-            refundItem.productId
-          );
+            updateInventoryStmt.run(
+              refundItem.refundQuantity,
+              now,
+              refundItem.productId
+            );
+          }
         }
+
+        return refundId;
+      });
+
+      refundTransaction();
+
+      // Return the created refund transaction
+      const result = await this.getTransactionById(refundId);
+      if (!result) {
+        throw new Error("Failed to retrieve refund transaction");
       }
-
-      return refundId;
-    });
-
-    refundTransaction();
-
-    // Return the created refund transaction
-    return this.getTransactionById(refundId)!;
+      return result;
+    })();
   }
 
-  validateRefundEligibility(
+  async validateRefundEligibility(
     transactionId: string,
     refundItems: RefundItem[]
-  ): {
+  ): Promise<{
     isValid: boolean;
     errors: string[];
-  } {
+  }> {
     const errors: string[] = [];
 
     // Get original transaction
-    const originalTransaction = this.getTransactionById(transactionId);
+    const originalTransaction = await this.getTransactionById(transactionId);
     if (!originalTransaction) {
       errors.push("Original transaction not found");
       return { isValid: false, errors };
@@ -5514,16 +2737,16 @@ export class DatabaseManager {
     return createdTransaction;
   }
 
-  validateVoidEligibility(transactionId: string): {
+  async validateVoidEligibility(transactionId: string): Promise<{
     isValid: boolean;
     errors: string[];
     requiresManagerApproval: boolean;
-  } {
+  }> {
     const errors: string[] = [];
     let requiresManagerApproval = false;
 
     // Get transaction
-    const transaction = this.getTransactionByIdAnyStatus(transactionId);
+    const transaction = await this.getTransactionByIdAnyStatus(transactionId);
     if (!transaction) {
       errors.push("Transaction not found");
       return { isValid: false, errors, requiresManagerApproval: false };
@@ -6073,7 +3296,7 @@ export class DatabaseManager {
     const db = this.getDrizzleInstance();
 
     // Get shift data
-    const shift = await this.getShiftByIdDrizzle(shiftId);
+    const shift = this.shifts.getShiftById(shiftId);
     if (!shift) return null;
 
     // Get linked schedule if exists
@@ -6171,7 +3394,7 @@ export class DatabaseManager {
   }
 
   // Reporting Methods
-  generateShiftReport(shiftId: string): ShiftReport | null {
+  async generateShiftReport(shiftId: string): Promise<ShiftReport | null> {
     // Get shift data
     const shiftStmt = this.db.prepare(`SELECT * FROM shifts WHERE id = ?`);
     const shift = shiftStmt.get(shiftId) as Shift;
@@ -6188,7 +3411,7 @@ export class DatabaseManager {
     }
 
     // Get transactions
-    const transactions = this.getTransactionsByShiftId(shiftId);
+    const transactions = await this.getTransactionsByShiftId(shiftId);
 
     // Get cash drawer counts
     const cashDrawerCounts = this.getCashDrawerCountsByShiftId(shiftId);

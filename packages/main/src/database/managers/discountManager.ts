@@ -11,22 +11,12 @@ import { eq, and, desc, lte, gte, lt, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class DiscountManager {
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
   private uuid: any;
 
-  constructor(db: Database, drizzle: DrizzleDB, uuid: any) {
-    this.drizzle = drizzle;
+  constructor(drizzle: DrizzleDB, uuid: any) {
+    this.db = drizzle;
     this.uuid = uuid;
-  }
-
-  /**
-   * Get Drizzle ORM instance
-   */
-  private getDrizzleInstance(): DrizzleDB {
-    if (!this.drizzle) {
-      throw new Error("Drizzle ORM not initialized");
-    }
-    return this.drizzle;
   }
 
   /**
@@ -40,7 +30,6 @@ export class DiscountManager {
   ): Discount {
     const now = new Date().toISOString();
     const id = this.uuid.v4();
-    const drizzle = this.getDrizzleInstance();
 
     const discount: Discount = {
       id,
@@ -61,7 +50,7 @@ export class DiscountManager {
       ? JSON.stringify(discountData.daysOfWeek)
       : null;
 
-    drizzle
+    this.db
       .insert(schema.discounts)
       .values({
         id: discount.id,
@@ -110,7 +99,6 @@ export class DiscountManager {
     updates: Partial<Omit<Discount, "id" | "createdAt" | "usageCount">>
   ): void {
     const now = new Date().toISOString();
-    const drizzle = this.getDrizzleInstance();
 
     // Build update object, serializing arrays to JSON
     const updateData: any = { updatedAt: now };
@@ -140,7 +128,7 @@ export class DiscountManager {
 
     if (Object.keys(updateData).length === 1) return; // Only updatedAt
 
-    drizzle
+    this.db
       .update(schema.discounts)
       .set(updateData)
       .where(eq(schema.discounts.id, id))
@@ -151,16 +139,14 @@ export class DiscountManager {
    * Delete a discount
    */
   deleteDiscount(id: string): void {
-    const drizzle = this.getDrizzleInstance();
-    drizzle.delete(schema.discounts).where(eq(schema.discounts.id, id)).run();
+    this.db.delete(schema.discounts).where(eq(schema.discounts.id, id)).run();
   }
 
   /**
    * Get discount by ID
    */
   getDiscountById(id: string): Discount | null {
-    const drizzle = this.getDrizzleInstance();
-    const row = drizzle
+    const row = this.db
       .select()
       .from(schema.discounts)
       .where(eq(schema.discounts.id, id))
@@ -172,8 +158,7 @@ export class DiscountManager {
    * Get all discounts for a business
    */
   getDiscountsByBusiness(businessId: string): Discount[] {
-    const drizzle = this.getDrizzleInstance();
-    const rows = drizzle
+    const rows = this.db
       .select()
       .from(schema.discounts)
       .where(eq(schema.discounts.businessId, businessId))
@@ -182,7 +167,7 @@ export class DiscountManager {
         desc(schema.discounts.createdAt)
       )
       .all();
-    return rows.map((row) => this.deserializeDiscount(row));
+    return rows.map((row: any) => this.deserializeDiscount(row));
   }
 
   /**
@@ -190,9 +175,8 @@ export class DiscountManager {
    */
   getActiveDiscounts(businessId: string): Discount[] {
     const now = new Date().toISOString();
-    const drizzle = this.getDrizzleInstance();
 
-    const rows = drizzle
+    const rows = this.db
       .select()
       .from(schema.discounts)
       .where(
@@ -209,7 +193,7 @@ export class DiscountManager {
         desc(schema.discounts.createdAt)
       )
       .all();
-    return rows.map((row) => this.deserializeDiscount(row));
+    return rows.map((row: any) => this.deserializeDiscount(row));
   }
 
   /**
@@ -305,8 +289,7 @@ export class DiscountManager {
    * Increment usage count
    */
   incrementUsageCount(discountId: string): void {
-    const drizzle = this.getDrizzleInstance();
-    drizzle
+    this.db
       .update(schema.discounts)
       .set({
         usageCount: drizzleSql`${schema.discounts.usageCount} + 1`,
@@ -319,8 +302,7 @@ export class DiscountManager {
    * Validate coupon code
    */
   validateCouponCode(businessId: string, couponCode: string): Discount | null {
-    const drizzle = this.getDrizzleInstance();
-    const row = drizzle
+    const row = this.db
       .select()
       .from(schema.discounts)
       .where(

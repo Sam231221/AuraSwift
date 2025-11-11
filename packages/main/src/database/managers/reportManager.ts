@@ -3,22 +3,10 @@ import { eq, and, desc, asc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class ReportManager {
-  private db: any;
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
 
-  constructor(db: any, drizzle: DrizzleDB) {
-    this.db = db;
-    this.drizzle = drizzle;
-  }
-
-  /**
-   * Get Drizzle ORM instance
-   */
-  private getDrizzleInstance(): DrizzleDB {
-    if (!this.drizzle) {
-      throw new Error("Drizzle ORM not initialized");
-    }
-    return this.drizzle;
+  constructor(drizzle: DrizzleDB) {
+    this.db = drizzle;
   }
 
   // Report generation methods - to be implemented from database.ts
@@ -45,10 +33,8 @@ export class ReportManager {
     lastCountTime?: string;
     variance?: number;
   } {
-    const db = this.getDrizzleInstance();
-
     // Get shift details
-    const shift = db
+    const shift = this.db
       .select()
       .from(schema.shifts)
       .where(eq(schema.shifts.id, shiftId))
@@ -58,12 +44,14 @@ export class ReportManager {
       return { amount: 0, isEstimated: true };
     }
 
-    // Get the most recent cash count (using raw SQL method for now)
+    // Get the most recent cash count
     const latestCount = this.db
-      .prepare(
-        "SELECT * FROM cash_drawer_counts WHERE shiftId = ? ORDER BY timestamp DESC LIMIT 1"
-      )
-      .get(shiftId);
+      .select()
+      .from(schema.cashDrawerCounts)
+      .where(eq(schema.cashDrawerCounts.shiftId, shiftId))
+      .orderBy(desc(schema.cashDrawerCounts.timestamp))
+      .limit(1)
+      .get();
 
     if (latestCount) {
       // Use actual counted amount
@@ -100,10 +88,8 @@ export class ReportManager {
       cashVoids: number;
     };
   } {
-    const db = this.getDrizzleInstance();
-
     // Get shift details
-    const shift = db
+    const shift = this.db
       .select()
       .from(schema.shifts)
       .where(eq(schema.shifts.id, shiftId))
@@ -114,7 +100,7 @@ export class ReportManager {
     }
 
     // Calculate cash transactions using aggregation
-    const cashTransactions = db
+    const cashTransactions = this.db
       .select({
         type: schema.transactions.type,
         cashAmount: drizzleSql<number>`SUM(CASE 
@@ -171,10 +157,8 @@ export class ReportManager {
    * Complex reporting with aggregations and calculations
    */
   async generateShiftReportDrizzle(shiftId: string): Promise<any | null> {
-    const db = this.getDrizzleInstance();
-
     // Get shift data
-    const shift = db
+    const shift = this.db
       .select()
       .from(schema.shifts)
       .where(eq(schema.shifts.id, shiftId))
@@ -185,7 +169,7 @@ export class ReportManager {
     // Get linked schedule if exists
     let schedule: any = undefined;
     if (shift.scheduleId) {
-      const scheduleResult = db
+      const scheduleResult = this.db
         .select()
         .from(schema.schedules)
         .where(eq(schema.schedules.id, shift.scheduleId))
@@ -201,31 +185,35 @@ export class ReportManager {
     }
 
     // Get transactions
-    const allTransactions = db
+    const allTransactions = this.db
       .select()
       .from(schema.transactions)
       .where(eq(schema.transactions.shiftId, shiftId))
       .orderBy(desc(schema.transactions.timestamp))
       .all();
 
-    // Transform transactions with items (using raw SQL for now)
+    // Transform transactions with items
     const transactions = allTransactions.map((t: any) => ({
       ...t,
       items: this.db
-        .prepare("SELECT * FROM transaction_items WHERE transactionId = ?")
-        .all(t.id),
+        .select()
+        .from(schema.transactionItems)
+        .where(eq(schema.transactionItems.transactionId, t.id))
+        .all(),
       appliedDiscounts: t.appliedDiscounts
         ? JSON.parse(t.appliedDiscounts)
         : undefined,
     }));
 
-    // Get cash drawer counts (using raw SQL for now)
+    // Get cash drawer counts
     const cashDrawerCounts = this.db
-      .prepare("SELECT * FROM cash_drawer_counts WHERE shiftId = ?")
-      .all(shiftId);
+      .select()
+      .from(schema.cashDrawerCounts)
+      .where(eq(schema.cashDrawerCounts.shiftId, shiftId))
+      .all();
 
     // Calculate totals using aggregation
-    const salesStats = db
+    const salesStats = this.db
       .select({
         totalSales: drizzleSql<number>`COALESCE(SUM(CASE WHEN ${schema.transactions.type} = 'sale' AND ${schema.transactions.status} = 'completed' THEN ${schema.transactions.total} ELSE 0 END), 0)`,
         totalRefunds: drizzleSql<number>`COALESCE(ABS(SUM(CASE WHEN ${schema.transactions.type} = 'refund' AND ${schema.transactions.status} = 'completed' THEN ${schema.transactions.total} ELSE 0 END)), 0)`,

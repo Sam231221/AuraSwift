@@ -18,24 +18,12 @@ import {
 import * as schema from "../schema.js";
 
 export class TimeTrackingManager {
-  private db: any;
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
-    this.db = db;
-    this.drizzle = drizzle;
+  constructor(drizzle: DrizzleDB, uuid: any) {
+    this.db = drizzle;
     this.uuid = uuid;
-  }
-
-  /**
-   * Get Drizzle ORM instance
-   */
-  private getDrizzleInstance(): DrizzleDB {
-    if (!this.drizzle) {
-      throw new Error("Drizzle ORM has not been initialized");
-    }
-    return this.drizzle;
   }
 
   // ============= Clock Events =============
@@ -72,28 +60,7 @@ export class TimeTrackingManager {
       updatedAt: now,
     };
 
-    this.db
-      .prepare(
-        `
-        INSERT INTO clock_events (id, userId, terminalId, locationId, type, timestamp, method, status, geolocation, ipAddress, notes, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      )
-      .run(
-        clockEvent.id,
-        clockEvent.userId,
-        clockEvent.terminalId,
-        clockEvent.locationId,
-        clockEvent.type,
-        clockEvent.timestamp,
-        clockEvent.method,
-        clockEvent.status,
-        clockEvent.geolocation,
-        clockEvent.ipAddress,
-        clockEvent.notes,
-        clockEvent.createdAt,
-        clockEvent.updatedAt
-      );
+    this.db.insert(schema.clockEvents).values(clockEvent).run();
 
     return clockEvent;
   }
@@ -102,9 +69,14 @@ export class TimeTrackingManager {
    * Get clock event by ID
    */
   getClockEventById(eventId: string): ClockEvent | undefined {
-    return this.db
-      .prepare("SELECT * FROM clock_events WHERE id = ?")
-      .get(eventId) as ClockEvent | undefined;
+    const [event] = this.db
+      .select()
+      .from(schema.clockEvents)
+      .where(eq(schema.clockEvents.id, eventId))
+      .limit(1)
+      .all();
+
+    return event as ClockEvent | undefined;
   }
 
   /**
@@ -112,29 +84,39 @@ export class TimeTrackingManager {
    */
   getClockEventsByUser(userId: string, limit: number = 50): ClockEvent[] {
     return this.db
-      .prepare(
-        "SELECT * FROM clock_events WHERE userId = ? ORDER BY timestamp DESC LIMIT ?"
-      )
-      .all(userId, limit) as ClockEvent[];
+      .select()
+      .from(schema.clockEvents)
+      .where(eq(schema.clockEvents.userId, userId))
+      .orderBy(desc(schema.clockEvents.timestamp))
+      .limit(limit)
+      .all() as ClockEvent[];
   }
 
   /**
    * Get active clock-in event (no corresponding clock-out in active shift)
    */
   getActiveClockIn(userId: string): ClockEvent | undefined {
-    return this.db
-      .prepare(
-        `
-        SELECT ce.* FROM clock_events ce
-        LEFT JOIN time_shifts ts ON ts.clockInId = ce.id
-        WHERE ce.userId = ? 
-          AND ce.type = 'in' 
-          AND (ts.clockOutId IS NULL OR ts.status = 'active')
-        ORDER BY ce.timestamp DESC
-        LIMIT 1
-      `
+    const results = this.db
+      .select({
+        clockEvent: schema.clockEvents,
+      })
+      .from(schema.clockEvents)
+      .leftJoin(
+        schema.timeShifts,
+        eq(schema.timeShifts.clockInId, schema.clockEvents.id)
       )
-      .get(userId) as ClockEvent | undefined;
+      .where(
+        and(
+          eq(schema.clockEvents.userId, userId),
+          eq(schema.clockEvents.type, "in"),
+          drizzleSql`(${schema.timeShifts.clockOutId} IS NULL OR ${schema.timeShifts.status} = 'active')`
+        )
+      )
+      .orderBy(desc(schema.clockEvents.timestamp))
+      .limit(1)
+      .all();
+
+    return results[0]?.clockEvent as ClockEvent | undefined;
   }
 
   // ============= Time Shifts =============
@@ -152,7 +134,27 @@ export class TimeTrackingManager {
     const shiftId = this.uuid.v4();
     const now = new Date().toISOString();
 
-    const shift: TimeShift = {
+    this.db
+      .insert(schema.timeShifts)
+      .values({
+        id: shiftId,
+        userId: data.userId,
+        businessId: data.businessId,
+        clockInId: data.clockInId,
+        clockOutId: null,
+        scheduleId: data.scheduleId || null,
+        status: "active",
+        totalHours: null,
+        regularHours: null,
+        overtimeHours: null,
+        breakDuration: null,
+        notes: data.notes || null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    return {
       id: shiftId,
       userId: data.userId,
       businessId: data.businessId,
@@ -168,32 +170,6 @@ export class TimeTrackingManager {
       createdAt: now,
       updatedAt: now,
     };
-
-    this.db
-      .prepare(
-        `
-        INSERT INTO time_shifts (id, userId, businessId, clockInId, clockOutId, scheduleId, status, totalHours, regularHours, overtimeHours, breakDuration, notes, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      )
-      .run(
-        shift.id,
-        shift.userId,
-        shift.businessId,
-        shift.clockInId,
-        shift.clockOutId,
-        shift.scheduleId,
-        shift.status,
-        shift.totalHours,
-        shift.regularHours,
-        shift.overtimeHours,
-        shift.breakDuration,
-        shift.notes,
-        shift.createdAt,
-        shift.updatedAt
-      );
-
-    return shift;
   }
 
   /**
@@ -232,28 +208,18 @@ export class TimeTrackingManager {
     const now = new Date().toISOString();
 
     this.db
-      .prepare(
-        `
-        UPDATE time_shifts 
-        SET clockOutId = ?, 
-            status = 'completed',
-            totalHours = ?,
-            regularHours = ?,
-            overtimeHours = ?,
-            breakDuration = ?,
-            updatedAt = ?
-        WHERE id = ?
-      `
-      )
-      .run(
+      .update(schema.timeShifts)
+      .set({
         clockOutId,
+        status: "completed",
         totalHours,
         regularHours,
         overtimeHours,
-        breakMinutes,
-        now,
-        shiftId
-      );
+        breakDuration: breakMinutes,
+        updatedAt: now,
+      })
+      .where(eq(schema.timeShifts.id, shiftId))
+      .run();
 
     return this.getShiftById(shiftId)!;
   }
@@ -262,20 +228,34 @@ export class TimeTrackingManager {
    * Get shift by ID
    */
   getShiftById(shiftId: string): TimeShift | undefined {
-    return this.db
-      .prepare("SELECT * FROM time_shifts WHERE id = ?")
-      .get(shiftId) as TimeShift | undefined;
+    const [shift] = this.db
+      .select()
+      .from(schema.timeShifts)
+      .where(eq(schema.timeShifts.id, shiftId))
+      .limit(1)
+      .all();
+
+    return shift as TimeShift | undefined;
   }
 
   /**
    * Get active shift for user
    */
   getActiveShift(userId: string): TimeShift | undefined {
-    return this.db
-      .prepare(
-        "SELECT * FROM time_shifts WHERE userId = ? AND status = 'active' ORDER BY createdAt DESC LIMIT 1"
+    const [shift] = this.db
+      .select()
+      .from(schema.timeShifts)
+      .where(
+        and(
+          eq(schema.timeShifts.userId, userId),
+          eq(schema.timeShifts.status, "active")
+        )
       )
-      .get(userId) as TimeShift | undefined;
+      .orderBy(desc(schema.timeShifts.createdAt))
+      .limit(1)
+      .all();
+
+    return shift as TimeShift | undefined;
   }
 
   /**
@@ -283,10 +263,12 @@ export class TimeTrackingManager {
    */
   getShiftsByUser(userId: string, limit: number = 50): TimeShift[] {
     return this.db
-      .prepare(
-        "SELECT * FROM time_shifts WHERE userId = ? ORDER BY createdAt DESC LIMIT ?"
-      )
-      .all(userId, limit) as TimeShift[];
+      .select()
+      .from(schema.timeShifts)
+      .where(eq(schema.timeShifts.userId, userId))
+      .orderBy(desc(schema.timeShifts.createdAt))
+      .limit(limit)
+      .all() as TimeShift[];
   }
 
   /**
@@ -297,18 +279,26 @@ export class TimeTrackingManager {
     startDate: string,
     endDate: string
   ): TimeShift[] {
-    return this.db
-      .prepare(
-        `
-        SELECT ts.* FROM time_shifts ts
-        JOIN clock_events ce ON ts.clockInId = ce.id
-        WHERE ts.businessId = ? 
-          AND ce.timestamp >= ? 
-          AND ce.timestamp <= ?
-        ORDER BY ce.timestamp DESC
-      `
+    const results = this.db
+      .select({
+        shift: schema.timeShifts,
+      })
+      .from(schema.timeShifts)
+      .innerJoin(
+        schema.clockEvents,
+        eq(schema.timeShifts.clockInId, schema.clockEvents.id)
       )
-      .all(businessId, startDate, endDate) as TimeShift[];
+      .where(
+        and(
+          eq(schema.timeShifts.businessId, businessId),
+          gte(schema.clockEvents.timestamp, startDate),
+          lte(schema.clockEvents.timestamp, endDate)
+        )
+      )
+      .orderBy(desc(schema.clockEvents.timestamp))
+      .all();
+
+    return results.map((r) => r.shift) as TimeShift[];
   }
 
   // ============= Breaks =============
@@ -332,7 +322,25 @@ export class TimeTrackingManager {
       throw new Error("There is already an active break for this shift");
     }
 
-    const breakRecord: Break = {
+    this.db
+      .insert(schema.breaks)
+      .values({
+        id: breakId,
+        shiftId: data.shiftId,
+        userId: data.userId,
+        type: data.type || "rest",
+        startTime: now,
+        endTime: null,
+        duration: null,
+        isPaid: data.isPaid || false,
+        status: "active",
+        notes: data.notes || null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    return {
       id: breakId,
       shiftId: data.shiftId,
       userId: data.userId,
@@ -346,30 +354,6 @@ export class TimeTrackingManager {
       createdAt: now,
       updatedAt: now,
     };
-
-    this.db
-      .prepare(
-        `
-        INSERT INTO breaks (id, shiftId, userId, type, startTime, endTime, duration, isPaid, status, notes, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      )
-      .run(
-        breakRecord.id,
-        breakRecord.shiftId,
-        breakRecord.userId,
-        breakRecord.type,
-        breakRecord.startTime,
-        breakRecord.endTime,
-        breakRecord.duration,
-        breakRecord.isPaid ? 1 : 0,
-        breakRecord.status,
-        breakRecord.notes,
-        breakRecord.createdAt,
-        breakRecord.updatedAt
-      );
-
-    return breakRecord;
   }
 
   /**
@@ -391,17 +375,15 @@ export class TimeTrackingManager {
     const duration = Math.floor((endTime - startTime) / (1000 * 60)); // Duration in minutes
 
     this.db
-      .prepare(
-        `
-        UPDATE breaks 
-        SET endTime = ?, 
-            duration = ?,
-            status = 'completed',
-            updatedAt = ?
-        WHERE id = ?
-      `
-      )
-      .run(now, duration, now, breakId);
+      .update(schema.breaks)
+      .set({
+        endTime: now,
+        duration,
+        status: "completed",
+        updatedAt: now,
+      })
+      .where(eq(schema.breaks.id, breakId))
+      .run();
 
     return this.getBreakById(breakId)!;
   }
@@ -410,9 +392,12 @@ export class TimeTrackingManager {
    * Get break by ID
    */
   getBreakById(breakId: string): Break | undefined {
-    const result = this.db
-      .prepare("SELECT * FROM breaks WHERE id = ?")
-      .get(breakId);
+    const [result] = this.db
+      .select()
+      .from(schema.breaks)
+      .where(eq(schema.breaks.id, breakId))
+      .limit(1)
+      .all();
 
     if (!result) return undefined;
 
@@ -426,11 +411,17 @@ export class TimeTrackingManager {
    * Get active break for a shift
    */
   getActiveBreak(shiftId: string): Break | undefined {
-    const result = this.db
-      .prepare(
-        "SELECT * FROM breaks WHERE shiftId = ? AND status = 'active' LIMIT 1"
+    const [result] = this.db
+      .select()
+      .from(schema.breaks)
+      .where(
+        and(
+          eq(schema.breaks.shiftId, shiftId),
+          eq(schema.breaks.status, "active")
+        )
       )
-      .get(shiftId);
+      .limit(1)
+      .all();
 
     if (!result) return undefined;
 
@@ -445,10 +436,13 @@ export class TimeTrackingManager {
    */
   getBreaksByShift(shiftId: string): Break[] {
     const results = this.db
-      .prepare("SELECT * FROM breaks WHERE shiftId = ? ORDER BY startTime ASC")
-      .all(shiftId);
+      .select()
+      .from(schema.breaks)
+      .where(eq(schema.breaks.shiftId, shiftId))
+      .orderBy(schema.breaks.startTime)
+      .all();
 
-    return results.map((result: any) => ({
+    return results.map((result) => ({
       ...result,
       isPaid: Boolean(result.isPaid),
     })) as Break[];
@@ -459,12 +453,14 @@ export class TimeTrackingManager {
    */
   getBreaksByUser(userId: string, limit: number = 50): Break[] {
     const results = this.db
-      .prepare(
-        "SELECT * FROM breaks WHERE userId = ? ORDER BY startTime DESC LIMIT ?"
-      )
-      .all(userId, limit);
+      .select()
+      .from(schema.breaks)
+      .where(eq(schema.breaks.userId, userId))
+      .orderBy(desc(schema.breaks.startTime))
+      .limit(limit)
+      .all();
 
-    return results.map((result: any) => ({
+    return results.map((result) => ({
       ...result,
       isPaid: Boolean(result.isPaid),
     })) as Break[];
@@ -496,7 +492,27 @@ export class TimeTrackingManager {
       timeDifference = Math.floor((corrected - original) / (1000 * 60));
     }
 
-    const correction: TimeCorrection = {
+    this.db
+      .insert(schema.timeCorrections)
+      .values({
+        id: correctionId,
+        userId: data.userId,
+        clockEventId: data.clockEventId || null,
+        shiftId: data.shiftId || null,
+        correctionType: data.correctionType,
+        originalTime: data.originalTime || null,
+        correctedTime: data.correctedTime,
+        timeDifference,
+        reason: data.reason,
+        requestedBy: data.requestedBy,
+        approvedBy: null,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    return {
       id: correctionId,
       userId: data.userId,
       clockEventId: data.clockEventId,
@@ -512,32 +528,6 @@ export class TimeTrackingManager {
       createdAt: now,
       updatedAt: now,
     };
-
-    this.db
-      .prepare(
-        `
-        INSERT INTO time_corrections (id, userId, clockEventId, shiftId, correctionType, originalTime, correctedTime, timeDifference, reason, requestedBy, approvedBy, status, createdAt, updatedAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      )
-      .run(
-        correction.id,
-        correction.userId,
-        correction.clockEventId,
-        correction.shiftId,
-        correction.correctionType,
-        correction.originalTime,
-        correction.correctedTime,
-        correction.timeDifference,
-        correction.reason,
-        correction.requestedBy,
-        correction.approvedBy,
-        correction.status,
-        correction.createdAt,
-        correction.updatedAt
-      );
-
-    return correction;
   }
 
   /**
@@ -561,26 +551,25 @@ export class TimeTrackingManager {
     const status = approved ? "approved" : "rejected";
 
     this.db
-      .prepare(
-        `
-        UPDATE time_corrections 
-        SET status = ?, approvedBy = ?, updatedAt = ?
-        WHERE id = ?
-      `
-      )
-      .run(status, approvedBy, now, correctionId);
+      .update(schema.timeCorrections)
+      .set({
+        status,
+        approvedBy,
+        updatedAt: now,
+      })
+      .where(eq(schema.timeCorrections.id, correctionId))
+      .run();
 
     // If approved, apply the correction
     if (approved && correction.clockEventId) {
       this.db
-        .prepare(
-          `
-          UPDATE clock_events 
-          SET timestamp = ?, updatedAt = ?
-          WHERE id = ?
-        `
-        )
-        .run(correction.correctedTime, now, correction.clockEventId);
+        .update(schema.clockEvents)
+        .set({
+          timestamp: correction.correctedTime,
+          updatedAt: now,
+        })
+        .where(eq(schema.clockEvents.id, correction.clockEventId))
+        .run();
     }
 
     return this.getTimeCorrectionById(correctionId)!;
@@ -590,25 +579,39 @@ export class TimeTrackingManager {
    * Get time correction by ID
    */
   getTimeCorrectionById(correctionId: string): TimeCorrection | undefined {
-    return this.db
-      .prepare("SELECT * FROM time_corrections WHERE id = ?")
-      .get(correctionId) as TimeCorrection | undefined;
+    const [correction] = this.db
+      .select()
+      .from(schema.timeCorrections)
+      .where(eq(schema.timeCorrections.id, correctionId))
+      .limit(1)
+      .all();
+
+    return correction as TimeCorrection | undefined;
   }
 
   /**
    * Get pending time corrections for a business
    */
   getPendingTimeCorrections(businessId: string): TimeCorrection[] {
-    return this.db
-      .prepare(
-        `
-        SELECT tc.* FROM time_corrections tc
-        JOIN users u ON tc.userId = u.id
-        WHERE u.businessId = ? AND tc.status = 'pending'
-        ORDER BY tc.createdAt DESC
-      `
+    const results = this.db
+      .select({
+        correction: schema.timeCorrections,
+      })
+      .from(schema.timeCorrections)
+      .innerJoin(
+        schema.users,
+        eq(schema.timeCorrections.userId, schema.users.id)
       )
-      .all(businessId) as TimeCorrection[];
+      .where(
+        and(
+          eq(schema.users.businessId, businessId),
+          eq(schema.timeCorrections.status, "pending")
+        )
+      )
+      .orderBy(desc(schema.timeCorrections.createdAt))
+      .all();
+
+    return results.map((r) => r.correction) as TimeCorrection[];
   }
 
   /**
@@ -619,10 +622,12 @@ export class TimeTrackingManager {
     limit: number = 50
   ): TimeCorrection[] {
     return this.db
-      .prepare(
-        "SELECT * FROM time_corrections WHERE userId = ? ORDER BY createdAt DESC LIMIT ?"
-      )
-      .all(userId, limit) as TimeCorrection[];
+      .select()
+      .from(schema.timeCorrections)
+      .where(eq(schema.timeCorrections.userId, userId))
+      .orderBy(desc(schema.timeCorrections.createdAt))
+      .limit(limit)
+      .all() as TimeCorrection[];
   }
 
   // ============= Fraud Detection & Validation =============
@@ -646,16 +651,21 @@ export class TimeTrackingManager {
     }
 
     // Check for rapid clock events (potential buddy punching)
+    const thirtySecondsAgo = new Date(
+      new Date(clockEvent.timestamp).getTime() - 30000
+    ).toISOString();
+
     const recentEvents = this.db
-      .prepare(
-        `
-        SELECT * FROM clock_events 
-        WHERE terminalId = ? 
-          AND timestamp > datetime(?, '-30 seconds')
-          AND userId != ?
-      `
+      .select()
+      .from(schema.clockEvents)
+      .where(
+        and(
+          eq(schema.clockEvents.terminalId, clockEvent.terminalId),
+          gte(schema.clockEvents.timestamp, thirtySecondsAgo),
+          drizzleSql`${schema.clockEvents.userId} != ${clockEvent.userId}`
+        )
       )
-      .all(clockEvent.terminalId, clockEvent.timestamp, clockEvent.userId);
+      .all();
 
     if (recentEvents.length > 0) {
       warnings.push(

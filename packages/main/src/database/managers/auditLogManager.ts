@@ -3,99 +3,36 @@ import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class AuditLogManager {
-  private db: any;
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
-    this.db = db;
-    this.drizzle = drizzle;
+  constructor(drizzle: DrizzleDB, uuid: any) {
+    this.db = drizzle;
     this.uuid = uuid;
   }
 
   /**
-   * Get Drizzle ORM instance
+   * Create audit log
    */
-  private getDrizzleInstance(): DrizzleDB {
-    if (!this.drizzle) {
-      throw new Error("Drizzle ORM not initialized");
-    }
-    return this.drizzle;
-  }
-
   createAuditLog(logData: {
-    userId: string;
-    action: string;
-    resource: string;
-    resourceId: string;
-    details?: string;
-  }): void {
-    const logId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    this.db
-      .prepare(
-        `INSERT INTO audit_logs (id, userId, action, resource, resourceId, details, timestamp, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
-        logId,
-        logData.userId,
-        logData.action,
-        logData.resource,
-        logData.resourceId,
-        logData.details || null,
-        now,
-        now
-      );
-  }
-
-  getAuditLogsByUser(userId: string, limit: number = 100): any[] {
-    return this.db
-      .prepare(
-        "SELECT * FROM audit_logs WHERE userId = ? ORDER BY timestamp DESC LIMIT ?"
-      )
-      .all(userId, limit);
-  }
-
-  getAuditLogsByResource(
-    resource: string,
-    resourceId: string,
-    limit: number = 100
-  ): any[] {
-    return this.db
-      .prepare(
-        "SELECT * FROM audit_logs WHERE resource = ? AND resourceId = ? ORDER BY timestamp DESC LIMIT ?"
-      )
-      .all(resource, resourceId, limit);
-  }
-
-  // ============================================
-  // DRIZZLE ORM METHODS
-  // ============================================
-
-  /**
-   * Create audit log using Drizzle ORM (type-safe)
-   */
-  createDrizzle(auditData: {
     userId: string;
     action: string;
     resource: string;
     resourceId: string;
     details?: any;
   }): void {
-    const db = this.getDrizzleInstance();
-    const auditId = this.uuid.v4();
+    const logId = this.uuid.v4();
     const now = new Date().toISOString();
 
-    db.insert(schema.auditLogs)
+    this.db
+      .insert(schema.auditLogs)
       .values({
-        id: auditId,
-        userId: auditData.userId,
-        action: auditData.action,
-        resource: auditData.resource,
-        resourceId: auditData.resourceId,
-        details: auditData.details ? JSON.stringify(auditData.details) : null,
+        id: logId,
+        userId: logData.userId,
+        action: logData.action,
+        resource: logData.resource,
+        resourceId: logData.resourceId,
+        details: logData.details ? JSON.stringify(logData.details) : null,
         timestamp: now,
         createdAt: now,
       })
@@ -103,9 +40,54 @@ export class AuditLogManager {
   }
 
   /**
-   * Get audit logs with filtering using Drizzle ORM (type-safe)
+   * Get audit logs by user
    */
-  getDrizzle(options?: {
+  getAuditLogsByUser(userId: string, limit: number = 100): any[] {
+    const results = this.db
+      .select()
+      .from(schema.auditLogs)
+      .where(eq(schema.auditLogs.userId, userId))
+      .orderBy(desc(schema.auditLogs.timestamp))
+      .limit(limit)
+      .all();
+
+    return results.map((log: any) => ({
+      ...log,
+      details: log.details ? JSON.parse(log.details) : null,
+    }));
+  }
+
+  /**
+   * Get audit logs by resource
+   */
+  getAuditLogsByResource(
+    resource: string,
+    resourceId: string,
+    limit: number = 100
+  ): any[] {
+    const results = this.db
+      .select()
+      .from(schema.auditLogs)
+      .where(
+        and(
+          eq(schema.auditLogs.resource, resource),
+          eq(schema.auditLogs.resourceId, resourceId)
+        )
+      )
+      .orderBy(desc(schema.auditLogs.timestamp))
+      .limit(limit)
+      .all();
+
+    return results.map((log: any) => ({
+      ...log,
+      details: log.details ? JSON.parse(log.details) : null,
+    }));
+  }
+
+  /**
+   * Get audit logs with filtering
+   */
+  getAuditLogs(options?: {
     userId?: string;
     resource?: string;
     resourceId?: string;
@@ -113,8 +95,6 @@ export class AuditLogManager {
     limit?: number;
     offset?: number;
   }): any[] {
-    const db = this.getDrizzleInstance();
-
     // Build where conditions
     const conditions = [];
     if (options?.userId) {
@@ -131,7 +111,7 @@ export class AuditLogManager {
     }
 
     // Build query with conditions
-    let queryBuilder = db.select().from(schema.auditLogs);
+    let queryBuilder = this.db.select().from(schema.auditLogs);
 
     if (conditions.length > 0) {
       queryBuilder = queryBuilder.where(and(...conditions)) as any;
@@ -154,23 +134,5 @@ export class AuditLogManager {
       ...log,
       details: log.details ? JSON.parse(log.details) : null,
     }));
-  }
-
-  /**
-   * Get audit logs by user using Drizzle ORM (type-safe)
-   */
-  getByUserDrizzle(userId: string, limit: number = 100): any[] {
-    return this.getDrizzle({ userId, limit });
-  }
-
-  /**
-   * Get audit logs by resource using Drizzle ORM (type-safe)
-   */
-  getByResourceDrizzle(
-    resource: string,
-    resourceId: string,
-    limit: number = 100
-  ): any[] {
-    return this.getDrizzle({ resource, resourceId, limit });
   }
 }

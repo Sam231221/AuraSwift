@@ -4,29 +4,16 @@ import { eq } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class BusinessManager {
-  private db: any;
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
-    this.db = db;
-    this.drizzle = drizzle;
+  constructor(drizzle: DrizzleDB, uuid: any) {
+    this.db = drizzle;
     this.uuid = uuid;
   }
 
-  /**
-   * Get Drizzle ORM instance
-   */
-  private getDrizzleInstance(): DrizzleDB {
-    if (!this.drizzle) {
-      throw new Error("Drizzle ORM not initialized");
-    }
-    return this.drizzle;
-  }
-
   getBusinessById(id: string): Business | null {
-    const drizzle = this.getDrizzleInstance();
-    const result = drizzle
+    const result = this.db
       .select()
       .from(schema.businesses)
       .where(eq(schema.businesses.id, id))
@@ -44,9 +31,8 @@ export class BusinessManager {
   }): Business {
     const businessId = this.uuid.v4();
     const now = new Date().toISOString();
-    const drizzle = this.getDrizzleInstance();
 
-    drizzle
+    this.db
       .insert(schema.businesses)
       .values({
         id: businessId,
@@ -76,10 +62,9 @@ export class BusinessManager {
       vatNumber: string;
     }>
   ): boolean {
-    const drizzle = this.getDrizzleInstance();
     const now = new Date().toISOString();
 
-    const result = drizzle
+    const result = this.db
       .update(schema.businesses)
       .set({
         ...updates,

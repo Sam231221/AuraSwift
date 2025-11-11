@@ -4,32 +4,19 @@ import { eq, and, like } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class SupplierManager {
-  private db: any;
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
-    this.db = db;
-    this.drizzle = drizzle;
+  constructor(drizzle: DrizzleDB, uuid: any) {
+    this.db = drizzle;
     this.uuid = uuid;
-  }
-
-  /**
-   * Get Drizzle ORM instance
-   */
-  private getDrizzleInstance(): DrizzleDB {
-    if (!this.drizzle) {
-      throw new Error("Drizzle ORM not initialized");
-    }
-    return this.drizzle;
   }
 
   /**
    * Get supplier by ID
    */
   getSupplierById(id: string): Supplier | null {
-    const drizzle = this.getDrizzleInstance();
-    const result = drizzle
+    const result = this.db
       .select()
       .from(schema.suppliers)
       .where(eq(schema.suppliers.id, id))
@@ -42,9 +29,7 @@ export class SupplierManager {
    * Get all suppliers for a business
    */
   getSuppliersByBusinessId(businessId: string, activeOnly = false): Supplier[] {
-    const drizzle = this.getDrizzleInstance();
-
-    let queryBuilder = drizzle.select().from(schema.suppliers);
+    let queryBuilder = this.db.select().from(schema.suppliers);
 
     if (activeOnly) {
       const results = queryBuilder
@@ -68,8 +53,7 @@ export class SupplierManager {
    * Search suppliers by name
    */
   searchSuppliers(businessId: string, searchTerm: string): Supplier[] {
-    const drizzle = this.getDrizzleInstance();
-    const results = drizzle
+    const results = this.db
       .select()
       .from(schema.suppliers)
       .where(
@@ -101,9 +85,8 @@ export class SupplierManager {
   }): Supplier {
     const supplierId = this.uuid.v4();
     const now = new Date().toISOString();
-    const drizzle = this.getDrizzleInstance();
 
-    drizzle
+    this.db
       .insert(schema.suppliers)
       .values({
         id: supplierId,
@@ -150,10 +133,9 @@ export class SupplierManager {
       notes: string;
     }>
   ): boolean {
-    const drizzle = this.getDrizzleInstance();
     const now = new Date().toISOString();
 
-    const result = drizzle
+    const result = this.db
       .update(schema.suppliers)
       .set({
         ...updates,
@@ -176,8 +158,7 @@ export class SupplierManager {
    * Permanently delete supplier from database
    */
   permanentlyDeleteSupplier(id: string): boolean {
-    const drizzle = this.getDrizzleInstance();
-    const result = drizzle
+    const result = this.db
       .delete(schema.suppliers)
       .where(eq(schema.suppliers.id, id))
       .run();
@@ -189,8 +170,7 @@ export class SupplierManager {
    * Get active suppliers count for a business
    */
   getActiveSuppliersCount(businessId: string): number {
-    const drizzle = this.getDrizzleInstance();
-    const result = drizzle
+    const result = this.db
       .select()
       .from(schema.suppliers)
       .where(

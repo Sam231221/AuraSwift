@@ -4,24 +4,12 @@ import { eq, and, desc, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class AuditManager {
-  private db: any;
-  private drizzle: DrizzleDB;
+  private db: DrizzleDB;
   private uuid: any;
 
-  constructor(db: any, drizzle: DrizzleDB, uuid: any) {
-    this.db = db;
-    this.drizzle = drizzle;
+  constructor(drizzle: DrizzleDB, uuid: any) {
+    this.db = drizzle;
     this.uuid = uuid;
-  }
-
-  /**
-   * Get Drizzle ORM instance
-   */
-  private getDrizzleInstance(): DrizzleDB {
-    if (!this.drizzle) {
-      throw new Error("Drizzle ORM has not been initialized");
-    }
-    return this.drizzle;
   }
 
   /**
@@ -45,7 +33,28 @@ export class AuditManager {
     const auditId = this.uuid.v4();
     const now = new Date().toISOString();
 
-    const auditLog: AuditLog = {
+    this.db
+      .insert(schema.auditLogs)
+      .values({
+        id: auditId,
+        action: data.action,
+        resource: data.entityType, // Store in resource for backward compatibility
+        resourceId: data.entityId, // Store in resourceId for backward compatibility
+        entityType: data.entityType,
+        entityId: data.entityId,
+        userId: data.userId,
+        details:
+          typeof data.details === "string"
+            ? data.details
+            : JSON.stringify(data.details),
+        ipAddress: data.ipAddress,
+        terminalId: data.terminalId,
+        timestamp: now,
+        createdAt: now,
+      })
+      .run();
+
+    return {
       id: auditId,
       action: data.action,
       entityType: data.entityType,
@@ -60,30 +69,6 @@ export class AuditManager {
       timestamp: now,
       createdAt: now,
     };
-
-    this.db
-      .prepare(
-        `
-        INSERT INTO audit_logs (id, userId, action, resource, resourceId, entityType, entityId, details, ipAddress, terminalId, timestamp, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      )
-      .run(
-        auditLog.id,
-        auditLog.userId,
-        auditLog.action,
-        auditLog.entityType, // Also store in resource for backward compatibility
-        auditLog.entityId, // Also store in resourceId for backward compatibility
-        auditLog.entityType,
-        auditLog.entityId,
-        auditLog.details,
-        auditLog.ipAddress,
-        auditLog.terminalId,
-        auditLog.timestamp,
-        auditLog.createdAt
-      );
-
-    return auditLog;
   }
 
   /**
@@ -265,10 +250,17 @@ export class AuditManager {
     limit: number = 50
   ): AuditLog[] {
     return this.db
-      .prepare(
-        "SELECT * FROM audit_logs WHERE entityType = ? AND entityId = ? ORDER BY timestamp DESC LIMIT ?"
+      .select()
+      .from(schema.auditLogs)
+      .where(
+        and(
+          eq(schema.auditLogs.entityType, entityType),
+          eq(schema.auditLogs.entityId, entityId)
+        )
       )
-      .all(entityType, entityId, limit) as AuditLog[];
+      .orderBy(desc(schema.auditLogs.timestamp))
+      .limit(limit)
+      .all() as AuditLog[];
   }
 
   /**
@@ -276,10 +268,12 @@ export class AuditManager {
    */
   getAuditLogsByUser(userId: string, limit: number = 100): AuditLog[] {
     return this.db
-      .prepare(
-        "SELECT * FROM audit_logs WHERE userId = ? ORDER BY timestamp DESC LIMIT ?"
-      )
-      .all(userId, limit) as AuditLog[];
+      .select()
+      .from(schema.auditLogs)
+      .where(eq(schema.auditLogs.userId, userId))
+      .orderBy(desc(schema.auditLogs.timestamp))
+      .limit(limit)
+      .all() as AuditLog[];
   }
 
   /**
@@ -287,10 +281,12 @@ export class AuditManager {
    */
   getAuditLogsByAction(action: string, limit: number = 100): AuditLog[] {
     return this.db
-      .prepare(
-        "SELECT * FROM audit_logs WHERE action = ? ORDER BY timestamp DESC LIMIT ?"
-      )
-      .all(action, limit) as AuditLog[];
+      .select()
+      .from(schema.auditLogs)
+      .where(eq(schema.auditLogs.action, action))
+      .orderBy(desc(schema.auditLogs.timestamp))
+      .limit(limit)
+      .all() as AuditLog[];
   }
 
   /**
@@ -302,40 +298,48 @@ export class AuditManager {
     entityType?: string,
     limit: number = 100
   ): AuditLog[] {
-    let query =
-      "SELECT * FROM audit_logs WHERE timestamp >= ? AND timestamp <= ?";
-    const params: any[] = [startDate, endDate];
+    const conditions = [
+      gte(schema.auditLogs.timestamp, startDate),
+      lte(schema.auditLogs.timestamp, endDate),
+    ];
 
     if (entityType) {
-      query += " AND entityType = ?";
-      params.push(entityType);
+      conditions.push(eq(schema.auditLogs.entityType, entityType));
     }
 
-    query += " ORDER BY timestamp DESC LIMIT ?";
-    params.push(limit);
-
-    return this.db.prepare(query).all(...params) as AuditLog[];
+    return this.db
+      .select()
+      .from(schema.auditLogs)
+      .where(and(...conditions))
+      .orderBy(desc(schema.auditLogs.timestamp))
+      .limit(limit)
+      .all() as AuditLog[];
   }
 
   /**
    * Get recent suspicious activities
    */
   getSuspiciousActivities(businessId: string, limit: number = 50): AuditLog[] {
-    return this.db
-      .prepare(
-        `
-        SELECT al.* FROM audit_logs al
-        JOIN users u ON al.userId = u.id
-        WHERE u.businessId = ?
-          AND (
-            al.action IN ('clock_event_modified', 'shift_forced_end', 'time_correction_requested')
-            OR al.action LIKE '%concurrent%'
-          )
-        ORDER BY al.timestamp DESC
-        LIMIT ?
-      `
+    const results = this.db
+      .select({
+        auditLog: schema.auditLogs,
+      })
+      .from(schema.auditLogs)
+      .innerJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
+      .where(
+        and(
+          eq(schema.users.businessId, businessId),
+          drizzleSql`(
+            ${schema.auditLogs.action} IN ('clock_event_modified', 'shift_forced_end', 'time_correction_requested')
+            OR ${schema.auditLogs.action} LIKE '%concurrent%'
+          )`
+        )
       )
-      .all(businessId, limit) as AuditLog[];
+      .orderBy(desc(schema.auditLogs.timestamp))
+      .limit(limit)
+      .all();
+
+    return results.map((r) => r.auditLog) as AuditLog[];
   }
 
   /**
@@ -346,18 +350,23 @@ export class AuditManager {
     startDate: string,
     endDate: string
   ): AuditLog[] {
-    return this.db
-      .prepare(
-        `
-        SELECT al.* FROM audit_logs al
-        JOIN users u ON al.userId = u.id
-        WHERE u.businessId = ?
-          AND al.timestamp >= ?
-          AND al.timestamp <= ?
-        ORDER BY al.timestamp DESC
-      `
+    const results = this.db
+      .select({
+        auditLog: schema.auditLogs,
+      })
+      .from(schema.auditLogs)
+      .innerJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
+      .where(
+        and(
+          eq(schema.users.businessId, businessId),
+          gte(schema.auditLogs.timestamp, startDate),
+          lte(schema.auditLogs.timestamp, endDate)
+        )
       )
-      .all(businessId, startDate, endDate) as AuditLog[];
+      .orderBy(desc(schema.auditLogs.timestamp))
+      .all();
+
+    return results.map((r) => r.auditLog) as AuditLog[];
   }
 
   /**
@@ -369,8 +378,9 @@ export class AuditManager {
     const cutoffIso = cutoffDate.toISOString();
 
     const result = this.db
-      .prepare("DELETE FROM audit_logs WHERE timestamp < ?")
-      .run(cutoffIso);
+      .delete(schema.auditLogs)
+      .where(drizzleSql`${schema.auditLogs.timestamp} < ${cutoffIso}`)
+      .run();
 
     return result.changes || 0;
   }
