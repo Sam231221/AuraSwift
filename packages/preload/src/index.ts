@@ -33,8 +33,10 @@ contextBridge.exposeInMainWorld("authAPI", {
 
   createUser: (userData: {
     businessId: string;
-    email: string;
-    password: string;
+    username: string;
+    pin: string;
+    email?: string;
+    password?: string;
     firstName: string;
     lastName: string;
     role: "cashier" | "manager";
@@ -42,8 +44,8 @@ contextBridge.exposeInMainWorld("authAPI", {
   }) => ipcRenderer.invoke("auth:createUser", userData),
 
   login: (credentials: {
-    email: string;
-    password: string;
+    username: string;
+    pin: string;
     rememberMe?: boolean;
   }) => ipcRenderer.invoke("auth:login", credentials),
 

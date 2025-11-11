@@ -23,9 +23,13 @@ export interface RegisterRequest {
 }
 
 export interface LoginRequest {
-  email: string;
-  password: string;
+  username: string;
+  pin: string;
   rememberMe?: boolean;
+  terminalId?: string;
+  locationId?: string;
+  ipAddress?: string;
+  autoClockIn?: boolean; // Whether to automatically clock in on login
 }
 
 export interface AuthResponse {
@@ -35,6 +39,9 @@ export interface AuthResponse {
   users?: User[];
   token?: string;
   errors?: string[];
+  clockEvent?: any; // Clock-in/out event if applicable
+  shift?: any; // Active shift if applicable
+  requiresClockIn?: boolean; // Whether user needs to manually clock in
 }
 export interface CreateProductRequest {
   name: string;
@@ -172,28 +179,28 @@ export class AuthAPI {
   async login(data: LoginRequest): Promise<AuthResponse> {
     try {
       // Validate input
-      if (!validateEmail(data.email)) {
+      if (!data.username || data.username.trim().length < 1) {
         return {
           success: false,
-          message: "Invalid email format",
+          message: "Username is required",
         };
       }
 
-      if (!data.password || data.password.length < 1) {
+      if (!data.pin || data.pin.length < 1) {
         return {
           success: false,
-          message: "Password is required",
+          message: "PIN is required",
         };
       }
 
       const db = await this.getDb();
 
       // Authenticate user
-      const user = await db.authenticateUser(data.email, data.password);
+      const user = await db.authenticateUser(data.username, data.pin);
       if (!user) {
         return {
           success: false,
-          message: "Invalid email or password",
+          message: "Invalid username or PIN",
         };
       }
 
@@ -205,11 +212,91 @@ export class AuthAPI {
         session = db.createSession(user.id, 0.5); // 12 hours
       }
 
+      // Log session creation in audit
+      await db.audit.logSessionAction(
+        "login",
+        session,
+        user.id,
+        data.terminalId || "unknown",
+        data.ipAddress
+      );
+
+      // Check for existing active shift
+      const activeShift = db.timeTracking.getActiveShift(user.id);
+
+      let clockEvent = null;
+      let shift = null;
+
+      // Auto clock-in logic for cashiers and managers
+      if (
+        !activeShift &&
+        (user.role === "cashier" || user.role === "manager")
+      ) {
+        if (data.autoClockIn !== false) {
+          // Auto clock-in by default for non-admin users
+          try {
+            clockEvent = await db.timeTracking.createClockEvent({
+              userId: user.id,
+              terminalId: data.terminalId || "unknown",
+              locationId: data.locationId,
+              type: "in",
+              method: "login",
+              ipAddress: data.ipAddress,
+            });
+
+            // Validate the clock event
+            const validation = await db.timeTracking.validateClockEvent(
+              clockEvent
+            );
+            if (!validation.valid) {
+              console.warn("Clock-in validation warnings:", validation);
+              await db.audit.logClockEvent(
+                "clock_in",
+                clockEvent,
+                user.id,
+                data.terminalId,
+                data.ipAddress,
+                { validation }
+              );
+            } else {
+              await db.audit.logClockEvent(
+                "clock_in",
+                clockEvent,
+                user.id,
+                data.terminalId,
+                data.ipAddress
+              );
+            }
+
+            // Create shift
+            shift = await db.timeTracking.createShift({
+              userId: user.id,
+              businessId: user.businessId,
+              clockInId: clockEvent.id,
+            });
+
+            await db.audit.logShiftAction(
+              "shift_started",
+              shift,
+              user.id,
+              data.terminalId,
+              data.ipAddress
+            );
+          } catch (clockError) {
+            console.error("Auto clock-in error:", clockError);
+            // Don't fail login if clock-in fails
+          }
+        }
+      }
+
       return {
         success: true,
         message: "Login successful",
         user,
         token: session.token,
+        clockEvent: clockEvent || undefined,
+        shift: shift || activeShift || undefined,
+        requiresClockIn: !clockEvent && !activeShift && user.role !== "admin",
       };
     } catch (error) {
       console.error("Login error:", error);
@@ -256,13 +343,94 @@ export class AuthAPI {
     }
   }
 
-  async logout(token: string): Promise<AuthResponse> {
+  async logout(
+    token: string,
+    options?: {
+      terminalId?: string;
+      ipAddress?: string;
+      autoClockOut?: boolean;
+    }
+  ): Promise<AuthResponse> {
     try {
       const db = await this.getDb();
+
+      // Get session to find user
+      const session = db.getSessionByToken(token);
+      if (!session) {
+        return {
+          success: false,
+          message: "Session not found",
+        };
+      }
+
+      const user = db.users.getUserById(session.userId);
+      if (!user) {
+        return {
+          success: false,
+          message: "User not found",
+        };
+      }
+
+      // Check for active shift and auto clock-out
+      let clockEvent = null;
+      let shift = null;
+      const activeShift = db.timeTracking.getActiveShift(user.id);
+
+      if (activeShift && options?.autoClockOut !== false) {
+        try {
+          // Auto clock-out on logout
+          clockEvent = await db.timeTracking.createClockEvent({
+            userId: user.id,
+            terminalId: options?.terminalId || "unknown",
+            type: "out",
+            method: "logout",
+            ipAddress: options?.ipAddress,
+          });
+
+          await db.audit.logClockEvent(
+            "clock_out",
+            clockEvent,
+            user.id,
+            options?.terminalId,
+            options?.ipAddress
+          );
+
+          // Complete the shift
+          shift = await db.timeTracking.completeShift(
+            activeShift.id,
+            clockEvent.id
+          );
+
+          await db.audit.logShiftAction(
+            "shift_completed",
+            shift,
+            user.id,
+            options?.terminalId,
+            options?.ipAddress
+          );
+        } catch (clockError) {
+          console.error("Auto clock-out error:", clockError);
+          // Don't fail logout if clock-out fails
+        }
+      }
+
+      // Log session termination
+      await db.audit.logSessionAction(
+        "logout",
+        session,
+        user.id,
+        options?.terminalId || "unknown",
+        options?.ipAddress
+      );
+
+      // Delete session
       const deleted = db.deleteSession(token);
+
       return {
         success: deleted,
-        message: deleted ? "Logged out successfully" : "Session not found",
+        message: deleted ? "Logged out successfully" : "Logout failed",
+        clockEvent: clockEvent || undefined,
+        shift: shift || undefined,
       };
     } catch (error) {
       console.error("Logout error:", error);
@@ -433,7 +601,9 @@ export class AuthAPI {
       // Check if PLU already exists (if PLU is provided)
       if (productData.plu) {
         try {
-          const existingProductByPLU = db.products.getProductByPLU(productData.plu);
+          const existingProductByPLU = db.products.getProductByPLU(
+            productData.plu
+          );
           if (existingProductByPLU) {
             return {
               success: false,
@@ -597,7 +767,10 @@ export class AuthAPI {
       const { modifiers, ...updatesWithoutModifiers } = updates;
 
       // Update the product first
-      const product = await db.products.updateProduct(id, updatesWithoutModifiers);
+      const product = await db.products.updateProduct(
+        id,
+        updatesWithoutModifiers
+      );
 
       // Handle modifiers if provided
       if (modifiers !== undefined) {
@@ -718,7 +891,9 @@ export class AuthAPI {
   async getCategoriesByBusiness(businessId: string): Promise<any> {
     try {
       const db = await this.getDb();
-      const categories = await db.categories.getCategoriesByBusiness(businessId);
+      const categories = await db.categories.getCategoriesByBusiness(
+        businessId
+      );
 
       return {
         success: true,
@@ -952,8 +1127,10 @@ export class AuthAPI {
 
   async createUser(userData: {
     businessId: string;
-    email: string;
-    password: string;
+    username: string;
+    pin: string;
+    email?: string;
+    password?: string;
     firstName: string;
     lastName: string;
     role: "cashier" | "manager";
@@ -986,6 +1163,542 @@ export class AuthAPI {
       return {
         success: false,
         message: error.message || "Failed to create user",
+      };
+    }
+  }
+
+  // ============= Time Tracking Methods =============
+
+  /**
+   * Manual clock-in (when not done automatically on login)
+   */
+  async clockIn(data: {
+    userId: string;
+    terminalId: string;
+    locationId?: string;
+    ipAddress?: string;
+  }): Promise<any> {
+    try {
+      const db = await this.getDb();
+
+      // Check for existing active shift
+      const activeShift = db.timeTracking.getActiveShift(data.userId);
+      if (activeShift) {
+        return {
+          success: false,
+          message: "User already has an active shift",
+          shift: activeShift,
+        };
+      }
+
+      const user = db.users.getUserById(data.userId);
+      if (!user) {
+        return {
+          success: false,
+          message: "User not found",
+        };
+      }
+
+      // Create clock-in event
+      const clockEvent = await db.timeTracking.createClockEvent({
+        userId: data.userId,
+        terminalId: data.terminalId,
+        locationId: data.locationId,
+        type: "in",
+        method: "manual",
+        ipAddress: data.ipAddress,
+      });
+
+      // Validate clock event
+      const validation = await db.timeTracking.validateClockEvent(clockEvent);
+
+      // Log audit
+      await db.audit.logClockEvent(
+        "clock_in",
+        clockEvent,
+        data.userId,
+        data.terminalId,
+        data.ipAddress,
+        { validation }
+      );
+
+      // Create shift
+      const shift = await db.timeTracking.createShift({
+        userId: data.userId,
+        businessId: user.businessId,
+        clockInId: clockEvent.id,
+      });
+
+      await db.audit.logShiftAction(
+        "shift_started",
+        shift,
+        data.userId,
+        data.terminalId,
+        data.ipAddress
+      );
+
+      return {
+        success: true,
+        message: validation.valid
+          ? "Clocked in successfully"
+          : "Clocked in with warnings",
+        clockEvent,
+        shift,
+        validation,
+      };
+    } catch (error: any) {
+      console.error("Clock-in error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to clock in",
+      };
+    }
+  }
+
+  /**
+   * Manual clock-out (when not done automatically on logout)
+   */
+  async clockOut(data: {
+    userId: string;
+    terminalId: string;
+    ipAddress?: string;
+  }): Promise<any> {
+    try {
+      const db = await this.getDb();
+
+      // Check for active shift
+      const activeShift = db.timeTracking.getActiveShift(data.userId);
+      if (!activeShift) {
+        return {
+          success: false,
+          message: "No active shift found",
+        };
+      }
+
+      // Create clock-out event
+      const clockEvent = await db.timeTracking.createClockEvent({
+        userId: data.userId,
+        terminalId: data.terminalId,
+        type: "out",
+        method: "manual",
+        ipAddress: data.ipAddress,
+      });
+
+      await db.audit.logClockEvent(
+        "clock_out",
+        clockEvent,
+        data.userId,
+        data.terminalId,
+        data.ipAddress
+      );
+
+      // Complete shift
+      const shift = await db.timeTracking.completeShift(
+        activeShift.id,
+        clockEvent.id
+      );
+
+      await db.audit.logShiftAction(
+        "shift_completed",
+        shift,
+        data.userId,
+        data.terminalId,
+        data.ipAddress
+      );
+
+      return {
+        success: true,
+        message: "Clocked out successfully",
+        clockEvent,
+        shift,
+      };
+    } catch (error: any) {
+      console.error("Clock-out error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to clock out",
+      };
+    }
+  }
+
+  /**
+   * Start a break
+   */
+  async startBreak(data: {
+    userId: string;
+    shiftId: string;
+    type?: "meal" | "rest" | "other";
+    isPaid?: boolean;
+    terminalId?: string;
+    ipAddress?: string;
+  }): Promise<any> {
+    try {
+      const db = await this.getDb();
+
+      const breakRecord = await db.timeTracking.startBreak({
+        shiftId: data.shiftId,
+        userId: data.userId,
+        type: data.type,
+        isPaid: data.isPaid,
+      });
+
+      await db.audit.logBreakAction(
+        "break_started",
+        breakRecord,
+        data.userId,
+        data.terminalId,
+        data.ipAddress
+      );
+
+      return {
+        success: true,
+        message: "Break started successfully",
+        break: breakRecord,
+      };
+    } catch (error: any) {
+      console.error("Start break error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to start break",
+      };
+    }
+  }
+
+  /**
+   * End a break
+   */
+  async endBreak(data: {
+    breakId: string;
+    userId: string;
+    terminalId?: string;
+    ipAddress?: string;
+  }): Promise<any> {
+    try {
+      const db = await this.getDb();
+
+      const breakRecord = await db.timeTracking.endBreak(data.breakId);
+
+      await db.audit.logBreakAction(
+        "break_ended",
+        breakRecord,
+        data.userId,
+        data.terminalId,
+        data.ipAddress
+      );
+
+      return {
+        success: true,
+        message: "Break ended successfully",
+        break: breakRecord,
+      };
+    } catch (error: any) {
+      console.error("End break error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to end break",
+      };
+    }
+  }
+
+  /**
+   * Get active shift for user
+   */
+  async getActiveShift(userId: string): Promise<any> {
+    try {
+      const db = await this.getDb();
+      const shift = db.timeTracking.getActiveShift(userId);
+
+      if (!shift) {
+        return {
+          success: false,
+          message: "No active shift found",
+        };
+      }
+
+      // Get clock-in event
+      const clockIn = db.timeTracking.getClockEventById(shift.clockInId);
+
+      // Get breaks
+      const breaks = db.timeTracking.getBreaksByShift(shift.id);
+
+      return {
+        success: true,
+        message: "Active shift retrieved",
+        shift,
+        clockIn,
+        breaks,
+      };
+    } catch (error: any) {
+      console.error("Get active shift error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get active shift",
+      };
+    }
+  }
+
+  /**
+   * Get shift history for user
+   */
+  async getShiftHistory(userId: string, limit: number = 50): Promise<any> {
+    try {
+      const db = await this.getDb();
+      const shifts = db.timeTracking.getShiftsByUser(userId, limit);
+
+      return {
+        success: true,
+        message: "Shift history retrieved",
+        shifts,
+      };
+    } catch (error: any) {
+      console.error("Get shift history error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get shift history",
+      };
+    }
+  }
+
+  /**
+   * Request time correction
+   */
+  async requestTimeCorrection(data: {
+    userId: string;
+    clockEventId?: string;
+    shiftId?: string;
+    correctionType: "clock_time" | "break_time" | "manual_entry";
+    originalTime?: string;
+    correctedTime: string;
+    reason: string;
+    requestedBy: string;
+    terminalId?: string;
+    ipAddress?: string;
+  }): Promise<any> {
+    try {
+      const db = await this.getDb();
+
+      const correction = await db.timeTracking.requestTimeCorrection({
+        userId: data.userId,
+        clockEventId: data.clockEventId,
+        shiftId: data.shiftId,
+        correctionType: data.correctionType,
+        originalTime: data.originalTime,
+        correctedTime: data.correctedTime,
+        reason: data.reason,
+        requestedBy: data.requestedBy,
+      });
+
+      await db.audit.logTimeCorrectionAction(
+        "time_correction_requested",
+        correction,
+        data.requestedBy,
+        data.terminalId,
+        data.ipAddress
+      );
+
+      return {
+        success: true,
+        message: "Time correction requested successfully",
+        correction,
+      };
+    } catch (error: any) {
+      console.error("Request time correction error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to request time correction",
+      };
+    }
+  }
+
+  /**
+   * Approve or reject time correction (manager only)
+   */
+  async processTimeCorrection(data: {
+    correctionId: string;
+    approvedBy: string;
+    approved: boolean;
+    terminalId?: string;
+    ipAddress?: string;
+  }): Promise<any> {
+    try {
+      const db = await this.getDb();
+
+      // Check if approver is manager or admin
+      const approver = db.users.getUserById(data.approvedBy);
+      if (
+        !approver ||
+        (approver.role !== "manager" && approver.role !== "admin")
+      ) {
+        return {
+          success: false,
+          message: "Only managers and admins can approve time corrections",
+        };
+      }
+
+      const correction = await db.timeTracking.processTimeCorrection(
+        data.correctionId,
+        data.approvedBy,
+        data.approved
+      );
+
+      await db.audit.logTimeCorrectionAction(
+        data.approved ? "time_correction_approved" : "time_correction_rejected",
+        correction,
+        data.approvedBy,
+        data.terminalId,
+        data.ipAddress
+      );
+
+      return {
+        success: true,
+        message: data.approved
+          ? "Time correction approved successfully"
+          : "Time correction rejected",
+        correction,
+      };
+    } catch (error: any) {
+      console.error("Process time correction error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to process time correction",
+      };
+    }
+  }
+
+  /**
+   * Get pending time corrections for business (manager view)
+   */
+  async getPendingTimeCorrections(businessId: string): Promise<any> {
+    try {
+      const db = await this.getDb();
+      const corrections = db.timeTracking.getPendingTimeCorrections(businessId);
+
+      return {
+        success: true,
+        message: "Pending time corrections retrieved",
+        corrections,
+      };
+    } catch (error: any) {
+      console.error("Get pending time corrections error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get pending time corrections",
+      };
+    }
+  }
+
+  /**
+   * Force clock-out by manager
+   */
+  async forceClockOut(data: {
+    userId: string;
+    managerId: string;
+    reason: string;
+    terminalId?: string;
+    ipAddress?: string;
+  }): Promise<any> {
+    try {
+      const db = await this.getDb();
+
+      // Check if requester is manager or admin
+      const manager = db.users.getUserById(data.managerId);
+      if (
+        !manager ||
+        (manager.role !== "manager" && manager.role !== "admin")
+      ) {
+        return {
+          success: false,
+          message: "Only managers and admins can force clock-out",
+        };
+      }
+
+      const result = await db.timeTracking.forceClockOut(
+        data.userId,
+        data.managerId,
+        data.reason
+      );
+
+      await db.audit.logShiftAction(
+        "shift_forced_end",
+        result.shift,
+        data.managerId,
+        data.terminalId,
+        data.ipAddress,
+        { reason: data.reason, forcedUserId: data.userId }
+      );
+
+      return {
+        success: true,
+        message: "User clocked out successfully",
+        clockEvent: result.clockEvent,
+        shift: result.shift,
+      };
+    } catch (error: any) {
+      console.error("Force clock-out error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to force clock-out",
+      };
+    }
+  }
+
+  /**
+   * Get attendance report for date range
+   */
+  async getAttendanceReport(data: {
+    businessId: string;
+    startDate: string;
+    endDate: string;
+    userId?: string;
+  }): Promise<any> {
+    try {
+      const db = await this.getDb();
+
+      const shifts = db.timeTracking.getShiftsByBusinessAndDateRange(
+        data.businessId,
+        data.startDate,
+        data.endDate
+      );
+
+      // Filter by user if specified
+      const filteredShifts = data.userId
+        ? shifts.filter((s: any) => s.userId === data.userId)
+        : shifts;
+
+      // Calculate statistics
+      const totalShifts = filteredShifts.length;
+      const totalHours = filteredShifts.reduce(
+        (sum: number, s: any) => sum + (s.totalHours || 0),
+        0
+      );
+      const regularHours = filteredShifts.reduce(
+        (sum: number, s: any) => sum + (s.regularHours || 0),
+        0
+      );
+      const overtimeHours = filteredShifts.reduce(
+        (sum: number, s: any) => sum + (s.overtimeHours || 0),
+        0
+      );
+
+      return {
+        success: true,
+        message: "Attendance report generated",
+        report: {
+          startDate: data.startDate,
+          endDate: data.endDate,
+          totalShifts,
+          totalHours,
+          regularHours,
+          overtimeHours,
+          averageHoursPerShift: totalShifts > 0 ? totalHours / totalShifts : 0,
+          shifts: filteredShifts,
+        },
+      };
+    } catch (error: any) {
+      console.error("Get attendance report error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to generate attendance report",
       };
     }
   }

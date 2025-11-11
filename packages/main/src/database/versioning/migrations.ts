@@ -99,6 +99,97 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+
+  {
+    version: 2,
+    name: "0002_add_username_pin_auth",
+    description: "Add username/PIN authentication columns to users table",
+    up: (db) => {
+      try {
+        // Check if columns already exist
+        const tableInfo = db
+          .prepare("PRAGMA table_info(users)")
+          .all() as Array<{
+          name: string;
+        }>;
+        const columnNames = tableInfo.map((col) => col.name);
+
+        const hasUsername = columnNames.includes("username");
+        const hasPin = columnNames.includes("pin");
+
+        if (!hasUsername) {
+          console.log("      Adding 'username' column to users table...");
+          db.exec(
+            `ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT '';`
+          );
+        }
+
+        if (!hasPin) {
+          console.log("      Adding 'pin' column to users table...");
+          db.exec(`ALTER TABLE users ADD COLUMN pin TEXT NOT NULL DEFAULT '';`);
+        }
+
+        // Create unique index on username if it doesn't exist
+        const indexes = db
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='users'"
+          )
+          .all()
+          .map((idx: any) => idx.name);
+
+        if (!indexes.includes("users_username_unique")) {
+          console.log("      Creating unique index on username...");
+          db.exec(
+            `CREATE UNIQUE INDEX users_username_unique ON users (username);`
+          );
+        }
+
+        // Migrate existing users: set username from email and default PIN
+        const usersNeedingMigration = db
+          .prepare(
+            "SELECT id, email, username FROM users WHERE username = '' OR username IS NULL"
+          )
+          .all() as Array<{ id: string; email: string; username: string }>;
+
+        if (usersNeedingMigration.length > 0) {
+          console.log(
+            `      Migrating ${usersNeedingMigration.length} existing user(s)...`
+          );
+          const updateStmt = db.prepare(
+            "UPDATE users SET username = ?, pin = ? WHERE id = ?"
+          );
+
+          for (const user of usersNeedingMigration) {
+            // Generate username from email (before @ symbol) or use id
+            const username = user.email
+              ? user.email.split("@")[0]
+              : `user_${user.id.substring(0, 8)}`;
+            const pin = "1234"; // Default PIN
+
+            updateStmt.run(username, pin, user.id);
+            console.log(
+              `         ✓ User ${user.id}: username set to '${username}'`
+            );
+          }
+        }
+
+        console.log(
+          "      ✅ Migration '0002_add_username_pin_auth' applied successfully"
+        );
+      } catch (error: any) {
+        if (
+          error.message.includes("duplicate column name") ||
+          error.message.includes("already exists")
+        ) {
+          console.log(
+            "      ℹ️  Migration '0002_add_username_pin_auth' - changes already exist"
+          );
+        } else {
+          throw error;
+        }
+      }
+    },
+  },
 ];
 
 /**

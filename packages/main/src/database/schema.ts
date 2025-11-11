@@ -27,8 +27,10 @@ export const businesses = sqliteTable("businesses", {
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
-  email: text("email").unique().notNull(),
-  password: text("password").notNull(),
+  username: text("username").unique().notNull(),
+  email: text("email"),
+  password: text("password"),
+  pin: text("pin").notNull(),
   firstName: text("firstName").notNull(),
   lastName: text("lastName").notNull(),
   businessName: text("businessName").notNull(),

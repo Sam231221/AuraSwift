@@ -1,7 +1,9 @@
 export interface User {
   id: string;
-  email: string;
-  password: string;
+  username: string;
+  email?: string;
+  password?: string;
+  pin: string;
   firstName: string;
   lastName: string;
   businessName: string;
@@ -340,4 +342,113 @@ export interface PrintJobRetry {
   error: string;
   timestamp: string;
   next_retry_at: string;
+}
+
+// Clock-in/Clock-out System Types
+export interface ClockEvent {
+  id: string;
+  userId: string;
+  terminalId: string;
+  locationId?: string;
+  type: "in" | "out";
+  timestamp: string;
+  method: "login" | "manual" | "auto" | "manager";
+  status: "pending" | "confirmed" | "disputed";
+  geolocation?: string; // JSON string with coordinates
+  ipAddress?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimeShift {
+  id: string;
+  userId: string;
+  businessId: string;
+  clockInId: string; // References ClockEvent
+  clockOutId?: string; // References ClockEvent
+  scheduleId?: string; // Optional - links to Schedule
+  status: "active" | "completed" | "pending_review";
+  totalHours?: number;
+  regularHours?: number;
+  overtimeHours?: number;
+  breakDuration?: number; // Total break time in minutes
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Break {
+  id: string;
+  shiftId: string;
+  userId: string;
+  type: "meal" | "rest" | "other";
+  startTime: string;
+  endTime?: string;
+  duration?: number; // Duration in minutes
+  isPaid: boolean;
+  status: "active" | "completed";
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TimeCorrection {
+  id: string;
+  clockEventId?: string;
+  shiftId?: string;
+  userId: string;
+  correctionType: "clock_time" | "break_time" | "manual_entry";
+  originalTime?: string;
+  correctedTime: string;
+  timeDifference: number; // In minutes
+  reason: string;
+  requestedBy: string; // userId who requested
+  approvedBy?: string; // Manager userId who approved
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  entityType:
+    | "clock_event"
+    | "shift"
+    | "break"
+    | "time_correction"
+    | "session"
+    | "user";
+  entityId: string;
+  userId: string; // Who performed the action
+  details: string; // JSON string with before/after state
+  ipAddress?: string;
+  terminalId?: string;
+  timestamp: string;
+  createdAt: string;
+}
+
+export interface AttendanceReport {
+  userId: string;
+  userName: string;
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  totalShifts: number;
+  totalHours: number;
+  regularHours: number;
+  overtimeHours: number;
+  lateClockIns: number;
+  missedClockOuts: number;
+  averageHoursPerShift: number;
+  tardinessMinutes: number;
+}
+
+export interface ShiftValidation {
+  valid: boolean;
+  violations: string[];
+  warnings: string[];
+  requiresReview: boolean;
 }

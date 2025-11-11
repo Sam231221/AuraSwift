@@ -27,6 +27,13 @@ import type {
   AppliedModifier,
   CashDrawerCount,
   ShiftReport,
+  ClockEvent,
+  TimeShift,
+  Break,
+  TimeCorrection,
+  AuditLog,
+  AttendanceReport,
+  ShiftValidation,
 } from "../../../types/database.d.ts";
 
 // Re-export types for use in other modules
@@ -49,6 +56,13 @@ export type {
   AppliedModifier,
   CashDrawerCount,
   ShiftReport,
+  ClockEvent,
+  TimeShift,
+  Break,
+  TimeCorrection,
+  AuditLog,
+  AttendanceReport,
+  ShiftValidation,
 };
 
 import { initializeDrizzle, type DrizzleDB } from "./database/drizzle.js";
@@ -70,6 +84,9 @@ import { CashDrawerManager } from "./database/managers/cashDrawerManager.js";
 import { DiscountManager } from "./database/managers/discountManager.js";
 import { InventoryManager } from "./database/managers/inventoryManager.js";
 import { SupplierManager } from "./database/managers/supplierManager.js";
+import { TimeTrackingManager } from "./database/managers/timeTrackingManager.js";
+import { AuditManager } from "./database/managers/auditManager.js";
+import { TimeTrackingReportManager } from "./database/managers/timeTrackingReportManager.js";
 
 export class DatabaseManager {
   private db: any;
@@ -93,6 +110,9 @@ export class DatabaseManager {
   public discounts!: DiscountManager;
   public inventory!: InventoryManager;
   public suppliers!: SupplierManager;
+  public timeTracking!: TimeTrackingManager;
+  public audit!: AuditManager;
+  public timeTrackingReports!: TimeTrackingReportManager;
 
   constructor() {
     // Don't initialize here, wait for explicit initialization
@@ -181,6 +201,16 @@ export class DatabaseManager {
     this.discounts = new DiscountManager(this.db, this.drizzle, this.uuid);
     this.inventory = new InventoryManager(this.db, this.drizzle, this.uuid);
     this.suppliers = new SupplierManager(this.db, this.drizzle, this.uuid);
+    this.timeTracking = new TimeTrackingManager(
+      this.db,
+      this.drizzle,
+      this.uuid
+    );
+    this.audit = new AuditManager(this.db, this.drizzle, this.uuid);
+    this.timeTrackingReports = new TimeTrackingReportManager(
+      this.db,
+      this.drizzle
+    );
 
     console.log("✅ All managers initialized successfully");
   }
@@ -251,8 +281,10 @@ export class DatabaseManager {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT,
+        password TEXT,
+        pin TEXT NOT NULL,
         firstName TEXT NOT NULL,
         lastName TEXT NOT NULL,
         businessName TEXT NOT NULL,
@@ -302,6 +334,57 @@ export class DatabaseManager {
       this.db.exec(`ALTER TABLE categories ADD COLUMN parentId TEXT;`);
     } catch (err) {
       // Column already exists, ignore error
+    }
+
+    // Migration: Add new columns to audit_logs for time tracking system
+    try {
+      this.db.exec(`ALTER TABLE audit_logs ADD COLUMN entityType TEXT;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+    try {
+      this.db.exec(`ALTER TABLE audit_logs ADD COLUMN entityId TEXT;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+    try {
+      this.db.exec(`ALTER TABLE audit_logs ADD COLUMN ipAddress TEXT;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+    try {
+      this.db.exec(`ALTER TABLE audit_logs ADD COLUMN terminalId TEXT;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    // Migration: Add username and pin columns to users table
+    try {
+      this.db.exec(`ALTER TABLE users ADD COLUMN username TEXT;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+    try {
+      this.db.exec(`ALTER TABLE users ADD COLUMN pin TEXT;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+
+    // Migrate existing users: generate username from email and default PIN
+    try {
+      const usersNeedingMigration = this.db
+        .prepare("SELECT id, email FROM users WHERE username IS NULL")
+        .all();
+
+      for (const user of usersNeedingMigration) {
+        const username = user.email.split("@")[0]; // Use email prefix as username
+        const pin = "1234"; // Default PIN, users should change this
+        this.db
+          .prepare("UPDATE users SET username = ?, pin = ? WHERE id = ?")
+          .run(username, pin, user.id);
+      }
+    } catch (err) {
+      // Migration already done or error
     }
 
     // Migration: Add UNIQUE constraint on (name, businessId) for categories
@@ -690,15 +773,19 @@ export class DatabaseManager {
       )
     `);
 
-    // Audit logs table for tracking sensitive operations
+    // Audit logs table for tracking sensitive operations and time tracking
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS audit_logs (
         id TEXT PRIMARY KEY,
         userId TEXT NOT NULL,
         action TEXT NOT NULL,
-        resource TEXT NOT NULL,
-        resourceId TEXT NOT NULL,
+        resource TEXT,
+        resourceId TEXT,
+        entityType TEXT,
+        entityId TEXT,
         details TEXT,
+        ipAddress TEXT,
+        terminalId TEXT,
         timestamp TEXT NOT NULL,
         createdAt TEXT NOT NULL,
         FOREIGN KEY (userId) REFERENCES users (id)
@@ -741,6 +828,97 @@ export class DatabaseManager {
         timestamp TEXT NOT NULL,
         next_retry_at TEXT NOT NULL,
         FOREIGN KEY (job_id) REFERENCES print_jobs (job_id) ON DELETE CASCADE
+      )
+    `);
+
+    // Clock-in/Clock-out System Tables
+    // Clock events table - tracks all clock in/out events
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS clock_events (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        terminalId TEXT NOT NULL,
+        locationId TEXT,
+        type TEXT NOT NULL CHECK (type IN ('in', 'out')),
+        timestamp TEXT NOT NULL,
+        method TEXT NOT NULL CHECK (method IN ('login', 'manual', 'auto', 'manager')),
+        status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'disputed')) DEFAULT 'confirmed',
+        geolocation TEXT,
+        ipAddress TEXT,
+        notes TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (userId) REFERENCES users (id)
+      )
+    `);
+
+    // Time shifts table - represents work shifts with clock in/out
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS time_shifts (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        businessId TEXT NOT NULL,
+        clockInId TEXT NOT NULL,
+        clockOutId TEXT,
+        scheduleId TEXT,
+        status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'pending_review')) DEFAULT 'active',
+        totalHours REAL,
+        regularHours REAL,
+        overtimeHours REAL,
+        breakDuration INTEGER,
+        notes TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (userId) REFERENCES users (id),
+        FOREIGN KEY (businessId) REFERENCES businesses (id),
+        FOREIGN KEY (clockInId) REFERENCES clock_events (id),
+        FOREIGN KEY (clockOutId) REFERENCES clock_events (id),
+        FOREIGN KEY (scheduleId) REFERENCES schedules (id)
+      )
+    `);
+
+    // Breaks table - tracks breaks during shifts
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS breaks (
+        id TEXT PRIMARY KEY,
+        shiftId TEXT NOT NULL,
+        userId TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('meal', 'rest', 'other')) DEFAULT 'rest',
+        startTime TEXT NOT NULL,
+        endTime TEXT,
+        duration INTEGER,
+        isPaid BOOLEAN DEFAULT 0,
+        status TEXT NOT NULL CHECK (status IN ('active', 'completed')) DEFAULT 'active',
+        notes TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (shiftId) REFERENCES time_shifts (id),
+        FOREIGN KEY (userId) REFERENCES users (id)
+      )
+    `);
+
+    // Time corrections table - tracks manual corrections to clock times
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS time_corrections (
+        id TEXT PRIMARY KEY,
+        clockEventId TEXT,
+        shiftId TEXT,
+        userId TEXT NOT NULL,
+        correctionType TEXT NOT NULL CHECK (correctionType IN ('clock_time', 'break_time', 'manual_entry')),
+        originalTime TEXT,
+        correctedTime TEXT NOT NULL,
+        timeDifference INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        requestedBy TEXT NOT NULL,
+        approvedBy TEXT,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (clockEventId) REFERENCES clock_events (id),
+        FOREIGN KEY (shiftId) REFERENCES time_shifts (id),
+        FOREIGN KEY (userId) REFERENCES users (id),
+        FOREIGN KEY (requestedBy) REFERENCES users (id),
+        FOREIGN KEY (approvedBy) REFERENCES users (id)
       )
     `);
 
@@ -814,6 +992,29 @@ export class DatabaseManager {
       
       CREATE INDEX IF NOT EXISTS idx_print_job_retries_job_id ON print_job_retries(job_id);
       CREATE INDEX IF NOT EXISTS idx_print_job_retries_timestamp ON print_job_retries(timestamp);
+
+      -- Indexes for clock-in/clock-out system
+      CREATE INDEX IF NOT EXISTS idx_clock_events_userId ON clock_events(userId);
+      CREATE INDEX IF NOT EXISTS idx_clock_events_timestamp ON clock_events(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_clock_events_type ON clock_events(type);
+      CREATE INDEX IF NOT EXISTS idx_clock_events_status ON clock_events(status);
+
+      CREATE INDEX IF NOT EXISTS idx_time_shifts_userId ON time_shifts(userId);
+      CREATE INDEX IF NOT EXISTS idx_time_shifts_businessId ON time_shifts(businessId);
+      CREATE INDEX IF NOT EXISTS idx_time_shifts_status ON time_shifts(status);
+      CREATE INDEX IF NOT EXISTS idx_time_shifts_clockInId ON time_shifts(clockInId);
+      CREATE INDEX IF NOT EXISTS idx_time_shifts_clockOutId ON time_shifts(clockOutId);
+
+      CREATE INDEX IF NOT EXISTS idx_breaks_shiftId ON breaks(shiftId);
+      CREATE INDEX IF NOT EXISTS idx_breaks_userId ON breaks(userId);
+      CREATE INDEX IF NOT EXISTS idx_breaks_status ON breaks(status);
+
+      CREATE INDEX IF NOT EXISTS idx_time_corrections_userId ON time_corrections(userId);
+      CREATE INDEX IF NOT EXISTS idx_time_corrections_status ON time_corrections(status);
+      CREATE INDEX IF NOT EXISTS idx_time_corrections_requestedBy ON time_corrections(requestedBy);
+
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_entityType ON audit_logs(entityType);
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_entityId ON audit_logs(entityId);
     `);
 
     // Insert default admin user if no users exist
@@ -867,12 +1068,14 @@ export class DatabaseManager {
         this.db
           .prepare(
             `
-          INSERT INTO users (id, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO users (id, username, pin, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
           )
           .run(
             adminId,
+            "admin",
+            "1234",
             "admin@store.com",
             hashedPassword,
             "Admin",
@@ -886,7 +1089,7 @@ export class DatabaseManager {
             1
           );
 
-        console.log("Default admin user created: admin@store.com / admin123");
+        console.log("Default admin user created: username: admin / PIN: 1234");
       } finally {
         // Re-enable foreign key constraints
         this.db.exec("PRAGMA foreign_keys = ON");
@@ -896,8 +1099,10 @@ export class DatabaseManager {
 
   // User management methods
   async createUser(userData: {
-    email: string;
-    password: string;
+    username: string;
+    pin: string;
+    email?: string;
+    password?: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -906,7 +1111,9 @@ export class DatabaseManager {
   }): Promise<User> {
     const userId = this.uuid.v4();
     const businessId = userData.businessId || this.uuid.v4();
-    const hashedPassword = await this.bcrypt.hash(userData.password, 10);
+    const hashedPassword = userData.password
+      ? await this.bcrypt.hash(userData.password, 10)
+      : null;
     const now = new Date().toISOString();
 
     // Set permissions based on role
@@ -970,13 +1177,15 @@ export class DatabaseManager {
       this.db
         .prepare(
           `
-        INSERT INTO users (id, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (id, username, pin, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
         )
         .run(
           userId,
-          userData.email,
+          userData.username,
+          userData.pin,
+          userData.email ?? null,
           hashedPassword,
           userData.firstName,
           userData.lastName,
@@ -1013,6 +1222,18 @@ export class DatabaseManager {
     };
   }
 
+  getUserByUsername(username: string): User | null {
+    const user = this.db
+      .prepare("SELECT * FROM users WHERE username = ? AND isActive = 1")
+      .get(username) as any;
+    if (!user) return null;
+
+    return {
+      ...user,
+      permissions: JSON.parse(user.permissions),
+    };
+  }
+
   getUserById(id: string): User | null {
     const user = this.db
       .prepare("SELECT * FROM users WHERE id = ? AND isActive = 1")
@@ -1025,18 +1246,16 @@ export class DatabaseManager {
     };
   }
 
-  async authenticateUser(
-    email: string,
-    password: string
-  ): Promise<User | null> {
-    const user = this.getUserByEmail(email);
+  async authenticateUser(username: string, pin: string): Promise<User | null> {
+    const user = this.getUserByUsername(username);
     if (!user) return null;
 
-    const isValidPassword = await this.bcrypt.compare(password, user.password);
-    if (!isValidPassword) return null;
+    // For PIN, we do direct comparison (PINs are stored as plain text for now)
+    // If you want to hash PINs, you can use bcrypt here too
+    if (user.pin !== pin) return null;
 
-    // Return user without password
-    const { password: _, ...userWithoutPassword } = user;
+    // Return user without password and PIN
+    const { password: _, pin: __, ...userWithoutPassword } = user;
     return userWithoutPassword as User;
   }
 
@@ -1407,6 +1626,10 @@ export class DatabaseManager {
 
     return {
       ...user,
+      email: user.email ?? undefined,
+      password: user.password ?? undefined,
+      username: user.username ?? user.email?.split("@")[0] ?? "",
+      pin: user.pin ?? "1234",
       address: user.address ?? "",
       permissions: JSON.parse(user.permissions),
       isActive: Boolean(user.isActive),
@@ -1430,6 +1653,10 @@ export class DatabaseManager {
 
     return {
       ...user,
+      email: user.email ?? undefined,
+      password: user.password ?? undefined,
+      username: user.username ?? user.email?.split("@")[0] ?? "",
+      pin: user.pin ?? "1234",
       address: user.address ?? "",
       permissions: JSON.parse(user.permissions),
       isActive: Boolean(user.isActive),
@@ -1456,6 +1683,10 @@ export class DatabaseManager {
 
     return users.map((user) => ({
       ...user,
+      email: user.email ?? undefined,
+      password: user.password ?? undefined,
+      username: user.username ?? user.email?.split("@")[0] ?? "",
+      pin: user.pin ?? "1234",
       address: user.address ?? "",
       permissions: JSON.parse(user.permissions),
       isActive: Boolean(user.isActive),
@@ -1491,6 +1722,10 @@ export class DatabaseManager {
 
     return users.map((user) => ({
       ...user,
+      email: user.email ?? undefined,
+      password: user.password ?? undefined,
+      username: user.username ?? user.email?.split("@")[0] ?? "",
+      pin: user.pin ?? "1234",
       address: user.address ?? "",
       permissions: JSON.parse(user.permissions),
       isActive: Boolean(user.isActive),
@@ -1581,8 +1816,10 @@ export class DatabaseManager {
    * NEW method - replaces createUser()
    */
   async createUserDrizzle(userData: {
-    email: string;
-    password: string;
+    username: string;
+    pin: string;
+    email?: string;
+    password?: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -1592,7 +1829,9 @@ export class DatabaseManager {
     const db = this.getDrizzleInstance();
     const userId = this.uuid.v4();
     const businessId = userData.businessId || this.uuid.v4();
-    const hashedPassword = await this.bcrypt.hash(userData.password, 10);
+    const hashedPassword = userData.password
+      ? await this.bcrypt.hash(userData.password, 10)
+      : null;
     const now = new Date().toISOString();
 
     // Set permissions based on role
@@ -1661,6 +1900,8 @@ export class DatabaseManager {
       tx.insert(schema.users)
         .values({
           id: userId,
+          username: userData.username,
+          pin: userData.pin,
           email: userData.email,
           password: hashedPassword,
           firstName: userData.firstName,

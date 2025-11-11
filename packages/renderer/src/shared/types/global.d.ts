@@ -5,7 +5,9 @@ interface APIResponse {
   token?: string;
   user?: {
     id: string;
-    email: string;
+    username: string;
+    pin: string;
+    email?: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -71,8 +73,10 @@ declare global {
       }) => Promise<APIResponse>;
       createUser: (userData: {
         businessId: string;
-        email: string;
-        password: string;
+        username: string;
+        pin: string;
+        email?: string;
+        password?: string;
         firstName: string;
         lastName: string;
         role: "cashier" | "manager";
@@ -80,8 +84,8 @@ declare global {
         address?: string;
       }) => Promise<APIResponse>;
       login: (credentials: {
-        email: string;
-        password: string;
+        username: string;
+        pin: string;
         rememberMe?: boolean;
       }) => Promise<APIResponse>;
       validateSession: (token: string) => Promise<APIResponse>;
