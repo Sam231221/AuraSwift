@@ -1106,6 +1106,38 @@ export class AuthAPI {
   }
 
   // User management methods
+  async getAllActiveUsers(): Promise<AuthResponse> {
+    try {
+      const db = await this.getDb();
+      // Get all active users from all businesses for login screen
+      const allUsers = db.db
+        .prepare(
+          `SELECT id, username, pin, email, firstName, lastName, role, businessId, businessName, permissions, createdAt, updatedAt, isActive
+           FROM users 
+           WHERE isActive = 1 
+           ORDER BY role DESC, firstName ASC`
+        )
+        .all()
+        .map((user: any) => ({
+          ...user,
+          permissions: JSON.parse(user.permissions),
+          isActive: Boolean(user.isActive),
+        }));
+
+      return {
+        success: true,
+        message: "Users retrieved successfully",
+        users: allUsers,
+      };
+    } catch (error: any) {
+      console.error("Get all active users error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get users",
+      };
+    }
+  }
+
   async getUsersByBusiness(businessId: string): Promise<AuthResponse> {
     try {
       const db = await this.getDb();

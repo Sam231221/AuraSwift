@@ -28,7 +28,9 @@ interface APIResponse {
   };
   users?: Array<{
     id: string;
-    email: string;
+    username: string;
+    pin: string;
+    email?: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -95,6 +97,7 @@ declare global {
         userId: string,
         updates: Record<string, string | number | boolean>
       ) => Promise<APIResponse>;
+      getAllActiveUsers: () => Promise<APIResponse>;
       getUsersByBusiness: (businessId: string) => Promise<APIResponse>;
       deleteUser: (userId: string) => Promise<APIResponse>;
       getBusinessById: (businessId: string) => Promise<{

@@ -8,8 +8,8 @@ import { Eye, EyeOff, AlertCircle } from "lucide-react";
 
 interface LoginFormProps {
   onSubmit: (
-    email: string,
-    password: string,
+    username: string,
+    pin: string,
     rememberMe: boolean
   ) => Promise<void>;
   error: string;
@@ -17,16 +17,16 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSubmit, error, isLoading }: LoginFormProps) {
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
+    const username = formData.get("username") as string;
+    const pin = formData.get("pin") as string;
 
-    await onSubmit(email, password, rememberMe);
+    await onSubmit(username, pin, rememberMe);
   };
 
   return (
@@ -40,26 +40,29 @@ export function LoginForm({ onSubmit, error, isLoading }: LoginFormProps) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email Address</Label>
+          <Label htmlFor="username">Username</Label>
           <Input
-            id="email"
-            name="email"
-            type="email"
-            placeholder="store@example.com"
+            id="username"
+            name="username"
+            type="text"
+            placeholder="Enter your username"
             className="h-11"
+            autoComplete="username"
             required
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="pin">PIN</Label>
           <div className="relative">
             <Input
-              id="password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Enter your password"
+              id="pin"
+              name="pin"
+              type={showPin ? "text" : "password"}
+              placeholder="Enter your PIN"
               className="h-11 pr-10"
+              maxLength={6}
+              autoComplete="off"
               required
             />
             <Button
@@ -67,9 +70,9 @@ export function LoginForm({ onSubmit, error, isLoading }: LoginFormProps) {
               variant="ghost"
               size="sm"
               className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => setShowPin(!showPin)}
             >
-              {showPassword ? (
+              {showPin ? (
                 <EyeOff className="h-4 w-4 text-muted-foreground" />
               ) : (
                 <Eye className="h-4 w-4 text-muted-foreground" />

@@ -60,6 +60,8 @@ contextBridge.exposeInMainWorld("authAPI", {
   updateUser: (userId: string, updates: any) =>
     ipcRenderer.invoke("auth:updateUser", userId, updates),
 
+  getAllActiveUsers: () => ipcRenderer.invoke("auth:getAllActiveUsers"),
+
   getUsersByBusiness: (businessId: string) =>
     ipcRenderer.invoke("auth:getUsersByBusiness", businessId),
 

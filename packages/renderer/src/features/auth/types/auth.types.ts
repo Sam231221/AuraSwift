@@ -1,6 +1,8 @@
 export interface User {
   id: string;
-  email: string;
+  username: string;
+  pin: string;
+  email?: string;
   firstName: string;
   lastName: string;
   businessName: string;
@@ -30,8 +32,8 @@ export interface Permission {
 export interface AuthContextType {
   user: User | null;
   login: (
-    email: string,
-    password: string,
+    username: string,
+    pin: string,
     rememberMe?: boolean
   ) => Promise<{ success: boolean; message: string; errors?: string[] }>;
   register: (userData: {
@@ -53,8 +55,10 @@ export interface AuthContextType {
   }) => Promise<{ success: boolean; message: string; errors?: string[] }>;
   createUser: (userData: {
     businessId: string;
-    email: string;
-    password: string;
+    username: string;
+    pin: string;
+    email?: string;
+    password?: string;
     firstName: string;
     lastName: string;
     role: "cashier" | "manager";

@@ -1,146 +1,284 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Store, Shield } from "lucide-react";
+import { Store, User, ArrowLeft, Delete } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { AuthHeroSection } from "@/features/auth/components/auth-hero-section";
-import { LoginForm } from "@/features/auth/components/login-form";
-import { RegisterForm } from "@/features/auth/components/register-form";
+
+// Color mapping based on role
+const ROLE_COLORS: Record<string, string> = {
+  admin: "bg-blue-500",
+  manager: "bg-green-500",
+  cashier: "bg-purple-500",
+};
+
+// Get alternating colors for multiple users with same role
+const getUserColor = (role: string, index: number): string => {
+  const baseColor = ROLE_COLORS[role] || "bg-gray-500";
+  if (role === "cashier") {
+    const colors = [
+      "bg-purple-500",
+      "bg-orange-500",
+      "bg-pink-500",
+      "bg-cyan-500",
+    ];
+    return colors[index % colors.length];
+  }
+  return baseColor;
+};
+
+interface UserForLogin {
+  id: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  role: "admin" | "manager" | "cashier";
+  color: string;
+}
 
 export default function AuthPage() {
+  const [users, setUsers] = useState<UserForLogin[]>([]);
+  const [selectedUser, setSelectedUser] = useState<UserForLogin | null>(null);
+  const [pin, setPin] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [registerError, setRegisterError] = useState("");
-  const [registerSuccess, setRegisterSuccess] = useState("");
-  const { login, registerBusiness, isLoading } = useAuth();
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const { login, isLoading } = useAuth();
 
-  const handleLoginSubmit = async (
-    email: string,
-    password: string,
-    rememberMe: boolean
-  ) => {
+  // Fetch users on mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await window.authAPI.getAllActiveUsers();
+        if (response.success && response.users) {
+          // Map users and assign colors
+          const cashierCount = { count: 0 };
+          const mappedUsers = response.users.map((user) => {
+            const color = getUserColor(user.role, cashierCount.count);
+            if (user.role === "cashier") {
+              cashierCount.count++;
+            }
+            return {
+              id: user.id,
+              username: user.username,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              role: user.role as "admin" | "manager" | "cashier",
+              color,
+            };
+          });
+          setUsers(mappedUsers);
+        }
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const handlePinInput = (digit: string) => {
+    if (pin.length < 4) {
+      setPin(pin + digit);
+    }
+  };
+
+  const handleDeletePin = () => {
+    setPin(pin.slice(0, -1));
+  };
+
+  const handleBack = () => {
+    setSelectedUser(null);
+    setPin("");
     setLoginError("");
-    const result = await login(email, password, rememberMe);
-    if (!result.success) {
-      setLoginError(result.message);
-    }
   };
 
-  const handleRegisterSubmit = async (userData: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    businessName: string;
-    avatar?: string;
-    businessAvatar?: string;
-  }) => {
-    setRegisterError("");
-    setRegisterSuccess("");
+  // Auto-submit when PIN is complete
+  useEffect(() => {
+    const handleLogin = async () => {
+      if (!selectedUser || pin.length !== 4) return;
 
-    const result = await registerBusiness(userData);
-    if (result.success) {
-      setRegisterSuccess(
-        "Account created successfully! You are now logged in."
-      );
-    } else {
-      setRegisterError(result.message);
+      setLoginError("");
+      const result = await login(selectedUser.username, pin, false);
+      if (!result.success) {
+        setLoginError(result.message);
+        setPin("");
+      }
+    };
+
+    if (pin.length === 4 && selectedUser) {
+      handleLogin();
     }
-  };
+  }, [pin, selectedUser, login]);
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
       {/* Left Side - Hero Section */}
       <AuthHeroSection />
 
-      {/* Right Side - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
+      {/* Right Side - Auth Interface */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-lg">
           {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <Store className="w-5 h-5 text-primary-foreground" />
+          <div className="lg:hidden flex items-center gap-3 mb-6 justify-center">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-md">
+              <Store className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">AuraSwift</h1>
-              <p className="text-xs text-muted-foreground">
-                Point of Sale System
-              </p>
+              <h1 className="text-xl font-bold text-gray-900">AuraSwift</h1>
+              <p className="text-xs text-gray-600">Restaurant Terminal</p>
             </div>
           </div>
 
-          {/* Auth Card */}
-          <Card className="border-0 shadow-2xl bg-card/80 backdrop-blur-sm">
-            <CardHeader className="space-y-4 ">
-              <div className="flex items-center justify-between">
-                <Badge variant="secondary" className="text-xs font-medium">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Secure Access
-                </Badge>
-              </div>
-            </CardHeader>
-
-            <CardContent>
-              <div className="mb-6 p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-semibold text-sm mb-2">
-                  Demo Credentials:
-                </h4>
-                <div className="space-y-1 text-xs text-muted-foreground">
-                  <p>
-                    <strong>Admin:</strong> admin@store.com
+          {!selectedUser ? (
+            // User Selection Screen
+            <Card className="border-0 shadow-none bg-transparent rounded-3xl overflow-hidden">
+              <div className="p-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                    Select User
+                  </h2>
+                  <p className="text-gray-600 text-sm">
+                    {isLoadingUsers
+                      ? "Loading users..."
+                      : "Tap your profile to login"}
                   </p>
-                  <p className="text-xs mt-1">Password: admin123</p>
+                </div>
+
+                {isLoadingUsers ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : users.length === 0 ? (
+                  <div className="text-center py-12 text-gray-600">
+                    <p>No users found. Please contact administrator.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {users.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => setSelectedUser(user)}
+                        className="group relative flex flex-col items-center p-4 rounded-xl border border-gray-200 hover:border-blue-400 bg-white hover:bg-blue-50 transition-all duration-200 hover:scale-105"
+                      >
+                        <div
+                          className={`w-14 h-14 ${user.color} rounded-full flex items-center justify-center mb-2 transition-shadow`}
+                        >
+                          <User className="w-7 h-7 text-white" />
+                        </div>
+                        <h3 className="font-semibold text-gray-900 text-sm mb-0.5">
+                          {user.firstName} {user.lastName}
+                        </h3>
+                        <p className="text-xs text-gray-600 uppercase tracking-wide">
+                          {user.role}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-6 pt-4 border-t border-gray-200 text-center">
+                  <p className="text-xs text-gray-600">
+                    Version 2.4.1 | 2025 AuraSwift Systems
+                  </p>
                 </div>
               </div>
+            </Card>
+          ) : (
+            // PIN Entry Screen
+            <Card className="border-0 shadow-none bg-transparent rounded-3xl overflow-hidden">
+              <div className="p-6">
+                <div className="text-center mb-6">
+                  <div
+                    className={`w-16 h-16 ${selectedUser.color} rounded-full flex items-center justify-center mx-auto mb-3`}
+                  >
+                    <User className="w-8 h-8 text-white" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900 mb-1">
+                    {selectedUser.firstName} {selectedUser.lastName}
+                  </h2>
+                  <p className="text-gray-600 uppercase tracking-wide text-xs">
+                    {selectedUser.role}
+                  </p>
+                  <p className="text-orange-600 text-xs font-medium mt-1">
+                    Demo PIN: 1234
+                  </p>
+                </div>
 
-              <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Sign In</TabsTrigger>
-                  <TabsTrigger value="register">Register</TabsTrigger>
-                </TabsList>
+                {/* PIN Input Display */}
+                <div className="bg-gray-100 rounded-xl p-4 mb-4">
+                  <div className="flex items-center justify-center gap-1 mb-2">
+                    <User className="w-4 h-4 text-gray-600" />
+                    <span className="text-gray-600 text-xs uppercase tracking-wider font-medium">
+                      Enter PIN
+                    </span>
+                  </div>
+                  <div className="flex justify-center gap-2">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center text-xl font-bold transition-all ${
+                          pin.length > i
+                            ? "bg-blue-500 border-blue-500 text-white"
+                            : "bg-white border-gray-300 text-transparent"
+                        }`}
+                      >
+                        {pin.length > i ? "●" : "○"}
+                      </div>
+                    ))}
+                  </div>
+                  {loginError && (
+                    <p className="text-red-500 text-xs text-center mt-2">
+                      {loginError}
+                    </p>
+                  )}
+                </div>
 
-                <TabsContent value="login">
-                  <LoginForm
-                    onSubmit={handleLoginSubmit}
-                    error={loginError}
-                    isLoading={isLoading}
-                  />
-                </TabsContent>
-
-                <TabsContent value="register">
-                  <RegisterForm
-                    onSubmit={handleRegisterSubmit}
-                    error={registerError}
-                    success={registerSuccess}
-                    isLoading={isLoading}
-                  />
-                </TabsContent>
-              </Tabs>
-
-              <div className="mt-6 text-center">
-                <p className="text-xs text-muted-foreground">
-                  {"By signing in, you agree to our "}
-                  <Button variant="link" className="p-0 h-auto text-xs">
-                    Terms of Service
+                {/* Number Pad */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                    <Button
+                      key={num}
+                      onClick={() => handlePinInput(num.toString())}
+                      disabled={isLoading || pin.length >= 4}
+                      className="h-14 text-xl font-semibold bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg transition-all disabled:opacity-50"
+                    >
+                      {num}
+                    </Button>
+                  ))}
+                  <Button
+                    onClick={() => handlePinInput("0")}
+                    disabled={isLoading || pin.length >= 4}
+                    className="h-14 text-xl font-semibold bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg transition-all col-span-3 disabled:opacity-50"
+                  >
+                    0
                   </Button>
-                  {" and "}
-                  <Button variant="link" className="p-0 h-auto text-xs">
-                    Privacy Policy
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={handleBack}
+                    disabled={isLoading}
+                    variant="outline"
+                    className="h-12 text-sm font-medium bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    BACK
                   </Button>
-                </p>
+                  <Button
+                    onClick={handleDeletePin}
+                    disabled={isLoading || pin.length === 0}
+                    className="h-12 text-sm font-medium bg-red-100 hover:bg-red-200 text-red-700 border-0 rounded-lg disabled:opacity-50"
+                  >
+                    <Delete className="w-4 h-4 mr-2" />
+                    DELETE
+                  </Button>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="mt-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              {"Need help? "}
-              <Button variant="link" className="p-0 h-auto text-sm">
-                Contact Support
-              </Button>
-            </p>
-          </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

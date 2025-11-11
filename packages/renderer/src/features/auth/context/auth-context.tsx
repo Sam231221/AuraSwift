@@ -12,8 +12,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const login = async (
-    email: string,
-    password: string,
+    username: string,
+    pin: string,
     rememberMe: boolean = false
   ): Promise<{ success: boolean; message: string; errors?: string[] }> => {
     setIsLoading(true);
@@ -21,8 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const response = await window.authAPI.login({
-        email,
-        password,
+        username,
+        pin,
         rememberMe,
       });
 
@@ -136,8 +136,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const createUser = async (userData: {
     businessId: string;
-    email: string;
-    password: string;
+    username: string;
+    pin: string;
+    email?: string;
+    password?: string;
     firstName: string;
     lastName: string;
     role: "cashier" | "manager";

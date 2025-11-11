@@ -148,6 +148,18 @@ ipcMain.handle("auth:deleteUser", async (event, userId) => {
   }
 });
 
+ipcMain.handle("auth:getAllActiveUsers", async (event) => {
+  try {
+    return await authAPI.getAllActiveUsers();
+  } catch (error) {
+    console.error("Get all active users IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get users",
+    };
+  }
+});
+
 ipcMain.handle("auth:getUsersByBusiness", async (event, businessId) => {
   try {
     return await authAPI.getUsersByBusiness(businessId);
