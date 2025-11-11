@@ -26,6 +26,9 @@
  */
 
 import type { Database } from "better-sqlite3";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
 
 export interface Migration {
   version: number;
@@ -187,6 +190,169 @@ export const MIGRATIONS: Migration[] = [
         } else {
           throw error;
         }
+      }
+    },
+  },
+
+  {
+    version: 3,
+    name: "0003_create_demo_users",
+    description:
+      "Create default demo users (admin, john-manager, sarah-cashier, emma-cashier)",
+    up: (db) => {
+      try {
+        // Check if demo users already exist
+        const john = db
+          .prepare("SELECT id FROM users WHERE username = ?")
+          .get("john");
+        const sarah = db
+          .prepare("SELECT id FROM users WHERE username = ?")
+          .get("sarah");
+        const emma = db
+          .prepare("SELECT id FROM users WHERE username = ?")
+          .get("emma");
+
+        // Get default business
+        const defaultBusiness = db
+          .prepare("SELECT id FROM businesses LIMIT 1")
+          .get() as { id: string } | undefined;
+
+        if (!defaultBusiness) {
+          console.log(
+            "      ℹ️  No business found, skipping demo users creation"
+          );
+          return;
+        }
+
+        const businessId = defaultBusiness.id;
+        const bcrypt = require("bcryptjs");
+        const { v4: uuidv4 } = require("uuid");
+        const hashedPassword = bcrypt.hashSync("admin123", 10);
+        const now = new Date().toISOString();
+
+        let createdCount = 0;
+
+        // Create john (manager) if doesn't exist
+        if (!john) {
+          const managerId = uuidv4();
+          const managerPermissions = JSON.stringify([
+            { action: "read", resource: "sales" },
+            { action: "create", resource: "transactions" },
+            { action: "void", resource: "transactions" },
+            { action: "apply", resource: "discounts" },
+            { action: "read", resource: "products" },
+            { action: "update", resource: "inventory" },
+            { action: "read", resource: "all_reports" },
+            { action: "manage", resource: "staff_schedules" },
+          ]);
+
+          db.prepare(
+            `INSERT INTO users (id, username, pin, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).run(
+            managerId,
+            "john",
+            "1234",
+            "john@store.com",
+            hashedPassword,
+            "John",
+            "Smith",
+            "Default Store",
+            "manager",
+            businessId,
+            managerPermissions,
+            now,
+            now,
+            1,
+            ""
+          );
+          createdCount++;
+          console.log("         ✓ Created manager: john / PIN: 1234");
+        }
+
+        // Create sarah (cashier) if doesn't exist
+        if (!sarah) {
+          const cashierId1 = uuidv4();
+          const cashierPermissions = JSON.stringify([
+            { action: "read", resource: "sales" },
+            { action: "create", resource: "transactions" },
+            { action: "read", resource: "products" },
+            { action: "read", resource: "basic_reports" },
+          ]);
+
+          db.prepare(
+            `INSERT INTO users (id, username, pin, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).run(
+            cashierId1,
+            "sarah",
+            "1234",
+            "sarah@store.com",
+            hashedPassword,
+            "Sarah",
+            "Johnson",
+            "Default Store",
+            "cashier",
+            businessId,
+            cashierPermissions,
+            now,
+            now,
+            1,
+            ""
+          );
+          createdCount++;
+          console.log("         ✓ Created cashier: sarah / PIN: 1234");
+        }
+
+        // Create emma (cashier) if doesn't exist
+        if (!emma) {
+          const cashierId2 = uuidv4();
+          const cashierPermissions = JSON.stringify([
+            { action: "read", resource: "sales" },
+            { action: "create", resource: "transactions" },
+            { action: "read", resource: "products" },
+            { action: "read", resource: "basic_reports" },
+          ]);
+
+          db.prepare(
+            `INSERT INTO users (id, username, pin, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ).run(
+            cashierId2,
+            "emma",
+            "1234",
+            "emma@store.com",
+            hashedPassword,
+            "Emma",
+            "Davis",
+            "Default Store",
+            "cashier",
+            businessId,
+            cashierPermissions,
+            now,
+            now,
+            1,
+            ""
+          );
+          createdCount++;
+          console.log("         ✓ Created cashier: emma / PIN: 1234");
+        }
+
+        if (createdCount > 0) {
+          console.log(
+            `      ✅ Migration '0003_create_demo_users' created ${createdCount} user(s)`
+          );
+        } else {
+          console.log(
+            "      ℹ️  Migration '0003_create_demo_users' - all demo users already exist"
+          );
+        }
+      } catch (error: any) {
+        console.error(
+          "      ❌ Migration '0003_create_demo_users' failed:",
+          error.message
+        );
+        throw error;
       }
     },
   },
