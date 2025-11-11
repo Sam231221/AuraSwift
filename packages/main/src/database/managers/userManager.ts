@@ -27,68 +27,11 @@ export class UserManager {
     return this.drizzle;
   }
 
-  async createDefaultAdmin(): Promise<void> {
-    const userCount = this.db
-      .prepare("SELECT COUNT(*) as count FROM users")
-      .get() as { count: number };
-
-    if (userCount.count === 0) {
-      const adminId = this.uuid.v4();
-      const businessId = this.uuid.v4();
-      const hashedPassword = await this.bcrypt.hash("admin123", 10);
-      const now = new Date().toISOString();
-
-      const adminPermissions = JSON.stringify([{ action: "*", resource: "*" }]);
-
-      // Temporarily disable foreign key constraints
-      this.db.exec("PRAGMA foreign_keys = OFF");
-
-      try {
-        // Create default business first
-        this.db
-          .prepare(
-            `
-          INSERT INTO businesses (id, name, ownerId, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?)
-        `
-          )
-          .run(businessId, "Default Store", adminId, now, now);
-
-        // Create admin user
-        this.db
-          .prepare(
-            `
-          INSERT INTO users (id, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `
-          )
-          .run(
-            adminId,
-            "admin@store.com",
-            hashedPassword,
-            "Admin",
-            "User",
-            "Default Store",
-            "admin",
-            businessId,
-            adminPermissions,
-            now,
-            now,
-            1,
-            ""
-          );
-
-        console.log("Default admin user created: admin@store.com / admin123");
-      } finally {
-        // Re-enable foreign key constraints
-        this.db.exec("PRAGMA foreign_keys = ON");
-      }
-    }
-  }
-
   async createUser(userData: {
+    username: string;
     email: string;
     password: string;
+    pin: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -98,6 +41,7 @@ export class UserManager {
     const userId = this.uuid.v4();
     const businessId = userData.businessId || this.uuid.v4();
     const hashedPassword = await this.bcrypt.hash(userData.password, 10);
+    const hashedPin = await this.bcrypt.hash(userData.pin, 10);
     const now = new Date().toISOString();
 
     // Set permissions based on role
@@ -130,57 +74,53 @@ export class UserManager {
 
     // If businessId is provided, check that it exists
     if (userData.businessId) {
-      const businessExists = this.db
-        .prepare("SELECT id FROM businesses WHERE id = ?")
-        .get(userData.businessId);
+      const [businessExists] = this.drizzle
+        .select({ id: schema.businesses.id })
+        .from(schema.businesses)
+        .where(eq(schema.businesses.id, userData.businessId))
+        .limit(1)
+        .all();
       if (!businessExists) {
         throw new Error("Business does not exist for provided businessId");
       }
     }
 
-    // Temporarily disable foreign key constraints for user creation
-    this.db.exec("PRAGMA foreign_keys = OFF");
-
-    try {
-      // Create business if not provided
+    // Use Drizzle transaction
+    this.drizzle.transaction((tx) => {
+      // 1. Create business if not provided
       if (!userData.businessId) {
-        this.db
-          .prepare(
-            `
-          INSERT INTO businesses (id, name, ownerId, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?)
-        `
-          )
-          .run(businessId, userData.businessName, userId, now, now);
+        tx.insert(schema.businesses)
+          .values({
+            id: businessId,
+            name: userData.businessName,
+            ownerId: userId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
       }
 
-      // Create user
-      this.db
-        .prepare(
-          `
-        INSERT INTO users (id, email, password, firstName, lastName, businessName, role, businessId, permissions, createdAt, updatedAt, isActive, address)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-        )
-        .run(
-          userId,
-          userData.email,
-          hashedPassword,
-          userData.firstName,
-          userData.lastName,
-          userData.businessName,
-          userData.role,
+      // 2. Create user
+      tx.insert(schema.users)
+        .values({
+          id: userId,
+          username: userData.username,
+          email: userData.email,
+          password: hashedPassword,
+          pin: hashedPin,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          businessName: userData.businessName,
+          role: userData.role,
           businessId,
-          JSON.stringify(permissions),
-          now,
-          now,
-          1,
-          "" // Default empty address
-        );
-    } finally {
-      // Re-enable foreign key constraints
-      this.db.exec("PRAGMA foreign_keys = ON");
-    }
+          permissions: JSON.stringify(permissions),
+          isActive: true,
+          address: "",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+    });
 
     const user = this.getUserById(userId);
     if (!user) {
@@ -190,27 +130,43 @@ export class UserManager {
   }
 
   getUserByEmail(email: string): User | null {
-    const user = this.db
-      .prepare("SELECT * FROM users WHERE email = ? AND isActive = 1")
-      .get(email) as any;
+    const [user] = this.drizzle
+      .select()
+      .from(schema.users)
+      .where(
+        and(eq(schema.users.email, email), eq(schema.users.isActive, true))
+      )
+      .limit(1)
+      .all();
+
     if (!user) return null;
 
     return {
       ...user,
-      permissions: JSON.parse(user.permissions),
-    };
+      permissions:
+        typeof user.permissions === "string"
+          ? JSON.parse(user.permissions)
+          : user.permissions,
+    } as User;
   }
 
   getUserById(id: string): User | null {
-    const user = this.db
-      .prepare("SELECT * FROM users WHERE id = ? AND isActive = 1")
-      .get(id) as any;
+    const [user] = this.drizzle
+      .select()
+      .from(schema.users)
+      .where(and(eq(schema.users.id, id), eq(schema.users.isActive, true)))
+      .limit(1)
+      .all();
+
     if (!user) return null;
 
     return {
       ...user,
-      permissions: JSON.parse(user.permissions),
-    };
+      permissions:
+        typeof user.permissions === "string"
+          ? JSON.parse(user.permissions)
+          : user.permissions,
+    } as User;
   }
 
   async authenticateUser(
@@ -228,21 +184,65 @@ export class UserManager {
     return userWithoutPassword as User;
   }
 
-  getUsersByBusiness(businessId: string): User[] {
-    const users = this.db
-      .prepare(
-        `
-      SELECT * FROM users 
-      WHERE businessId = ? AND isActive = 1
-      ORDER BY createdAt DESC
-    `
+  getUserByUsername(username: string): User | null {
+    const [user] = this.drizzle
+      .select()
+      .from(schema.users)
+      .where(
+        and(
+          eq(schema.users.username, username),
+          eq(schema.users.isActive, true)
+        )
       )
-      .all(businessId) as any[];
+      .limit(1)
+      .all();
+
+    if (!user) return null;
+
+    return {
+      ...user,
+      permissions:
+        typeof user.permissions === "string"
+          ? JSON.parse(user.permissions)
+          : user.permissions,
+    } as User;
+  }
+
+  async authenticateUserByUsernamePin(
+    username: string,
+    pin: string
+  ): Promise<User | null> {
+    const user = this.getUserByUsername(username);
+    if (!user) return null;
+
+    const isValidPin = await this.bcrypt.compare(pin, user.pin);
+    if (!isValidPin) return null;
+
+    // Return user without password and PIN
+    const { password: _, pin: __, ...userWithoutSecrets } = user;
+    return userWithoutSecrets as User;
+  }
+
+  getUsersByBusiness(businessId: string): User[] {
+    const users = this.drizzle
+      .select()
+      .from(schema.users)
+      .where(
+        and(
+          eq(schema.users.businessId, businessId),
+          eq(schema.users.isActive, true)
+        )
+      )
+      .orderBy(desc(schema.users.createdAt))
+      .all();
 
     return users.map((user) => ({
       ...user,
-      permissions: JSON.parse(user.permissions),
-    }));
+      permissions:
+        typeof user.permissions === "string"
+          ? JSON.parse(user.permissions)
+          : user.permissions,
+    })) as User[];
   }
 
   updateUser(
@@ -253,130 +253,49 @@ export class UserManager {
       businessName: string;
       role: "cashier" | "manager" | "admin";
       isActive: boolean;
+      address: string;
     }>
-  ): boolean {
-    const setClause = Object.keys(updates)
-      .map((key) => `${key} = ?`)
-      .join(", ");
+  ): { changes: number } {
+    const now = new Date().toISOString();
 
-    const values = Object.values(updates);
-    values.push(new Date().toISOString()); // updatedAt
-    values.push(id);
+    const result = this.drizzle
+      .update(schema.users)
+      .set({ ...updates, updatedAt: now })
+      .where(eq(schema.users.id, id))
+      .run();
 
-    const result = this.db
-      .prepare(
-        `
-      UPDATE users 
-      SET ${setClause}, updatedAt = ?
-      WHERE id = ?
-    `
-      )
-      .run(...values);
-
-    return result.changes > 0;
+    return result;
   }
 
-  deleteUser(id: string): boolean {
-    const result = this.db
-      .prepare(
-        `
-      UPDATE users 
-      SET isActive = 0, updatedAt = ?
-      WHERE id = ?
-    `
-      )
-      .run(new Date().toISOString(), id);
+  deleteUser(id: string): { changes: number } {
+    const now = new Date().toISOString();
 
-    return result.changes > 0;
+    const result = this.drizzle
+      .update(schema.users)
+      .set({
+        isActive: false,
+        updatedAt: now,
+      })
+      .where(eq(schema.users.id, id))
+      .run();
+
+    return result;
   }
 
   deleteUserSessions(userId: string): void {
-    this.db.prepare("DELETE FROM sessions WHERE userId = ?").run(userId);
-  }
-
-  // ============================================
-  // DRIZZLE ORM METHODS
-  // ============================================
-
-  /**
-   * Get user by email using Drizzle ORM (type-safe)
-   */
-  async getByEmailDrizzle(email: string): Promise<User | null> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [user] = await drizzle
-      .select()
-      .from(schema.users)
-      .where(
-        and(eq(schema.users.email, email), eq(schema.users.isActive, true))
-      )
-      .limit(1);
-
-    if (!user) return null;
-
-    return {
-      ...user,
-      isActive: user.isActive ?? true,
-      address: user.address ?? "",
-      permissions: JSON.parse(user.permissions as string) as Permission[],
-    } as User;
-  }
-
-  /**
-   * Get user by ID using Drizzle ORM (type-safe)
-   */
-  async getByIdDrizzle(id: string): Promise<User | null> {
-    const drizzle = this.getDrizzleInstance();
-
-    const [user] = await drizzle
-      .select()
-      .from(schema.users)
-      .where(and(eq(schema.users.id, id), eq(schema.users.isActive, true)))
-      .limit(1);
-
-    if (!user) return null;
-
-    return {
-      ...user,
-      isActive: user.isActive ?? true,
-      address: user.address ?? "",
-      permissions: JSON.parse(user.permissions as string) as Permission[],
-    } as User;
-  }
-
-  /**
-   * Get users by business using Drizzle ORM (type-safe)
-   */
-  async getByBusinessDrizzle(businessId: string): Promise<User[]> {
-    const drizzle = this.getDrizzleInstance();
-
-    const users = await drizzle
-      .select()
-      .from(schema.users)
-      .where(
-        and(
-          eq(schema.users.businessId, businessId),
-          eq(schema.users.isActive, true)
-        )
-      )
-      .orderBy(desc(schema.users.createdAt));
-
-    return users.map((user) => ({
-      ...user,
-      isActive: user.isActive ?? true,
-      address: user.address ?? "",
-      permissions: JSON.parse(user.permissions as string) as Permission[],
-    })) as User[];
+    this.drizzle
+      .delete(schema.sessions)
+      .where(eq(schema.sessions.userId, userId))
+      .run();
   }
 
   /**
    * Search users by name or email using Drizzle ORM (type-safe)
    */
-  async searchDrizzle(businessId: string, searchTerm: string): Promise<User[]> {
-    const drizzle = this.getDrizzleInstance();
+  async searchUsers(businessId: string, searchTerm: string): Promise<User[]> {
     const searchPattern = `%${searchTerm}%`;
 
-    const users = await drizzle
+    const users = this.drizzle
       .select()
       .from(schema.users)
       .where(
@@ -390,7 +309,8 @@ export class UserManager {
           )`
         )
       )
-      .orderBy(desc(schema.users.createdAt));
+      .orderBy(desc(schema.users.createdAt))
+      .all();
 
     return users.map((user) => ({
       ...user,
@@ -401,12 +321,10 @@ export class UserManager {
   }
 
   /**
-   * Get user with business details using Drizzle JOIN (type-safe)
+   * Get user with business details using JOIN (type-safe)
    */
-  async getWithBusinessDrizzle(userId: string) {
-    const drizzle = this.getDrizzleInstance();
-
-    const result = await drizzle
+  getUserWithBusiness(userId: string) {
+    const result = this.drizzle
       .select({
         user: schema.users,
         business: schema.businesses,
@@ -417,7 +335,8 @@ export class UserManager {
         eq(schema.users.businessId, schema.businesses.id)
       )
       .where(and(eq(schema.users.id, userId), eq(schema.users.isActive, true)))
-      .limit(1);
+      .limit(1)
+      .all();
 
     if (!result[0]) return null;
 
@@ -428,153 +347,5 @@ export class UserManager {
       ) as Permission[],
       business: result[0].business,
     };
-  }
-
-  /**
-   * Update user using Drizzle ORM (type-safe)
-   */
-  async updateDrizzle(
-    id: string,
-    updates: Partial<{
-      firstName: string;
-      lastName: string;
-      businessName: string;
-      role: "cashier" | "manager" | "admin";
-      isActive: boolean;
-      address: string;
-    }>
-  ): Promise<boolean> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const result = await drizzle
-      .update(schema.users)
-      .set({ ...updates, updatedAt: now })
-      .where(eq(schema.users.id, id));
-
-    return result.changes > 0;
-  }
-
-  /**
-   * Delete user using Drizzle ORM (soft delete, type-safe)
-   */
-  async deleteDrizzle(id: string): Promise<boolean> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const result = await drizzle
-      .update(schema.users)
-      .set({
-        isActive: false,
-        updatedAt: now,
-      })
-      .where(eq(schema.users.id, id));
-
-    return result.changes > 0;
-  }
-
-  /**
-   * Create user with optional business creation (Drizzle)
-   * Complex operation with multi-entity creation and permission setup
-   */
-  async createDrizzle(userData: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    businessName: string;
-    role: "cashier" | "manager" | "admin";
-    businessId?: string;
-  }): Promise<User> {
-    const drizzle = this.getDrizzleInstance();
-    const userId = this.uuid.v4();
-    const businessId = userData.businessId || this.uuid.v4();
-    const hashedPassword = await this.bcrypt.hash(userData.password, 10);
-    const now = new Date().toISOString();
-
-    // Set permissions based on role
-    let permissions: Permission[];
-    switch (userData.role) {
-      case "cashier":
-        permissions = [
-          { action: "read", resource: "sales" },
-          { action: "create", resource: "transactions" },
-          { action: "read", resource: "products" },
-          { action: "read", resource: "basic_reports" },
-        ];
-        break;
-      case "manager":
-        permissions = [
-          { action: "read", resource: "sales" },
-          { action: "create", resource: "transactions" },
-          { action: "void", resource: "transactions" },
-          { action: "apply", resource: "discounts" },
-          { action: "read", resource: "products" },
-          { action: "update", resource: "inventory" },
-          { action: "read", resource: "all_reports" },
-          { action: "manage", resource: "staff_schedules" },
-        ];
-        break;
-      case "admin":
-        permissions = [{ action: "*", resource: "*" }];
-        break;
-    }
-
-    // If businessId is provided, check that it exists
-    if (userData.businessId) {
-      const businessExists = await drizzle
-        .select({ id: schema.businesses.id })
-        .from(schema.businesses)
-        .where(eq(schema.businesses.id, userData.businessId))
-        .get();
-
-      if (!businessExists) {
-        throw new Error("Business does not exist for provided businessId");
-      }
-    }
-
-    // Use Drizzle transaction for atomicity
-    drizzle.transaction((tx) => {
-      // 1. Create business if not provided
-      if (!userData.businessId) {
-        tx.insert(schema.businesses)
-          .values({
-            id: businessId,
-            name: userData.businessName,
-            ownerId: userId,
-            address: null,
-            phone: null,
-            vatNumber: null,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .run();
-      }
-
-      // 2. Create user
-      tx.insert(schema.users)
-        .values({
-          id: userId,
-          email: userData.email,
-          password: hashedPassword,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          businessName: userData.businessName,
-          role: userData.role,
-          businessId,
-          permissions: JSON.stringify(permissions),
-          isActive: true,
-          address: "",
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run();
-    });
-
-    const user = await this.getByIdDrizzle(userId);
-    if (!user) {
-      throw new Error("User not found after creation");
-    }
-    return user;
   }
 }

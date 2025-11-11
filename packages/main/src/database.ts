@@ -1312,274 +1312,56 @@ export class DatabaseManager {
     return user;
   }
 
-  getUserByEmail(email: string): User | null {
-    const user = this.db
-      .prepare("SELECT * FROM users WHERE email = ? AND isActive = 1")
-      .get(email) as any;
-    if (!user) return null;
+  // ============================================
+  // FACADE METHODS - Delegate to managers
+  // These methods maintain backward compatibility
+  // while using the proper manager architecture
+  // ============================================
 
-    return {
-      ...user,
-      permissions: JSON.parse(user.permissions),
-    };
+  getUserByEmail(email: string): User | null {
+    return this.users.getUserByEmail(email);
   }
 
   getUserByUsername(username: string): User | null {
-    const user = this.db
-      .prepare("SELECT * FROM users WHERE username = ? AND isActive = 1")
-      .get(username) as any;
-    if (!user) return null;
-
-    return {
-      ...user,
-      permissions: JSON.parse(user.permissions),
-    };
+    return this.users.getUserByUsername(username);
   }
 
   getUserById(id: string): User | null {
-    const user = this.db
-      .prepare("SELECT * FROM users WHERE id = ? AND isActive = 1")
-      .get(id) as any;
-    if (!user) return null;
-
-    return {
-      ...user,
-      permissions: JSON.parse(user.permissions),
-    };
+    return this.users.getUserById(id);
   }
 
   async authenticateUser(username: string, pin: string): Promise<User | null> {
-    const user = this.getUserByUsername(username);
-    if (!user) return null;
-
-    // For PIN, we do direct comparison (PINs are stored as plain text for now)
-    // If you want to hash PINs, you can use bcrypt here too
-    if (user.pin !== pin) return null;
-
-    // Return user without password and PIN
-    const { password: _, pin: __, ...userWithoutPassword } = user;
-    return userWithoutPassword as User;
+    return this.users.authenticateUserByUsernamePin(username, pin);
   }
 
   // Session management methods
-  /**
-   * Create or update a session by token. If session exists, update createdAt; else, create new session.
-   * @param token Session token
-   * @param value JSON string containing userId and other info
-   */
+  // Session methods - delegate to SessionManager
   createOrUpdateSession(token: string, value: string): void {
-    const session = this.getSessionByToken(token);
-    if (session) {
-      this.db
-        .prepare(
-          "UPDATE sessions SET token = ?, createdAt = datetime('now') WHERE id = ?"
-        )
-        .run(token, session.id);
-    } else {
-      const userId = JSON.parse(value).userId || "";
-      // Validate user exists and is active
-      const user = this.db
-        .prepare("SELECT id FROM users WHERE id = ? AND isActive = 1")
-        .get(userId);
-      if (!user) {
-        throw new Error(
-          "Cannot create session: user does not exist or is not active"
-        );
-      }
-      const sessionId = this.uuid.v4();
-      const expiresAt = new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000
-      ).toISOString();
-      this.db
-        .prepare(
-          `INSERT INTO sessions (id, userId, token, expiresAt, createdAt) VALUES (?, ?, ?, ?, datetime('now'))`
-        )
-        .run(sessionId, userId, token, expiresAt);
-    }
+    return this.sessions.createOrUpdateSession(token, value);
   }
 
-  /**
-   * Get session by token
-   */
   getSessionByToken(token: string): Session | null {
-    const session = this.db
-      .prepare(
-        `SELECT * FROM sessions WHERE token = ? AND expiresAt > datetime('now')`
-      )
-      .get(token) as any;
-    return session || null;
+    return this.sessions.getSessionByToken(token);
   }
 
-  /**
-   * Delete session by token
-   */
   deleteSessionByToken(token: string): void {
-    this.db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+    return this.sessions.deleteSessionByToken(token);
   }
 
   createSession(userId: string, expiryDays: number = 7): Session {
-    const sessionId = this.uuid.v4();
-    const token = this.uuid.v4();
-    const now = new Date();
-    const expiresAt = new Date(
-      now.getTime() + expiryDays * 24 * 60 * 60 * 1000
-    );
-
-    this.db
-      .prepare(
-        `
-      INSERT INTO sessions (id, userId, token, expiresAt, createdAt)
-      VALUES (?, ?, ?, ?, ?)
-    `
-      )
-      .run(
-        sessionId,
-        userId,
-        token,
-        expiresAt.toISOString(),
-        now.toISOString()
-      );
-
-    return {
-      id: sessionId,
-      userId,
-      token,
-      expiresAt: expiresAt.toISOString(),
-      createdAt: now.toISOString(),
-    };
+    return this.sessions.createSession(userId, expiryDays);
   }
 
   deleteSession(token: string): boolean {
-    const result = this.db
-      .prepare("DELETE FROM sessions WHERE token = ?")
-      .run(token);
-    return result.changes > 0;
+    return this.sessions.deleteSession(token);
   }
 
-  deleteUserSessions(userId: string): void {
-    this.db.prepare("DELETE FROM sessions WHERE userId = ?").run(userId);
+  deleteUserSessions(userId: string): number {
+    return this.sessions.deleteUserSessions(userId);
   }
 
-  // Cleanup expired sessions
-  cleanupExpiredSessions(): void {
-    this.db
-      .prepare("DELETE FROM sessions WHERE expiresAt <= datetime('now')")
-      .run();
-  }
-
-  // ============================================
-  // DRIZZLE ORM SESSION METHODS
-  // ============================================
-
-  /**
-   * Get session by token using Drizzle ORM (type-safe)
-   * Alternative to getSessionByToken() above
-   */
-  async getSessionByTokenDrizzle(token: string): Promise<Session | null> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const [session] = await drizzle
-      .select()
-      .from(schema.sessions)
-      .where(
-        and(
-          eq(schema.sessions.token, token),
-          drizzleSql`${schema.sessions.expiresAt} > ${now}`
-        )
-      )
-      .limit(1);
-
-    return session || null;
-  }
-
-  /**
-   * Get all sessions for a user using Drizzle ORM (type-safe)
-   * NEW method - list user sessions
-   */
-  async getUserSessionsDrizzle(userId: string): Promise<Session[]> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const sessions = await drizzle
-      .select()
-      .from(schema.sessions)
-      .where(
-        and(
-          eq(schema.sessions.userId, userId),
-          drizzleSql`${schema.sessions.expiresAt} > ${now}`
-        )
-      )
-      .orderBy(desc(schema.sessions.createdAt));
-
-    return sessions;
-  }
-
-  /**
-   * Get active sessions count for a user using Drizzle ORM
-   * NEW method - session monitoring
-   */
-  async getActiveSessionCountDrizzle(userId: string): Promise<number> {
-    const drizzle = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const result = await drizzle
-      .select({ count: drizzleSql<number>`count(*)` })
-      .from(schema.sessions)
-      .where(
-        and(
-          eq(schema.sessions.userId, userId),
-          drizzleSql`${schema.sessions.expiresAt} > ${now}`
-        )
-      );
-
-    return result[0]?.count || 0;
-  }
-
-  /**
-   * Delete session by token (Drizzle)
-   * NEW method - delete specific session
-   */
-  deleteSessionDrizzle(token: string): boolean {
-    const db = this.getDrizzleInstance();
-
-    const result = db
-      .delete(schema.sessions)
-      .where(eq(schema.sessions.token, token))
-      .run();
-
-    return result.changes > 0;
-  }
-
-  /**
-   * Delete all sessions for a user (Drizzle)
-   * NEW method - cleanup user sessions
-   */
-  deleteUserSessionsDrizzle(userId: string): number {
-    const db = this.getDrizzleInstance();
-
-    const result = db
-      .delete(schema.sessions)
-      .where(eq(schema.sessions.userId, userId))
-      .run();
-
-    return result.changes;
-  }
-
-  /**
-   * Cleanup expired sessions (Drizzle)
-   * NEW method - maintenance task
-   */
-  cleanupExpiredSessionsDrizzle(): number {
-    const db = this.getDrizzleInstance();
-    const now = new Date().toISOString();
-
-    const result = db
-      .delete(schema.sessions)
-      .where(drizzleSql`${schema.sessions.expiresAt} <= ${now}`)
-      .run();
-
-    return result.changes;
+  cleanupExpiredSessions(): number {
+    return this.sessions.cleanupExpiredSessions();
   }
 
   // Business management methods

@@ -228,6 +228,7 @@ export const MIGRATIONS: Migration[] = [
         const bcrypt = require("bcryptjs");
         const { v4: uuidv4 } = require("uuid");
         const hashedPassword = bcrypt.hashSync("admin123", 10);
+        const hashedPin = bcrypt.hashSync("1234", 10);
         const now = new Date().toISOString();
 
         let createdCount = 0;
@@ -252,7 +253,7 @@ export const MIGRATIONS: Migration[] = [
           ).run(
             managerId,
             "john",
-            "1234",
+            hashedPin,
             "john@store.com",
             hashedPassword,
             "John",
@@ -286,7 +287,7 @@ export const MIGRATIONS: Migration[] = [
           ).run(
             cashierId1,
             "sarah",
-            "1234",
+            hashedPin,
             "sarah@store.com",
             hashedPassword,
             "Sarah",
@@ -320,7 +321,7 @@ export const MIGRATIONS: Migration[] = [
           ).run(
             cashierId2,
             "emma",
-            "1234",
+            hashedPin,
             "emma@store.com",
             hashedPassword,
             "Emma",
