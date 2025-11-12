@@ -5,9 +5,8 @@ import { getDatabase, type DatabaseManagers } from "./database/index.js";
 // Get auth API and database instance
 const authAPI = getAuthAPI();
 let db: DatabaseManagers | null = null;
-getDatabase().then((database) => {
-  db = database;
-});
+// Don't initialize database here - it will be initialized in initApp()
+// The database will be lazy-loaded when first IPC handler is called
 
 // IPC handlers for persistent key-value storage using app_settings table
 ipcMain.handle("auth:set", async (event, key: string, value: string) => {

@@ -1,10 +1,11 @@
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { app } from "electron";
+import { app, dialog } from "electron";
 import { createRequire } from "module";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { runDrizzleMigrations } from "./drizzle-migrator.js";
+import Database from "better-sqlite3";
 
 const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
@@ -58,9 +59,30 @@ export class DBManager {
       // Initialize Drizzle ORM wrapper
       const drizzleDb = drizzle(this.db);
 
+      // Check for downgrade scenario (newer database, older app)
+      const isDowngradeAttempt = this.checkForDowngrade(this.db, dbPath);
+      if (isDowngradeAttempt) {
+        console.error(
+          "❌ Database downgrade detected - app version is older than database schema"
+        );
+        dialog.showErrorBox(
+          "Cannot Open Database",
+          "This database was created with a newer version of AuraSwift.\n\n" +
+            "Please update the application to the latest version to continue.\n\n" +
+            `Current app version: ${app.getVersion()}\n` +
+            "Database requires a newer version."
+        );
+        app.quit();
+        return;
+      }
+
       // Run Drizzle migrations automatically
-      // This handles ALL schema creation from .sql files (no manual table creation needed!)
-      const migrationSuccess = await runDrizzleMigrations(drizzleDb, dbPath);
+      // Pass both Drizzle wrapper (for migrate()) and raw DB (for transactions/integrity checks)
+      const migrationSuccess = await runDrizzleMigrations(
+        drizzleDb,
+        this.db,
+        dbPath
+      );
 
       if (!migrationSuccess) {
         throw new Error("Database migration failed");
@@ -71,6 +93,126 @@ export class DBManager {
     } catch (error) {
       console.error("Database initialization error:", error);
       throw error;
+    }
+  }
+
+  /**
+   * Check if user is trying to open a newer database with an older app version
+   * This prevents crashes from schema mismatches during downgrades
+   */
+  private checkForDowngrade(db: Database.Database, dbPath: string): boolean {
+    try {
+      // Get app version
+      const appVersion = app.getVersion();
+
+      // Check if database has migration tracking table
+      const tableExists = db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='__drizzle_migrations'"
+        )
+        .get();
+
+      if (!tableExists) {
+        // No migrations applied yet - fresh database, no downgrade risk
+        return false;
+      }
+
+      // Get the latest migration applied to database
+      const latestMigration = db
+        .prepare(
+          "SELECT created_at FROM __drizzle_migrations ORDER BY id DESC LIMIT 1"
+        )
+        .get() as { created_at: number } | undefined;
+
+      if (!latestMigration) {
+        // No migrations applied yet
+        return false;
+      }
+
+      // Store app version in a custom table for version tracking
+      // This allows us to detect downgrades across updates
+      const versionTableExists = db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='_app_version'"
+        )
+        .get();
+
+      if (!versionTableExists) {
+        // Create version tracking table
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS _app_version (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            version TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+          );
+        `);
+
+        // Store current version
+        db.prepare(
+          "INSERT OR REPLACE INTO _app_version (id, version, updated_at) VALUES (1, ?, ?)"
+        ).run(appVersion, Date.now());
+
+        return false; // First time tracking, no downgrade
+      }
+
+      // Get stored version
+      const storedVersion = db
+        .prepare("SELECT version FROM _app_version WHERE id = 1")
+        .get() as { version: string } | undefined;
+
+      if (!storedVersion) {
+        // No version stored, store current and continue
+        db.prepare(
+          "INSERT OR REPLACE INTO _app_version (id, version, updated_at) VALUES (1, ?, ?)"
+        ).run(appVersion, Date.now());
+        return false;
+      }
+
+      // Compare versions (simple string comparison works for semver if formatted correctly)
+      const isDowngrade = this.isVersionDowngrade(
+        storedVersion.version,
+        appVersion
+      );
+
+      if (!isDowngrade) {
+        // Update stored version to current
+        db.prepare(
+          "UPDATE _app_version SET version = ?, updated_at = ? WHERE id = 1"
+        ).run(appVersion, Date.now());
+      }
+
+      return isDowngrade;
+    } catch (error) {
+      console.error("Error checking for downgrade:", error);
+      // On error, allow to proceed (don't block legitimate updates)
+      return false;
+    }
+  }
+
+  /**
+   * Compare two semver version strings
+   * Returns true if newVersion < storedVersion (downgrade attempt)
+   */
+  private isVersionDowngrade(
+    storedVersion: string,
+    newVersion: string
+  ): boolean {
+    try {
+      const stored = storedVersion.split(".").map(Number);
+      const current = newVersion.split(".").map(Number);
+
+      for (let i = 0; i < Math.max(stored.length, current.length); i++) {
+        const s = stored[i] || 0;
+        const c = current[i] || 0;
+
+        if (c < s) return true; // Downgrade detected
+        if (c > s) return false; // Upgrade, OK
+      }
+
+      return false; // Same version, OK
+    } catch (error) {
+      console.error("Version comparison error:", error);
+      return false; // On error, don't block
     }
   }
 

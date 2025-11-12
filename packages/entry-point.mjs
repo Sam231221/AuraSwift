@@ -8,6 +8,11 @@ try {
 
 import { initApp } from "@app/main";
 import { fileURLToPath } from "node:url";
+import { app } from "electron";
+
+// Disable hardware acceleration before app is ready
+// This must be called before any other app initialization
+app.disableHardwareAcceleration();
 
 if (
   process.env.NODE_ENV === "development" ||

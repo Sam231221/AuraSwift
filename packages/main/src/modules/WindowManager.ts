@@ -250,6 +250,39 @@ class WindowManager implements AppModule {
     });
 
     if (this.#renderer instanceof URL) {
+      // In development, check if dev server is running before trying to load
+      if (process.env.NODE_ENV === "development") {
+        try {
+          const response = await fetch(this.#renderer.href, {
+            method: "HEAD",
+            signal: AbortSignal.timeout(2000), // 2 second timeout
+          });
+          if (!response.ok) {
+            throw new Error(`Dev server returned ${response.status}`);
+          }
+        } catch (error) {
+          console.error("\n❌ Frontend dev server is not running!");
+          console.error(`   Cannot load: ${this.#renderer.href}`);
+          console.error("\n💡 To start the frontend dev server, run:");
+          console.error("   npm run dev --workspace @app/renderer");
+          console.error("\n   Or start both frontend and backend together:");
+          console.error("   npm run dev (in root directory)\n");
+
+          // Show error dialog to user
+          const { dialog } = await import("electron");
+          await dialog.showErrorBox(
+            "Development Server Not Running",
+            `The frontend development server is not running.\n\n` +
+              `Please start it with:\n` +
+              `npm run dev --workspace @app/renderer\n\n` +
+              `Then restart the app.`
+          );
+
+          electronApp.quit();
+          return browserWindow;
+        }
+      }
+
       await browserWindow.loadURL(this.#renderer.href);
     } else {
       await browserWindow.loadFile(this.#renderer.path);
