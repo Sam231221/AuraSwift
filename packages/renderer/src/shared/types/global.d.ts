@@ -223,7 +223,7 @@ declare global {
           restockable: boolean;
         }>
       ) => Promise<APIResponse>;
-      createRefund: (refundData: {
+      createRefundTransaction: (refundData: {
         originalTransactionId: string;
         shiftId: string;
         businessId: string;

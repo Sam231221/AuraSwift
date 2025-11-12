@@ -1,12 +1,13 @@
 import { ipcMain } from "electron";
-import { getAuthAPI } from "./authApi.js";
+import { getAuthAPI } from "./appApi.js";
 import { getDatabase, type DatabaseManagers } from "./database/index.js";
 
 // Get auth API and database instance
 const authAPI = getAuthAPI();
 let db: DatabaseManagers | null = null;
-// Don't initialize database here - it will be initialized in initApp()
-// The database will be lazy-loaded when first IPC handler is called
+getDatabase().then((database) => {
+  db = database;
+});
 
 // IPC handlers for persistent key-value storage using app_settings table
 ipcMain.handle("auth:set", async (event, key: string, value: string) => {
@@ -143,18 +144,6 @@ ipcMain.handle("auth:deleteUser", async (event, userId) => {
     return {
       success: false,
       message: "Delete failed",
-    };
-  }
-});
-
-ipcMain.handle("auth:getAllActiveUsers", async (event) => {
-  try {
-    return await authAPI.getAllActiveUsers();
-  } catch (error) {
-    console.error("Get all active users IPC error:", error);
-    return {
-      success: false,
-      message: "Failed to get users",
     };
   }
 });
@@ -666,18 +655,17 @@ ipcMain.handle("shift:getStats", async (event, shiftId) => {
     const transactions = await db.transactions.getTransactionsByShift(shiftId);
 
     const stats = {
-      totalTransactions: transactions.filter(
-        (t: any) => t.status === "completed"
-      ).length,
+      totalTransactions: transactions.filter((t) => t.status === "completed")
+        .length,
       totalSales: transactions
-        .filter((t: any) => t.type === "sale" && t.status === "completed")
-        .reduce((sum: number, t: any) => sum + t.total, 0),
+        .filter((t) => t.type === "sale" && t.status === "completed")
+        .reduce((sum, t) => sum + t.total, 0),
       totalRefunds: Math.abs(
         transactions
-          .filter((t: any) => t.type === "refund" && t.status === "completed")
-          .reduce((sum: number, t: any) => sum + t.total, 0)
+          .filter((t) => t.type === "refund" && t.status === "completed")
+          .reduce((sum, t) => sum + t.total, 0)
       ),
-      totalVoids: transactions.filter((t: any) => t.status === "voided").length,
+      totalVoids: transactions.filter((t) => t.status === "voided").length,
     };
 
     return {
@@ -819,7 +807,7 @@ ipcMain.handle("shift:getPendingReconciliation", async (event, businessId) => {
 ipcMain.handle("refunds:getTransactionById", async (event, transactionId) => {
   try {
     const db = await getDatabase();
-    const transaction = await db.getTransactionById(transactionId);
+    const transaction = await db.transactions.getTransactionById(transactionId);
 
     return {
       success: !!transaction,
@@ -840,7 +828,9 @@ ipcMain.handle(
   async (event, receiptNumber) => {
     try {
       const db = await getDatabase();
-      const transaction = await db.getTransactionByReceiptNumber(receiptNumber);
+      const transaction = await db.transactions.getTransactionByReceiptNumber(
+        receiptNumber
+      );
 
       return {
         success: !!transaction,
@@ -862,7 +852,10 @@ ipcMain.handle(
   async (event, businessId, limit = 50) => {
     try {
       const db = await getDatabase();
-      const transactions = await db.getRecentTransactions(businessId, limit);
+      const transactions = db.transactions.getRecentTransactions(
+        businessId,
+        limit
+      );
 
       return {
         success: true,
@@ -883,7 +876,7 @@ ipcMain.handle(
   async (event, shiftId, limit = 50) => {
     try {
       const db = await getDatabase();
-      const transactions = await db.getShiftTransactions(shiftId, limit);
+      const transactions = db.transactions.getShiftTransactions(shiftId, limit);
 
       return {
         success: true,
@@ -904,7 +897,7 @@ ipcMain.handle(
   async (event, transactionId, refundItems) => {
     try {
       const db = await getDatabase();
-      const validation = db.validateRefundEligibility(
+      const validation = db.transactions.validateRefundEligibility(
         transactionId,
         refundItems
       );
@@ -928,7 +921,8 @@ ipcMain.handle("refunds:create", async (event, refundData) => {
     const db = await getDatabase();
 
     // Validate refund eligibility first
-    const validation = await db.validateRefundEligibility(
+
+    const validation = await db.transactions.validateRefundEligibility(
       refundData.originalTransactionId,
       refundData.refundItems
     );
@@ -940,7 +934,9 @@ ipcMain.handle("refunds:create", async (event, refundData) => {
       };
     }
 
-    const refundTransaction = await db.createRefundTransaction(refundData);
+    const refundTransaction = await db.transactions.createRefundTransaction(
+      refundData
+    );
 
     return {
       success: true,
@@ -959,7 +955,7 @@ ipcMain.handle("refunds:create", async (event, refundData) => {
 ipcMain.handle("voids:validateEligibility", async (event, transactionId) => {
   try {
     const db = await getDatabase();
-    const validation = db.validateVoidEligibility(transactionId);
+    const validation = db.transactions.validateVoidEligibility(transactionId);
 
     return {
       success: true,
@@ -979,7 +975,9 @@ ipcMain.handle("voids:create", async (event, voidData) => {
     const db = await getDatabase();
 
     // Validate void eligibility first
-    const validation = await db.validateVoidEligibility(voidData.transactionId);
+    const validation = db.transactions.validateVoidEligibility(
+      voidData.transactionId
+    );
 
     if (!validation.isValid) {
       return {
@@ -998,7 +996,7 @@ ipcMain.handle("voids:create", async (event, voidData) => {
       };
     }
 
-    const result = await db.voidTransaction(voidData);
+    const result = db.transactions.voidTransaction(voidData);
 
     return result;
   } catch (error) {
@@ -1014,7 +1012,8 @@ ipcMain.handle("voids:create", async (event, voidData) => {
 ipcMain.handle("voids:getTransactionById", async (event, transactionId) => {
   try {
     const db = await getDatabase();
-    const transaction = await db.getTransactionByIdAnyStatus(transactionId);
+    const transaction =
+      db.transactions.getTransactionByIdAnyStatus(transactionId);
 
     return {
       success: true,
@@ -1034,9 +1033,8 @@ ipcMain.handle(
   async (event, receiptNumber) => {
     try {
       const db = await getDatabase();
-      const transaction = await db.getTransactionByReceiptNumberAnyStatus(
-        receiptNumber
-      );
+      const transaction =
+        db.transactions.getTransactionByReceiptNumberAnyStatus(receiptNumber);
 
       return {
         success: true,

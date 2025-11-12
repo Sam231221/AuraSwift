@@ -216,7 +216,7 @@ export class DBManager {
     }
   }
 
-  private getDatabasePath(): string {
+  public getDatabasePath(): string {
     // Multiple ways to detect development mode
     const isDev =
       process.env.NODE_ENV === "development" ||

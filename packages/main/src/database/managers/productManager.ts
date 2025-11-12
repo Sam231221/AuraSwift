@@ -128,19 +128,20 @@ export class ProductManager {
       return this.getProductById(id);
     }
 
-    const result = await this.drizzle
+    // First check if product exists
+    try {
+      await this.getProductById(id);
+    } catch (error) {
+      throw new Error("Product not found");
+    }
+
+    await this.drizzle
       .update(schema.products)
       .set({
         ...updates,
         updatedAt: now,
       })
-      .where(
-        and(eq(schema.products.id, id), eq(schema.products.isActive, true))
-      );
-
-    if (result.changes === 0) {
-      throw new Error("Product not found or update failed");
-    }
+      .where(eq(schema.products.id, id));
 
     return this.getProductById(id);
   }

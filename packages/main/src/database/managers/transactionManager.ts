@@ -351,7 +351,7 @@ export class TransactionManager {
   /**
    * Create refund transaction
    */
-  async createRefund(refundData: {
+  async createRefundTransaction(refundData: {
     originalTransactionId: string;
     shiftId: string;
     businessId: string;

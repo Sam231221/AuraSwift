@@ -264,7 +264,9 @@ const RefundTransactionView: React.FC<RefundModalProps> = ({
         cashierId: user.id,
       };
 
-      const response = await window.refundAPI.createRefund(refundData);
+      const response = await window.refundAPI.createRefundTransaction(
+        refundData
+      );
 
       if (response.success) {
         toast.success("Refund processed successfully");

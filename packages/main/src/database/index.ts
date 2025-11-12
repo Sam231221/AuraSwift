@@ -18,6 +18,7 @@ import { AuditManager } from "./managers/auditManager.js";
 import { TimeTrackingReportManager } from "./managers/timeTrackingReportManager.js";
 import { SettingsManager } from "./managers/settingsManager.js";
 import { initializeDrizzle } from "./drizzle.js";
+import { getDatabaseInfo } from "./utils/dbInfo.js";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -44,6 +45,13 @@ export interface DatabaseManagers {
   audit: AuditManager;
   timeTrackingReports: TimeTrackingReportManager;
   settings: SettingsManager;
+
+  getDatabaseInfo: () => {
+    path: string;
+    mode: "development" | "production";
+    exists: boolean;
+    size?: number;
+  };
 
   emptyAllTables(): Promise<any>;
 }
@@ -122,103 +130,13 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     timeTrackingReports,
     settings,
 
-    // Facade methods for backward compatibility
-    // Settings methods
-    setSetting: (key: string, value: string) => settings.setSetting(key, value),
-    getSetting: (key: string) => settings.getSetting(key),
-    deleteSetting: (key: string) => settings.deleteSetting(key),
-
-    // Business methods
-    getBusinessById: (id: string) => businesses.getBusinessById(id),
-
-    // Schedule methods
-    createSchedule: (schedule: any) => schedules.createSchedule(schedule),
-    getSchedulesByBusinessId: (businessId: string) =>
-      schedules.getSchedulesByBusiness(businessId),
-    getSchedulesByStaffId: (staffId: string) =>
-      schedules.getSchedulesByStaffId(staffId),
-    updateSchedule: (scheduleId: string, updates: any) =>
-      schedules.updateSchedule(scheduleId, updates),
-    deleteSchedule: (scheduleId: string) =>
-      schedules.deleteSchedule(scheduleId),
-    updateScheduleStatus: (scheduleId: string, status: any) =>
-      schedules.updateScheduleStatus(scheduleId, status),
-
-    // Shift methods
-    autoCloseOldActiveShifts: () => shifts.autoCloseOldActiveShifts(),
-    autoEndOverdueShiftsToday: () => shifts.autoEndOverdueShiftsToday(),
-    getTodaysActiveShiftByCashier: (cashierId: string) =>
-      shifts.getTodaysActiveShift(cashierId),
-    createShift: (shift: any) => shifts.createShift(shift),
-    endShift: (shiftId: string, endData: any) =>
-      shifts.endShift(shiftId, endData),
-    getShiftById: (shiftId: string) => shifts.getShiftById(shiftId),
-    getHourlyTransactionStats: (shiftId: string) =>
-      shifts.getHourlyTransactionStats(shiftId),
-    reconcileShift: (shiftId: string, reconciliationData: any) =>
-      shifts.reconcileShift(shiftId, reconciliationData),
-    getPendingReconciliationShifts: (businessId: string) =>
-      shifts.getPendingReconciliationShifts(businessId),
-
-    // Transaction methods
-    getTransactionsByShiftId: (shiftId: string) =>
-      transactions.getTransactionsByShift(shiftId),
-    createTransaction: (transaction: any) =>
-      transactions.createTransaction(transaction),
-    getTransactionById: (transactionId: string) =>
-      transactions.getTransactionById(transactionId),
-    getTransactionByReceiptNumber: (receiptNumber: string) =>
-      transactions.getTransactionByReceiptNumber(receiptNumber),
-    getRecentTransactions: (businessId: string, limit?: number) =>
-      transactions.getRecentTransactions(businessId, limit),
-    getShiftTransactions: (shiftId: string, limit?: number) =>
-      transactions.getShiftTransactions(shiftId, limit),
-    validateRefundEligibility: async (
-      transactionId: string,
-      refundItems: any
-    ) => {
-      // TODO: Implement in TransactionManager
-      throw new Error(
-        "validateRefundEligibility not yet implemented in modular architecture"
-      );
-    },
-    createRefundTransaction: async (refundData: any) => {
-      // TODO: Implement in TransactionManager
-      throw new Error(
-        "createRefundTransaction not yet implemented in modular architecture"
-      );
-    },
-    validateVoidEligibility: async (transactionId: string) => {
-      return transactions.validateVoidEligibility(transactionId);
-    },
-    voidTransaction: async (voidData: any) => {
-      return transactions.voidTransaction(voidData);
-    },
-    getTransactionByIdAnyStatus: (transactionId: string) =>
-      transactions.getTransactionByIdAnyStatus(transactionId),
-    getTransactionByReceiptNumberAnyStatus: (receiptNumber: string) =>
-      transactions.getTransactionByReceiptNumberAnyStatus(receiptNumber),
-
-    // Cash Drawer methods
-    getCurrentCashDrawerBalance: (shiftId: string) =>
-      cashDrawers.getCurrentCashDrawerBalance(shiftId),
-    getExpectedCashForShift: (shiftId: string) =>
-      cashDrawers.getExpectedCashForShift(shiftId),
-    createCashDrawerCount: (countData: any) =>
-      cashDrawers.createCashDrawerCount(countData),
-    getCashDrawerCountsByShiftId: (shiftId: string) =>
-      cashDrawers.getCashDrawerCountsByShift(shiftId),
-
-    // Audit methods
-    createAuditLog: (auditData: any) => auditLogs.createAuditLog(auditData),
-
-    // Database info methods - TODO: Implement in DBManager
+    // Database info methods
     getDatabaseInfo: () => {
-      return {
-        path: "unknown",
-        mode: "production" as const,
-        exists: true,
-      };
+      if (!dbManagerInstance) {
+        throw new Error("Database not initialized");
+      }
+      const dbPath = dbManagerInstance.getDatabasePath();
+      return getDatabaseInfo(dbPath);
     },
     emptyAllTables: async () => {
       throw new Error(

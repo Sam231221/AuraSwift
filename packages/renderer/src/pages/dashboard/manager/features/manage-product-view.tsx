@@ -102,7 +102,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     "add" | "remove"
   >("add");
   const [stockAdjustmentQuantity, setStockAdjustmentQuantity] = useState("");
-  const [stockAdjustmentReason, setStockAdjustmentReason] = useState("");
+  const [stockAdjustmentReason, setStockAdjustmentReason] =
+    useState("Stock received");
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [activeTab, setActiveTab] = useState<string>("basic");
 
@@ -1311,7 +1312,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   }
                   onClick={() => {
                     setStockAdjustmentType("add");
-                    setStockAdjustmentReason("Stock received");
                   }}
                 >
                   Add Stock
@@ -1324,7 +1324,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   }
                   onClick={() => {
                     setStockAdjustmentType("remove");
-                    setStockAdjustmentReason("Stock adjustment");
                   }}
                 >
                   Remove Stock
@@ -1377,7 +1376,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                       // Reset form
                       setStockAdjustmentProduct(null);
                       setStockAdjustmentQuantity("");
-                      setStockAdjustmentReason("");
+                      setStockAdjustmentReason("Stock received");
                       setStockAdjustmentType("add");
                     } else {
                       toast.error("Please enter a valid quantity and reason");
@@ -1393,7 +1392,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   onClick={() => {
                     setStockAdjustmentProduct(null);
                     setStockAdjustmentQuantity("");
-                    setStockAdjustmentReason("");
+                    setStockAdjustmentReason("Stock received");
                     setStockAdjustmentType("add");
                   }}
                 >

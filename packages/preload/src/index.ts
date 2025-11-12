@@ -300,7 +300,7 @@ contextBridge.exposeInMainWorld("refundAPI", {
       refundItems
     ),
 
-  createRefund: (refundData: {
+  createRefundTransaction: (refundData: {
     originalTransactionId: string;
     shiftId: string;
     businessId: string;

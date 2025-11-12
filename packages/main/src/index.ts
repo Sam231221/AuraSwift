@@ -10,7 +10,7 @@ import { terminateAppOnLastWindowClose } from "./modules/ApplicationTerminatorOn
 import { autoUpdater } from "./modules/AutoUpdater.js";
 import { allowInternalOrigins } from "./modules/BlockNotAllowdOrigins.js";
 import { allowExternalUrls } from "./modules/ExternalUrls.js";
-import "./authStore.js"; // Initialize auth handlers
+import "./appStore.js"; // Initialize auth handlers
 import { getDatabase } from "./database/index.js";
 
 // Global reference to autoUpdater instance for menu access
