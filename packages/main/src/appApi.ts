@@ -956,7 +956,7 @@ export class AuthAPI {
     try {
       const db = await this.getDb();
 
-      const adjustment = db.createStockAdjustment(adjustmentData);
+      const adjustment = db.inventory.createStockAdjustment(adjustmentData);
 
       return {
         success: true,
