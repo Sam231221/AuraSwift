@@ -13,7 +13,13 @@ const requiredString = (fieldName: string) =>
     .min(1, `${fieldName} is required`)
     .trim();
 
-const optionalString = z.string().trim().optional();
+const optionalString = z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal(""))
+  .or(z.null())
+  .transform((val) => val || "");
 
 // SKU validation: alphanumeric, dashes, underscores only
 export const skuSchema = z
@@ -109,7 +115,10 @@ export const productSchema = z
     category: z
       .string({ message: "Category must be text" })
       .min(1, "Please select a category"),
-    price: priceSchema,
+    price: z
+      .number({ message: "Price must be a number" })
+      .nonnegative("Price cannot be negative")
+      .finite("Price must be a valid number"),
     costPrice: costPriceSchema,
     taxRate: taxRateSchema,
     stockLevel: stockLevelSchema,
@@ -174,7 +183,10 @@ export const productUpdateSchema = z
     category: z
       .string({ message: "Category must be text" })
       .min(1, "Please select a category"),
-    price: priceSchema,
+    price: z
+      .number({ message: "Price must be a number" })
+      .nonnegative("Price cannot be negative")
+      .finite("Price must be a valid number"),
     costPrice: costPriceSchema,
     taxRate: taxRateSchema,
     stockLevel: stockLevelSchema,

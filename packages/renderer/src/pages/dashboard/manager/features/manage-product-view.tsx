@@ -132,13 +132,16 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       setLoading(true);
       const response = await window.productAPI.getByBusiness(user!.businessId);
       if (response.success && response.products) {
-        setProducts(response.products);
+        // Ensure products is always an array
+        setProducts(Array.isArray(response.products) ? response.products : []);
       } else {
         toast.error("Failed to load products");
+        setProducts([]); // Set to empty array on error
       }
     } catch (error) {
       console.error("Error loading products:", error);
       toast.error("Failed to load products");
+      setProducts([]); // Set to empty array on error
     } finally {
       setLoading(false);
     }
@@ -148,13 +151,18 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     try {
       const response = await window.categoryAPI.getByBusiness(user!.businessId);
       if (response.success && response.categories) {
-        setCategories(response.categories);
+        // Ensure categories is always an array
+        setCategories(
+          Array.isArray(response.categories) ? response.categories : []
+        );
       } else {
         toast.error("Failed to load categories");
+        setCategories([]); // Set to empty array on error
       }
     } catch (error) {
       console.error("Error loading categories:", error);
       toast.error("Failed to load categories");
+      setCategories([]); // Set to empty array on error
     }
   }, [user]);
 
@@ -180,26 +188,33 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const productsPerPage = 10;
 
   // Get low stock products
-  const lowStockProducts = products.filter(
-    (p) => p.stockLevel <= p.minStockLevel && p.isActive
-  );
+  const lowStockProducts = Array.isArray(products)
+    ? products.filter((p) => p.stockLevel <= p.minStockLevel && p.isActive)
+    : [];
 
   // Filter products
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      filterCategory === "all" || product.category === filterCategory;
-    const matchesStock =
-      filterStock === "all" ||
-      (filterStock === "low" && product.stockLevel <= product.minStockLevel) ||
-      (filterStock === "in_stock" &&
-        product.stockLevel > product.minStockLevel) ||
-      (filterStock === "out_of_stock" && product.stockLevel === 0);
-    return matchesSearch && matchesCategory && matchesStock;
-  });
+  const filteredProducts = Array.isArray(products)
+    ? products.filter((product) => {
+        const matchesSearch =
+          (product.name || "")
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          (product.description || "")
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          (product.sku || "").toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory =
+          filterCategory === "all" || product.category === filterCategory;
+        const matchesStock =
+          filterStock === "all" ||
+          (filterStock === "low" &&
+            product.stockLevel <= product.minStockLevel) ||
+          (filterStock === "in_stock" &&
+            product.stockLevel > product.minStockLevel) ||
+          (filterStock === "out_of_stock" && product.stockLevel === 0);
+        return matchesSearch && matchesCategory && matchesStock;
+      })
+    : [];
 
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
   const startIndex = (currentPage - 1) * productsPerPage;
@@ -232,14 +247,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   }, [categories]);
 
   const openAddProductDrawer = useCallback(() => {
-    // Ensure we have categories loaded before opening
-    if (categories.length === 0) {
-      toast.error("Please wait for categories to load or add a category first");
-      return;
-    }
     resetForm();
     setIsDrawerOpen(true);
-  }, [categories, resetForm]);
+  }, [resetForm]);
 
   const handleAddProduct = async () => {
     // Clear previous errors
@@ -346,9 +356,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         ...newProduct,
         // Trim string fields
         name: newProduct.name.trim(),
-        description: newProduct.description.trim(),
+        description: (newProduct.description || "").trim(),
         sku: newProduct.sku.trim(),
-        plu: newProduct.plu.trim() || undefined,
+        plu: (newProduct.plu || "").trim() || undefined,
         businessId: user!.businessId,
         // Include only valid modifiers
         modifiers: validModifiers,
@@ -814,7 +824,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                 £
                 {products.length > 0
                   ? (
-                      products.reduce((sum, p) => sum + p.price, 0) /
+                      products.reduce((sum, p) => sum + (p.price || 0), 0) /
                       products.length
                     ).toFixed(2)
                   : "0.00"}
@@ -1123,9 +1133,12 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                                 <div className="text-gray-900 font-medium">
                                   £
                                   {product.requiresWeight
-                                    ? product.pricePerUnit?.toFixed(2) ||
-                                      product.price.toFixed(2)
-                                    : product.price.toFixed(2)}
+                                    ? (
+                                        product.pricePerUnit ||
+                                        product.price ||
+                                        0
+                                      ).toFixed(2)
+                                    : (product.price || 0).toFixed(2)}
                                   {product.requiresWeight && (
                                     <span className="text-xs text-gray-500 ml-1">
                                       /{product.unit}
@@ -1133,7 +1146,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                                   )}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  Cost: £{product.costPrice.toFixed(2)}
+                                  Cost: £{(product.costPrice || 0).toFixed(2)}
                                 </div>
                               </div>
                               {product.requiresWeight && (
@@ -1698,10 +1711,12 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   <div>
                     <Label>Profit Margin</Label>
                     <div className="mt-1 p-2 bg-gray-50 rounded text-sm">
-                      {newProduct.price > 0 && newProduct.costPrice > 0
+                      {(newProduct.price || 0) > 0 &&
+                      (newProduct.costPrice || 0) > 0
                         ? `${(
-                            ((newProduct.price - newProduct.costPrice) /
-                              newProduct.price) *
+                            (((newProduct.price || 0) -
+                              (newProduct.costPrice || 0)) /
+                              (newProduct.price || 1)) *
                             100
                           ).toFixed(1)}%`
                         : "N/A"}

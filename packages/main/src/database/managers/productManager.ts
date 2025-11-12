@@ -94,6 +94,29 @@ export class ProductManager {
     } as Product;
   }
 
+  async getProductBySKU(sku: string): Promise<Product | null> {
+    const [product] = await this.drizzle
+      .select()
+      .from(schema.products)
+      .where(
+        and(eq(schema.products.sku, sku), eq(schema.products.isActive, true))
+      )
+      .limit(1);
+
+    if (!product) {
+      return null;
+    }
+
+    const modifiers = await this.getProductModifiers(product.id);
+
+    return {
+      ...product,
+      isActive: Boolean(product.isActive),
+      requiresWeight: Boolean(product.requiresWeight),
+      modifiers,
+    } as Product;
+  }
+
   async getProductsByBusiness(businessId: string): Promise<Product[]> {
     const products = await this.drizzle
       .select()

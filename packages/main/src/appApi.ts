@@ -446,7 +446,9 @@ export class AuthAPI {
 
       // Check if SKU already exists
       try {
-        const existingProduct = db.products.getProductById(productData.sku);
+        const existingProduct = await db.products.getProductBySKU(
+          productData.sku
+        );
         if (existingProduct) {
           return {
             success: false,
@@ -460,7 +462,7 @@ export class AuthAPI {
       // Check if PLU already exists (if PLU is provided)
       if (productData.plu) {
         try {
-          const existingProductByPLU = db.products.getProductByPLU(
+          const existingProductByPLU = await db.products.getProductByPLU(
             productData.plu
           );
           if (existingProductByPLU) {
@@ -522,12 +524,15 @@ export class AuthAPI {
       }
 
       // Fetch the complete product with modifiers
-      const completeProduct = db.products.getProductById(product.id);
+      const completeProduct = await db.products.getProductById(product.id);
+
+      // Convert to plain object to ensure serialization works
+      const serializedProduct = JSON.parse(JSON.stringify(completeProduct));
 
       return {
         success: true,
         message: "Product created successfully",
-        product: completeProduct,
+        product: serializedProduct,
       };
     } catch (error: any) {
       console.error("Product creation error:", error);
@@ -544,12 +549,15 @@ export class AuthAPI {
   async getProductsByBusiness(businessId: string): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
-      const products = db.products.getProductsByBusiness(businessId);
+      const products = await db.products.getProductsByBusiness(businessId);
+
+      // Convert to plain objects to ensure serialization works
+      const serializedProducts = JSON.parse(JSON.stringify(products));
 
       return {
         success: true,
         message: "Products retrieved successfully",
-        products,
+        products: serializedProducts,
       };
     } catch (error: any) {
       console.error("Get products error:", error);
@@ -566,12 +574,15 @@ export class AuthAPI {
   async getProductById(id: string): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
-      const product = db.products.getProductById(id);
+      const product = await db.products.getProductById(id);
+
+      // Convert to plain object to ensure serialization works
+      const serializedProduct = JSON.parse(JSON.stringify(product));
 
       return {
         success: true,
         message: "Product retrieved successfully",
-        product,
+        product: serializedProduct,
       };
     } catch (error: any) {
       console.error("Get product error:", error);
@@ -595,7 +606,9 @@ export class AuthAPI {
       // If updating SKU, check it doesn't already exist
       if (updates.sku) {
         try {
-          const existingProduct = db.products.getProductById(updates.sku);
+          const existingProduct = await db.products.getProductBySKU(
+            updates.sku
+          );
           if (existingProduct && existingProduct.id !== id) {
             return {
               success: false,
@@ -610,7 +623,9 @@ export class AuthAPI {
       // If updating PLU, check it doesn't already exist
       if (updates.plu) {
         try {
-          const existingProductByPLU = db.products.getProductByPLU(updates.plu);
+          const existingProductByPLU = await db.products.getProductByPLU(
+            updates.plu
+          );
           if (existingProductByPLU && existingProductByPLU.id !== id) {
             return {
               success: false,
@@ -634,11 +649,11 @@ export class AuthAPI {
       // Handle modifiers if provided
       if (modifiers !== undefined) {
         // Get current product modifiers
-        const currentModifiers = db.products.getProductModifiers(id);
+        const currentModifiers = await db.products.getProductModifiers(id);
 
         // Remove all existing modifiers for this product
         for (const modifier of currentModifiers) {
-          db.products.removeModifierFromProduct(id, modifier.id);
+          await db.products.removeModifierFromProduct(id, modifier.id);
         }
 
         // Add new modifiers
@@ -676,12 +691,15 @@ export class AuthAPI {
       }
 
       // Fetch the complete updated product with modifiers
-      const updatedProduct = db.products.getProductById(id);
+      const updatedProduct = await db.products.getProductById(id);
+
+      // Convert to plain object to ensure serialization works
+      const serializedProduct = JSON.parse(JSON.stringify(updatedProduct));
 
       return {
         success: true,
         message: "Product updated successfully",
-        product: updatedProduct,
+        product: serializedProduct,
       };
     } catch (error: any) {
       console.error("Product update error:", error);
@@ -698,7 +716,7 @@ export class AuthAPI {
   async deleteProduct(id: string): Promise<ProductResponse> {
     try {
       const db = await this.getDb();
-      const deleted = db.products.deleteProduct(id);
+      const deleted = await db.products.deleteProduct(id);
 
       if (!deleted) {
         return {
@@ -730,10 +748,13 @@ export class AuthAPI {
       const db = await this.getDb();
       const category = await db.categories.createCategory(categoryData);
 
+      // Convert to plain object to ensure serialization works
+      const serializedCategory = JSON.parse(JSON.stringify(category));
+
       return {
         success: true,
         message: "Category created successfully",
-        category,
+        category: serializedCategory,
       };
     } catch (error: any) {
       console.error("Category creation error:", error);
@@ -754,9 +775,12 @@ export class AuthAPI {
         businessId
       );
 
+      // Convert to plain objects to ensure serialization works
+      const serializedCategories = JSON.parse(JSON.stringify(categories));
+
       return {
         success: true,
-        categories,
+        categories: serializedCategories,
       };
     } catch (error: any) {
       console.error("Get categories error:", error);
@@ -782,9 +806,12 @@ export class AuthAPI {
         };
       }
 
+      // Convert to plain object to ensure serialization works
+      const serializedCategory = JSON.parse(JSON.stringify(category));
+
       return {
         success: true,
-        category,
+        category: serializedCategory,
       };
     } catch (error: any) {
       console.error("Get category error:", error);
@@ -810,10 +837,13 @@ export class AuthAPI {
         };
       }
 
+      // Convert to plain object to ensure serialization works
+      const serializedCategory = JSON.parse(JSON.stringify(category));
+
       return {
         success: true,
         message: "Category updated successfully",
-        category,
+        category: serializedCategory,
       };
     } catch (error: any) {
       console.error("Update category error:", error);
@@ -894,14 +924,14 @@ export class AuthAPI {
 
       // Add options
       for (const option of modifierData.options) {
-        db.products.createModifierOption(modifier.id, {
+        await db.products.createModifierOption(modifier.id, {
           name: option.name,
           price: option.price,
         });
       }
 
       // Get the complete modifier with options
-      const completeModifier = db.getModifierById(modifier.id);
+      const completeModifier = await db.getModifierById(modifier.id);
 
       return {
         success: true,

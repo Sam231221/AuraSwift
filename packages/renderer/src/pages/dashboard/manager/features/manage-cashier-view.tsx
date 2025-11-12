@@ -121,7 +121,7 @@ export default function CashierManagementView({
           .filter((u) => u.role === "cashier")
           .map((u) => ({
             id: u.id,
-            email: u.email,
+            email: u.email ?? "", // Ensure email is always a string
             firstName: u.firstName,
             lastName: u.lastName,
             role: u.role as "cashier",
@@ -191,6 +191,9 @@ export default function CashierManagementView({
         role: "cashier" as "cashier" | "manager",
         avatar: newUser.avatar || undefined,
         address: newUser.address || undefined,
+        // Required for PIN-based system
+        username: newUser.email, // Use email as username for now
+        pin: "1234", // Default PIN, should be set by admin or user later
       };
 
       const response = await createUser(userData);

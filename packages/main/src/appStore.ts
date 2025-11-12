@@ -394,9 +394,13 @@ ipcMain.handle("schedules:create", async (event, scheduleData) => {
       ...scheduleData,
       status: "upcoming" as const,
     });
+
+    // Convert to plain object to ensure serialization works
+    const serializedSchedule = JSON.parse(JSON.stringify(schedule));
+
     return {
       success: true,
-      data: schedule,
+      data: serializedSchedule,
     };
   } catch (error) {
     console.error("Create schedule IPC error:", error);
@@ -411,9 +415,13 @@ ipcMain.handle("schedules:getByBusiness", async (event, businessId) => {
   try {
     if (!db) db = await getDatabase();
     const schedules = db.schedules.getSchedulesByBusiness(businessId);
+
+    // Convert to plain objects to ensure serialization works
+    const serializedSchedules = JSON.parse(JSON.stringify(schedules));
+
     return {
       success: true,
-      data: schedules,
+      data: serializedSchedules,
     };
   } catch (error) {
     console.error("Get schedules IPC error:", error);
@@ -428,9 +436,13 @@ ipcMain.handle("schedules:getByStaff", async (event, staffId) => {
   try {
     if (!db) db = await getDatabase();
     const schedules = db.schedules.getSchedulesByStaffId(staffId);
+
+    // Convert to plain objects to ensure serialization works
+    const serializedSchedules = JSON.parse(JSON.stringify(schedules));
+
     return {
       success: true,
-      data: schedules,
+      data: serializedSchedules,
     };
   } catch (error) {
     console.error("Get staff schedules IPC error:", error);
@@ -447,10 +459,13 @@ ipcMain.handle("schedules:update", async (event, id, updates) => {
 
     const updatedSchedule = db.schedules.updateSchedule(id, updates);
 
+    // Convert to plain object to ensure serialization works
+    const serializedSchedule = JSON.parse(JSON.stringify(updatedSchedule));
+
     return {
       success: true,
       message: "Schedule updated successfully",
-      data: updatedSchedule,
+      data: serializedSchedule,
     };
   } catch (error) {
     console.error("Update schedule IPC error:", error);
@@ -507,9 +522,13 @@ ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
     const staffUsers = users.filter(
       (user) => user.role === "cashier" || user.role === "manager"
     );
+
+    // Convert to plain objects to ensure serialization works
+    const serializedUsers = JSON.parse(JSON.stringify(staffUsers));
+
     return {
       success: true,
-      data: staffUsers,
+      data: serializedUsers,
     };
   } catch (error) {
     console.error("Get cashier users IPC error:", error);
@@ -539,10 +558,13 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
     // Check if cashier already has an active shift (only check today's shifts)
     const existingShift = db.shifts.getTodaysActiveShift(shiftData.cashierId);
     if (existingShift) {
+      // Convert to plain object to ensure serialization works
+      const serializedExistingShift = JSON.parse(JSON.stringify(existingShift));
+
       return {
         success: false,
         message: "You already have an active shift running",
-        data: existingShift,
+        data: serializedExistingShift,
       };
     }
 
@@ -565,10 +587,13 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
       }
     }
 
+    // Convert to plain object to ensure serialization works
+    const serializedShift = JSON.parse(JSON.stringify(shift));
+
     return {
       success: true,
       message: "Shift started successfully",
-      data: shift,
+      data: serializedShift,
     };
   } catch (error) {
     console.error("Start shift IPC error:", error);
@@ -627,9 +652,13 @@ ipcMain.handle("shift:getActive", async (event, cashierId) => {
 
     // Use the new method that checks for today's active shift only
     const shift = db.shifts.getTodaysActiveShift(cashierId);
+
+    // Convert to plain object to ensure serialization works
+    const serializedShift = shift ? JSON.parse(JSON.stringify(shift)) : null;
+
     return {
       success: true,
-      data: shift,
+      data: serializedShift,
     };
   } catch (error) {
     console.error("Get active shift IPC error:", error);
@@ -745,9 +774,12 @@ ipcMain.handle("transactions:create", async (event, transactionData) => {
       transactionData
     );
 
+    // Convert to plain object to ensure serialization works
+    const serializedTransaction = JSON.parse(JSON.stringify(transaction));
+
     return {
       success: true,
-      transaction,
+      transaction: serializedTransaction,
     };
   } catch (error) {
     console.error("Create transaction IPC error:", error);
@@ -763,9 +795,12 @@ ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
     const db = await getDatabase();
     const transactions = await db.transactions.getTransactionsByShift(shiftId);
 
+    // Convert to plain objects to ensure serialization works
+    const serializedTransactions = JSON.parse(JSON.stringify(transactions));
+
     return {
       success: true,
-      data: transactions,
+      data: serializedTransactions,
     };
   } catch (error) {
     console.error("Get transactions by shift IPC error:", error);
@@ -789,9 +824,12 @@ ipcMain.handle(
         reconciliationData
       );
 
+      // Convert to plain object to ensure serialization works
+      const serializedShift = JSON.parse(JSON.stringify(updatedShift));
+
       return {
         success: true,
-        shift: updatedShift,
+        shift: serializedShift,
       };
     } catch (error) {
       console.error("Reconcile shift IPC error:", error);
@@ -808,9 +846,12 @@ ipcMain.handle("shift:getPendingReconciliation", async (event, businessId) => {
     const db = await getDatabase();
     const pendingShifts = db.shifts.getPendingReconciliationShifts(businessId);
 
+    // Convert to plain objects to ensure serialization works
+    const serializedShifts = JSON.parse(JSON.stringify(pendingShifts));
+
     return {
       success: true,
-      shifts: pendingShifts,
+      shifts: serializedShifts,
     };
   } catch (error) {
     console.error("Get pending reconciliation shifts IPC error:", error);
@@ -827,10 +868,15 @@ ipcMain.handle("refunds:getTransactionById", async (event, transactionId) => {
     const db = await getDatabase();
     const transaction = await db.transactions.getTransactionById(transactionId);
 
+    // Convert to plain object to ensure serialization works
+    const serializedTransaction = transaction
+      ? JSON.parse(JSON.stringify(transaction))
+      : null;
+
     return {
-      success: !!transaction,
-      transaction,
-      message: transaction ? undefined : "Transaction not found",
+      success: !!serializedTransaction,
+      transaction: serializedTransaction,
+      message: serializedTransaction ? undefined : "Transaction not found",
     };
   } catch (error) {
     console.error("Get transaction by ID IPC error:", error);
@@ -850,10 +896,15 @@ ipcMain.handle(
         receiptNumber
       );
 
+      // Convert to plain object to ensure serialization works
+      const serializedTransaction = transaction
+        ? JSON.parse(JSON.stringify(transaction))
+        : null;
+
       return {
-        success: !!transaction,
-        transaction,
-        message: transaction ? undefined : "Transaction not found",
+        success: !!serializedTransaction,
+        transaction: serializedTransaction,
+        message: serializedTransaction ? undefined : "Transaction not found",
       };
     } catch (error) {
       console.error("Get transaction by receipt IPC error:", error);
@@ -870,14 +921,17 @@ ipcMain.handle(
   async (event, businessId, limit = 50) => {
     try {
       const db = await getDatabase();
-      const transactions = db.transactions.getRecentTransactions(
+      const transactions = await db.transactions.getRecentTransactions(
         businessId,
         limit
       );
 
+      // Convert to plain objects to ensure serialization works
+      const serializedTransactions = JSON.parse(JSON.stringify(transactions));
+
       return {
         success: true,
-        transactions,
+        transactions: serializedTransactions,
       };
     } catch (error) {
       console.error("Get recent transactions IPC error:", error);
@@ -894,11 +948,17 @@ ipcMain.handle(
   async (event, shiftId, limit = 50) => {
     try {
       const db = await getDatabase();
-      const transactions = db.transactions.getShiftTransactions(shiftId, limit);
+      const transactions = await db.transactions.getShiftTransactions(
+        shiftId,
+        limit
+      );
+
+      // Convert to plain objects to ensure serialization works
+      const serializedTransactions = JSON.parse(JSON.stringify(transactions));
 
       return {
         success: true,
-        transactions,
+        transactions: serializedTransactions,
       };
     } catch (error) {
       console.error("Get shift transactions IPC error:", error);
