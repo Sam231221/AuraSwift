@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1762819929520,
-      "tag": "0000_complete_imperial_guard",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1731283800000,
-      "tag": "0001_add_suppliers",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1731283900000,
-      "tag": "0002_add_username_pin_auth",
+      "when": 1762905825802,
+      "tag": "0000_curly_blue_shield",
       "breakpoints": true
     }
   ]

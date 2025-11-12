@@ -12,7 +12,7 @@ import { createRequire } from "module";
 import { createLogger, format, transports } from "winston";
 import * as path from "path";
 import { app } from "electron";
-import { getDatabase } from "../database.js";
+import { getDatabase } from "../database/index.js";
 
 const require = createRequire(import.meta.url);
 

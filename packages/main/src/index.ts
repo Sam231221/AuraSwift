@@ -12,7 +12,7 @@ import { autoUpdater } from "./modules/AutoUpdater.js";
 import { allowInternalOrigins } from "./modules/BlockNotAllowdOrigins.js";
 import { allowExternalUrls } from "./modules/ExternalUrls.js";
 import "./authStore.js"; // Initialize auth handlers
-import { getDatabase } from "./database.js";
+import { getDatabase } from "./database/index.js";
 
 // Global reference to autoUpdater instance for menu access
 let autoUpdaterInstance: ReturnType<typeof autoUpdater> | null = null;
@@ -41,7 +41,7 @@ export async function initApp(initConfig: AppInitConfig) {
   // Run cleanup every 30 minutes
   const cleanupInterval = setInterval(() => {
     try {
-      db.autoCloseOldActiveShifts();
+      db.shifts.autoCloseOldActiveShifts();
     } catch (error) {
       // Error during periodic shift cleanup
     }
@@ -54,7 +54,7 @@ export async function initApp(initConfig: AppInitConfig) {
 
   // Run cleanup immediately on startup
   try {
-    db.autoCloseOldActiveShifts();
+    db.shifts.autoCloseOldActiveShifts();
   } catch (error) {
     // Error during startup shift cleanup
   }

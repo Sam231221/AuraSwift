@@ -1,10 +1,10 @@
 import { ipcMain } from "electron";
 import { getAuthAPI } from "./authApi.js";
-import { getDatabase, type DatabaseManager } from "./database.js";
+import { getDatabase, type DatabaseManagers } from "./database/index.js";
 
 // Get auth API and database instance
 const authAPI = getAuthAPI();
-let db: DatabaseManager | null = null;
+let db: DatabaseManagers | null = null;
 getDatabase().then((database) => {
   db = database;
 });
@@ -14,7 +14,7 @@ ipcMain.handle("auth:set", async (event, key: string, value: string) => {
   try {
     if (!db) db = await getDatabase();
     // Store key-value pair in app_settings table
-    db.setSetting(key, value);
+    db.settings.setSetting(key, value);
     return true;
   } catch (error) {
     console.error("Error setting auth data:", error);
@@ -25,7 +25,7 @@ ipcMain.handle("auth:set", async (event, key: string, value: string) => {
 ipcMain.handle("auth:get", async (event, key: string) => {
   try {
     if (!db) db = await getDatabase();
-    const value = db.getSetting(key);
+    const value = db.settings.getSetting(key);
     return value;
   } catch (error) {
     console.error("Error getting auth data:", error);
@@ -36,7 +36,7 @@ ipcMain.handle("auth:get", async (event, key: string) => {
 ipcMain.handle("auth:delete", async (event, key: string) => {
   try {
     if (!db) db = await getDatabase();
-    db.deleteSetting(key);
+    db.settings.deleteSetting(key);
     return true;
   } catch (error) {
     console.error("Error deleting auth data:", error);
@@ -188,7 +188,7 @@ ipcMain.handle("auth:createUser", async (event, userData) => {
 ipcMain.handle("auth:getBusinessById", async (event, businessId) => {
   try {
     const db = await getDatabase();
-    const business = db.getBusinessById(businessId);
+    const business = db.businesses.getBusinessById(businessId);
 
     if (business) {
       return {
@@ -384,7 +384,7 @@ ipcMain.handle("stock:getAdjustments", async (event, productId) => {
 ipcMain.handle("schedules:create", async (event, scheduleData) => {
   try {
     if (!db) db = await getDatabase();
-    const schedule = db.createSchedule({
+    const schedule = db.schedules.createSchedule({
       ...scheduleData,
       status: "upcoming" as const,
     });
@@ -404,7 +404,7 @@ ipcMain.handle("schedules:create", async (event, scheduleData) => {
 ipcMain.handle("schedules:getByBusiness", async (event, businessId) => {
   try {
     if (!db) db = await getDatabase();
-    const schedules = db.getSchedulesByBusinessId(businessId);
+    const schedules = db.schedules.getSchedulesByBusiness(businessId);
     return {
       success: true,
       data: schedules,
@@ -421,7 +421,7 @@ ipcMain.handle("schedules:getByBusiness", async (event, businessId) => {
 ipcMain.handle("schedules:getByStaff", async (event, staffId) => {
   try {
     if (!db) db = await getDatabase();
-    const schedules = db.getSchedulesByStaffId(staffId);
+    const schedules = db.schedules.getSchedulesByStaffId(staffId);
     return {
       success: true,
       data: schedules,
@@ -439,7 +439,7 @@ ipcMain.handle("schedules:update", async (event, id, updates) => {
   try {
     if (!db) db = await getDatabase();
 
-    const updatedSchedule = db.updateSchedule(id, updates);
+    const updatedSchedule = db.schedules.updateSchedule(id, updates);
 
     return {
       success: true,
@@ -460,7 +460,7 @@ ipcMain.handle("schedules:delete", async (event, id) => {
   try {
     if (!db) db = await getDatabase();
 
-    db.deleteSchedule(id);
+    db.schedules.deleteSchedule(id);
 
     return {
       success: true,
@@ -479,7 +479,7 @@ ipcMain.handle("schedules:delete", async (event, id) => {
 ipcMain.handle("schedules:updateStatus", async (event, id, status) => {
   try {
     if (!db) db = await getDatabase();
-    db.updateScheduleStatus(id, status);
+    db.schedules.updateScheduleStatus(id, status);
     return {
       success: true,
       message: "Schedule status updated successfully",
@@ -520,18 +520,18 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
     if (!db) db = await getDatabase();
 
     // Clean up overdue and old unclosed shifts first to prevent conflicts
-    const overdueCount = db.autoEndOverdueShiftsToday();
+    const overdueCount = db.shifts.autoEndOverdueShiftsToday();
     if (overdueCount > 0) {
       // auto-ended overdue shifts
     }
 
-    const closedCount = db.autoCloseOldActiveShifts();
+    const closedCount = db.shifts.autoCloseOldActiveShifts();
     if (closedCount > 0) {
       // auto-closed old active shifts
     }
 
     // Check if cashier already has an active shift (only check today's shifts)
-    const existingShift = db.getTodaysActiveShiftByCashier(shiftData.cashierId);
+    const existingShift = db.shifts.getTodaysActiveShift(shiftData.cashierId);
     if (existingShift) {
       return {
         success: false,
@@ -540,7 +540,7 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
       };
     }
 
-    const shift = db.createShift({
+    const shift = db.shifts.createShift({
       scheduleId: shiftData.scheduleId,
       cashierId: shiftData.cashierId,
       businessId: shiftData.businessId,
@@ -553,7 +553,7 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
     // Update schedule status if linked
     if (shiftData.scheduleId) {
       try {
-        db.updateScheduleStatus(shiftData.scheduleId, "active");
+        db.schedules.updateScheduleStatus(shiftData.scheduleId, "active");
       } catch (error) {
         console.warn("Could not update schedule status:", error);
       }
@@ -577,7 +577,7 @@ ipcMain.handle("shift:end", async (event, shiftId, endData) => {
   try {
     if (!db) db = await getDatabase();
 
-    db.endShift(shiftId, {
+    db.shifts.endShift(shiftId, {
       endTime: new Date().toISOString(),
       finalCashDrawer: endData.finalCashDrawer,
       expectedCashDrawer: endData.expectedCashDrawer,
@@ -608,19 +608,19 @@ ipcMain.handle("shift:getActive", async (event, cashierId) => {
     if (!db) db = await getDatabase();
 
     // First, auto-end any overdue shifts from today (more aggressive)
-    const overdueCount = db.autoEndOverdueShiftsToday();
+    const overdueCount = db.shifts.autoEndOverdueShiftsToday();
     if (overdueCount > 0) {
       // auto-ended overdue shifts from today
     }
 
     // Then clean up old unclosed shifts (24+ hours old)
-    const closedCount = db.autoCloseOldActiveShifts();
+    const closedCount = db.shifts.autoCloseOldActiveShifts();
     if (closedCount > 0) {
       // auto-closed old active shifts
     }
 
     // Use the new method that checks for today's active shift only
-    const shift = db.getTodaysActiveShiftByCashier(cashierId);
+    const shift = db.shifts.getTodaysActiveShift(cashierId);
     return {
       success: true,
       data: shift,
@@ -642,7 +642,7 @@ ipcMain.handle("shift:getTodaySchedule", async (event, cashierId) => {
     const dateString = today.toISOString().split("T")[0];
 
     // Get schedules for this cashier today
-    const schedules = db.getSchedulesByStaffId(cashierId);
+    const schedules = db.schedules.getSchedulesByStaffId(cashierId);
     const todaySchedule = schedules.find(
       (schedule) => schedule.startTime.split("T")[0] === dateString
     );
@@ -664,20 +664,21 @@ ipcMain.handle("shift:getStats", async (event, shiftId) => {
   try {
     if (!db) db = await getDatabase();
 
-    const transactions = db.getTransactionsByShiftId(shiftId);
+    const transactions = await db.transactions.getTransactionsByShift(shiftId);
 
     const stats = {
-      totalTransactions: transactions.filter((t) => t.status === "completed")
-        .length,
+      totalTransactions: transactions.filter(
+        (t: any) => t.status === "completed"
+      ).length,
       totalSales: transactions
-        .filter((t) => t.type === "sale" && t.status === "completed")
-        .reduce((sum, t) => sum + t.total, 0),
+        .filter((t: any) => t.type === "sale" && t.status === "completed")
+        .reduce((sum: number, t: any) => sum + t.total, 0),
       totalRefunds: Math.abs(
         transactions
-          .filter((t) => t.type === "refund" && t.status === "completed")
-          .reduce((sum, t) => sum + t.total, 0)
+          .filter((t: any) => t.type === "refund" && t.status === "completed")
+          .reduce((sum: number, t: any) => sum + t.total, 0)
       ),
-      totalVoids: transactions.filter((t) => t.status === "voided").length,
+      totalVoids: transactions.filter((t: any) => t.status === "voided").length,
     };
 
     return {
@@ -697,7 +698,7 @@ ipcMain.handle("shift:getHourlyStats", async (event, shiftId) => {
   try {
     if (!db) db = await getDatabase();
 
-    const hourlyStats = db.getHourlyTransactionStats(shiftId);
+    const hourlyStats = db.shifts.getHourlyTransactionStats(shiftId);
 
     return {
       success: true,
@@ -716,7 +717,7 @@ ipcMain.handle("shift:getCashDrawerBalance", async (event, shiftId) => {
   try {
     if (!db) db = await getDatabase();
 
-    const cashBalance = db.getCurrentCashDrawerBalance(shiftId);
+    const cashBalance = db.cashDrawers.getCurrentCashDrawerBalance(shiftId);
 
     return {
       success: true,
@@ -735,7 +736,9 @@ ipcMain.handle("shift:getCashDrawerBalance", async (event, shiftId) => {
 ipcMain.handle("transactions:create", async (event, transactionData) => {
   try {
     const db = await getDatabase();
-    const transaction = db.createTransaction(transactionData);
+    const transaction = await db.transactions.createTransaction(
+      transactionData
+    );
 
     return {
       success: true,
@@ -753,7 +756,7 @@ ipcMain.handle("transactions:create", async (event, transactionData) => {
 ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
   try {
     const db = await getDatabase();
-    const transactions = db.getTransactionsByShiftId(shiftId);
+    const transactions = await db.transactions.getTransactionsByShift(shiftId);
 
     return {
       success: true,
@@ -776,7 +779,10 @@ ipcMain.handle(
       const db = await getDatabase();
 
       // Update shift with actual cash drawer amount and manager approval
-      const updatedShift = db.reconcileShift(shiftId, reconciliationData);
+      const updatedShift = db.shifts.reconcileShift(
+        shiftId,
+        reconciliationData
+      );
 
       return {
         success: true,
@@ -795,7 +801,7 @@ ipcMain.handle(
 ipcMain.handle("shift:getPendingReconciliation", async (event, businessId) => {
   try {
     const db = await getDatabase();
-    const pendingShifts = db.getPendingReconciliationShifts(businessId);
+    const pendingShifts = db.shifts.getPendingReconciliationShifts(businessId);
 
     return {
       success: true,
@@ -814,7 +820,7 @@ ipcMain.handle("shift:getPendingReconciliation", async (event, businessId) => {
 ipcMain.handle("refunds:getTransactionById", async (event, transactionId) => {
   try {
     const db = await getDatabase();
-    const transaction = db.getTransactionById(transactionId);
+    const transaction = await db.getTransactionById(transactionId);
 
     return {
       success: !!transaction,
@@ -835,7 +841,7 @@ ipcMain.handle(
   async (event, receiptNumber) => {
     try {
       const db = await getDatabase();
-      const transaction = db.getTransactionByReceiptNumber(receiptNumber);
+      const transaction = await db.getTransactionByReceiptNumber(receiptNumber);
 
       return {
         success: !!transaction,
@@ -857,7 +863,7 @@ ipcMain.handle(
   async (event, businessId, limit = 50) => {
     try {
       const db = await getDatabase();
-      const transactions = db.getRecentTransactions(businessId, limit);
+      const transactions = await db.getRecentTransactions(businessId, limit);
 
       return {
         success: true,
@@ -878,7 +884,7 @@ ipcMain.handle(
   async (event, shiftId, limit = 50) => {
     try {
       const db = await getDatabase();
-      const transactions = db.getShiftTransactions(shiftId, limit);
+      const transactions = await db.getShiftTransactions(shiftId, limit);
 
       return {
         success: true,
@@ -923,7 +929,7 @@ ipcMain.handle("refunds:create", async (event, refundData) => {
     const db = await getDatabase();
 
     // Validate refund eligibility first
-    const validation = db.validateRefundEligibility(
+    const validation = await db.validateRefundEligibility(
       refundData.originalTransactionId,
       refundData.refundItems
     );
@@ -935,7 +941,7 @@ ipcMain.handle("refunds:create", async (event, refundData) => {
       };
     }
 
-    const refundTransaction = db.createRefundTransaction(refundData);
+    const refundTransaction = await db.createRefundTransaction(refundData);
 
     return {
       success: true,
@@ -974,7 +980,7 @@ ipcMain.handle("voids:create", async (event, voidData) => {
     const db = await getDatabase();
 
     // Validate void eligibility first
-    const validation = db.validateVoidEligibility(voidData.transactionId);
+    const validation = await db.validateVoidEligibility(voidData.transactionId);
 
     if (!validation.isValid) {
       return {
@@ -993,7 +999,7 @@ ipcMain.handle("voids:create", async (event, voidData) => {
       };
     }
 
-    const result = db.voidTransaction(voidData);
+    const result = await db.voidTransaction(voidData);
 
     return result;
   } catch (error) {
@@ -1009,7 +1015,7 @@ ipcMain.handle("voids:create", async (event, voidData) => {
 ipcMain.handle("voids:getTransactionById", async (event, transactionId) => {
   try {
     const db = await getDatabase();
-    const transaction = db.getTransactionByIdAnyStatus(transactionId);
+    const transaction = await db.getTransactionByIdAnyStatus(transactionId);
 
     return {
       success: true,
@@ -1029,8 +1035,9 @@ ipcMain.handle(
   async (event, receiptNumber) => {
     try {
       const db = await getDatabase();
-      const transaction =
-        db.getTransactionByReceiptNumberAnyStatus(receiptNumber);
+      const transaction = await db.getTransactionByReceiptNumberAnyStatus(
+        receiptNumber
+      );
 
       return {
         success: true,
@@ -1050,7 +1057,7 @@ ipcMain.handle(
 ipcMain.handle("cashDrawer:getExpectedCash", async (event, shiftId) => {
   try {
     const db = await getDatabase();
-    const result = db.getExpectedCashForShift(shiftId);
+    const result = db.cashDrawers.getExpectedCashForShift(shiftId);
 
     return {
       success: true,
@@ -1070,14 +1077,14 @@ ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
     const db = await getDatabase();
 
     // Get shift to determine business ID
-    const shift = db.getShiftById(countData.shiftId);
+    const shift = db.shifts.getShiftById(countData.shiftId);
 
     if (!shift) {
       throw new Error("Shift not found");
     }
 
     // Create the cash drawer count
-    const cashDrawerCount = db.createCashDrawerCount({
+    const cashDrawerCount = db.cashDrawers.createCashDrawerCount({
       shiftId: countData.shiftId,
       businessId: shift.businessId,
       countType: countData.countType,
@@ -1091,7 +1098,7 @@ ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
 
     // Create audit log entry for the count
     if (Math.abs(countData.variance) > 0) {
-      db.createAuditLog({
+      db.auditLogs.createAuditLog({
         userId: countData.countedBy,
         action: "cash-count",
         resource: "cash_drawer_counts",
@@ -1124,7 +1131,7 @@ ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
 ipcMain.handle("cashDrawer:getCountsByShift", async (event, shiftId) => {
   try {
     const db = await getDatabase();
-    const counts = db.getCashDrawerCountsByShiftId(shiftId);
+    const counts = db.cashDrawers.getCashDrawerCountsByShift(shiftId);
 
     return {
       success: true,
@@ -1345,7 +1352,7 @@ ipcMain.handle("database:import", async (event) => {
     }
 
     // Close current database connection
-    const { closeDatabase } = await import("./database.js");
+    const { closeDatabase } = await import("./database/index.js");
     closeDatabase();
     console.log("Database connection closed");
 
@@ -1375,7 +1382,9 @@ ipcMain.handle("database:import", async (event) => {
 
     // Try to reinitialize database if import failed
     try {
-      const { getDatabase: getNewDatabase } = await import("./database.js");
+      const { getDatabase: getNewDatabase } = await import(
+        "./database/index.js"
+      );
       await getNewDatabase();
     } catch (reinitError) {
       console.error(
@@ -1400,7 +1409,7 @@ ipcMain.handle("app:restart", async () => {
     console.log("Restarting application...");
 
     // Close database connection before restart
-    const { closeDatabase } = await import("./database.js");
+    const { closeDatabase } = await import("./database/index.js");
     closeDatabase();
 
     // Relaunch and exit

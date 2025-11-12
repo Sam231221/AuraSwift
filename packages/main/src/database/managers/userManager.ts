@@ -277,6 +277,26 @@ export class UserManager {
   }
 
   /**
+   * Get all active users across all businesses (for login screen)
+   */
+  getAllActiveUsers(): User[] {
+    const users = this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.isActive, true))
+      .orderBy(desc(schema.users.role), schema.users.firstName)
+      .all();
+
+    return users.map((user) => ({
+      ...user,
+      isActive: Boolean(user.isActive),
+      address: user.address ?? "",
+      email: user.email ?? "",
+      permissions: JSON.parse(user.permissions as string) as Permission[],
+    })) as User[];
+  }
+
+  /**
    * Search users by name or email using Drizzle ORM (type-safe)
    */
   async searchUsers(businessId: string, searchTerm: string): Promise<User[]> {

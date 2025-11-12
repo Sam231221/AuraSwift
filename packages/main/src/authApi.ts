@@ -5,7 +5,7 @@ import {
   type Product,
   type Modifier,
   type StockAdjustment,
-} from "./database.js";
+} from "./database/index.js";
 import {
   validatePassword,
   validateEmail,
@@ -156,7 +156,7 @@ export class AuthAPI {
       const user = await db.users.createUser(data);
 
       // Create session using the correct userId
-      const session = db.createSession(user.id);
+      const session = db.sessions.createSession(user.id);
 
       // Return user without password
       const { password: _, ...userWithoutPassword } = user;
@@ -196,7 +196,10 @@ export class AuthAPI {
       const db = await this.getDb();
 
       // Authenticate user
-      const user = await db.authenticateUser(data.username, data.pin);
+      const user = await db.users.authenticateUserByUsernamePin(
+        data.username,
+        data.pin
+      );
       if (!user) {
         return {
           success: false,
@@ -207,9 +210,9 @@ export class AuthAPI {
       // Create session with custom expiry if rememberMe is set
       let session;
       if (data.rememberMe) {
-        session = db.createSession(user.id, 30); // 30 days
+        session = db.sessions.createSession(user.id, 30); // 30 days
       } else {
-        session = db.createSession(user.id, 0.5); // 12 hours
+        session = db.sessions.createSession(user.id, 0.5); // 12 hours
       }
 
       // Log session creation in audit
@@ -424,7 +427,7 @@ export class AuthAPI {
       );
 
       // Delete session
-      const deleted = db.deleteSession(token);
+      const deleted = db.sessions.deleteSession(token);
 
       return {
         success: deleted,
@@ -1110,19 +1113,7 @@ export class AuthAPI {
     try {
       const db = await this.getDb();
       // Get all active users from all businesses for login screen
-      const allUsers = db.db
-        .prepare(
-          `SELECT id, username, pin, email, firstName, lastName, role, businessId, businessName, permissions, createdAt, updatedAt, isActive
-           FROM users 
-           WHERE isActive = 1 
-           ORDER BY role DESC, firstName ASC`
-        )
-        .all()
-        .map((user: any) => ({
-          ...user,
-          permissions: JSON.parse(user.permissions),
-          isActive: Boolean(user.isActive),
-        }));
+      const allUsers = db.users.getAllActiveUsers();
 
       return {
         success: true,

@@ -24,9 +24,30 @@ CREATE TABLE `audit_logs` (
 	`action` text NOT NULL,
 	`resource` text NOT NULL,
 	`resourceId` text NOT NULL,
+	`entityType` text,
+	`entityId` text,
 	`details` text,
+	`ipAddress` text,
+	`terminalId` text,
 	`timestamp` text NOT NULL,
 	`createdAt` text NOT NULL,
+	FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `breaks` (
+	`id` text PRIMARY KEY NOT NULL,
+	`shiftId` text NOT NULL,
+	`userId` text NOT NULL,
+	`type` text DEFAULT 'rest' NOT NULL,
+	`startTime` text NOT NULL,
+	`endTime` text,
+	`duration` integer,
+	`isPaid` integer DEFAULT false,
+	`status` text DEFAULT 'active' NOT NULL,
+	`notes` text,
+	`createdAt` text NOT NULL,
+	`updatedAt` text NOT NULL,
+	FOREIGN KEY (`shiftId`) REFERENCES `time_shifts`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
@@ -70,6 +91,23 @@ CREATE TABLE `categories` (
 	`updatedAt` text NOT NULL,
 	FOREIGN KEY (`parentId`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`businessId`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `clock_events` (
+	`id` text PRIMARY KEY NOT NULL,
+	`userId` text NOT NULL,
+	`terminalId` text NOT NULL,
+	`locationId` text,
+	`type` text NOT NULL,
+	`timestamp` text NOT NULL,
+	`method` text NOT NULL,
+	`status` text DEFAULT 'confirmed' NOT NULL,
+	`geolocation` text,
+	`ipAddress` text,
+	`notes` text,
+	`createdAt` text NOT NULL,
+	`updatedAt` text NOT NULL,
+	FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE TABLE `discounts` (
@@ -275,6 +313,50 @@ CREATE TABLE `suppliers` (
 	`createdAt` text NOT NULL,
 	`updatedAt` text NOT NULL,
 	FOREIGN KEY (`businessId`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `time_corrections` (
+	`id` text PRIMARY KEY NOT NULL,
+	`clockEventId` text,
+	`shiftId` text,
+	`userId` text NOT NULL,
+	`correctionType` text NOT NULL,
+	`originalTime` text,
+	`correctedTime` text NOT NULL,
+	`timeDifference` integer NOT NULL,
+	`reason` text NOT NULL,
+	`requestedBy` text NOT NULL,
+	`approvedBy` text,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`createdAt` text NOT NULL,
+	`updatedAt` text NOT NULL,
+	FOREIGN KEY (`clockEventId`) REFERENCES `clock_events`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`shiftId`) REFERENCES `time_shifts`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`requestedBy`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`approvedBy`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `time_shifts` (
+	`id` text PRIMARY KEY NOT NULL,
+	`userId` text NOT NULL,
+	`businessId` text NOT NULL,
+	`clockInId` text NOT NULL,
+	`clockOutId` text,
+	`scheduleId` text,
+	`status` text DEFAULT 'active' NOT NULL,
+	`totalHours` real,
+	`regularHours` real,
+	`overtimeHours` real,
+	`breakDuration` integer,
+	`notes` text,
+	`createdAt` text NOT NULL,
+	`updatedAt` text NOT NULL,
+	FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`businessId`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`clockInId`) REFERENCES `clock_events`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`clockOutId`) REFERENCES `clock_events`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`scheduleId`) REFERENCES `schedules`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE TABLE `transaction_items` (
