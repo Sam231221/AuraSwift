@@ -172,6 +172,24 @@ ipcMain.handle("auth:createUser", async (event, userData) => {
   }
 });
 
+ipcMain.handle("auth:getAllActiveUsers", async (event) => {
+  try {
+    const db = await getDatabase();
+    const users = db.users.getAllActiveUsers();
+
+    return {
+      success: true,
+      users,
+    };
+  } catch (error) {
+    console.error("Get all active users IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get active users",
+    };
+  }
+});
+
 // Business Management IPC handlers
 ipcMain.handle("auth:getBusinessById", async (event, businessId) => {
   try {

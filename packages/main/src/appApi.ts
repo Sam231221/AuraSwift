@@ -7,11 +7,19 @@ import {
   type StockAdjustment,
 } from "./database/index.js";
 import {
-  validatePassword,
-  validateEmail,
-  validateName,
-  validateBusinessName,
-} from "./passwordUtils.js";
+  registerSchema,
+  loginSchema,
+  pinLoginSchema,
+  updateUserSchema,
+  createStaffUserSchema,
+  sessionTokenSchema,
+  userIdSchema,
+  validateInput,
+  type RegisterInput,
+  type LoginInput,
+  type PinLoginInput,
+  type UpdateUserInput,
+} from "./database/validation/authSchemas.js";
 
 export interface RegisterRequest {
   email: string;
@@ -23,8 +31,10 @@ export interface RegisterRequest {
 }
 
 export interface LoginRequest {
-  email: string;
-  password: string;
+  email?: string;
+  password?: string;
+  username?: string;
+  pin?: string;
   rememberMe?: boolean;
 }
 
@@ -100,44 +110,22 @@ export class AuthAPI {
 
   async register(data: RegisterRequest): Promise<AuthResponse> {
     try {
-      // Validate input data
-      const validationErrors: string[] = [];
+      // Validate input data using Zod schema
+      const validation = validateInput(registerSchema, data);
 
-      if (!validateEmail(data.email)) {
-        validationErrors.push("Invalid email format");
-      }
-
-      if (!validateName(data.firstName)) {
-        validationErrors.push("First name must be between 2 and 50 characters");
-      }
-
-      if (!validateName(data.lastName)) {
-        validationErrors.push("Last name must be between 2 and 50 characters");
-      }
-
-      if (!validateBusinessName(data.businessName)) {
-        validationErrors.push(
-          "Business name must be between 2 and 100 characters"
-        );
-      }
-
-      const passwordValidation = validatePassword(data.password);
-      if (!passwordValidation.isValid) {
-        validationErrors.push(...passwordValidation.errors);
-      }
-
-      if (validationErrors.length > 0) {
+      if (!validation.success) {
         return {
           success: false,
           message: "Validation failed",
-          errors: validationErrors,
+          errors: validation.errors,
         };
       }
 
+      const validatedData = validation.data;
       const db = await this.getDb();
 
       // Check if user already exists
-      const existingUser = db.users.getUserByEmail(data.email);
+      const existingUser = db.users.getUserByEmail(validatedData.email);
       if (existingUser) {
         return {
           success: false,
@@ -145,11 +133,11 @@ export class AuthAPI {
         };
       }
 
-      // Create user
-      const user = await db.users.createUser(data);
+      // Create user with validated data
+      const user = await db.users.createUser(validatedData);
 
       // Create session using the correct userId
-      const session = db.createSession(user.id);
+      const session = db.sessions.createSession(user.id);
 
       // Return user without password
       const { password: _, ...userWithoutPassword } = user;
@@ -171,39 +159,78 @@ export class AuthAPI {
 
   async login(data: LoginRequest): Promise<AuthResponse> {
     try {
-      // Validate input
-      if (!validateEmail(data.email)) {
-        return {
-          success: false,
-          message: "Invalid email format",
-        };
-      }
-
-      if (!data.password || data.password.length < 1) {
-        return {
-          success: false,
-          message: "Password is required",
-        };
-      }
-
       const db = await this.getDb();
+      let user: User | null = null;
+      let rememberMe = data.rememberMe || false;
 
-      // Authenticate user
-      const user = await db.authenticateUser(data.email, data.password);
-      if (!user) {
+      // Check if this is PIN-based login (username + PIN)
+      if (data.username && data.pin) {
+        // Validate PIN login
+        const validation = validateInput(pinLoginSchema, {
+          username: data.username,
+          pin: data.pin,
+          rememberMe: data.rememberMe,
+        });
+
+        if (!validation.success) {
+          return {
+            success: false,
+            message: "Validation failed",
+            errors: validation.errors,
+          };
+        }
+
+        // Authenticate with username and PIN
+        user = await db.users.authenticateUserByUsernamePin(
+          data.username,
+          data.pin
+        );
+
+        if (!user) {
+          return {
+            success: false,
+            message: "Invalid username or PIN",
+          };
+        }
+      }
+      // Email/password login (legacy/admin login)
+      else if (data.email && data.password) {
+        // Validate email/password login
+        const validation = validateInput(loginSchema, {
+          email: data.email,
+          password: data.password,
+          rememberMe: data.rememberMe,
+        });
+
+        if (!validation.success) {
+          return {
+            success: false,
+            message: "Validation failed",
+            errors: validation.errors,
+          };
+        }
+
+        // Authenticate with email and password
+        user = await db.users.authenticateUser(data.email, data.password);
+
+        if (!user) {
+          return {
+            success: false,
+            message: "Invalid email or password",
+          };
+        }
+      } else {
         return {
           success: false,
-          message: "Invalid email or password",
+          message: "Please provide either username/PIN or email/password",
         };
       }
 
       // Create session with custom expiry if rememberMe is set
-      let session;
-      if (data.rememberMe) {
-        session = db.createSession(user.id, 30); // 30 days
-      } else {
-        session = db.createSession(user.id, 0.5); // 12 hours
-      }
+      const session = db.sessions.createSession(
+        user.id,
+        rememberMe ? 30 : 0.5 // 30 days or 12 hours
+      );
 
       return {
         success: true,
@@ -223,7 +250,7 @@ export class AuthAPI {
   async validateSession(token: string): Promise<AuthResponse> {
     try {
       const db = await this.getDb();
-      const session = db.getSessionByToken(token);
+      const session = db.sessions.getSessionByToken(token);
       if (!session) {
         return {
           success: false,
@@ -259,7 +286,7 @@ export class AuthAPI {
   async logout(token: string): Promise<AuthResponse> {
     try {
       const db = await this.getDb();
-      const deleted = db.deleteSession(token);
+      const deleted = db.sessions.deleteSession(token);
       return {
         success: deleted,
         message: deleted ? "Logged out successfully" : "Session not found",
@@ -382,7 +409,7 @@ export class AuthAPI {
   // Cleanup expired sessions (call this periodically)
   async cleanupExpiredSessions(): Promise<void> {
     const db = await this.getDb();
-    db.cleanupExpiredSessions();
+    db.sessions.cleanupExpiredSessions();
   }
 
   // Product Management Methods
@@ -970,7 +997,7 @@ export class AuthAPI {
       const db = await this.getDb();
 
       // Create user with business name from business ID
-      const business = db.getBusinessById(userData.businessId);
+      const business = db.businesses.getBusinessById(userData.businessId);
       if (!business) {
         return {
           success: false,
