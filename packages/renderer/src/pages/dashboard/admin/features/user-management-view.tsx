@@ -131,7 +131,7 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
           .filter((u) => u.role !== "admin")
           .map((u) => ({
             id: u.id,
-            email: u.email,
+            email: u.email || "", // Ensure always string
             firstName: u.firstName,
             lastName: u.lastName,
             role: u.role as "cashier" | "manager",
@@ -201,6 +201,7 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
 
     setIsLoading(true);
     try {
+      // Use email as username, and set a default PIN (should be changed by admin later)
       const userData = {
         businessId: user.businessId,
         email: newUser.email,
@@ -210,6 +211,8 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
         role: newUser.role,
         avatar: newUser.avatar || undefined,
         address: newUser.address || undefined,
+        username: newUser.email, // Use email as username
+        pin: "1234", // Default PIN, should be changed by admin/user later
       };
 
       const response = await createUser(userData);
