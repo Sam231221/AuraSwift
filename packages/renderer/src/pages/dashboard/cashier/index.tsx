@@ -13,7 +13,7 @@ import CashierDashboardView from "./features/cashier-dashboard-view";
 export default function CashierDashboard() {
   const [currentView, setCurrentView] = useState<
     "dashboard" | "newTransaction"
-  >("dashboard");
+  >("newTransaction");
 
   const { user } = useAuth();
   const navigate = useNavigate();

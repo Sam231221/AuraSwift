@@ -23,6 +23,9 @@ import {
   Download,
   Mail,
   X,
+  RotateCcw,
+  XCircle,
+  LayoutDashboard,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
@@ -39,6 +42,9 @@ import { ReceiptPrinterStatus } from "@/components/printer/ReceiptPrinterCompone
 import type { TransactionData, PrinterConfig } from "@/types/printer";
 import { useCardPayment } from "@/hooks/useStripeTerminal";
 import { PaymentStatusModal } from "@/components/payment/PaymentComponents";
+import RefundTransactionView from "./refund-transaction-view";
+import VoidTransactionModal from "./void-transaction-view";
+import CashDrawerCountModal from "./cash-drawer-count-modal";
 
 interface CartItem {
   product: Product;
@@ -68,7 +74,230 @@ interface BreadcrumbItem {
   name: string;
 }
 
-const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
+// Quick Actions Carousel Component
+interface QuickActionsCarouselProps {
+  onRefund: () => void;
+  onVoid: () => void;
+  onCount: () => void;
+  onDashboard: () => void;
+}
+
+const CarouselCard: React.FC<{
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  onClick: () => void;
+  hoverColor: string;
+}> = ({ icon: Icon, title, onClick, hoverColor }) => (
+  <button
+    onClick={onClick}
+    className={`shrink-0 basis-1/3 w-16 h-16 p-2 bg-gray-100 rounded-lg flex flex-col items-center justify-center gap-1  transition-all hover:shadow-md ${hoverColor}`}
+    style={{ minWidth: "0" }}
+  >
+    <Icon className="w-6 h-6" />
+    <span className="text-sm">{title}</span>
+  </button>
+);
+
+const QuickActionsCarousel: React.FC<QuickActionsCarouselProps> = ({
+  onRefund,
+  onVoid,
+  onCount,
+  onDashboard,
+}) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [dragStart, setDragStart] = useState(0);
+  const [dragEnd, setDragEnd] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const items = [
+    {
+      icon: RotateCcw,
+      title: "Refund",
+      onClick: onRefund,
+      hoverColor: "hover:bg-blue-50",
+    },
+    {
+      icon: XCircle,
+      title: "Void",
+      onClick: onVoid,
+      hoverColor: "hover:bg-red-50",
+    },
+    {
+      icon: Calculator,
+      title: "Count",
+      onClick: onCount,
+      hoverColor: "hover:bg-green-50",
+    },
+    {
+      icon: LayoutDashboard,
+      title: "Dashboard",
+      onClick: onDashboard,
+      hoverColor: "hover:bg-purple-50",
+    },
+  ];
+
+  const itemsPerView = 4;
+  const maxIndex = Math.max(0, items.length - itemsPerView);
+  const minSwipeDistance = 50;
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => Math.min(maxIndex, prev + 1));
+  };
+
+  // Touch events
+  const onTouchStart = (e: React.TouchEvent) => {
+    setDragEnd(0);
+    setDragStart(e.targetTouches[0].clientX);
+    setIsDragging(true);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setDragEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    handleDragEnd();
+  };
+
+  // Mouse events for trackpad/mouse support
+  const onMouseDown = (e: React.MouseEvent) => {
+    setDragEnd(0);
+    setDragStart(e.clientX);
+    setIsDragging(true);
+    e.preventDefault(); // Prevent text selection
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setDragEnd(e.clientX);
+  };
+
+  const onMouseUp = () => {
+    if (!isDragging) return;
+    handleDragEnd();
+  };
+
+  const onMouseLeave = () => {
+    if (!isDragging) return;
+    handleDragEnd();
+  };
+
+  const handleDragEnd = () => {
+    if (!dragStart || !dragEnd) {
+      setIsDragging(false);
+      return;
+    }
+
+    const distance = dragStart - dragEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && currentIndex < maxIndex) {
+      handleNext();
+    }
+    if (isRightSwipe && currentIndex > 0) {
+      handlePrev();
+    }
+
+    setIsDragging(false);
+    setDragStart(0);
+    setDragEnd(0);
+  };
+
+  // Calculate exact transform based on container width
+  const getTransform = () => {
+    if (!containerRef.current) return "translateX(0)";
+
+    const container = containerRef.current;
+    const containerWidth = container.offsetWidth;
+
+    // Each card takes up 1/3 of the container width (for 3 items view)
+    // Plus we need to account for gaps between items
+    const cardWidth = containerWidth / itemsPerView;
+    const offset = currentIndex * cardWidth;
+
+    return `translateX(-${offset}px)`;
+  };
+
+  return (
+    <div className="mb-4 p-2 bg-white rounded-lg shadow-sm">
+      <div className="flex items-center w-full gap-2">
+        {/* Left Arrow */}
+        <button
+          onClick={handlePrev}
+          disabled={currentIndex === 0}
+          className="shrink-0 w-8 h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+          style={{
+            clipPath: "polygon(30% 0, 100% 0, 100% 100%, 30% 100%, 0 50%)",
+          }}
+        >
+          <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-gray-700 rotate-180" />
+        </button>
+
+        {/* Carousel Container */}
+        <div
+          ref={containerRef}
+          className="overflow-hidden flex-1 cursor-grab active:cursor-grabbing select-none"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseLeave}
+        >
+          <div
+            className="flex gap-2 transition-transform duration-300 ease-in-out"
+            style={{
+              transform: getTransform(),
+              width: `${(items.length / itemsPerView) * 100}%`,
+            }}
+          >
+            {items.map((item, index) => (
+              <div
+                key={index}
+                className="shrink-0"
+                style={{
+                  width: `calc(${100 / items.length}% - ${
+                    ((items.length - 1) * 0.5) / items.length
+                  }rem)`,
+                }}
+              >
+                <CarouselCard
+                  icon={item.icon}
+                  title={item.title}
+                  onClick={item.onClick}
+                  hoverColor={item.hoverColor}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Arrow */}
+        <button
+          onClick={handleNext}
+          disabled={currentIndex === maxIndex}
+          className="shrink-0 w-8 h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+          style={{
+            clipPath: "polygon(0 0, 70% 0, 100% 50%, 70% 100%, 0 100%)",
+          }}
+        >
+          <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-gray-700" />
+        </button>
+      </div>
+    </div>
+  );
+  // ...existing code...
+};
+
+//const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   // State management
   const [cart, setCart] = useState<CartItem[]>([]);
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -148,6 +377,11 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
   const [showReceiptOptions, setShowReceiptOptions] = useState(false);
   const [completedTransactionData, setCompletedTransactionData] =
     useState<TransactionData | null>(null);
+
+  // Quick action modals state
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showVoidModal, setShowVoidModal] = useState(false);
+  const [showCountModal, setShowCountModal] = useState(false);
 
   // Hardware barcode scanner integration
   const handleHardwareScan = useCallback(
@@ -1327,7 +1561,15 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
 
         {/* Right Column - Cart & Payment */}
         <div className="">
-          <div className="bg-white p-2 border-t-black-200  shadow-lg">
+          {/* Quick Actions Carousel */}
+          <QuickActionsCarousel
+            onRefund={() => setShowRefundModal(true)}
+            onVoid={() => setShowVoidModal(true)}
+            onCount={() => setShowCountModal(true)}
+            onDashboard={onBack}
+          />
+
+          <div className="bg-white border-t-black-200  shadow-lg">
             <CardContent className="pt-1">
               <div className="flex gap-2">
                 <Input
@@ -1428,6 +1670,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
               </div>
             </CardContent>
           </div>
+
           <div className="bg-white p-2 border-b-slate-200 shadow-sm">
             <CardContent className="pt-4">
               <AnimatePresence>
@@ -2040,6 +2283,48 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = () => {
             </div>
           </motion.div>
         </motion.div>
+      )}
+
+      {/* Refund Transaction Modal */}
+      {showRefundModal && (
+        <RefundTransactionView
+          isOpen={showRefundModal}
+          onClose={() => setShowRefundModal(false)}
+          onRefundProcessed={() => {
+            setShowRefundModal(false);
+            toast.success("Refund processed successfully!");
+            // Optionally reload transactions or update state
+          }}
+        />
+      )}
+
+      {/* Void Transaction Modal */}
+      {showVoidModal && (
+        <VoidTransactionModal
+          isOpen={showVoidModal}
+          onClose={() => setShowVoidModal(false)}
+          onVoidComplete={() => {
+            setShowVoidModal(false);
+            toast.success("Transaction voided successfully!");
+            // Optionally reload transactions or update state
+          }}
+          activeShiftId={user?.id || null}
+        />
+      )}
+
+      {/* Cash Drawer Count Modal */}
+      {showCountModal && user && (
+        <CashDrawerCountModal
+          isOpen={showCountModal}
+          onClose={() => setShowCountModal(false)}
+          onCountComplete={() => {
+            setShowCountModal(false);
+            toast.success("Cash count completed successfully!");
+          }}
+          activeShiftId={user.id}
+          countType="mid-shift"
+          startingCash={0}
+        />
       )}
     </>
   );
