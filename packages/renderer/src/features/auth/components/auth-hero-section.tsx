@@ -1,4 +1,4 @@
-import { Store, TrendingUp, Users, CreditCard, BarChart3 } from "lucide-react";
+import { TrendingUp, Users, CreditCard, BarChart3 } from "lucide-react";
 
 export function AuthHeroSection() {
   return (
@@ -7,18 +7,6 @@ export function AuthHeroSection() {
 
       <div className="relative z-10 flex flex-col justify-center px-12 py-16">
         <div>
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
-              <Store className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">AuraSwift</h1>
-              <p className="text-sm text-muted-foreground">
-                Point of Sale System
-              </p>
-            </div>
-          </div>
-
           <h2 className="text-4xl font-bold text-balance leading-tight mb-6">
             {"Transform your retail operations with intelligent POS solutions"}
           </h2>

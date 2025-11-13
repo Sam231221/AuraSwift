@@ -552,3 +552,347 @@ See [Contributing Guide](CONTRIBUTING.md).
 [electron]: https://github.com/electron/electron
 [electron-builder]: https://github.com/electron-userland/electron-builder
 [playwright]: https://playwright.dev
+
+```
+AuraSwift
+├─ .editorconfig
+├─ .env
+├─ .idea
+│  ├─ codeStyles
+│  │  ├─ Project.xml
+│  │  └─ codeStyleConfig.xml
+│  ├─ deployment.xml
+│  ├─ git_toolbox_blame.xml
+│  ├─ git_toolbox_prj.xml
+│  ├─ inspectionProfiles
+│  │  └─ Project_Default.xml
+│  ├─ jsLibraryMappings.xml
+│  ├─ jsLinters
+│  │  └─ eslint.xml
+│  ├─ jsonSchemas.xml
+│  ├─ modules.xml
+│  ├─ php.xml
+│  ├─ prettier.xml
+│  ├─ runConfigurations
+│  │  └─ Attach_Debugger.xml
+│  ├─ scopes
+│  │  ├─ main.xml
+│  │  ├─ preload.xml
+│  │  └─ renderer.xml
+│  ├─ vcs.xml
+│  └─ webResources.xml
+├─ .npmrc
+├─ .releaserc.json
+├─ .versionrc.json
+├─ CHANGELOG.md
+├─ CONTRIBUTING.md
+├─ DATABASE_CONFIG.md
+├─ LICENSE
+├─ README.md
+├─ buildResources
+│  ├─ icon.icns
+│  └─ icon.ico
+├─ docs
+│  ├─ AutoUpdate
+│  │  ├─ AUTO_UPDATE_FEATURE_IN_DETAIL.md
+│  │  ├─ AUTO_UPDATE_GUIDE.md
+│  │  ├─ CLIENT_MIGRATION_COMPREHENSIVE_ANALYSIS.md
+│  │  ├─ CLIENT_MIGRATION_TESTING_GUIDE.md
+│  │  ├─ CLIENT_MIGRATION_TESTING_PLAN.md
+│  │  ├─ CLIENT_RELEASE_TESTING_GUIDE.md
+│  │  ├─ DATABASE_MIGRATION_BEST_PRACTICES.md
+│  │  ├─ DATABASE_SCHEMA_CHANGES_GUIDE.md
+│  │  ├─ FIRST_RELEASE_TEST_PLAN.md
+│  │  ├─ IN_DETAIL_UPDATE_WORKFLOW.md
+│  │  ├─ MIGRATION_REFACTOR_SUMMARY.md
+│  │  ├─ MIGRATION_SAFETY_IMPLEMENTATION.md
+│  │  ├─ QUICK_TESTING_CHECKLIST.md
+│  │  ├─ README.md
+│  │  └─ VISUAL_UPDATE_GUIDE.md
+│  ├─ CASHIER_QUICK_REFERENCE.md
+│  ├─ CASHIER_TRANSACTION_WORKFLOW.md
+│  ├─ CLOCK_IN_OUT_QUICK_REFERENCE.md
+│  ├─ CLOCK_IN_OUT_SYSTEM.md
+│  ├─ ChangeLog
+│  │  └─ CHANGELOG_GENERATION_GUIDE.md
+│  ├─ DATABASE_MIGRATION_SYSTEM.md
+│  ├─ DATABASE_SEEDING.md
+│  ├─ DISCOUNT_SYSTEM.md
+│  ├─ DRIZZLE_MIGRATION_GUIDE.md
+│  ├─ HP_LASERJET_ANALYSIS.md
+│  ├─ Hardwares
+│  │  ├─ CARD_READERD_HARDWARE_SETUP.md
+│  │  ├─ PAYMENT_ISSUES_SUMMARY.md
+│  │  ├─ PAYMENT_PRODUCTION_READINESS_ANALYSIS.md
+│  │  ├─ PAYMENT_QUICK_FIXES.md
+│  │  ├─ PCICompilanceGuide.md
+│  │  ├─ PRINTER_INTEGRATION_SUMMARY.md
+│  │  ├─ PRINTER_ISSUES_SUMMARY.md
+│  │  ├─ PRINTER_PRODUCTION_ANALYSIS.md
+│  │  ├─ PRINTER_TESTING_GUIDE.md
+│  │  ├─ README.md
+│  │  └─ SUPPORTED_PRINTERS.md
+│  ├─ InstallerTypes
+│  │  ├─ INSTALLER_TYPES_GUIDE.md
+│  │  ├─ INSTALLER_VS_PORTABLE_EXPLAINED.md
+│  │  └─ NSISANDSQUIRRELApproach.MD
+│  ├─ Issues_LifeCycle
+│  │  └─ index.md
+│  ├─ MIGRATION_WORKFLOW.md
+│  ├─ NOTES.md
+│  ├─ USER_CREATION_VALIDATION.md
+│  ├─ Validations
+│  │  └─ AUTH_FORM_VALIDATION.md
+│  ├─ WebHooks
+│  │  ├─ WebhookInDetail.md
+│  │  └─ readme.md
+│  ├─ Zod
+│  │  ├─ DRIZZLE_ZOD_VALIDATION.md
+│  │  ├─ MIGRATION_SUMMARY.md
+│  │  └─ ZOD_VALIDATION_GUIDE.md
+│  └─ new_auth_system.md
+├─ drizzle.config.ts
+├─ electron-builder.mjs
+├─ migrate-existing-db.mjs
+├─ package-lock.json
+├─ package.json
+├─ packages
+│  ├─ dev-mode.js
+│  ├─ electron-versions
+│  │  ├─ README.md
+│  │  ├─ index.js
+│  │  └─ package.json
+│  ├─ entry-point.mjs
+│  ├─ integrate-renderer
+│  │  ├─ create-renderer.js
+│  │  ├─ index.js
+│  │  └─ package.json
+│  ├─ main
+│  │  ├─ package.json
+│  │  ├─ src
+│  │  │  ├─ AppInitConfig.ts
+│  │  │  ├─ AppModule.ts
+│  │  │  ├─ ModuleContext.ts
+│  │  │  ├─ ModuleRunner.ts
+│  │  │  ├─ appApi.ts
+│  │  │  ├─ appStore.ts
+│  │  │  ├─ index.ts
+│  │  │  ├─ modules
+│  │  │  │  ├─ AbstractSecurityModule.ts
+│  │  │  │  ├─ ApplicationTerminatorOnLastWindowClose.ts
+│  │  │  │  ├─ AutoUpdater.ts
+│  │  │  │  ├─ BlockNotAllowdOrigins.ts
+│  │  │  │  ├─ ChromeDevToolsExtension.ts
+│  │  │  │  ├─ ExternalUrls.ts
+│  │  │  │  ├─ HardwareAccelerationModule.ts
+│  │  │  │  ├─ SingleInstanceApp.ts
+│  │  │  │  └─ WindowManager.ts
+│  │  │  ├─ passwordUtils.ts
+│  │  │  ├─ services
+│  │  │  │  ├─ officePrinterService.ts
+│  │  │  │  ├─ paymentService.ts
+│  │  │  │  ├─ pdfReceiptService.ts
+│  │  │  │  └─ thermalPrinterService.ts
+│  │  │  └─ thermalPrinterService.ts
+│  │  ├─ tsconfig.json
+│  │  └─ vite.config.js
+│  ├─ preload
+│  │  ├─ package.json
+│  │  ├─ src
+│  │  │  ├─ exposed.ts
+│  │  │  ├─ index.ts
+│  │  │  ├─ nodeCrypto.ts
+│  │  │  └─ versions.ts
+│  │  ├─ tsconfig.json
+│  │  └─ vite.config.js
+│  └─ renderer
+│     ├─ README.md
+│     ├─ components.json
+│     ├─ docs
+│     │  ├─ SalesVsCashDrawerCount.md
+│     │  ├─ auditLogs.md
+│     │  ├─ barcodeintegrationRoughFlow.md
+│     │  ├─ cashdrawercountlogic.md
+│     │  ├─ cashierFlow.md
+│     │  ├─ refundtransactionlogic.md
+│     │  ├─ shiftallCases.md
+│     │  ├─ shifttimeCase.md
+│     │  └─ voidtransactionlogic.md
+│     ├─ eslint.config.js
+│     ├─ index.html
+│     ├─ package.json
+│     ├─ public
+│     │  ├─ modern-retail-store-interior-with-sleek-pos-system.jpg
+│     │  └─ vite.svg
+│     ├─ src
+│     │  ├─ app
+│     │  │  ├─ App.tsx
+│     │  │  └─ providers
+│     │  │     └─ app-providers.tsx
+│     │  ├─ assets
+│     │  │  └─ react.svg
+│     │  ├─ components
+│     │  │  ├─ payment
+│     │  │  │  └─ PaymentComponents.tsx
+│     │  │  ├─ printer
+│     │  │  │  └─ ReceiptPrinterComponents.tsx
+│     │  │  ├─ scanner
+│     │  │  │  └─ ScannerStatusComponents.tsx
+│     │  │  └─ ui
+│     │  │     ├─ accordion.tsx
+│     │  │     ├─ alert-dialog.tsx
+│     │  │     ├─ alert.tsx
+│     │  │     ├─ aspect-ratio.tsx
+│     │  │     ├─ avatar.tsx
+│     │  │     ├─ badge.tsx
+│     │  │     ├─ breadcrumb.tsx
+│     │  │     ├─ button.tsx
+│     │  │     ├─ calendar.tsx
+│     │  │     ├─ card.tsx
+│     │  │     ├─ carousel.tsx
+│     │  │     ├─ chart.tsx
+│     │  │     ├─ checkbox.tsx
+│     │  │     ├─ collapsible.tsx
+│     │  │     ├─ command.tsx
+│     │  │     ├─ context-menu.tsx
+│     │  │     ├─ dialog.tsx
+│     │  │     ├─ drawer.tsx
+│     │  │     ├─ dropdown-menu.tsx
+│     │  │     ├─ form.tsx
+│     │  │     ├─ hover-card.tsx
+│     │  │     ├─ input-otp.tsx
+│     │  │     ├─ input.tsx
+│     │  │     ├─ label.tsx
+│     │  │     ├─ menubar.tsx
+│     │  │     ├─ navigation-menu.tsx
+│     │  │     ├─ pagination.tsx
+│     │  │     ├─ popover.tsx
+│     │  │     ├─ progress.tsx
+│     │  │     ├─ radio-group.tsx
+│     │  │     ├─ resizable.tsx
+│     │  │     ├─ scroll-area.tsx
+│     │  │     ├─ select.tsx
+│     │  │     ├─ separator.tsx
+│     │  │     ├─ sheet.tsx
+│     │  │     ├─ sidebar.tsx
+│     │  │     ├─ skeleton.tsx
+│     │  │     ├─ slider.tsx
+│     │  │     ├─ sonner.tsx
+│     │  │     ├─ switch.tsx
+│     │  │     ├─ table.tsx
+│     │  │     ├─ tabs.tsx
+│     │  │     ├─ textarea.tsx
+│     │  │     ├─ toggle-group.tsx
+│     │  │     ├─ toggle.tsx
+│     │  │     └─ tooltip.tsx
+│     │  ├─ features
+│     │  │  ├─ auth
+│     │  │  │  ├─ components
+│     │  │  │  │  ├─ auth-hero-section.tsx
+│     │  │  │  │  ├─ index.ts
+│     │  │  │  │  ├─ login-form.tsx
+│     │  │  │  │  └─ register-form.tsx
+│     │  │  │  ├─ context
+│     │  │  │  │  └─ auth-context.tsx
+│     │  │  │  ├─ services
+│     │  │  │  └─ types
+│     │  │  │     └─ auth.types.ts
+│     │  │  ├─ inventory
+│     │  │  ├─ sales
+│     │  │  └─ user-management
+│     │  ├─ hooks
+│     │  │  ├─ useOfficePrinter.ts
+│     │  │  ├─ useProductionScanner.ts
+│     │  │  ├─ useStripeTerminal.ts
+│     │  │  └─ useThermalPrinter.ts
+│     │  ├─ index.css
+│     │  ├─ layouts
+│     │  │  └─ dashboard-layout.tsx
+│     │  ├─ lib
+│     │  │  ├─ auth.ts
+│     │  │  └─ utils.ts
+│     │  ├─ main.tsx
+│     │  ├─ pages
+│     │  │  ├─ auth
+│     │  │  │  └─ index.tsx
+│     │  │  └─ dashboard
+│     │  │     ├─ admin
+│     │  │     │  ├─ features
+│     │  │     │  │  ├─ admin-dashboard-view.tsx
+│     │  │     │  │  └─ user-management-view.tsx
+│     │  │     │  └─ index.tsx
+│     │  │     ├─ cashier
+│     │  │     │  ├─ features
+│     │  │     │  │  ├─ cash-drawer-count-modal.tsx
+│     │  │     │  │  ├─ cashier-dashboard-view.tsx
+│     │  │     │  │  ├─ new-transaction-view.tsx
+│     │  │     │  │  ├─ refund-transaction-view.tsx
+│     │  │     │  │  └─ void-transaction-view.tsx
+│     │  │     │  └─ index.tsx
+│     │  │     ├─ index.tsx
+│     │  │     └─ manager
+│     │  │        ├─ features
+│     │  │        │  ├─ manage-cashier-view.tsx
+│     │  │        │  ├─ manage-categories-view.tsx
+│     │  │        │  ├─ manage-product-view.tsx
+│     │  │        │  ├─ manager-dashboard-view.tsx
+│     │  │        │  └─ staff-schedules-view.tsx
+│     │  │        └─ index.tsx
+│     │  ├─ redux
+│     │  │  ├─ AuthSlice.tsx
+│     │  │  └─ store.ts
+│     │  ├─ schemas
+│     │  │  ├─ category-schema.ts
+│     │  │  ├─ design1.png
+│     │  │  └─ product-schema.ts
+│     │  ├─ shared
+│     │  │  ├─ components
+│     │  │  │  ├─ avatar-upload.tsx
+│     │  │  │  ├─ index.ts
+│     │  │  │  ├─ loading-screen.tsx
+│     │  │  │  ├─ protected-route.tsx
+│     │  │  │  ├─ public-route.tsx
+│     │  │  │  └─ user-avatar.tsx
+│     │  │  ├─ constants
+│     │  │  ├─ hooks
+│     │  │  │  ├─ index.ts
+│     │  │  │  ├─ use-auth.tsx
+│     │  │  │  └─ use-mobile.ts
+│     │  │  ├─ services
+│     │  │  ├─ types
+│     │  │  │  └─ global.d.ts
+│     │  │  └─ utils
+│     │  │     ├─ auth.ts
+│     │  │     ├─ cn.ts
+│     │  │     └─ index.ts
+│     │  ├─ store
+│     │  │  └─ index.ts
+│     │  ├─ types
+│     │  │  ├─ auth-store.d.ts
+│     │  │  ├─ officePrinter.ts
+│     │  │  ├─ printer.ts
+│     │  │  └─ product.types.ts
+│     │  ├─ utils
+│     │  │  ├─ paymentFlow.ts
+│     │  │  ├─ pdfReceiptGenerator.ts
+│     │  │  ├─ receiptGenerator.ts
+│     │  │  └─ scannerAudio.ts
+│     │  └─ vite-env.d.ts
+│     ├─ tsconfig.app.json
+│     ├─ tsconfig.json
+│     ├─ tsconfig.node.json
+│     └─ vite.config.ts
+├─ scripts
+│  ├─ README.md
+│  └─ bridge-migration.mjs
+├─ test-db-path.mjs
+├─ test-payment-flow.js
+├─ test-stripe-config.js
+├─ tests
+│  ├─ e2e.spec.ts
+│  └─ hardware-integration.spec.ts
+└─ types
+   ├─ env.d.ts
+   └─ payment.d.ts
+
+```

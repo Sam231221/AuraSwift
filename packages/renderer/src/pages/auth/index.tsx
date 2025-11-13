@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Store, User, ArrowLeft, Delete } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { AuthHeroSection } from "@/features/auth/components/auth-hero-section";
+import AuthHeader from "@/features/auth/components/auth-header";
 
 // Color mapping based on role
 const ROLE_COLORS: Record<string, string> = {
@@ -113,174 +115,167 @@ export default function AuthPage() {
   }, [pin, selectedUser, login]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex">
-      {/* Left Side - Hero Section */}
-      <AuthHeroSection />
+    <div className="flex flex-col min-h-screen">
+      <AuthHeader />
+      <main className="flex-1 bg-gradient-to-br from-gray-50 to-gray-100 flex">
+        {/* Left Side - Hero Section */}
+        <AuthHeroSection />
 
-      {/* Right Side - Auth Interface */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-lg">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-6 justify-center">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-md">
-              <Store className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">AuraSwift</h1>
-              <p className="text-xs text-gray-600">Restaurant Terminal</p>
-            </div>
-          </div>
-
-          {!selectedUser ? (
-            // User Selection Screen
-            <Card className="border-0 shadow-none bg-transparent rounded-3xl overflow-hidden">
-              <div className="p-6">
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                    Select User
-                  </h2>
-                  <p className="text-gray-600 text-sm">
-                    {isLoadingUsers
-                      ? "Loading users..."
-                      : "Tap your profile to login"}
-                  </p>
-                </div>
-
-                {isLoadingUsers ? (
-                  <div className="flex justify-center items-center py-12">
-                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : users.length === 0 ? (
-                  <div className="text-center py-12 text-gray-600">
-                    <p>No users found. Please contact administrator.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {users.map((user) => (
-                      <button
-                        key={user.id}
-                        onClick={() => setSelectedUser(user)}
-                        className="group relative flex flex-col items-center p-4 rounded-xl border border-gray-200 hover:border-blue-400 bg-white hover:bg-blue-50 transition-all duration-200 hover:scale-105"
-                      >
-                        <div
-                          className={`w-14 h-14 ${user.color} rounded-full flex items-center justify-center mb-2 transition-shadow`}
-                        >
-                          <User className="w-7 h-7 text-white" />
-                        </div>
-                        <h3 className="font-semibold text-gray-900 text-sm mb-0.5">
-                          {user.firstName} {user.lastName}
-                        </h3>
-                        <p className="text-xs text-gray-600 uppercase tracking-wide">
-                          {user.role}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-6 pt-4 border-t border-gray-200 text-center">
-                  <p className="text-xs text-gray-600">
-                    Version 2.4.1 | 2025 AuraSwift Systems
-                  </p>
-                </div>
-              </div>
-            </Card>
-          ) : (
-            // PIN Entry Screen
-            <Card className="border-0 shadow-none bg-transparent rounded-3xl overflow-hidden">
-              <div className="p-6">
-                <div className="text-center mb-6">
-                  <div
-                    className={`w-16 h-16 ${selectedUser.color} rounded-full flex items-center justify-center mx-auto mb-3`}
-                  >
-                    <User className="w-8 h-8 text-white" />
-                  </div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-1">
-                    {selectedUser.firstName} {selectedUser.lastName}
-                  </h2>
-                  <p className="text-gray-600 uppercase tracking-wide text-xs">
-                    {selectedUser.role}
-                  </p>
-                  <p className="text-orange-600 text-xs font-medium mt-1">
-                    Demo PIN: 1234
-                  </p>
-                </div>
-
-                {/* PIN Input Display */}
-                <div className="bg-gray-100 rounded-xl p-4 mb-4">
-                  <div className="flex items-center justify-center gap-1 mb-2">
-                    <User className="w-4 h-4 text-gray-600" />
-                    <span className="text-gray-600 text-xs uppercase tracking-wider font-medium">
-                      Enter PIN
-                    </span>
-                  </div>
-                  <div className="flex justify-center gap-2">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center text-xl font-bold transition-all ${
-                          pin.length > i
-                            ? "bg-blue-500 border-blue-500 text-white"
-                            : "bg-white border-gray-300 text-transparent"
-                        }`}
-                      >
-                        {pin.length > i ? "●" : "○"}
-                      </div>
-                    ))}
-                  </div>
-                  {loginError && (
-                    <p className="text-red-500 text-xs text-center mt-2">
-                      {loginError}
+        {/* Right Side - Auth Interface */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
+          <div className="w-full max-w-lg">
+            {!selectedUser ? (
+              // User Selection Screen
+              <Card className="border-0 shadow-none bg-transparent rounded-3xl overflow-hidden">
+                <div className="p-6">
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                      Select User
+                    </h2>
+                    <p className="text-gray-600 text-sm">
+                      {isLoadingUsers
+                        ? "Loading users..."
+                        : "Tap your profile to login"}
                     </p>
+                  </div>
+
+                  {isLoadingUsers ? (
+                    <div className="flex justify-center items-center py-12">
+                      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : users.length === 0 ? (
+                    <div className="text-center py-12 text-gray-600">
+                      <p>No users found. Please contact administrator.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {users.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => setSelectedUser(user)}
+                          className="group relative flex flex-col items-center p-2 hover:rounded-full hover:bg-blue-50 transition-all duration-200 hover:scale-105"
+                        >
+                          <div
+                            className={`w-14 h-14 ${user.color} rounded-full flex items-center justify-center mb-2 transition-shadow`}
+                          >
+                            <User className="w-7 h-7 text-white" />
+                          </div>
+                          <h3 className="font-semibold text-gray-900 text-sm mb-0.5">
+                            {user.firstName} {user.lastName}
+                          </h3>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-
-                {/* Number Pad */}
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                    <Button
-                      key={num}
-                      onClick={() => handlePinInput(num.toString())}
-                      disabled={isLoading || pin.length >= 4}
-                      className="h-14 text-xl font-semibold bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg transition-all disabled:opacity-50"
+              </Card>
+            ) : (
+              // PIN Entry Screen
+              <Card className="border-0 shadow-none bg-transparent rounded-3xl overflow-hidden">
+                <div className="p-6">
+                  <div className="text-center mb-6">
+                    <div
+                      className={`w-16 h-16 ${selectedUser.color} rounded-full flex items-center justify-center mx-auto mb-3`}
                     >
-                      {num}
-                    </Button>
-                  ))}
-                  <Button
-                    onClick={() => handlePinInput("0")}
-                    disabled={isLoading || pin.length >= 4}
-                    className="h-14 text-xl font-semibold bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg transition-all col-span-3 disabled:opacity-50"
-                  >
-                    0
-                  </Button>
-                </div>
+                      <User className="w-8 h-8 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">
+                      {selectedUser.firstName} {selectedUser.lastName}
+                    </h2>
+                    <p className="text-gray-600 uppercase tracking-wide text-xs">
+                      {selectedUser.role}
+                    </p>
 
-                {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={handleBack}
-                    disabled={isLoading}
-                    variant="outline"
-                    className="h-12 text-sm font-medium bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    BACK
-                  </Button>
-                  <Button
-                    onClick={handleDeletePin}
-                    disabled={isLoading || pin.length === 0}
-                    className="h-12 text-sm font-medium bg-red-100 hover:bg-red-200 text-red-700 border-0 rounded-lg disabled:opacity-50"
-                  >
-                    <Delete className="w-4 h-4 mr-2" />
-                    DELETE
-                  </Button>
+                    <p className="text-orange-600 text-xs font-medium mt-1 tracking-wide">
+                      {selectedUser.role === "admin"
+                        ? "Demo Pin: 1234"
+                        : selectedUser.role === "manager"
+                        ? "Demo Pin: 5678"
+                        : "Demo Pin:999"}
+                    </p>
+                  </div>
+
+                  {/* PIN Input Display */}
+                  <div className="bg-gray-100 rounded-xl p-4 mb-4">
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <User className="w-4 h-4 text-gray-600" />
+                      <span className="text-gray-600 text-xs uppercase tracking-wider font-medium">
+                        Enter PIN
+                      </span>
+                    </div>
+                    <div className="flex justify-center gap-2">
+                      {[0, 1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center text-xl font-bold transition-all ${
+                            pin.length > i
+                              ? "bg-blue-500 border-blue-500 text-white"
+                              : "bg-white border-gray-300 text-transparent"
+                          }`}
+                        >
+                          {pin.length > i ? "●" : "○"}
+                        </div>
+                      ))}
+                    </div>
+                    {loginError && (
+                      <p className="text-red-500 text-xs text-center mt-2">
+                        {loginError}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Number Pad */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                      <Button
+                        key={num}
+                        onClick={() => handlePinInput(num.toString())}
+                        disabled={isLoading || pin.length >= 4}
+                        className="h-14 text-xl font-semibold bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg transition-all disabled:opacity-50"
+                      >
+                        {num}
+                      </Button>
+                    ))}
+                    <Button
+                      onClick={() => handlePinInput("0")}
+                      disabled={isLoading || pin.length >= 4}
+                      className="h-14 text-xl font-semibold bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg transition-all col-span-3 disabled:opacity-50"
+                    >
+                      0
+                    </Button>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      onClick={handleBack}
+                      disabled={isLoading}
+                      variant="outline"
+                      className="h-12 text-sm font-medium bg-gray-200 hover:bg-gray-300 text-gray-900 border-0 rounded-lg"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      BACK
+                    </Button>
+                    <Button
+                      onClick={handleDeletePin}
+                      disabled={isLoading || pin.length === 0}
+                      className="h-12 text-sm font-medium bg-red-100 hover:bg-red-200 text-red-700 border-0 rounded-lg disabled:opacity-50"
+                    >
+                      <Delete className="w-4 h-4 mr-2" />
+                      DELETE
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          )}
+              </Card>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
+      <footer className="shrink-0 py-3 border-t border-gray-200 text-center bg-white/80">
+        <p className="text-xs text-gray-600">
+          Version 2.4.1 | 2025 AuraSwift Systems | All rights reserved
+        </p>
+      </footer>
     </div>
   );
 }
