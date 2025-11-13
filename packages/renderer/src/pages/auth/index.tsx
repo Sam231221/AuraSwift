@@ -182,16 +182,13 @@ export default function AuthPage() {
                     <h2 className="text-xl font-bold text-gray-900 mb-1">
                       {selectedUser.firstName} {selectedUser.lastName}
                     </h2>
-                    <p className="text-gray-600 uppercase tracking-wide text-xs">
-                      {selectedUser.role}
-                    </p>
 
                     <p className="text-orange-600 text-xs font-medium mt-1 tracking-wide">
                       {selectedUser.role === "admin"
                         ? "Demo Pin: 1234"
                         : selectedUser.role === "manager"
                         ? "Demo Pin: 5678"
-                        : "Demo Pin:999"}
+                        : "Demo Pin:9999"}
                     </p>
                   </div>
 
