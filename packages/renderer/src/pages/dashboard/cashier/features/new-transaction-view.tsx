@@ -1358,7 +1358,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               </div>
             </CardHeader>
             <CardContent className="pt-4">
-              {/* Search Bar */}
+              {/* Search Bar
               <div className="mb-4 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
@@ -1367,7 +1367,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="bg-white border-slate-300 pl-10"
                 />
-              </div>
+              </div> */}
 
               {loading ? (
                 <div className="flex items-center justify-center py-12">
