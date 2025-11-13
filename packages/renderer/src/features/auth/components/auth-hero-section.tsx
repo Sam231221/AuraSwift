@@ -2,7 +2,7 @@ import { TrendingUp, Users, CreditCard, BarChart3 } from "lucide-react";
 
 export function AuthHeroSection() {
   return (
-    <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/5 via-accent/10 to-secondary/5 relative overflow-hidden">
+    <div className="hidden lg:flex lg:w-1/2 bg-linear-to-br from-primary/5 via-accent/10 to-secondary/5 relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('/modern-retail-store-interior-with-sleek-pos-system.jpg')] bg-cover bg-center opacity-10" />
 
       <div className="relative z-10 flex flex-col justify-center px-12 py-16">
@@ -19,7 +19,7 @@ export function AuthHeroSection() {
 
           <div className="grid grid-cols-2 gap-6">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center shrink-0">
                 <TrendingUp className="w-5 h-5 text-accent-foreground" />
               </div>
               <div>
@@ -31,7 +31,7 @@ export function AuthHeroSection() {
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center shrink-0">
                 <Users className="w-5 h-5 text-accent-foreground" />
               </div>
               <div>
@@ -43,7 +43,7 @@ export function AuthHeroSection() {
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center shrink-0">
                 <CreditCard className="w-5 h-5 text-accent-foreground" />
               </div>
               <div>
@@ -55,7 +55,7 @@ export function AuthHeroSection() {
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center shrink-0">
                 <BarChart3 className="w-5 h-5 text-accent-foreground" />
               </div>
               <div>

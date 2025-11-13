@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Store, User, ArrowLeft, Delete } from "lucide-react";
+import { User, ArrowLeft, Delete } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { AuthHeroSection } from "@/features/auth/components/auth-hero-section";
 import AuthHeader from "@/features/auth/components/auth-header";
@@ -117,7 +117,7 @@ export default function AuthPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <AuthHeader />
-      <main className="flex-1 bg-gradient-to-br from-gray-50 to-gray-100 flex">
+      <main className="flex-1 bg-linear-to-br from-gray-50 to-gray-100 flex">
         {/* Left Side - Hero Section */}
         <AuthHeroSection />
 
