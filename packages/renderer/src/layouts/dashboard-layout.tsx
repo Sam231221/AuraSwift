@@ -72,7 +72,7 @@ export function DashboardLayout({
       </header>
 
       {/* Main Content */}
-      <main className="p-6">{children}</main>
+      <main className="p-3">{children}</main>
     </div>
   );
 }

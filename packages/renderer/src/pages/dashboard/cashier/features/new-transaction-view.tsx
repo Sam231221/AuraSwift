@@ -1329,14 +1329,14 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         className="mb-4"
       /> */}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="flex flex-col lg:flex-row gap-2 h-[calc(100vh-7rem)]">
         {/* Left Column - Product Scanning & Selection */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-white border-slate-200 shadow-sm">
+        <div className="flex flex-col flex-1 min-h-0">
+          <Card className="bg-white border-slate-200 flex-1 flex flex-col shadow-sm overflow-hidden">
             <CardHeader className="bg-slate-50 py-1">
               <div className="flex items-center justify-between">
                 {/* Breadcrumb Navigation */}
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-1 text-sm">
                   {breadcrumb.map((item, index) => (
                     <React.Fragment key={item.id || "root"}>
                       {index > 0 && (
@@ -1357,18 +1357,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-4">
-              {/* Search Bar
-              <div className="mb-4 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search products by name, SKU, or PLU..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-white border-slate-300 pl-10"
-                />
-              </div> */}
-
+            <CardContent className="pt-1 flex-1 overflow-y-auto scroll-smooth">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -1396,9 +1385,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   {/* Show Categories if no search query and categories exist at current level */}
                   {!searchQuery && currentCategories.length > 0 && (
                     <div>
-                      {/* <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">
-                        Categories
-                      </h3> */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {currentCategories.map((category) => {
                           const childCount = categories.filter(
@@ -1560,7 +1546,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </div>
 
         {/* Right Column - Cart & Payment */}
-        <div className="">
+        <div className="flex flex-col w-full lg:w-[420px] max-w-full min-h-0 overflow-y-auto scroll-smooth">
           {/* Quick Actions Carousel */}
           <QuickActionsCarousel
             onRefund={() => setShowRefundModal(true)}
