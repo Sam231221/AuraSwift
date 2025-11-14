@@ -223,15 +223,16 @@ class WindowManager implements AppModule {
         sandbox: false, // Sandbox disabled because the demo of preload script depend on the Node.js api
         webviewTag: false, // The webview tag is not recommended. Consider alternatives like an iframe or Electron's BrowserView. @see https://www.electronjs.org/docs/latest/api/webview-tag#warning
         preload: this.#preload.path,
-        devTools: this.#openDevTools, // Enable DevTools based on config
+        devTools: process.env.NODE_ENV === "development", // Only enable DevTools in development
       },
     });
 
     // Hide the menu bar completely
     browserWindow.setMenuBarVisibility(false);
 
-    // Prevent opening DevTools with keyboard shortcuts (only if DevTools disabled)
-    if (!this.#openDevTools) {
+    // Disable DevTools completely in production
+    if (process.env.NODE_ENV === "production") {
+      // Prevent opening DevTools with keyboard shortcuts
       browserWindow.webContents.on("before-input-event", (event, input) => {
         // Block F12 and Ctrl+Shift+I (Cmd+Option+I on Mac)
         if (
@@ -241,6 +242,16 @@ class WindowManager implements AppModule {
         ) {
           event.preventDefault();
         }
+      });
+
+      // Disable right-click context menu (prevents "Inspect Element")
+      browserWindow.webContents.on("context-menu", (event) => {
+        event.preventDefault();
+      });
+
+      // Block any programmatic attempts to open DevTools
+      browserWindow.webContents.on("devtools-opened", () => {
+        browserWindow.webContents.closeDevTools();
       });
     }
 
@@ -308,7 +319,8 @@ class WindowManager implements AppModule {
 
     window?.show();
 
-    if (this.#openDevTools) {
+    // Only auto-open DevTools in development mode
+    if (this.#openDevTools && process.env.NODE_ENV === "development") {
       window?.webContents.openDevTools();
     }
 
