@@ -1767,10 +1767,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                             <SelectValue placeholder="Select unit" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="lb">Pounds (lb)</SelectItem>
                             <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                            <SelectItem value="oz">Ounces (oz)</SelectItem>
-                            <SelectItem value="g">Grams (g)</SelectItem>
                           </SelectContent>
                         </Select>
                         {formErrors.unit && (
