@@ -24,10 +24,7 @@ export default function CashierDashboard() {
   }
 
   return (
-    <DashboardLayout
-      title={`${getRoleDisplayName(user.role)} Dashboard`}
-      subtitle={`Welcome, ${getUserDisplayName(user)}`}
-    >
+    <>
       <div className="grid gap-6">
         <AnimatePresence mode="wait">
           <motion.div
@@ -54,6 +51,6 @@ export default function CashierDashboard() {
           </motion.div>
         </AnimatePresence>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

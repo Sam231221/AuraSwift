@@ -6,6 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Calculator,
   CreditCard,
   CheckCircle,
@@ -32,7 +40,7 @@ import { useAuth } from "@/shared/hooks/use-auth";
 import type { Product } from "@/types/product.types";
 import { toast } from "sonner";
 import { useProductionScanner } from "@/hooks/useProductionScanner";
-import { ScanHistory } from "@/components/scanner/ScannerStatusComponents";
+
 import { ScannerAudio } from "@/utils/scannerAudio";
 import {
   useReceiptPrintingFlow,
@@ -45,6 +53,8 @@ import { PaymentStatusModal } from "@/components/payment/PaymentComponents";
 import RefundTransactionView from "./refund-transaction-view";
 import VoidTransactionModal from "./void-transaction-view";
 import CashDrawerCountModal from "./cash-drawer-count-modal";
+import { QuickActionButtons } from "./quick-actions-buttons";
+import { NumericKeypad } from "./numeric-keypad";
 
 interface CartItem {
   product: Product;
@@ -326,7 +336,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     { id: null, name: "All Categories" },
   ]);
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   // Scanner state
   const [audioEnabled] = useState(true);
@@ -1329,9 +1339,9 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         className="mb-4"
       /> */}
 
-      <div className="flex flex-col lg:flex-row gap-2 h-[calc(100vh-7rem)]">
+      <div className="flex p-2 flex-col lg:flex-row gap-2 min-h-screen h-screen">
         {/* Left Column - Product Scanning & Selection */}
-        <div className="flex flex-col flex-1 min-h-0">
+        <div className="flex mb-2 flex-col flex-1 min-h-0 min-w-0">
           <Card className="bg-white border-slate-200 flex-1 flex flex-col shadow-sm overflow-hidden">
             <CardHeader className="bg-slate-50 py-1">
               <div className="flex items-center justify-between">
@@ -1543,277 +1553,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               )}
             </CardContent>
           </Card>
-        </div>
+          {!paymentStep && <QuickActionButtons onLogOff={logout} />}
 
-        {/* Right Column - Cart & Payment */}
-        <div className="flex flex-col w-full lg:w-[420px] max-w-full min-h-0 overflow-y-auto scroll-smooth">
-          {/* Quick Actions Carousel */}
-          <QuickActionsCarousel
-            onRefund={() => setShowRefundModal(true)}
-            onVoid={() => setShowVoidModal(true)}
-            onCount={() => setShowCountModal(true)}
-            onDashboard={onBack}
-          />
-
-          <div className="bg-white border-t-black-200  shadow-lg">
-            <CardContent className="pt-1">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Scan/Enter barcode or PLU code"
-                  value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleBarcodeScan()}
-                  className="bg-white text-sm border-slate-300"
-                />
-                <Button
-                  onClick={handleBarcodeScan}
-                  className="bg-sky-600 hover:bg-sky-700"
-                >
-                  Scan
-                </Button>
-              </div>
-
-              <div
-                className={`mt-1 flex items-center gap-2 p-2 rounded ${
-                  selectedWeightProduct
-                    ? "bg-blue-50 border border-blue-200"
-                    : ""
-                }`}
-              >
-                <Scale
-                  className={`h-4 w-4 ${
-                    selectedWeightProduct ? "text-blue-600" : "text-slate-500"
-                  }`}
-                />
-                <span
-                  className={`text-sm ${
-                    selectedWeightProduct
-                      ? "text-blue-700 font-medium"
-                      : "text-slate-600"
-                  }`}
-                >
-                  {selectedWeightProduct
-                    ? `Weight for ${selectedWeightProduct.name}:`
-                    : "Weight (for produce):"}
-                </span>
-                <Input
-                  type="number"
-                  placeholder={
-                    selectedWeightProduct
-                      ? `Enter weight in ${
-                          selectedWeightProduct.unit || "units"
-                        }`
-                      : "Enter weight"
-                  }
-                  value={weightInput}
-                  onChange={(e) => setWeightInput(e.target.value)}
-                  className={`w-24 ${
-                    selectedWeightProduct
-                      ? "border-blue-300"
-                      : "border-slate-300"
-                  } bg-white`}
-                />
-                <span
-                  className={`text-sm ${
-                    selectedWeightProduct
-                      ? "text-blue-600 font-medium"
-                      : "text-slate-600"
-                  }`}
-                >
-                  {selectedWeightProduct?.unit || "units"}
-                </span>
-                {selectedWeightProduct && (
-                  <>
-                    {weightInput && parseFloat(weightInput) > 0 && (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          addToCart(
-                            selectedWeightProduct,
-                            parseFloat(weightInput)
-                          );
-                          setWeightInput("");
-                          setSelectedWeightProduct(null);
-                        }}
-                        className="h-8 px-3 bg-sky-600 hover:bg-sky-700 text-white"
-                      >
-                        Add to Cart
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedWeightProduct(null);
-                        setWeightInput("");
-                      }}
-                      className="h-8 px-2 text-slate-600 hover:text-slate-800"
-                    >
-                      Clear
-                    </Button>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </div>
-
-          <div className="bg-white p-2 border-b-slate-200 shadow-sm">
-            <CardContent className="pt-4">
-              <AnimatePresence>
-                {cart.length === 0 ? (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-slate-400 text-center py-4"
-                  >
-                    No items in cart. Scan or search for products.
-                  </motion.p>
-                ) : (
-                  <div className="space-y-3 max-h-80 overflow-y-auto">
-                    {cart.map((item) => (
-                      <motion.div
-                        key={item.product.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -100 }}
-                        className="flex justify-between items-start p-3 bg-slate-50 rounded-lg border border-slate-200"
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium text-slate-800">
-                            {item.product.name}
-                          </div>
-                          {item.product.requiresWeight && item.weight && (
-                            <div className="text-sm text-slate-500">
-                              Weight: {item.weight.toFixed(2)}{" "}
-                              {item.product.unit || "lbs"}
-                            </div>
-                          )}
-                          <div className="text-sm text-slate-500">
-                            {item.product.requiresWeight &&
-                            item.product.pricePerUnit
-                              ? `£${item.product.pricePerUnit.toFixed(2)} per ${
-                                  item.product.unit
-                                }`
-                              : `£${item.product.price.toFixed(2)} each`}
-                          </div>
-                          <div className="text-sm font-medium text-green-600">
-                            {item.product.requiresWeight &&
-                            item.weight &&
-                            item.product.pricePerUnit ? (
-                              <>
-                                £
-                                {(
-                                  item.product.pricePerUnit *
-                                  item.weight *
-                                  item.quantity
-                                ).toFixed(2)}
-                                <span className="text-xs text-slate-500 ml-1">
-                                  ({item.weight.toFixed(2)} {item.product.unit}{" "}
-                                  × {item.quantity})
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                £
-                                {(item.product.price * item.quantity).toFixed(
-                                  2
-                                )}
-                                <span className="text-xs text-slate-500 ml-1">
-                                  (× {item.quantity})
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              updateQuantity(item.product.id, item.quantity - 1)
-                            }
-                            className="h-7 w-7 p-0 border-slate-300"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-
-                          <span className="text-sm w-6 text-center font-medium">
-                            {item.quantity}
-                          </span>
-
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              updateQuantity(item.product.id, item.quantity + 1)
-                            }
-                            className="h-7 w-7 p-0 border-slate-300"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeFromCart(item.product.id)}
-                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </AnimatePresence>
-
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <div className="flex justify-between mb-1 text-slate-700">
-                  <span>Subtotal:</span>
-                  <span>£{subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between mb-1 text-slate-700">
-                  <span>Items Count:</span>
-                  <span>{cart.length}</span>
-                </div>
-                <div className="flex justify-between mb-1 text-slate-500">
-                  <span>Tax (8%):</span>
-                  <span>£{tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-bold text-lg mt-3 pt-2 border-t border-slate-200 text-sky-700">
-                  <span>Total:</span>
-                  <span>£{total.toFixed(2)}</span>
-                </div>
-
-                {!paymentStep ? (
-                  <Button
-                    className="w-full mt-4 bg-sky-600 hover:bg-sky-700 h-11 text-lg"
-                    onClick={() => setPaymentStep(true)}
-                    disabled={cart.length === 0}
-                  >
-                    <Calculator className="h-5 w-5 mr-2" />
-                    Checkout
-                  </Button>
-                ) : (
-                  <Button
-                    className="w-full mt-4 bg-slate-200 hover:bg-slate-300 text-slate-700 h-11"
-                    onClick={() => setPaymentStep(false)}
-                  >
-                    Back to Cart
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </div>
-          {/* Hardware Scanner History */}
-          {scanLog.length > 0 && (
-            <ScanHistory
-              scanLog={scanLog}
-              onClearLog={clearScanLog}
-              maxVisible={3}
-            />
-          )}
           {/* Payment Section */}
           {paymentStep && (
             <motion.div
@@ -1901,6 +1642,17 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             Gift card/Coupon
                           </span>
                         </div>
+                      </Button>
+                      {/* Cancel Button */}
+                      <Button
+                        variant="ghost"
+                        className="col-span-2 mt-2 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200"
+                        onClick={() => {
+                          setPaymentStep(false);
+                          setPaymentMethod(null);
+                        }}
+                      >
+                        Cancel
                       </Button>
                     </div>
                   ) : (
@@ -2021,6 +1773,16 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                           ? `Need £${(total - cashAmount).toFixed(2)} More`
                           : "Complete Transaction"}
                       </Button>
+                      <Button
+                        variant="ghost"
+                        className="col-span-2 mt-2 h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200"
+                        onClick={() => {
+                          setPaymentStep(false);
+                          setPaymentMethod(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -2058,6 +1820,310 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               </motion.div>
             </motion.div>
           )}
+        </div>
+
+        {/* Right Column - Cart & Payment */}
+
+        <div className="flex flex-col flex-[0_1_480px] w-full lg:w-[480px] max-w-[520px] gap-2 h-full overflow-hidden">
+          {/* Quick Actions Carousel */}
+
+          <QuickActionsCarousel
+            onRefund={() => setShowRefundModal(true)}
+            onVoid={() => setShowVoidModal(true)}
+            onCount={() => setShowCountModal(true)}
+            onDashboard={onBack}
+          />
+
+          <div className="bg-white border-t-black-200 shadow-lg shrink-0">
+            <CardContent className="p-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Scan/Enter barcode or PLU code"
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleBarcodeScan()}
+                  className="bg-white text-sm border-slate-300"
+                />
+                <Button
+                  onClick={handleBarcodeScan}
+                  className="bg-sky-600 hover:bg-sky-700"
+                >
+                  Scan
+                </Button>
+              </div>
+
+              <div
+                className={`mt-1 flex items-center gap-2 p-2 rounded ${
+                  selectedWeightProduct
+                    ? "bg-blue-50 border border-blue-200"
+                    : ""
+                }`}
+              >
+                <Scale
+                  className={`h-4 w-4 ${
+                    selectedWeightProduct ? "text-blue-600" : "text-slate-500"
+                  }`}
+                />
+                <span
+                  className={`text-sm ${
+                    selectedWeightProduct
+                      ? "text-blue-700 font-medium"
+                      : "text-slate-600"
+                  }`}
+                >
+                  {selectedWeightProduct
+                    ? `Weight for ${selectedWeightProduct.name}:`
+                    : "Weight (for produce):"}
+                </span>
+                <Input
+                  type="number"
+                  placeholder={
+                    selectedWeightProduct
+                      ? `Enter weight in ${
+                          selectedWeightProduct.unit || "units"
+                        }`
+                      : "Enter weight"
+                  }
+                  value={weightInput}
+                  onChange={(e) => setWeightInput(e.target.value)}
+                  className={`w-24 ${
+                    selectedWeightProduct
+                      ? "border-blue-300"
+                      : "border-slate-300"
+                  } bg-white`}
+                />
+                <span
+                  className={`text-sm ${
+                    selectedWeightProduct
+                      ? "text-blue-600 font-medium"
+                      : "text-slate-600"
+                  }`}
+                >
+                  {selectedWeightProduct?.unit || "units"}
+                </span>
+                {selectedWeightProduct && (
+                  <>
+                    {weightInput && parseFloat(weightInput) > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          addToCart(
+                            selectedWeightProduct,
+                            parseFloat(weightInput)
+                          );
+                          setWeightInput("");
+                          setSelectedWeightProduct(null);
+                        }}
+                        className="h-8 px-3 bg-sky-600 hover:bg-sky-700 text-white"
+                      >
+                        Add to Cart
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedWeightProduct(null);
+                        setWeightInput("");
+                      }}
+                      className="h-8 px-2 text-slate-600 hover:text-slate-800"
+                    >
+                      Clear
+                    </Button>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </div>
+          {/* table of cart items */}
+          <div className="bg-white border-b-slate-200 shadow-sm flex-1 flex flex-col min-h-0">
+            <CardContent className="p-2 flex-1 flex flex-col min-h-0">
+              <div className="border border-slate-200 rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+                <div className="shrink-0">
+                  <Table>
+                    <TableHeader className="bg-linear-to-r from-sky-200 to-blue-300">
+                      <TableRow className="h-10 border-b-0">
+                        <TableHead
+                          className="text-center font-semibold text-slate-800 h-10"
+                          style={{ width: "100px" }}
+                        >
+                          Unit/Weight
+                        </TableHead>
+                        <TableHead className="text-left font-semibold text-slate-800 h-10">
+                          Product
+                        </TableHead>
+                        <TableHead
+                          className="text-center font-semibold text-slate-800 h-10"
+                          style={{ width: "120px" }}
+                        >
+                          Price
+                        </TableHead>
+                        <TableHead
+                          className="text-center font-semibold text-slate-800 h-10"
+                          style={{ width: "100px" }}
+                        >
+                          Total
+                        </TableHead>
+                        <TableHead
+                          className="text-center font-semibold text-slate-800 h-10"
+                          style={{ width: "80px" }}
+                        >
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                  </Table>
+                </div>
+                <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+                  <Table>
+                    <TableBody>
+                      <AnimatePresence>
+                        {cart.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={5}
+                              className="text-slate-400 text-center py-8"
+                            >
+                              No items in Basket. Scan or search for products.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          cart.map((item) => (
+                            <TableRow
+                              key={item.product.id}
+                              className="border-b border-slate-200"
+                            >
+                              <TableCell
+                                className="text-center"
+                                style={{ width: "100px" }}
+                              >
+                                {item.product.requiresWeight && item.weight
+                                  ? `${item.weight.toFixed(2)} ${
+                                      item.product.unit || "lbs"
+                                    }`
+                                  : "-"}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {item.product.name}
+                              </TableCell>
+                              <TableCell
+                                className="text-center"
+                                style={{ width: "120px" }}
+                              >
+                                {item.product.requiresWeight &&
+                                item.product.pricePerUnit
+                                  ? `£${item.product.pricePerUnit.toFixed(
+                                      2
+                                    )} / ${item.product.unit}`
+                                  : `£${item.product.price.toFixed(2)}`}
+                              </TableCell>
+                              <TableCell
+                                className="text-center font-semibold"
+                                style={{ width: "100px" }}
+                              >
+                                {item.product.requiresWeight &&
+                                item.weight &&
+                                item.product.pricePerUnit
+                                  ? `£${(
+                                      item.product.pricePerUnit *
+                                      item.weight *
+                                      item.quantity
+                                    ).toFixed(2)}`
+                                  : `£${(
+                                      item.product.price * item.quantity
+                                    ).toFixed(2)}`}
+                              </TableCell>
+                              <TableCell
+                                className="text-center"
+                                style={{ width: "80px" }}
+                              >
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    removeFromCart(item.product.id)
+                                  }
+                                  className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </AnimatePresence>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <div className="mt-2 pt-2 border-t border-slate-200 shrink-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-slate-700 font-medium text-sm">
+                  <span>
+                    Subtotal:{" "}
+                    <span className="font-semibold">
+                      £{subtotal.toFixed(2)}
+                    </span>
+                  </span>
+                  <span>
+                    Items: <span className="font-semibold">{cart.length}</span>
+                  </span>
+                  <span className="text-slate-500">
+                    Tax (8%):{" "}
+                    <span className="font-semibold">£{tax.toFixed(2)}</span>
+                  </span>
+                  <span className="text-sky-700 font-bold text-lg ml-auto">
+                    Total: £{total.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </div>
+          <div className="shrink-0">
+            <NumericKeypad
+              onInput={(value) => {
+                // Handle numeric keypad input here
+                console.log("Numeric keypad input:", value);
+              }}
+              keysOverride={[
+                ["7", "8", "9", "Enter"],
+                ["4", "5", "6", "Clear"],
+                [
+                  "1",
+                  "2",
+                  "3",
+                  !paymentStep ? (
+                    <Button
+                      className="w-full h-full py-4 font-semibold text-lg rounded transition-colors bg-sky-600 hover:bg-sky-700 text-white"
+                      style={{ minHeight: 0, minWidth: 0 }}
+                      onClick={() => setPaymentStep(true)}
+                      disabled={cart.length === 0}
+                    >
+                      Checkout
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full h-full py-4 font-semibold text-lg rounded transition-colors bg-slate-200 hover:bg-slate-300 text-slate-700"
+                      style={{ minHeight: 0, minWidth: 0 }}
+                      onClick={() => setPaymentStep(false)}
+                    >
+                      Back to Cart
+                    </Button>
+                  ),
+                ],
+                ["0", "00", "", ""],
+              ]}
+            />
+          </div>
+
+          {/* Hardware Scanner History */}
+          {/* {scanLog.length > 0 && (
+            <ScanHistory
+              scanLog={scanLog}
+              onClearLog={clearScanLog}
+              maxVisible={3}
+            />
+          )} */}
         </div>
       </div>
 
