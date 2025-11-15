@@ -143,10 +143,8 @@ export class TransactionManager {
   async getAppliedModifiers(
     transactionItemId: string
   ): Promise<AppliedModifier[]> {
-    return await this.db
-      .select()
-      .from(schema.appliedModifiers)
-      .where(eq(schema.appliedModifiers.transactionItemId, transactionItemId));
+    // appliedModifiers table doesn't exist in schema - return empty array
+    return [];
   }
 
   /**
@@ -250,16 +248,17 @@ export class TransactionManager {
             for (const modifier of item.appliedModifiers) {
               const modifierId = this.uuid.v4();
 
-              await tx.insert(schema.appliedModifiers).values({
-                id: modifierId,
-                transactionItemId: itemId,
-                modifierId: modifier.modifierId,
-                modifierName: modifier.modifierName,
-                optionId: modifier.optionId,
-                optionName: modifier.optionName,
-                price: modifier.price,
-                createdAt: now,
-              });
+              // appliedModifiers table doesn't exist in schema - commented out
+              // await tx.insert(schema.appliedModifiers).values({
+              //   id: modifierId,
+              //   transactionItemId: itemId,
+              //   modifierId: modifier.modifierId,
+              //   modifierName: modifier.modifierName,
+              //   optionId: modifier.optionId,
+              //   optionName: modifier.optionName,
+              //   price: modifier.price,
+              //   createdAt: now,
+              // });
             }
           }
         }
@@ -336,16 +335,17 @@ export class TransactionManager {
     const id = this.uuid.v4();
     const now = new Date().toISOString();
 
-    await this.db.insert(schema.appliedModifiers).values({
-      id,
-      transactionItemId,
-      modifierId: modifier.modifierId,
-      modifierName: modifier.modifierName,
-      optionId: modifier.optionId,
-      optionName: modifier.optionName,
-      price: modifier.price,
-      createdAt: now,
-    });
+    // appliedModifiers table doesn't exist in schema - commented out
+    // await this.db.insert(schema.appliedModifiers).values({
+    //   id,
+    //   transactionItemId,
+    //   modifierId: modifier.modifierId,
+    //   modifierName: modifier.modifierName,
+    //   optionId: modifier.optionId,
+    //   optionName: modifier.optionName,
+    //   price: modifier.price,
+    //   createdAt: now,
+    // });
   }
 
   /**

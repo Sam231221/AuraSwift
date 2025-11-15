@@ -14,61 +14,34 @@ export class SupplierManager {
 
   /**
    * Get supplier by ID
+   * NOTE: Suppliers table doesn't exist in schema - stubbed out
    */
   getSupplierById(id: string): Supplier | null {
-    const result = this.db
-      .select()
-      .from(schema.suppliers)
-      .where(eq(schema.suppliers.id, id))
-      .get();
-
-    return result as Supplier | null;
+    // Suppliers table doesn't exist in schema
+    return null;
   }
 
   /**
    * Get all suppliers for a business
+   * NOTE: Suppliers table doesn't exist in schema - stubbed out
    */
   getSuppliersByBusinessId(businessId: string, activeOnly = false): Supplier[] {
-    let queryBuilder = this.db.select().from(schema.suppliers);
-
-    if (activeOnly) {
-      const results = queryBuilder
-        .where(
-          and(
-            eq(schema.suppliers.businessId, businessId),
-            eq(schema.suppliers.isActive, true)
-          )
-        )
-        .all();
-      return results as Supplier[];
-    }
-
-    const results = queryBuilder
-      .where(eq(schema.suppliers.businessId, businessId))
-      .all();
-    return results as Supplier[];
+    // Suppliers table doesn't exist in schema
+    return [];
   }
 
   /**
    * Search suppliers by name
+   * NOTE: Suppliers table doesn't exist in schema - stubbed out
    */
   searchSuppliers(businessId: string, searchTerm: string): Supplier[] {
-    const results = this.db
-      .select()
-      .from(schema.suppliers)
-      .where(
-        and(
-          eq(schema.suppliers.businessId, businessId),
-          like(schema.suppliers.name, `%${searchTerm}%`)
-        )
-      )
-      .all();
-
-    return results as Supplier[];
+    // Suppliers table doesn't exist in schema
+    return [];
   }
 
   /**
    * Create a new supplier
+   * NOTE: Suppliers table doesn't exist in schema - stubbed out
    */
   createSupplier(supplierData: {
     name: string;
@@ -83,39 +56,12 @@ export class SupplierManager {
     businessId: string;
     notes?: string;
   }): Supplier {
-    const supplierId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    this.db
-      .insert(schema.suppliers)
-      .values({
-        id: supplierId,
-        name: supplierData.name,
-        contactPerson: supplierData.contactPerson || null,
-        email: supplierData.email || null,
-        phone: supplierData.phone || null,
-        address: supplierData.address || null,
-        city: supplierData.city || null,
-        country: supplierData.country || null,
-        taxId: supplierData.taxId || null,
-        paymentTerms: supplierData.paymentTerms || null,
-        businessId: supplierData.businessId,
-        isActive: true,
-        notes: supplierData.notes || null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-
-    const supplier = this.getSupplierById(supplierId);
-    if (!supplier) {
-      throw new Error("Supplier not found after creation");
-    }
-    return supplier;
+    throw new Error("Suppliers feature not implemented - table does not exist in schema");
   }
 
   /**
    * Update supplier information
+   * NOTE: Suppliers table doesn't exist in schema - stubbed out
    */
   updateSupplier(
     id: string,
@@ -133,54 +79,31 @@ export class SupplierManager {
       notes: string;
     }>
   ): boolean {
-    const now = new Date().toISOString();
-
-    const result = this.db
-      .update(schema.suppliers)
-      .set({
-        ...updates,
-        updatedAt: now,
-      })
-      .where(eq(schema.suppliers.id, id))
-      .run();
-
-    return result.changes > 0;
+    throw new Error("Suppliers feature not implemented - table does not exist in schema");
   }
 
   /**
    * Delete supplier (soft delete by marking as inactive)
+   * NOTE: Suppliers table doesn't exist in schema - stubbed out
    */
   deleteSupplier(id: string): boolean {
-    return this.updateSupplier(id, { isActive: false });
+    throw new Error("Suppliers feature not implemented - table does not exist in schema");
   }
 
   /**
    * Permanently delete supplier from database
+   * NOTE: Suppliers table doesn't exist in schema - stubbed out
    */
   permanentlyDeleteSupplier(id: string): boolean {
-    const result = this.db
-      .delete(schema.suppliers)
-      .where(eq(schema.suppliers.id, id))
-      .run();
-
-    return result.changes > 0;
+    throw new Error("Suppliers feature not implemented - table does not exist in schema");
   }
 
   /**
    * Get active suppliers count for a business
+   * NOTE: Suppliers table doesn't exist in schema - stubbed out
    */
   getActiveSuppliersCount(businessId: string): number {
-    const result = this.db
-      .select()
-      .from(schema.suppliers)
-      .where(
-        and(
-          eq(schema.suppliers.businessId, businessId),
-          eq(schema.suppliers.isActive, true)
-        )
-      )
-      .all();
-
-    return result.length;
+    // Suppliers table doesn't exist in schema
+    return 0;
   }
 }

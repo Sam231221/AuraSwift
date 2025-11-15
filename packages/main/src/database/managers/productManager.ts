@@ -3,6 +3,42 @@ import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
+// Helper to convert schema product to Product type
+function mapSchemaProductToProduct(
+  product: typeof schema.products.$inferSelect
+): Product {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description || "",
+    price: product.basePrice, // Map basePrice to price
+    costPrice: product.costPrice || 0,
+    taxRate: 0, // TODO: Get from vatCategoryId if needed
+    sku: product.sku,
+    plu: product.plu || undefined,
+    image: product.image || undefined,
+    category: product.categoryId || "", // Map categoryId to category
+    stockLevel: Number(product.stockLevel || 0),
+    minStockLevel: Number(product.minStockLevel || 0),
+    businessId: product.businessId,
+    modifiers: [], // Stub - modifiers table doesn't exist
+    isActive: Boolean(product.isActive),
+    requiresWeight: Boolean(product.usesScale), // Map usesScale to requiresWeight
+    unit:
+      (product.salesUnit?.toLowerCase() as "lb" | "kg" | "oz" | "g" | "each") ||
+      "each",
+    pricePerUnit: product.pricePerKg || undefined,
+    createdAt:
+      product.createdAt instanceof Date
+        ? product.createdAt.toISOString()
+        : String(product.createdAt),
+    updatedAt:
+      product.updatedAt instanceof Date
+        ? product.updatedAt.toISOString()
+        : String(product.updatedAt),
+  };
+}
+
 export class ProductManager {
   private drizzle: DrizzleDB;
   private uuid: any;
@@ -16,7 +52,7 @@ export class ProductManager {
     productData: Omit<Product, "id" | "createdAt" | "updatedAt" | "modifiers">
   ): Promise<Product> {
     const productId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     // Validate required fields
     if (!productData.category || productData.category.trim() === "") {
@@ -27,20 +63,26 @@ export class ProductManager {
       id: productId,
       name: productData.name,
       description: productData.description || null,
-      price: productData.price,
+      basePrice: productData.price, // Map price to basePrice
       costPrice: productData.costPrice || 0,
-      taxRate: productData.taxRate || 0,
       sku: productData.sku,
       plu: productData.plu || null,
       image: productData.image || null,
-      category: productData.category,
+      categoryId: productData.category, // Map category to categoryId
       stockLevel: productData.stockLevel || 0,
       minStockLevel: productData.minStockLevel || 0,
       businessId: productData.businessId,
       isActive: productData.isActive !== false,
-      requiresWeight: productData.requiresWeight || false,
-      unit: productData.unit || "each",
-      pricePerUnit: productData.pricePerUnit || null,
+      usesScale: productData.requiresWeight || false, // Map requiresWeight to usesScale
+      salesUnit:
+        (productData.unit?.toUpperCase() as
+          | "PIECE"
+          | "KG"
+          | "GRAM"
+          | "LITRE"
+          | "ML"
+          | "PACK") || "PIECE",
+      pricePerKg: productData.pricePerUnit || null,
       createdAt: now,
       updatedAt: now,
     });
@@ -61,14 +103,7 @@ export class ProductManager {
       throw new Error("Product not found");
     }
 
-    const modifiers = await this.getProductModifiers(id);
-
-    return {
-      ...product,
-      isActive: Boolean(product.isActive),
-      requiresWeight: Boolean(product.requiresWeight),
-      modifiers,
-    } as Product;
+    return mapSchemaProductToProduct(product);
   }
 
   async getProductByPLU(plu: string): Promise<Product> {
@@ -84,14 +119,7 @@ export class ProductManager {
       throw new Error("Product not found");
     }
 
-    const modifiers = await this.getProductModifiers(product.id);
-
-    return {
-      ...product,
-      isActive: Boolean(product.isActive),
-      requiresWeight: Boolean(product.requiresWeight),
-      modifiers,
-    } as Product;
+    return mapSchemaProductToProduct(product);
   }
 
   async getProductBySKU(sku: string): Promise<Product | null> {
@@ -107,14 +135,7 @@ export class ProductManager {
       return null;
     }
 
-    const modifiers = await this.getProductModifiers(product.id);
-
-    return {
-      ...product,
-      isActive: Boolean(product.isActive),
-      requiresWeight: Boolean(product.requiresWeight),
-      modifiers,
-    } as Product;
+    return mapSchemaProductToProduct(product);
   }
 
   async getProductsByBusiness(businessId: string): Promise<Product[]> {
@@ -129,23 +150,14 @@ export class ProductManager {
       )
       .orderBy(schema.products.name);
 
-    const productsWithModifiers = await Promise.all(
-      products.map(async (product) => ({
-        ...product,
-        isActive: Boolean(product.isActive),
-        requiresWeight: Boolean(product.requiresWeight),
-        modifiers: await this.getProductModifiers(product.id),
-      }))
-    );
-
-    return productsWithModifiers as Product[];
+    return products.map(mapSchemaProductToProduct);
   }
 
   async updateProduct(
     id: string,
     updates: Partial<Omit<Product, "id" | "createdAt" | "modifiers">>
   ): Promise<Product> {
-    const now = new Date().toISOString();
+    const now = new Date();
 
     if (Object.keys(updates).length === 0) {
       return this.getProductById(id);
@@ -158,19 +170,43 @@ export class ProductManager {
       throw new Error("Product not found");
     }
 
+    // Map Product fields to schema fields
+    const schemaUpdates: any = {};
+    if (updates.price !== undefined) schemaUpdates.basePrice = updates.price;
+    if (updates.costPrice !== undefined)
+      schemaUpdates.costPrice = updates.costPrice;
+    if (updates.category !== undefined)
+      schemaUpdates.categoryId = updates.category;
+    if (updates.requiresWeight !== undefined)
+      schemaUpdates.usesScale = updates.requiresWeight;
+    if (updates.unit !== undefined)
+      schemaUpdates.salesUnit = updates.unit.toUpperCase();
+    if (updates.pricePerUnit !== undefined)
+      schemaUpdates.pricePerKg = updates.pricePerUnit;
+    if (updates.name !== undefined) schemaUpdates.name = updates.name;
+    if (updates.description !== undefined)
+      schemaUpdates.description = updates.description;
+    if (updates.sku !== undefined) schemaUpdates.sku = updates.sku;
+    if (updates.plu !== undefined) schemaUpdates.plu = updates.plu;
+    if (updates.image !== undefined) schemaUpdates.image = updates.image;
+    if (updates.stockLevel !== undefined)
+      schemaUpdates.stockLevel = updates.stockLevel;
+    if (updates.minStockLevel !== undefined)
+      schemaUpdates.minStockLevel = updates.minStockLevel;
+    if (updates.isActive !== undefined)
+      schemaUpdates.isActive = updates.isActive;
+    schemaUpdates.updatedAt = now;
+
     await this.drizzle
       .update(schema.products)
-      .set({
-        ...updates,
-        updatedAt: now,
-      })
+      .set(schemaUpdates)
       .where(eq(schema.products.id, id));
 
     return this.getProductById(id);
   }
 
   async deleteProduct(id: string): Promise<boolean> {
-    const now = new Date().toISOString();
+    const now = new Date();
 
     const result = await this.drizzle
       .update(schema.products)
@@ -185,131 +221,51 @@ export class ProductManager {
     return result.changes > 0;
   }
 
+  // Stub modifier functions - modifiers table doesn't exist in schema
   async createModifier(
     modifierData: Omit<Modifier, "id" | "createdAt" | "updatedAt" | "options">
   ): Promise<Modifier> {
-    const modifierId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    await this.drizzle.insert(schema.modifiers).values({
-      id: modifierId,
-      name: modifierData.name,
-      type: modifierData.type,
-      required: modifierData.required || false,
-      businessId: modifierData.businessId,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    return this.getModifierById(modifierId);
+    throw new Error(
+      "Modifiers feature not implemented - table does not exist in schema"
+    );
   }
 
   async getModifierById(id: string): Promise<Modifier> {
-    const [modifier] = await this.drizzle
-      .select()
-      .from(schema.modifiers)
-      .where(eq(schema.modifiers.id, id))
-      .limit(1);
-
-    if (!modifier) {
-      throw new Error("Modifier not found");
-    }
-
-    const options = await this.drizzle
-      .select()
-      .from(schema.modifierOptions)
-      .where(eq(schema.modifierOptions.modifierId, id))
-      .orderBy(schema.modifierOptions.name);
-
-    return {
-      ...modifier,
-      required: Boolean(modifier.required),
-      options: options as ModifierOption[],
-    } as Modifier;
+    throw new Error(
+      "Modifiers feature not implemented - table does not exist in schema"
+    );
   }
 
   async createModifierOption(
     modifierId: string,
     optionData: Omit<ModifierOption, "id" | "createdAt">
   ): Promise<ModifierOption> {
-    const optionId = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    await this.drizzle.insert(schema.modifierOptions).values({
-      id: optionId,
-      modifierId: modifierId,
-      name: optionData.name,
-      price: optionData.price,
-      createdAt: now,
-    });
-
-    return {
-      id: optionId,
-      name: optionData.name,
-      price: optionData.price,
-      createdAt: now,
-    };
+    throw new Error(
+      "Modifiers feature not implemented - table does not exist in schema"
+    );
   }
 
   async getProductModifiers(productId: string): Promise<Modifier[]> {
-    // Get modifiers joined with product_modifiers
-    const modifiersData = await this.drizzle
-      .select({
-        modifier: schema.modifiers,
-      })
-      .from(schema.modifiers)
-      .innerJoin(
-        schema.productModifiers,
-        eq(schema.modifiers.id, schema.productModifiers.modifierId)
-      )
-      .where(eq(schema.productModifiers.productId, productId))
-      .orderBy(schema.modifiers.name);
-
-    // Get options for each modifier
-    const modifiersWithOptions = await Promise.all(
-      modifiersData.map(async ({ modifier }) => {
-        const options = await this.drizzle
-          .select()
-          .from(schema.modifierOptions)
-          .where(eq(schema.modifierOptions.modifierId, modifier.id))
-          .orderBy(schema.modifierOptions.name);
-
-        return {
-          ...modifier,
-          required: Boolean(modifier.required),
-          options: options as ModifierOption[],
-        };
-      })
-    );
-
-    return modifiersWithOptions as Modifier[];
+    // Return empty array since modifiers table doesn't exist
+    return [];
   }
 
   async addModifierToProduct(
     productId: string,
     modifierId: string
   ): Promise<void> {
-    await this.drizzle
-      .insert(schema.productModifiers)
-      .values({
-        productId,
-        modifierId,
-      })
-      .onConflictDoNothing();
+    throw new Error(
+      "Modifiers feature not implemented - table does not exist in schema"
+    );
   }
 
   async removeModifierFromProduct(
     productId: string,
     modifierId: string
   ): Promise<void> {
-    await this.drizzle
-      .delete(schema.productModifiers)
-      .where(
-        and(
-          eq(schema.productModifiers.productId, productId),
-          eq(schema.productModifiers.modifierId, modifierId)
-        )
-      );
+    throw new Error(
+      "Modifiers feature not implemented - table does not exist in schema"
+    );
   }
 
   /**
@@ -336,7 +292,7 @@ export class ProductManager {
       )
       .orderBy(schema.products.name);
 
-    return products as Product[];
+    return products.map(mapSchemaProductToProduct);
   }
 
   /**
@@ -351,7 +307,7 @@ export class ProductManager {
       .from(schema.products)
       .leftJoin(
         schema.categories,
-        eq(schema.products.category, schema.categories.id)
+        eq(schema.products.categoryId, schema.categories.id)
       )
       .where(
         and(
@@ -383,6 +339,6 @@ export class ProductManager {
       )
       .orderBy(schema.products.stockLevel);
 
-    return products as Product[];
+    return products.map(mapSchemaProductToProduct);
   }
 }

@@ -43,4 +43,5 @@ function Badge({
   )
 }
 
+/* eslint-disable react-refresh/only-export-components */
 export { Badge, badgeVariants }

@@ -19,7 +19,8 @@ const paymentMethods = [
   { label: "CARD", color: "#4a5a5a" },
 ];
 
-export function PaymentPanel({ subtotal }: PaymentPanelProps) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function PaymentPanel({ subtotal: _subtotal }: PaymentPanelProps) {
   return (
     <div className="space-y-3">
       {/* Quick Amounts */}

@@ -86,6 +86,80 @@ export const useOfficePrinter = () => {
   }, [selectedPrinter]);
 
   /**
+   * Stop polling for job status
+   */
+  const stopStatusPolling = useCallback(() => {
+    if (statusPollInterval.current) {
+      clearInterval(statusPollInterval.current);
+      statusPollInterval.current = null;
+    }
+  }, []);
+
+  /**
+   * Get status of a print job
+   */
+  const getJobStatusById = useCallback(
+    async (jobId: string) => {
+      try {
+        if (!window.officePrinterAPI) {
+          throw new Error("Office printer API not available");
+        }
+
+        const result = await window.officePrinterAPI.getJobStatus(jobId);
+
+        if (result.success && result.status) {
+          setJobStatus(result.status);
+
+          // Update print state based on job status
+          switch (result.status.status) {
+            case "printing":
+              setPrintState("printing");
+              break;
+            case "completed":
+              setPrintState("completed");
+              stopStatusPolling();
+              toast.success("Print completed successfully");
+              break;
+            case "failed":
+              setPrintState("failed");
+              setError(result.status.error || "Print job failed");
+              stopStatusPolling();
+              toast.error(`Print failed: ${result.status.error}`);
+              break;
+            case "cancelled":
+              setPrintState("idle");
+              stopStatusPolling();
+              toast.info("Print job cancelled");
+              break;
+          }
+
+          return result.status;
+        } else {
+          throw new Error(result.error || "Failed to get job status");
+        }
+      } catch (err) {
+        console.error("Failed to get job status:", err);
+        return null;
+      }
+    },
+    [stopStatusPolling]
+  );
+
+  /**
+   * Start polling for job status
+   */
+  const startStatusPolling = useCallback(
+    (jobId: string) => {
+      stopStatusPolling(); // Clear any existing polling
+
+      statusPollInterval.current = setInterval(() => {
+        getJobStatusById(jobId);
+      }, 2000); // Poll every 2 seconds
+    },
+    [getJobStatusById, stopStatusPolling]
+  );
+
+  /**
    * Print a document
    */
   const printDocument = useCallback(
@@ -154,79 +228,8 @@ export const useOfficePrinter = () => {
         setIsLoading(false);
       }
     },
-    [selectedPrinter]
+    [selectedPrinter, startStatusPolling]
   );
-
-  /**
-   * Get status of a print job
-   */
-  const getJobStatusById = useCallback(async (jobId: string) => {
-    try {
-      if (!window.officePrinterAPI) {
-        throw new Error("Office printer API not available");
-      }
-
-      const result = await window.officePrinterAPI.getJobStatus(jobId);
-
-      if (result.success && result.status) {
-        setJobStatus(result.status);
-
-        // Update print state based on job status
-        switch (result.status.status) {
-          case "printing":
-            setPrintState("printing");
-            break;
-          case "completed":
-            setPrintState("completed");
-            stopStatusPolling();
-            toast.success("Print completed successfully");
-            break;
-          case "failed":
-            setPrintState("failed");
-            setError(result.status.error || "Print job failed");
-            stopStatusPolling();
-            toast.error(`Print failed: ${result.status.error}`);
-            break;
-          case "cancelled":
-            setPrintState("idle");
-            stopStatusPolling();
-            toast.info("Print job cancelled");
-            break;
-        }
-
-        return result.status;
-      } else {
-        throw new Error(result.error || "Failed to get job status");
-      }
-    } catch (err) {
-      console.error("Failed to get job status:", err);
-      return null;
-    }
-  }, []);
-
-  /**
-   * Start polling for job status
-   */
-  const startStatusPolling = useCallback(
-    (jobId: string) => {
-      stopStatusPolling(); // Clear any existing polling
-
-      statusPollInterval.current = setInterval(() => {
-        getJobStatusById(jobId);
-      }, 2000); // Poll every 2 seconds
-    },
-    [getJobStatusById]
-  );
-
-  /**
-   * Stop polling for job status
-   */
-  const stopStatusPolling = useCallback(() => {
-    if (statusPollInterval.current) {
-      clearInterval(statusPollInterval.current);
-      statusPollInterval.current = null;
-    }
-  }, []);
 
   /**
    * Cancel a print job
@@ -490,6 +493,14 @@ export const usePrintJobMonitor = (jobId: string | null) => {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const monitorInterval = useRef<NodeJS.Timeout | null>(null);
 
+  const stopMonitoring = useCallback(() => {
+    if (monitorInterval.current) {
+      clearInterval(monitorInterval.current);
+      monitorInterval.current = null;
+    }
+    setIsMonitoring(false);
+  }, []);
+
   const startMonitoring = useCallback(async () => {
     if (!jobId || !window.officePrinterAPI) {
       return;
@@ -520,15 +531,7 @@ export const usePrintJobMonitor = (jobId: string | null) => {
 
     // Start polling
     monitorInterval.current = setInterval(checkStatus, 2000);
-  }, [jobId]);
-
-  const stopMonitoring = useCallback(() => {
-    if (monitorInterval.current) {
-      clearInterval(monitorInterval.current);
-      monitorInterval.current = null;
-    }
-    setIsMonitoring(false);
-  }, []);
+  }, [jobId, stopMonitoring]);
 
   useEffect(() => {
     if (jobId) {

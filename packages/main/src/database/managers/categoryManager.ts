@@ -29,6 +29,8 @@ export class CategoryManager {
     return {
       ...category,
       isActive: Boolean(category.isActive),
+      createdAt: category.createdAt instanceof Date ? category.createdAt.toISOString() : String(category.createdAt),
+      updatedAt: category.updatedAt instanceof Date ? category.updatedAt.toISOString() : String(category.updatedAt),
     } as Category;
   }
 
@@ -50,6 +52,8 @@ export class CategoryManager {
     return categories.map((cat) => ({
       ...cat,
       isActive: Boolean(cat.isActive),
+      createdAt: cat.createdAt instanceof Date ? cat.createdAt.toISOString() : String(cat.createdAt),
+      updatedAt: cat.updatedAt instanceof Date ? cat.updatedAt.toISOString() : String(cat.updatedAt),
     })) as Category[];
   }
 
@@ -80,6 +84,8 @@ export class CategoryManager {
     return categories.map((cat) => ({
       ...cat,
       isActive: Boolean(cat.isActive),
+      createdAt: cat.createdAt instanceof Date ? cat.createdAt.toISOString() : String(cat.createdAt),
+      updatedAt: cat.updatedAt instanceof Date ? cat.updatedAt.toISOString() : String(cat.updatedAt),
     })) as Category[];
   }
 
@@ -137,7 +143,7 @@ export class CategoryManager {
     parentId?: string | null;
   }): Promise<Category> {
     const categoryId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     // Get the next sort order if not provided
     const nextSortOrder =
@@ -173,7 +179,7 @@ export class CategoryManager {
       isActive: boolean;
     }>
   ): Promise<Category> {
-    const now = new Date().toISOString();
+    const now = new Date();
 
     await this.drizzle
       .update(schema.categories)
@@ -190,7 +196,7 @@ export class CategoryManager {
    * Delete category (soft delete, type-safe)
    */
   async deleteCategory(id: string): Promise<boolean> {
-    const now = new Date().toISOString();
+    const now = new Date();
 
     // Check if category is being used by any products
     const productsUsingCategory = await this.drizzle
@@ -198,7 +204,7 @@ export class CategoryManager {
       .from(schema.products)
       .where(
         and(
-          eq(schema.products.category, id),
+          eq(schema.products.categoryId, id),
           eq(schema.products.isActive, true)
         )
       );
@@ -243,7 +249,7 @@ export class CategoryManager {
     businessId: string,
     categoryIds: string[]
   ): Promise<void> {
-    const now = new Date().toISOString();
+    const now = new Date();
 
     // Drizzle doesn't have transaction support in better-sqlite3 driver yet,
     // so we'll run updates sequentially
@@ -304,7 +310,7 @@ export class CategoryManager {
       },
     ];
 
-    const now = new Date().toISOString();
+    const now = new Date();
 
     for (let index = 0; index < defaultCategories.length; index++) {
       const category = defaultCategories[index];

@@ -25,7 +25,7 @@ export interface PrintJobConfig {
   documentData?: Buffer; // Raw document data
   documentType: "pdf" | "image" | "text" | "raw";
   options?: PrintOptions;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdBy?: string;
   businessId?: string;
 }

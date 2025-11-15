@@ -444,7 +444,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 
   // Initialize scanner hook
-  const { scanLog, clearScanLog } = useProductionScanner({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { scanLog: _scanLog, clearScanLog: _clearScanLog } = useProductionScanner({
     onScan: handleHardwareScan,
     enableAudio: audioEnabled,
     minBarcodeLength: 4, // Allow shorter codes for PLU
@@ -689,7 +690,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     });
   };
 
-  const updateQuantity = (productId: string, newQuantity: number) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _updateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) {
       removeFromCart(productId);
       return;

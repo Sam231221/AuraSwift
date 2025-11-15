@@ -57,7 +57,7 @@ export class InventoryManager {
       .update(schema.products)
       .set({
         stockLevel: newStockLevel,
-        updatedAt: now,
+        updatedAt: new Date(),
       })
       .where(eq(schema.products.id, adjustmentData.productId))
       .run();
