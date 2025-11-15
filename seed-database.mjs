@@ -35,19 +35,23 @@ console.log("📦 Seeding database at:", dbPath);
 const Database = require("better-sqlite3");
 const db = new Database(dbPath);
 
-// Hash password and PIN
-const PASSWORD_HASH = bcrypt.hashSync("Password123!", 10);
-const ADMIN_PIN = bcrypt.hashSync("1234", 10);
-const MANAGER_PIN = bcrypt.hashSync("5678", 10);
-const CASHIER_PIN = bcrypt.hashSync("9999", 10);
+// Generate salt and hash password and PINs
+const SALT = bcrypt.genSaltSync(10);
+const PASSWORD_HASH = bcrypt.hashSync("Password123!", SALT);
+const ADMIN_PIN_HASH = bcrypt.hashSync("1234", SALT);
+const MANAGER_PIN_HASH = bcrypt.hashSync("5678", SALT);
+const CASHIER_PIN_HASH = bcrypt.hashSync("9999", SALT);
 
 try {
+  // Disable foreign key constraints temporarily
+  db.prepare("PRAGMA foreign_keys = OFF").run();
+
   // Start transaction
   db.prepare("BEGIN").run();
 
-  console.log("\n🏪 Creating default business...");
+  console.log("\n🏪 Creating default business with temp ownerId...");
 
-  // Create Default Business
+  // Create Default Business with temp ownerId
   db.prepare(
     `
     INSERT INTO businesses (id, name, ownerId, address, phone, vatNumber, createdAt, updatedAt) 
@@ -56,7 +60,7 @@ try {
   ).run(
     "default-business-001",
     "Demo Store",
-    "default-admin-001",
+    "temp-owner",
     "123 Main Street, Downtown",
     "+1 (555) 123-4567",
     "VAT-123456789"
@@ -70,18 +74,19 @@ try {
   db.prepare(
     `
     INSERT INTO users (
-      id, username, email, password, pin, 
+      id, username, email, password_hash, pin_hash, salt,
       firstName, lastName, businessName, role, 
       businessId, permissions, 
       createdAt, updatedAt, isActive, address
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
   `
   ).run(
     "default-admin-001",
     "admin",
     "admin@store.com",
     PASSWORD_HASH,
-    ADMIN_PIN,
+    ADMIN_PIN_HASH,
+    SALT,
     "System",
     "Administrator",
     "Demo Store",
@@ -98,22 +103,32 @@ try {
   console.log("   PIN: 1234");
   console.log("   Password: Password123!");
 
+  // Update Business to set correct ownerId
+  db.prepare(
+    `
+    UPDATE businesses 
+    SET ownerId = ? 
+    WHERE id = ?
+  `
+  ).run("default-admin-001", "default-business-001");
+
   // Create Manager User
   db.prepare(
     `
     INSERT INTO users (
-      id, username, email, password, pin, 
+      id, username, email, password_hash, pin_hash, salt,
       firstName, lastName, businessName, role, 
       businessId, permissions, 
       createdAt, updatedAt, isActive, address
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
   `
   ).run(
     "default-manager-001",
     "manager",
     "manager@store.com",
     PASSWORD_HASH,
-    MANAGER_PIN,
+    MANAGER_PIN_HASH,
+    SALT,
     "Store",
     "Manager",
     "Demo Store",
@@ -142,18 +157,19 @@ try {
   db.prepare(
     `
     INSERT INTO users (
-      id, username, email, password, pin, 
+      id, username, email, password_hash, pin_hash, salt,
       firstName, lastName, businessName, role, 
       businessId, permissions, 
       createdAt, updatedAt, isActive, address
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
   `
   ).run(
     "default-cashier-001",
     "cashier",
     "cashier@store.com",
     PASSWORD_HASH,
-    CASHIER_PIN,
+    CASHIER_PIN_HASH,
+    SALT,
     "Demo",
     "Cashier",
     "Demo Store",
@@ -199,6 +215,9 @@ try {
 
   // Commit transaction
   db.prepare("COMMIT").run();
+
+  // Re-enable foreign key constraints
+  db.prepare("PRAGMA foreign_keys = ON").run();
 
   console.log("\n✨ Database seeded successfully!");
   console.log("\n📋 Summary:");

@@ -29,22 +29,23 @@ export async function seedDefaultData(db: any, schema: any) {
 
     console.log("📦 Seeding database with default data...");
 
-    // Hash password and PINs
-    const PASSWORD_HASH = await bcrypt.hash("Password123!", 10);
-    const ADMIN_PIN = await bcrypt.hash("1234", 10);
-    const MANAGER_PIN = await bcrypt.hash("5678", 10);
-    const CASHIER_PIN = await bcrypt.hash("9999", 10);
+    // Generate salt and hash password and PINs
+    const SALT = await bcrypt.genSalt(10);
+    const PASSWORD_HASH = await bcrypt.hash("Password123!", SALT);
+    const ADMIN_PIN_HASH = await bcrypt.hash("1234", SALT);
+    const MANAGER_PIN_HASH = await bcrypt.hash("5678", SALT);
+    const CASHIER_PIN_HASH = await bcrypt.hash("9999", SALT);
 
     const now = new Date().toISOString();
     const businessId = "default-business-001";
     const adminId = "default-admin-001";
 
-    // Create Default Business
+    // 1. Create Default Business with temp ownerId
     console.log("🏪 Creating default business...");
     await db.insert(businesses).values({
       id: businessId,
       name: "Demo Store",
-      ownerId: adminId,
+      ownerId: "temp-owner", // temp value, will update after admin user is created
       address: "123 Main Street, Downtown",
       phone: "+1 (555) 123-4567",
       vatNumber: "VAT-123456789",
@@ -53,14 +54,15 @@ export async function seedDefaultData(db: any, schema: any) {
     });
     console.log("✅ Business created: Demo Store");
 
-    // Create Admin User
+    // 2. Create Admin User with businessId
     console.log("\n👥 Creating default users...");
     await db.insert(users).values({
       id: adminId,
       username: "admin",
       email: "admin@store.com",
-      password: PASSWORD_HASH,
-      pin: ADMIN_PIN,
+      passwordHash: PASSWORD_HASH,
+      pinHash: ADMIN_PIN_HASH,
+      salt: SALT,
       firstName: "System",
       lastName: "Administrator",
       businessName: "Demo Store",
@@ -77,13 +79,20 @@ export async function seedDefaultData(db: any, schema: any) {
     console.log("   Email: admin@store.com");
     console.log("   PIN: 1234");
 
-    // Create Manager User
+    // 3. Update Business to set correct ownerId
+    await db
+      .update(businesses)
+      .set({ ownerId: adminId })
+      .where(businesses.id.eq(businessId));
+
+    // 4. Create Manager User
     await db.insert(users).values({
       id: "default-manager-001",
       username: "manager",
       email: "manager@store.com",
-      password: PASSWORD_HASH,
-      pin: MANAGER_PIN,
+      passwordHash: PASSWORD_HASH,
+      pinHash: MANAGER_PIN_HASH,
+      salt: SALT,
       firstName: "Store",
       lastName: "Manager",
       businessName: "Demo Store",
@@ -108,13 +117,14 @@ export async function seedDefaultData(db: any, schema: any) {
     console.log("   Email: manager@store.com");
     console.log("   PIN: 5678");
 
-    // Create Cashier User
+    // 5. Create Cashier User
     await db.insert(users).values({
       id: "default-cashier-001",
       username: "cashier",
       email: "cashier@store.com",
-      password: PASSWORD_HASH,
-      pin: CASHIER_PIN,
+      passwordHash: PASSWORD_HASH,
+      pinHash: CASHIER_PIN_HASH,
+      salt: SALT,
       firstName: "Demo",
       lastName: "Cashier",
       businessName: "Demo Store",

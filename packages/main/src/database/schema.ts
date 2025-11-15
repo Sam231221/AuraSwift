@@ -7,45 +7,97 @@
  * @see /packages/main/src/database/docs/07_DRIZZLE_ORM_INTEGRATION.md
  */
 
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
-import { sql } from "drizzle-orm";
-
+import {
+  text,
+  integer,
+  unique,
+  real,
+  sqliteTableCreator,
+} from "drizzle-orm/sqlite-core";
+import { index as drizzleIndex } from "drizzle-orm/sqlite-core";
+export const createTable = sqliteTableCreator((name) => name);
 // ============================================
 // BUSINESSES & USERS
 // ============================================
 
-export const businesses = sqliteTable("businesses", {
+export const businesses = createTable("businesses", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  ownerId: text("ownerId").notNull(),
-  address: text("address").default(""),
+  ownerId: text("ownerId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }), // or "restrict"
+
+  // Contact Information
+  email: text("email").default(""),
   phone: text("phone").default(""),
-  vatNumber: text("vatNumber").default(""),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  website: text("website").default(""),
+
+  // Location
+  address: text("address").default(""),
+  country: text("country").notNull().default(""),
+  city: text("city").notNull().default(""),
+  postalCode: text("postalCode").default(""),
+
+  // Business Identity
+  vatNumber: text("vatNumber").unique().default(""),
+  businessType: text("businessType", {
+    enum: ["retail", "restaurant", "service", "wholesale", "other"],
+  })
+    .notNull()
+    .default("retail"),
+  currency: text("currency").notNull().default("USD"),
+  timezone: text("timezone").notNull().default("UTC"),
+
+  // Status & Metadata
+  isActive: integer("isActive", { mode: "boolean" }).default(true),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .notNull()
+    .$onUpdate(() => new Date()),
 });
 
-export const users = sqliteTable("users", {
+export const users = createTable("users", {
   id: text("id").primaryKey(),
   username: text("username").unique().notNull(),
-  email: text("email"),
-  password: text("password"),
-  pin: text("pin").notNull(),
+  email: text("email").unique(),
+  passwordHash: text("password_hash"),
+  pinHash: text("pin_hash").notNull(),
+  salt: text("salt").notNull(),
   firstName: text("firstName").notNull(),
   lastName: text("lastName").notNull(),
   businessName: text("businessName").notNull(),
-  role: text("role", { enum: ["cashier", "manager", "admin"] }).notNull(),
+  role: text("role", {
+    enum: ["cashier", "supervisor", "manager", "admin", "owner"],
+  }).notNull(),
   businessId: text("businessId")
     .notNull()
-    .references(() => businesses.id),
-  permissions: text("permissions").notNull(),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+    .references((): any => businesses.id, { onDelete: "cascade" }),
+  permissions: text("permissions", { mode: "json" })
+    .$type<Permission[]>()
+    .notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .notNull()
+    .$onUpdate(() => new Date()),
+  lastLoginAt: integer("lastLoginAt", { mode: "timestamp_ms" }),
   isActive: integer("isActive", { mode: "boolean" }).default(true),
+  loginAttempts: integer("login_attempts").default(0),
+  lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
   address: text("address").default(""),
 });
 
-export const sessions = sqliteTable("sessions", {
+// Permission type definition
+export type Permission =
+  | "read:sales"
+  | "write:sales"
+  | "read:reports"
+  | "manage:inventory"
+  | "manage:users"
+  | "view:analytics"
+  | "override:transactions"
+  | "manage:settings";
+
+export const sessions = createTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
@@ -59,80 +111,156 @@ export const sessions = sqliteTable("sessions", {
 // PRODUCTS & INVENTORY
 // ============================================
 
-export const categories = sqliteTable("categories", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  parentId: text("parentId").references((): any => categories.id, {
-    onDelete: "set null",
-  }),
-  description: text("description"),
-  businessId: text("businessId")
-    .notNull()
-    .references(() => businesses.id),
-  isActive: integer("isActive", { mode: "boolean" }).default(true),
-  sortOrder: integer("sortOrder").default(0),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
-});
+export const vatCategories = createTable(
+  "vat_categories",
+  {
+    id: text("id").primaryKey(), // Use text/UUID for consistency
+    name: text("name").notNull(), // e.g. "Standard", "Reduced", "Zero"
+    ratePercent: real("rate_percent").notNull(), // e.g. 20.00
+    code: text("code").notNull(), // Should not be nullable  // e.g. "STD", "RED"
+    description: text("description"), // Add description
+    businessId: text("business_id") // 🔥 CRITICAL: Add business reference
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    isDefault: integer("is_default", { mode: "boolean" }).default(false),
+    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    businessIdx: index("vat_business_idx").on(table.businessId),
+    codeIdx: index("vat_code_idx").on(table.code),
+  })
+);
+export const categories = createTable(
+  "categories",
+  {
+    id: text("id").primaryKey(), // Consistent ID type
+    name: text("name").notNull(),
+    parentId: text("parent_id").references((): any => categories.id, {
+      // Fixed type
+      onDelete: "set null",
+    }),
+    description: text("description"),
+    vatCategoryId: text("vat_category_id").references(
+      // Fixed type
+      () => vatCategories.id,
+      { onDelete: "set null" }
+    ),
+    businessId: text("business_id") // 🔥 CRITICAL: Add business reference
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").default(0),
+    color: text("color"), // For UI organization
+    image: text("image"), // Category images
+    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("categories_business_idx").on(table.businessId),
+    index("categories_parent_idx").on(table.parentId),
+    index("categories_vat_idx").on(table.vatCategoryId),
+    // Ensure category names are unique within a business
+    unique("category_name_business_unique").on(table.name, table.businessId),
+  ]
+);
 
-export const products = sqliteTable("products", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  price: real("price").notNull(),
-  costPrice: real("costPrice").default(0),
-  taxRate: real("taxRate").default(0),
-  sku: text("sku").unique().notNull(),
-  plu: text("plu").unique(),
-  image: text("image"),
-  category: text("category")
-    .notNull()
-    .references(() => categories.id),
-  stockLevel: integer("stockLevel").default(0),
-  minStockLevel: integer("minStockLevel").default(0),
-  businessId: text("businessId")
-    .notNull()
-    .references(() => businesses.id),
-  isActive: integer("isActive", { mode: "boolean" }).default(true),
-  requiresWeight: integer("requiresWeight", { mode: "boolean" }).default(false),
-  unit: text("unit").default("each"),
-  pricePerUnit: real("pricePerUnit"),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
-});
+export const products = createTable(
+  "products",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
 
-export const modifiers = sqliteTable("modifiers", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  type: text("type", { enum: ["single", "multiple"] }).notNull(),
-  required: integer("required", { mode: "boolean" }).default(false),
-  businessId: text("businessId")
-    .notNull()
-    .references(() => businesses.id),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
-});
+    // 🔥 PRICING STRUCTURE - Clarify the confusion
+    basePrice: real("base_price").notNull(), // Standard price
+    costPrice: real("cost_price").default(0),
 
-export const modifierOptions = sqliteTable("modifier_options", {
-  id: text("id").primaryKey(),
-  modifierId: text("modifierId")
-    .notNull()
-    .references(() => modifiers.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  price: real("price").default(0),
-  createdAt: text("createdAt").notNull(),
-});
+    // Identifiers
+    sku: text("sku").notNull(),
+    barcode: text("barcode"), // More standard than PLU
+    plu: text("plu"), // For scale integration
 
-export const productModifiers = sqliteTable("product_modifiers", {
-  productId: text("productId")
-    .notNull()
-    .references(() => products.id, { onDelete: "cascade" }),
-  modifierId: text("modifierId")
-    .notNull()
-    .references(() => modifiers.id, { onDelete: "cascade" }),
-});
+    // Media
+    image: text("image"),
 
-export const stockAdjustments = sqliteTable("stock_adjustments", {
+    // Classification
+    categoryId: text("category_id").references(() => categories.id, {
+      onDelete: "set null",
+    }),
+
+    // 🔥 PRODUCT TYPE SYSTEM - Simplified
+    productType: text("product_type", {
+      enum: ["STANDARD", "WEIGHTED", "GENERIC"],
+    })
+      .notNull()
+      .default("STANDARD"),
+
+    // Unit configuration
+    salesUnit: text("sales_unit", {
+      enum: ["PIECE", "KG", "GRAM", "LITRE", "ML", "PACK"],
+    })
+      .notNull()
+      .default("PIECE"),
+
+    // Scale integration
+    usesScale: integer("uses_scale", { mode: "boolean" }).default(false),
+    pricePerKg: real("price_per_kg"), // Specific to weighted items
+
+    // Generic item behavior
+    isGenericButton: integer("is_generic_button", { mode: "boolean" }).default(
+      false
+    ),
+    genericDefaultPrice: real("generic_default_price"), // Suggested price for generic items
+
+    // Inventory
+    trackInventory: integer("track_inventory", { mode: "boolean" }).default(
+      true
+    ),
+    stockLevel: real("stock_level").default(0), // Use real for weighted items
+    minStockLevel: real("min_stock_level").default(0),
+    reorderPoint: real("reorder_point").default(0),
+
+    // VAT
+    vatCategoryId: text("vat_category_id").references(() => vatCategories.id, {
+      onDelete: "set null",
+    }),
+
+    // Business
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+
+    // Settings
+    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    allowPriceOverride: integer("allow_price_override", {
+      mode: "boolean",
+    }).default(false),
+    allowDiscount: integer("allow_discount", { mode: "boolean" }).default(true),
+
+    // Timestamps
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("products_business_idx").on(table.businessId),
+    index("products_category_idx").on(table.categoryId),
+    index("products_sku_idx").on(table.sku),
+    index("products_barcode_idx").on(table.barcode),
+    index("products_plu_idx").on(table.plu),
+    index("products_type_idx").on(table.productType),
+    // Ensure SKU is unique per business
+    unique("product_sku_business_unique").on(table.sku, table.businessId),
+  ]
+);
+export const stockAdjustments = createTable("stock_adjustments", {
   id: text("id").primaryKey(),
   productId: text("productId")
     .notNull()
@@ -142,6 +270,7 @@ export const stockAdjustments = sqliteTable("stock_adjustments", {
   }).notNull(),
   quantity: integer("quantity").notNull(),
   reason: text("reason"),
+  note: text("note"),
   userId: text("userId")
     .notNull()
     .references(() => users.id),
@@ -151,31 +280,11 @@ export const stockAdjustments = sqliteTable("stock_adjustments", {
   timestamp: text("timestamp").notNull(),
 });
 
-export const suppliers = sqliteTable("suppliers", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  contactPerson: text("contactPerson"),
-  email: text("email"),
-  phone: text("phone"),
-  address: text("address"),
-  city: text("city"),
-  country: text("country"),
-  taxId: text("taxId"),
-  paymentTerms: text("paymentTerms"),
-  businessId: text("businessId")
-    .notNull()
-    .references(() => businesses.id),
-  isActive: integer("isActive", { mode: "boolean" }).default(true),
-  notes: text("notes"),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
-});
-
 // ============================================
 // OPERATIONS
 // ============================================
 
-export const schedules = sqliteTable("schedules", {
+export const schedules = createTable("schedules", {
   id: text("id").primaryKey(),
   staffId: text("staffId")
     .notNull()
@@ -194,7 +303,7 @@ export const schedules = sqliteTable("schedules", {
   updatedAt: text("updatedAt").notNull(),
 });
 
-export const shifts = sqliteTable("shifts", {
+export const shifts = createTable("shifts", {
   id: text("id").primaryKey(),
   scheduleId: text("scheduleId").references(() => schedules.id),
   cashierId: text("cashierId")
@@ -219,7 +328,7 @@ export const shifts = sqliteTable("shifts", {
   updatedAt: text("updatedAt").notNull(),
 });
 
-export const transactions = sqliteTable("transactions", {
+export const transactions = createTable("transactions", {
   id: text("id").primaryKey(),
   shiftId: text("shiftId")
     .notNull()
@@ -259,7 +368,7 @@ export const transactions = sqliteTable("transactions", {
   appliedDiscounts: text("appliedDiscounts"),
 });
 
-export const transactionItems = sqliteTable("transaction_items", {
+export const transactionItems = createTable("transaction_items", {
   id: text("id").primaryKey(),
   transactionId: text("transactionId")
     .notNull()
@@ -278,22 +387,7 @@ export const transactionItems = sqliteTable("transaction_items", {
   createdAt: text("createdAt").notNull(),
 });
 
-export const appliedModifiers = sqliteTable("applied_modifiers", {
-  id: text("id").primaryKey(),
-  transactionItemId: text("transactionItemId")
-    .notNull()
-    .references(() => transactionItems.id),
-  modifierId: text("modifierId")
-    .notNull()
-    .references(() => modifiers.id),
-  modifierName: text("modifierName").notNull(),
-  optionId: text("optionId").notNull(),
-  optionName: text("optionName").notNull(),
-  price: real("price").notNull(),
-  createdAt: text("createdAt").notNull(),
-});
-
-export const cashDrawerCounts = sqliteTable("cash_drawer_counts", {
+export const cashDrawerCounts = createTable("cash_drawer_counts", {
   id: text("id").primaryKey(),
   shiftId: text("shiftId")
     .notNull()
@@ -317,7 +411,7 @@ export const cashDrawerCounts = sqliteTable("cash_drawer_counts", {
 // DISCOUNTS & PROMOTIONS
 // ============================================
 
-export const discounts = sqliteTable("discounts", {
+export const discounts = createTable("discounts", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
@@ -370,14 +464,14 @@ export const discounts = sqliteTable("discounts", {
 // SYSTEM
 // ============================================
 
-export const appSettings = sqliteTable("app_settings", {
+export const appSettings = createTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
   createdAt: text("createdAt").notNull(),
   updatedAt: text("updatedAt").notNull(),
 });
 
-export const auditLogs = sqliteTable("audit_logs", {
+export const auditLogs = createTable("audit_logs", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
@@ -398,7 +492,7 @@ export const auditLogs = sqliteTable("audit_logs", {
 // TIME TRACKING & CLOCK-IN/OUT SYSTEM
 // ============================================
 
-export const clockEvents = sqliteTable("clock_events", {
+export const clockEvents = createTable("clock_events", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
@@ -420,7 +514,7 @@ export const clockEvents = sqliteTable("clock_events", {
   updatedAt: text("updatedAt").notNull(),
 });
 
-export const timeShifts = sqliteTable("time_shifts", {
+export const timeShifts = createTable("time_shifts", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
@@ -445,7 +539,7 @@ export const timeShifts = sqliteTable("time_shifts", {
   updatedAt: text("updatedAt").notNull(),
 });
 
-export const breaks = sqliteTable("breaks", {
+export const breaks = createTable("breaks", {
   id: text("id").primaryKey(),
   shiftId: text("shiftId")
     .notNull()
@@ -468,7 +562,7 @@ export const breaks = sqliteTable("breaks", {
   updatedAt: text("updatedAt").notNull(),
 });
 
-export const timeCorrections = sqliteTable("time_corrections", {
+export const timeCorrections = createTable("time_corrections", {
   id: text("id").primaryKey(),
   clockEventId: text("clockEventId").references(() => clockEvents.id),
   shiftId: text("shiftId").references(() => timeShifts.id),
@@ -497,7 +591,7 @@ export const timeCorrections = sqliteTable("time_corrections", {
 // PRINTING SYSTEM
 // ============================================
 
-export const printJobs = sqliteTable("print_jobs", {
+export const printJobs = createTable("print_jobs", {
   jobId: text("job_id").primaryKey(),
   printerName: text("printer_name").notNull(),
   documentPath: text("document_path"),
@@ -530,7 +624,7 @@ export const printJobs = sqliteTable("print_jobs", {
   error: text("error"),
 });
 
-export const printJobRetries = sqliteTable("print_job_retries", {
+export const printJobRetries = createTable("print_job_retries", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   jobId: text("job_id")
     .notNull()
@@ -560,15 +654,6 @@ export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 
-export type Modifier = typeof modifiers.$inferSelect;
-export type NewModifier = typeof modifiers.$inferInsert;
-
-export type ModifierOption = typeof modifierOptions.$inferSelect;
-export type NewModifierOption = typeof modifierOptions.$inferInsert;
-
-export type ProductModifier = typeof productModifiers.$inferSelect;
-export type NewProductModifier = typeof productModifiers.$inferInsert;
-
 export type StockAdjustment = typeof stockAdjustments.$inferSelect;
 export type NewStockAdjustment = typeof stockAdjustments.$inferInsert;
 
@@ -583,9 +668,6 @@ export type NewTransaction = typeof transactions.$inferInsert;
 
 export type TransactionItem = typeof transactionItems.$inferSelect;
 export type NewTransactionItem = typeof transactionItems.$inferInsert;
-
-export type AppliedModifier = typeof appliedModifiers.$inferSelect;
-export type NewAppliedModifier = typeof appliedModifiers.$inferInsert;
 
 export type CashDrawerCount = typeof cashDrawerCounts.$inferSelect;
 export type NewCashDrawerCount = typeof cashDrawerCounts.$inferInsert;
@@ -616,3 +698,4 @@ export type NewPrintJob = typeof printJobs.$inferInsert;
 
 export type PrintJobRetry = typeof printJobRetries.$inferSelect;
 export type NewPrintJobRetry = typeof printJobRetries.$inferInsert;
+export const index = drizzleIndex;
