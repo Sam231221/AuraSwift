@@ -1,4 +1,4 @@
-interface APIResponse {
+export interface APIResponse {
   success: boolean;
   message: string;
   data?: unknown;

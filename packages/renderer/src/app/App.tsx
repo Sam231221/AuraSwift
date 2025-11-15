@@ -6,8 +6,8 @@ import {
 } from "react-router-dom";
 
 import { ProtectedRoute, PublicRoute } from "@/shared/components";
-import AuthPage from "@/pages/auth";
-import DashboardPage from "@/pages/dashboard";
+import AuthPage from "@/views/auth";
+import DashboardPage from "@/views/dashboard";
 
 export default function App() {
   return (

@@ -1,5 +1,8 @@
 import type { User } from "@/features/auth/types/auth.types";
 
+/**
+ * Check if a user has a specific permission
+ */
 export function hasPermission(
   user: User,
   action: string,
@@ -12,6 +15,9 @@ export function hasPermission(
   );
 }
 
+/**
+ * Get the display name for a role
+ */
 export function getRoleDisplayName(role: string): string {
   switch (role) {
     case "cashier":
@@ -25,6 +31,9 @@ export function getRoleDisplayName(role: string): string {
   }
 }
 
+/**
+ * Get the description for a role
+ */
 export function getRoleDescription(role: string): string {
   switch (role) {
     case "cashier":
@@ -38,6 +47,9 @@ export function getRoleDescription(role: string): string {
   }
 }
 
+/**
+ * Get the display name for a user (first name + last name)
+ */
 export function getUserDisplayName(user: User): string {
   return `${user.firstName} ${user.lastName}`;
 }

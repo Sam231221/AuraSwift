@@ -15,6 +15,7 @@ import type Database from "better-sqlite3";
 import * as schema from "./schema.js";
 
 let drizzleInstance: BetterSQLite3Database<typeof schema> | null = null;
+let rawDatabaseInstance: Database.Database | null = null;
 
 /**
  * Initialize Drizzle ORM with an existing better-sqlite3 database connection
@@ -36,6 +37,7 @@ export function initializeDrizzle(
   sqliteDb: Database.Database
 ): BetterSQLite3Database<typeof schema> {
   if (!drizzleInstance) {
+    rawDatabaseInstance = sqliteDb; // Store the raw database reference
     drizzleInstance = drizzle(sqliteDb, { schema });
     console.log("✅ Drizzle ORM initialized");
   }
@@ -60,6 +62,27 @@ export function getDrizzle(): BetterSQLite3Database<typeof schema> {
  */
 export function resetDrizzle(): void {
   drizzleInstance = null;
+  rawDatabaseInstance = null;
+}
+
+/**
+ * Get the underlying better-sqlite3 database instance from a Drizzle wrapper
+ * This is useful when you need to use raw SQL with .prepare() method
+ *
+ * @param drizzleDb - Drizzle database instance (not used, kept for API compatibility)
+ * @returns Raw better-sqlite3 database instance
+ */
+export function getRawDatabase(
+  drizzleDb: BetterSQLite3Database<typeof schema>
+): Database.Database {
+  // Return the stored raw database instance
+  if (rawDatabaseInstance) {
+    return rawDatabaseInstance;
+  }
+
+  throw new Error(
+    "Raw database instance not available. Make sure initializeDrizzle() was called."
+  );
 }
 
 // Re-export schema for convenience

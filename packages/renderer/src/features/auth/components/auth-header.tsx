@@ -2,7 +2,7 @@ import { BatteryFull, Bell, Store, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 
 // Header component for banner and time
-export default function AuthHeader() {
+export function AuthHeader() {
   const [time, setTime] = useState(() => new Date());
 
   useEffect(() => {

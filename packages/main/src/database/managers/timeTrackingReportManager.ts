@@ -1,13 +1,17 @@
 import type { AttendanceReport } from "../../../../../types/database.d.js";
 import type { DrizzleDB } from "../drizzle.js";
+import { getRawDatabase } from "../drizzle.js";
 import { eq, and, desc, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
+import type Database from "better-sqlite3";
 
 export class TimeTrackingReportManager {
   private db: DrizzleDB;
+  private rawDb: Database.Database;
 
   constructor(drizzle: DrizzleDB) {
     this.db = drizzle;
+    this.rawDb = getRawDatabase(drizzle);
   }
 
   /**
@@ -162,7 +166,7 @@ export class TimeTrackingReportManager {
     startDate: string,
     endDate: string
   ): any[] {
-    return this.db
+    return this.rawDb
       .prepare(
         `
         SELECT 
@@ -196,7 +200,7 @@ export class TimeTrackingReportManager {
       Date.now() - 24 * 60 * 60 * 1000
     ).toISOString();
 
-    return this.db
+    return this.rawDb
       .prepare(
         `
         SELECT 
@@ -226,7 +230,7 @@ export class TimeTrackingReportManager {
     startDate: string,
     endDate: string
   ): any[] {
-    return this.db
+    return this.rawDb
       .prepare(
         `
         SELECT 
@@ -258,7 +262,7 @@ export class TimeTrackingReportManager {
     startDate: string,
     endDate: string
   ): any[] {
-    return this.db
+    return this.rawDb
       .prepare(
         `
         SELECT 
@@ -296,7 +300,7 @@ export class TimeTrackingReportManager {
   ): any[] {
     const rate = hourlyRate || 15; // Default hourly rate
 
-    return this.db
+    return this.rawDb
       .prepare(
         `
         SELECT 
@@ -340,7 +344,7 @@ export class TimeTrackingReportManager {
     ).toISOString();
     const endDate = new Date().toISOString();
 
-    const shifts = this.db
+    const shifts = this.rawDb
       .prepare(
         `
         SELECT 
@@ -412,7 +416,7 @@ export class TimeTrackingReportManager {
     const today = new Date().toISOString().split("T")[0];
 
     // Currently clocked in users
-    const currentlyWorking = this.db
+    const currentlyWorking = this.rawDb
       .prepare(
         `
         SELECT 
@@ -433,7 +437,7 @@ export class TimeTrackingReportManager {
       .all(businessId);
 
     // Today's completed shifts
-    const completedToday = this.db
+    const completedToday = this.rawDb
       .prepare(
         `
         SELECT COUNT(*) as count
@@ -445,10 +449,10 @@ export class TimeTrackingReportManager {
           AND ts.status = 'completed'
       `
       )
-      .get(businessId);
+      .get(businessId) as { count: number } | undefined;
 
     // Active breaks
-    const activeBreaks = this.db
+    const activeBreaks = this.rawDb
       .prepare(
         `
         SELECT 
@@ -465,7 +469,7 @@ export class TimeTrackingReportManager {
       .all(businessId);
 
     // Today's total hours
-    const todayHours = this.db
+    const todayHours = this.rawDb
       .prepare(
         `
         SELECT 
@@ -479,7 +483,9 @@ export class TimeTrackingReportManager {
           AND ts.status = 'completed'
       `
       )
-      .get(businessId);
+      .get(businessId) as
+      | { totalHours: number | null; overtimeHours: number | null }
+      | undefined;
 
     return {
       currentlyWorking: currentlyWorking.length,
