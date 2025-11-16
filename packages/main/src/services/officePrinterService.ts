@@ -9,7 +9,7 @@
 
 import { ipcMain } from "electron";
 import { createRequire } from "module";
-import { createLogger, format, transports } from "winston";
+import { getLogger } from "../utils/logger.js";
 import * as path from "path";
 import { app } from "electron";
 import { getDatabase } from "../database/index.js";
@@ -106,43 +106,7 @@ export interface PrintJobRetry {
 // LOGGER SETUP
 // =============================================================================
 
-const logger = createLogger({
-  level: process.env.NODE_ENV === "production" ? "info" : "debug",
-  format: format.combine(
-    format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-    format.errors({ stack: true }),
-    format.splat(),
-    format.json()
-  ),
-  defaultMeta: { service: "office-printer-service" },
-  transports: [
-    // Write all logs to file
-    new transports.File({
-      filename: path.join(app.getPath("userData"), "logs", "printer-error.log"),
-      level: "error",
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    }),
-    new transports.File({
-      filename: path.join(
-        app.getPath("userData"),
-        "logs",
-        "printer-combined.log"
-      ),
-      maxsize: 5242880,
-      maxFiles: 5,
-    }),
-  ],
-});
-
-// Also log to console in development
-if (process.env.NODE_ENV !== "production") {
-  logger.add(
-    new transports.Console({
-      format: format.combine(format.colorize(), format.simple()),
-    })
-  );
-}
+const logger = getLogger("office-printer-service");
 
 // =============================================================================
 // OFFICE PRINTER SERVICE
