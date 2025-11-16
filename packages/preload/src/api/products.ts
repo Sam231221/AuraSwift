@@ -3,22 +3,30 @@ import { ipcRenderer } from "electron";
 export const productAPI = {
   create: (productData: {
     name: string;
-    description: string;
-    price: number;
-    costPrice: number;
-    taxRate: number;
+    description?: string;
+    basePrice: number;
+    costPrice?: number;
     sku: string;
+    barcode?: string;
     plu?: string;
     image?: string;
-    category: string;
-    stockLevel: number;
-    minStockLevel: number;
+    categoryId: string;
+    productType?: "STANDARD" | "WEIGHTED" | "GENERIC";
+    salesUnit?: "PIECE" | "KG" | "GRAM" | "LITRE" | "ML" | "PACK";
+    usesScale?: boolean;
+    pricePerKg?: number;
+    isGenericButton?: boolean;
+    genericDefaultPrice?: number;
+    trackInventory?: boolean;
+    stockLevel?: number;
+    minStockLevel?: number;
+    reorderPoint?: number;
+    vatCategoryId?: string;
+    vatOverridePercent?: number;
     businessId: string;
-    modifiers?: any[];
-    // Weight-based product fields
-    requiresWeight?: boolean;
-    unit?: "lb" | "kg" | "oz" | "g" | "each";
-    pricePerUnit?: number;
+    isActive?: boolean;
+    allowPriceOverride?: boolean;
+    allowDiscount?: boolean;
   }) => ipcRenderer.invoke("products:create", productData),
 
   getByBusiness: (businessId: string) =>
@@ -26,8 +34,35 @@ export const productAPI = {
 
   getById: (id: string) => ipcRenderer.invoke("products:getById", id),
 
-  update: (id: string, updates: any) =>
-    ipcRenderer.invoke("products:update", id, updates),
+  update: (
+    id: string,
+    updates: Partial<{
+      name: string;
+      description: string;
+      basePrice: number;
+      costPrice: number;
+      sku: string;
+      barcode: string;
+      plu: string;
+      image: string;
+      categoryId: string;
+      productType: "STANDARD" | "WEIGHTED" | "GENERIC";
+      salesUnit: "PIECE" | "KG" | "GRAM" | "LITRE" | "ML" | "PACK";
+      usesScale: boolean;
+      pricePerKg: number;
+      isGenericButton: boolean;
+      genericDefaultPrice: number;
+      trackInventory: boolean;
+      stockLevel: number;
+      minStockLevel: number;
+      reorderPoint: number;
+      vatCategoryId: string;
+      vatOverridePercent: number;
+      isActive: boolean;
+      allowPriceOverride: boolean;
+      allowDiscount: boolean;
+    }>
+  ) => ipcRenderer.invoke("products:update", id, updates),
 
   delete: (id: string) => ipcRenderer.invoke("products:delete", id),
 

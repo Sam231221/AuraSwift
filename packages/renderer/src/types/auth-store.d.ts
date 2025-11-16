@@ -32,17 +32,30 @@ declare global {
     productAPI: {
       create: (productData: {
         name: string;
-        description: string;
-        price: number;
-        costPrice: number;
-        taxRate: number;
+        description?: string;
+        basePrice: number;
+        costPrice?: number;
         sku: string;
+        barcode?: string;
         plu?: string;
         image?: string;
-        category: string;
-        stockLevel: number;
-        minStockLevel: number;
+        categoryId: string;
+        productType?: "STANDARD" | "WEIGHTED" | "GENERIC";
+        salesUnit?: "PIECE" | "KG" | "GRAM" | "LITRE" | "ML" | "PACK";
+        usesScale?: boolean;
+        pricePerKg?: number;
+        isGenericButton?: boolean;
+        genericDefaultPrice?: number;
+        trackInventory?: boolean;
+        stockLevel?: number;
+        minStockLevel?: number;
+        reorderPoint?: number;
+        vatCategoryId?: string;
+        vatOverridePercent?: number;
         businessId: string;
+        isActive?: boolean;
+        allowPriceOverride?: boolean;
+        allowDiscount?: boolean;
       }) => Promise<{
         success: boolean;
         message: string;
@@ -61,15 +74,28 @@ declare global {
         updates: Partial<{
           name: string;
           description: string;
-          price: number;
+          basePrice: number;
           costPrice: number;
-          taxRate: number;
           sku: string;
-          plu?: string;
-          image?: string;
-          category: string;
+          barcode: string;
+          plu: string;
+          image: string;
+          categoryId: string;
+          productType: "STANDARD" | "WEIGHTED" | "GENERIC";
+          salesUnit: "PIECE" | "KG" | "GRAM" | "LITRE" | "ML" | "PACK";
+          usesScale: boolean;
+          pricePerKg: number;
+          isGenericButton: boolean;
+          genericDefaultPrice: number;
+          trackInventory: boolean;
           stockLevel: number;
           minStockLevel: number;
+          reorderPoint: number;
+          vatCategoryId: string;
+          vatOverridePercent: number;
+          isActive: boolean;
+          allowPriceOverride: boolean;
+          allowDiscount: boolean;
         }>
       ) => Promise<{
         success: boolean;

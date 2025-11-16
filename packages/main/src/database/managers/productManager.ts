@@ -52,6 +52,7 @@ export class ProductManager {
       minStockLevel: productData.minStockLevel ?? 0,
       reorderPoint: productData.reorderPoint ?? 0,
       vatCategoryId: productData.vatCategoryId ?? null,
+      vatOverridePercent: productData.vatOverridePercent ?? null,
       businessId: productData.businessId,
       isActive: productData.isActive ?? true,
       allowPriceOverride: productData.allowPriceOverride ?? false,
@@ -162,51 +163,6 @@ export class ProductManager {
       );
 
     return result.changes > 0;
-  }
-
-  // Stub modifier functions - modifiers table doesn't exist in schema
-  async createModifier(modifierData: any): Promise<any> {
-    throw new Error(
-      "Modifiers feature not implemented - table does not exist in schema"
-    );
-  }
-
-  async getModifierById(id: string): Promise<any> {
-    throw new Error(
-      "Modifiers feature not implemented - table does not exist in schema"
-    );
-  }
-
-  async createModifierOption(
-    modifierId: string,
-    optionData: any
-  ): Promise<any> {
-    throw new Error(
-      "Modifiers feature not implemented - table does not exist in schema"
-    );
-  }
-
-  async getProductModifiers(productId: string): Promise<any[]> {
-    // Return empty array since modifiers table doesn't exist
-    return [];
-  }
-
-  async addModifierToProduct(
-    productId: string,
-    modifierId: string
-  ): Promise<void> {
-    throw new Error(
-      "Modifiers feature not implemented - table does not exist in schema"
-    );
-  }
-
-  async removeModifierFromProduct(
-    productId: string,
-    modifierId: string
-  ): Promise<void> {
-    throw new Error(
-      "Modifiers feature not implemented - table does not exist in schema"
-    );
   }
 
   /**
