@@ -1,15 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import {
-  Plus,
-  Edit,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  GripVertical,
-  Tag,
-  Settings,
-} from "lucide-react";
+import { Plus, ChevronLeft, Tag, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,199 +16,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { validateCategory } from "@/features/categories/schemas/category-schema";
-
-// Category type
-interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  businessId: string;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
-  parentId?: string | null;
-}
-
-type CategoryWithChildren = Category & { children: CategoryWithChildren[] };
-
-// CategoryRow component for hierarchical display
-interface CategoryRowProps {
-  category: CategoryWithChildren;
-  level: number;
-  isExpanded: boolean;
-  onToggleExpand: (id: string) => void;
-  onEdit: (category: Category) => void;
-  onDelete: (id: string) => void;
-  allCategories: Category[];
-  onReorder: (id: string, direction: "up" | "down") => void;
-  expandedCategories: Set<string>;
-}
-
-const CategoryRow: React.FC<CategoryRowProps> = ({
-  category,
-  level,
-  isExpanded,
-  onToggleExpand,
-  onEdit,
-  onDelete,
-  allCategories,
-  onReorder,
-  expandedCategories,
-}) => {
-  const hasChildren = category.children && category.children.length > 0;
-  const paddingLeft = level * 24 + 16;
-
-  // Get siblings at the same level for reordering
-  const getSiblings = () => {
-    if (!category.parentId) {
-      // Top-level categories
-      return allCategories.filter((c) => !c.parentId);
-    } else {
-      // Child categories - same parent
-      return allCategories.filter((c) => c.parentId === category.parentId);
-    }
-  };
-
-  const siblings = getSiblings();
-  const currentIndex = siblings.findIndex((c) => c.id === category.id);
-  const isFirst = currentIndex === 0;
-  const isLast = currentIndex === siblings.length - 1;
-
-  return (
-    <>
-      <div
-        className="flex items-center justify-between hover:bg-gray-50 border-b border-gray-100"
-        style={{
-          paddingLeft: `${paddingLeft}px`,
-          paddingRight: "16px",
-          paddingTop: "12px",
-          paddingBottom: "12px",
-        }}
-      >
-        <div className="flex items-center space-x-3 flex-1">
-          {/* Expand/Collapse button */}
-          <button
-            onClick={() => hasChildren && onToggleExpand(category.id)}
-            className={`w-6 h-6 flex items-center justify-center rounded hover:bg-gray-200 ${
-              !hasChildren ? "invisible" : ""
-            }`}
-          >
-            {hasChildren &&
-              (isExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-600" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-gray-600" />
-              ))}
-          </button>
-
-          {/* Drag handle */}
-          <div className="cursor-grab">
-            <GripVertical className="w-5 h-5 text-gray-400" />
-          </div>
-
-          {/* Reorder buttons */}
-          <div className="flex flex-col space-y-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onReorder(category.id, "up")}
-              disabled={isFirst}
-              className="h-5 w-5 p-0 hover:bg-blue-100"
-              title="Move up"
-            >
-              <span className="text-xs">↑</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onReorder(category.id, "down")}
-              disabled={isLast}
-              className="h-5 w-5 p-0 hover:bg-blue-100"
-              title="Move down"
-            >
-              <span className="text-xs">↓</span>
-            </Button>
-          </div>
-
-          {/* Category info */}
-          <div className="flex-1">
-            <div className="flex items-center space-x-2">
-              <span className="font-medium text-gray-900">{category.name}</span>
-              {hasChildren && (
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                  {category.children.length}{" "}
-                  {category.children.length === 1
-                    ? "subcategory"
-                    : "subcategories"}
-                </span>
-              )}
-            </div>
-            {category.description && (
-              <div className="text-sm text-gray-500 mt-0.5">
-                {category.description}
-              </div>
-            )}
-            <div className="text-xs text-gray-400 mt-1">
-              Created: {new Date(category.createdAt).toLocaleDateString()}
-            </div>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center space-x-2">
-          <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
-              category.isActive
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
-            }`}
-          >
-            {category.isActive ? "Active" : "Inactive"}
-          </span>
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit(category)}
-            title="Edit category"
-          >
-            <Edit className="w-4 h-4" />
-          </Button>
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onDelete(category.id)}
-            title="Delete category"
-          >
-            <Trash2 className="w-4 h-4 text-red-600" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Render children if expanded */}
-      {hasChildren && isExpanded && (
-        <>
-          {category.children.map((child) => (
-            <CategoryRow
-              key={child.id}
-              category={child}
-              level={level + 1}
-              isExpanded={expandedCategories.has(child.id)}
-              onToggleExpand={onToggleExpand}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              allCategories={allCategories}
-              onReorder={onReorder}
-              expandedCategories={expandedCategories}
-            />
-          ))}
-        </>
-      )}
-    </>
-  );
-};
+import type { Category } from "../../../../../../types/db";
+import { buildCategoryTree, focusFirstErrorField } from "./utilities";
+import { CategoryRow } from "./utilities/category-row";
 
 interface ManageCategoriesViewProps {
   onBack: () => void;
@@ -243,48 +43,17 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     name: "",
     description: "",
     parentId: "",
+    vatCategoryId: "",
+    color: "",
+    image: "",
+    isActive: true,
   });
 
   // Build hierarchical category tree
-  const categoryTree = useMemo(() => {
-    type CategoryWithChildren = Category & { children: CategoryWithChildren[] };
-    const tree: CategoryWithChildren[] = [];
-    const categoryMap = new Map<string, CategoryWithChildren>();
-
-    // First pass: create map with children array
-    categories.forEach((cat) => {
-      categoryMap.set(cat.id, { ...cat, children: [] });
-    });
-
-    // Second pass: build tree structure
-    categories.forEach((cat) => {
-      const categoryWithChildren = categoryMap.get(cat.id)!;
-      if (cat.parentId) {
-        const parent = categoryMap.get(cat.parentId);
-        if (parent) {
-          parent.children.push(categoryWithChildren);
-        } else {
-          // Parent not found, treat as top-level
-          tree.push(categoryWithChildren);
-        }
-      } else {
-        tree.push(categoryWithChildren);
-      }
-    });
-
-    // Sort by sortOrder at each level
-    const sortTree = (items: CategoryWithChildren[]) => {
-      items.sort((a, b) => a.sortOrder - b.sortOrder);
-      items.forEach((item) => {
-        if (item.children.length > 0) {
-          sortTree(item.children);
-        }
-      });
-    };
-
-    sortTree(tree);
-    return tree;
-  }, [categories]);
+  const categoryTree = useMemo(
+    () => buildCategoryTree(categories),
+    [categories]
+  );
 
   const toggleExpand = (categoryId: string) => {
     setExpandedCategories((prev) => {
@@ -304,9 +73,31 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       setLoading(true);
       const response = await window.categoryAPI.getByBusiness(user!.businessId);
       if (response.success && response.categories) {
-        // Sort by sortOrder
-        const sortedCategories = response.categories.sort(
-          (a: Category, b: Category) => a.sortOrder - b.sortOrder
+        // Normalize all fields to match Category type
+        const normalized: Category[] = response.categories.map(
+          (cat: unknown) => {
+            const c = cat as Partial<Category> & { [key: string]: unknown };
+            return {
+              ...c,
+              parentId: c.parentId ?? null,
+              vatCategoryId: c.vatCategoryId ?? null,
+              color: c.color ?? null,
+              image: c.image ?? null,
+              isActive: typeof c.isActive === "boolean" ? c.isActive : true,
+              sortOrder: c.sortOrder ?? 0,
+              createdAt: c.createdAt
+                ? new Date(c.createdAt as string | Date)
+                : new Date(),
+              updatedAt: c.updatedAt
+                ? new Date(c.updatedAt as string | Date)
+                : null,
+              description: c.description ?? "",
+            } as Category;
+          }
+        );
+        // Sort by sortOrder, handling nulls
+        const sortedCategories = normalized.sort(
+          (a: Category, b: Category) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
         );
         setCategories(sortedCategories);
       } else {
@@ -332,13 +123,16 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       name: "",
       description: "",
       parentId: "",
+      vatCategoryId: "",
+      color: "",
+      image: "",
+      isActive: true,
     });
     setEditingCategory(null);
     setFormErrors({});
   }, []);
 
   const handleAddCategory = async () => {
-    // Clear previous errors
     setFormErrors({});
 
     if (!user?.businessId) {
@@ -346,131 +140,106 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       return;
     }
 
-    // Validate using Zod schema
-    const validationResult = validateCategory({
+    // Prepare data for validation and API
+    const categoryPayload = {
       ...newCategory,
       businessId: user.businessId,
+      sortOrder:
+        editingCategory && typeof editingCategory.sortOrder === "number"
+          ? editingCategory.sortOrder
+          : categories.length + 1,
+      parentId: newCategory.parentId ? newCategory.parentId : undefined,
+      vatCategoryId: newCategory.vatCategoryId
+        ? newCategory.vatCategoryId
+        : undefined,
+      color: newCategory.color ? newCategory.color : undefined,
+      image: newCategory.image ? newCategory.image : undefined,
+      isActive:
+        typeof newCategory.isActive === "boolean" ? newCategory.isActive : true,
       ...(editingCategory && { id: editingCategory.id }),
-    });
+    };
 
-    // Show all errors if any exist
+    // Validate using Zod schema
+    const validationResult = validateCategory(categoryPayload);
     if (!validationResult.success && validationResult.errors) {
       setFormErrors(validationResult.errors);
-
-      // Focus on the first error field after a short delay
-      const errorFields = Object.keys(validationResult.errors);
-      if (errorFields.length > 0) {
-        setTimeout(() => {
-          const firstErrorField = errorFields[0];
-          const element = document.getElementById(firstErrorField);
-          if (element) {
-            element.focus();
-            element.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }, 100);
-      }
-
+      focusFirstErrorField(validationResult.errors);
       toast.error("Please fix the errors in the form");
       return;
     }
 
     try {
       setLoading(true);
+      let response;
+      if (editingCategory) {
+        response = await window.categoryAPI.update(
+          editingCategory.id,
+          categoryPayload
+        );
+      } else {
+        response = await window.categoryAPI.create(categoryPayload);
+      }
 
-      const categoryData = {
-        name: newCategory.name.trim(),
-        description: newCategory.description.trim(),
-        businessId: user.businessId,
-        sortOrder: categories.length + 1, // Add to end by default
-        parentId: newCategory.parentId || null,
+      // Normalize the returned category object
+      const normalizeCategory = (cat: unknown): Category => {
+        const c = cat as Partial<Category> & { [key: string]: unknown };
+        return {
+          ...c,
+          parentId: c.parentId ?? null,
+          vatCategoryId: c.vatCategoryId ?? null,
+          color: c.color ?? null,
+          image: c.image ?? null,
+          isActive: typeof c.isActive === "boolean" ? c.isActive : true,
+          sortOrder: c.sortOrder ?? 0,
+          createdAt: c.createdAt
+            ? new Date(c.createdAt as string | Date)
+            : new Date(),
+          updatedAt: c.updatedAt
+            ? new Date(c.updatedAt as string | Date)
+            : null,
+          description: c.description ?? "",
+        } as Category;
       };
 
-      if (editingCategory) {
-        // Update existing category
-        const response = await window.categoryAPI.update(
-          editingCategory.id,
-          categoryData
-        );
-        if (response.success && response.category) {
+      if (response.success && response.category) {
+        const normalizedCat = normalizeCategory(response.category);
+        if (editingCategory) {
           setCategories(
             categories.map((c) =>
-              c.id === editingCategory.id ? response.category! : c
+              c.id === editingCategory.id ? normalizedCat : c
             )
           );
           toast.success("Category updated successfully");
-          resetForm();
-          setIsDrawerOpen(false);
         } else {
-          console.error("Category update failed:", response);
-          // Check if it's a duplicate error
-          const errorMsg = response.message || "Failed to update category";
-          console.log("Update error message:", errorMsg);
-          const lowerErrorMsg = errorMsg.toLowerCase();
-
-          if (
-            (lowerErrorMsg.includes("name") &&
-              lowerErrorMsg.includes("already exists")) ||
-            lowerErrorMsg.includes("unique constraint failed: categories.name")
-          ) {
-            setFormErrors({
-              name: "This category name already exists. Please use a different name.",
-            });
-            setTimeout(() => {
-              const nameField = document.getElementById("name");
-              if (nameField) {
-                nameField.focus();
-                nameField.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
-              }
-            }, 100);
-            toast.error("Category name already exists");
-          } else {
-            toast.error(errorMsg);
-          }
-        }
-      } else {
-        // Create new category
-        const response = await window.categoryAPI.create(categoryData);
-        if (response.success && response.category) {
-          setCategories([...categories, response.category]);
+          setCategories([...categories, normalizedCat]);
           toast.success("Category created successfully");
-          resetForm();
-          setIsDrawerOpen(false);
+        }
+        resetForm();
+        setIsDrawerOpen(false);
+      } else {
+        const errorMsg =
+          response.message ||
+          (editingCategory
+            ? "Failed to update category"
+            : "Failed to create category");
+        const lowerErrorMsg = errorMsg.toLowerCase();
+        if (
+          (lowerErrorMsg.includes("name") &&
+            lowerErrorMsg.includes("already exists")) ||
+          lowerErrorMsg.includes("unique constraint failed: categories.name")
+        ) {
+          setFormErrors({
+            name: "This category name already exists. Please use a different name.",
+          });
+          focusFirstErrorField({
+            name: "This category name already exists. Please use a different name.",
+          });
+          toast.error("Category name already exists");
         } else {
-          // Check if it's a duplicate error
-          console.log("Create category failed. Full response:", response);
-          const errorMsg = response.message || "Failed to create category";
-          console.log("Error message:", errorMsg);
-          const lowerErrorMsg = errorMsg.toLowerCase();
-
-          if (
-            (lowerErrorMsg.includes("name") &&
-              lowerErrorMsg.includes("already exists")) ||
-            lowerErrorMsg.includes("unique constraint failed: categories.name")
-          ) {
-            setFormErrors({
-              name: "This category name already exists. Please use a different name.",
-            });
-            setTimeout(() => {
-              const nameField = document.getElementById("name");
-              if (nameField) {
-                nameField.focus();
-                nameField.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
-              }
-            }, 100);
-            toast.error("Category name already exists");
-          } else {
-            toast.error(errorMsg);
-          }
+          toast.error(errorMsg);
         }
       }
-
-      loadCategories(); // Reload to get updated order
+      await loadCategories();
     } catch (error) {
       console.error("Error saving category:", error);
       toast.error("Failed to save category");
@@ -485,6 +254,11 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       name: category.name,
       description: category.description || "",
       parentId: category.parentId ?? "",
+      vatCategoryId: category.vatCategoryId ?? "",
+      color: category.color ?? "",
+      image: category.image ?? "",
+      isActive:
+        typeof category.isActive === "boolean" ? category.isActive : true,
     });
     setIsDrawerOpen(true);
   };
@@ -528,42 +302,45 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       category.parentId ? c.parentId === category.parentId : !c.parentId
     );
 
-    // Sort siblings by sortOrder
-    siblings.sort((a, b) => a.sortOrder - b.sortOrder);
+    // Sort siblings by sortOrder (copy, don't mutate)
+    const sortedSiblings = siblings
+      .slice()
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
-    const currentIndex = siblings.findIndex((c) => c.id === categoryId);
+    const currentIndex = sortedSiblings.findIndex((c) => c.id === categoryId);
     if (
       (direction === "up" && currentIndex === 0) ||
-      (direction === "down" && currentIndex === siblings.length - 1)
+      (direction === "down" && currentIndex === sortedSiblings.length - 1)
     ) {
       return; // Can't move beyond boundaries
     }
 
     const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
 
-    // Create new array with swapped sortOrder values
-    const updatedSiblings = siblings.map((sibling, index) => {
-      if (index === currentIndex) {
-        return { ...sibling, sortOrder: siblings[newIndex].sortOrder };
-      } else if (index === newIndex) {
-        return { ...sibling, sortOrder: siblings[currentIndex].sortOrder };
-      }
-      return sibling;
-    });
+    // Swap the two siblings
+    const reorderedSiblings = sortedSiblings.slice();
+    const [moved] = reorderedSiblings.splice(currentIndex, 1);
+    reorderedSiblings.splice(newIndex, 0, moved);
 
-    // Update the categories array with new sortOrder values
+    // Update sortOrder for affected siblings
+    const updatedSiblings = reorderedSiblings.map((sibling, idx) => ({
+      ...sibling,
+      sortOrder: idx + 1,
+    }));
+
+    // Merge updated siblings back into categories
     const updatedCategories = categories.map((cat) => {
-      const updatedSibling = updatedSiblings.find((s) => s.id === cat.id);
-      return updatedSibling || cat;
+      const updated = updatedSiblings.find((s) => s.id === cat.id);
+      return updated ? updated : cat;
     });
 
-    // Update local state immediately for better UX
     setCategories(updatedCategories);
 
     try {
       // Send new order to backend (all category IDs sorted by sortOrder)
       const categoryIds = [...updatedCategories]
-        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .slice()
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
         .map((c) => c.id);
 
       const response = await window.categoryAPI.reorder(
@@ -855,7 +632,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                   }}
                 >
                   <option value="">None (Top-level)</option>
-                  {categories
+                  {buildCategoryTree(categories)
                     .filter(
                       (cat) => !editingCategory || cat.id !== editingCategory.id
                     )
@@ -872,6 +649,81 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                 )}
               </div>
 
+              <div>
+                <Label htmlFor="vatCategoryId">VAT Category</Label>
+                <Input
+                  id="vatCategoryId"
+                  value={newCategory.vatCategoryId}
+                  onChange={(e) => {
+                    setNewCategory({
+                      ...newCategory,
+                      vatCategoryId: e.target.value,
+                    });
+                    clearFieldError("vatCategoryId");
+                  }}
+                  placeholder="Enter VAT category ID (optional)"
+                  className={formErrors.vatCategoryId ? "border-red-500" : ""}
+                />
+                {formErrors.vatCategoryId && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {formErrors.vatCategoryId}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="color">Color</Label>
+                <Input
+                  id="color"
+                  value={newCategory.color}
+                  onChange={(e) => {
+                    setNewCategory({ ...newCategory, color: e.target.value });
+                    clearFieldError("color");
+                  }}
+                  placeholder="Enter color (optional)"
+                  className={formErrors.color ? "border-red-500" : ""}
+                />
+                {formErrors.color && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {formErrors.color}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="image">Image URL</Label>
+                <Input
+                  id="image"
+                  value={newCategory.image}
+                  onChange={(e) => {
+                    setNewCategory({ ...newCategory, image: e.target.value });
+                    clearFieldError("image");
+                  }}
+                  placeholder="Enter image URL (optional)"
+                  className={formErrors.image ? "border-red-500" : ""}
+                />
+                {formErrors.image && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {formErrors.image}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  id="isActive"
+                  type="checkbox"
+                  checked={newCategory.isActive}
+                  onChange={(e) =>
+                    setNewCategory({
+                      ...newCategory,
+                      isActive: e.target.checked,
+                    })
+                  }
+                />
+                <Label htmlFor="isActive">Active</Label>
+              </div>
+
               {editingCategory && (
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <h4 className="text-sm font-medium text-gray-900 mb-2">
@@ -880,11 +732,17 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                   <div className="text-sm text-gray-600 space-y-1">
                     <div>
                       Created:{" "}
-                      {new Date(editingCategory.createdAt).toLocaleString()}
+                      {editingCategory.createdAt instanceof Date
+                        ? editingCategory.createdAt.toLocaleString()
+                        : new Date(editingCategory.createdAt).toLocaleString()}
                     </div>
                     <div>
                       Last Updated:{" "}
-                      {new Date(editingCategory.updatedAt).toLocaleString()}
+                      {editingCategory.updatedAt
+                        ? editingCategory.updatedAt instanceof Date
+                          ? editingCategory.updatedAt.toLocaleString()
+                          : new Date(editingCategory.updatedAt).toLocaleString()
+                        : "-"}
                     </div>
                     <div>Sort Order: {editingCategory.sortOrder}</div>
                     <div>
