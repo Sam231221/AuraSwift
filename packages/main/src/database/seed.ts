@@ -14,7 +14,7 @@ import bcrypt from "bcryptjs";
  * @param {any} schema - Database schema
  */
 export async function seedDefaultData(db: any, schema: any) {
-  const { businesses, users, appSettings } = schema;
+  const { businesses, users, appSettings, vatCategories } = schema;
 
   try {
     console.log("\n🌱 Checking if seed data is needed...");
@@ -142,10 +142,68 @@ export async function seedDefaultData(db: any, schema: any) {
       isActive: true,
       address: "",
     });
+
     console.log("✅ Cashier user created");
     console.log("   Username: cashier");
     console.log("   Email: cashier@store.com");
     console.log("   PIN: 9999");
+
+    // 6. Create Default VAT Categories
+    console.log("\n💸 Creating default VAT categories...");
+    const defaultVatCategories = [
+      {
+        id: "vat-standard",
+        name: "Standard VAT",
+        ratePercent: 20.0,
+        code: "STD",
+        description: "Standard VAT rate",
+        businessId: businessId,
+        isDefault: true,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "vat-reduced",
+        name: "Reduced VAT",
+        ratePercent: 5.0,
+        code: "RED",
+        description: "Reduced VAT rate",
+        businessId: businessId,
+        isDefault: false,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "vat-zero",
+        name: "Zero VAT",
+        ratePercent: 0.0,
+        code: "ZERO",
+        description: "Zero VAT rate",
+        businessId: businessId,
+        isDefault: false,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: "vat-exempt",
+        name: "Exempt VAT",
+        ratePercent: 0.0,
+        code: "EXEMPT",
+        description: "VAT Exempt",
+        businessId: businessId,
+        isDefault: false,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    for (const vat of defaultVatCategories) {
+      await db.insert(vatCategories).values(vat);
+    }
+    console.log("✅ Default VAT categories created");
 
     // Create Default App Settings
     console.log("\n⚙️  Creating default app settings...");
