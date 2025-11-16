@@ -38,7 +38,6 @@ export const commonColumns = {
 
   // External ID for APIs, security (safe)
   publicId: text("public_id")
-    .unique()
     .notNull()
     .$defaultFn(() => crypto.randomUUID()),
 
@@ -492,6 +491,7 @@ export const shiftValidationIssues = createTable(
     dataSnapshot: text("data_snapshot"), // JSON snapshot of relevant data at time of validation
   },
   (table) => [
+    unique("validation_issues_public_id_unique").on(table.publicId),
     drizzleIndex("validation_issues_validation_idx").on(table.validationId),
     drizzleIndex("validation_issues_type_idx").on(table.type),
     drizzleIndex("validation_issues_severity_idx").on(table.severity),
@@ -544,6 +544,7 @@ export const shiftValidations = createTable(
     resolutionNotes: text("resolution_notes"),
   },
   (table) => [
+    unique("shift_validations_public_id_unique").on(table.publicId),
     drizzleIndex("shift_validations_shift_idx").on(table.shiftId),
     drizzleIndex("shift_validations_business_idx").on(table.businessId),
     drizzleIndex("shift_validations_valid_idx").on(table.valid),
