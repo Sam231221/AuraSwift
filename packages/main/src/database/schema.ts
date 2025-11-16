@@ -141,10 +141,10 @@ export const vatCategories = createTable(
     isActive: integer("is_active", { mode: "boolean" }).default(true),
     ...timestampColumns,
   },
-  (table) => ({
-    businessIdx: index("vat_business_idx").on(table.businessId),
-    codeIdx: index("vat_code_idx").on(table.code),
-  })
+  (table) => [
+    index("vat_business_idx").on(table.businessId),
+    index("vat_code_idx").on(table.code),
+  ]
 );
 export const categories = createTable(
   "categories",
@@ -161,6 +161,8 @@ export const categories = createTable(
       () => vatCategories.id,
       { onDelete: "set null" }
     ),
+    // (e.g. 0, 5, 20) or null
+    vatOverridePercent: real("vat_override_percent"),
     businessId: text("business_id") // 🔥 CRITICAL: Add business reference
       .notNull()
       .references(() => businesses.id, { onDelete: "cascade" }),
@@ -240,6 +242,8 @@ export const products = createTable(
       onDelete: "set null",
     }),
 
+    // (e.g. 0, 5, 20) or null
+    vatOverridePercent: real("vat_override_percent"),
     // Business
     businessId: text("business_id")
       .notNull()
