@@ -1,9 +1,7 @@
 import { ipcMain } from "electron";
-import { getAuthAPI } from "./appApi.js";
 import { getDatabase, type DatabaseManagers } from "./database/index.js";
 
-// Get auth API and database instance
-const authAPI = getAuthAPI();
+// Get database instance
 let db: DatabaseManagers | null = null;
 getDatabase().then((database) => {
   db = database;
@@ -47,7 +45,8 @@ ipcMain.handle("auth:delete", async (event, key: string) => {
 // Authentication API handlers
 ipcMain.handle("auth:register", async (event, userData) => {
   try {
-    return await authAPI.register(userData);
+    if (!db) db = await getDatabase();
+    return await db.users.register(userData);
   } catch (error) {
     console.error("Registration IPC error:", error);
     return {
@@ -60,13 +59,14 @@ ipcMain.handle("auth:register", async (event, userData) => {
 // Register business owner (automatically sets role to admin)
 ipcMain.handle("auth:registerBusiness", async (event, userData) => {
   try {
+    if (!db) db = await getDatabase();
     // Business owners are automatically admin users
     const registrationData = {
       ...userData,
       role: "admin" as const,
     };
 
-    return await authAPI.register(registrationData);
+    return await db.users.register(registrationData);
   } catch (error) {
     console.error("Business registration IPC error:", error);
     return {
@@ -78,7 +78,8 @@ ipcMain.handle("auth:registerBusiness", async (event, userData) => {
 
 ipcMain.handle("auth:login", async (event, credentials) => {
   try {
-    return await authAPI.login(credentials);
+    if (!db) db = await getDatabase();
+    return await db.users.login(credentials);
   } catch (error) {
     console.error("Login IPC error:", error);
     return {
@@ -90,7 +91,8 @@ ipcMain.handle("auth:login", async (event, credentials) => {
 
 ipcMain.handle("auth:validateSession", async (event, token) => {
   try {
-    return await authAPI.validateSession(token);
+    if (!db) db = await getDatabase();
+    return db.users.validateSession(token);
   } catch (error) {
     console.error("Session validation IPC error:", error);
     return {
@@ -102,7 +104,8 @@ ipcMain.handle("auth:validateSession", async (event, token) => {
 
 ipcMain.handle("auth:logout", async (event, token) => {
   try {
-    return await authAPI.logout(token);
+    if (!db) db = await getDatabase();
+    return db.users.logout(token);
   } catch (error) {
     console.error("Logout IPC error:", error);
     return {
@@ -114,7 +117,8 @@ ipcMain.handle("auth:logout", async (event, token) => {
 
 ipcMain.handle("auth:getUserById", async (event, userId) => {
   try {
-    return await authAPI.getUserById(userId);
+    if (!db) db = await getDatabase();
+    return db.users.getUserByIdWithResponse(userId);
   } catch (error) {
     console.error("Get user IPC error:", error);
     return {
@@ -126,7 +130,8 @@ ipcMain.handle("auth:getUserById", async (event, userId) => {
 
 ipcMain.handle("auth:updateUser", async (event, userId, updates) => {
   try {
-    return await authAPI.updateUser(userId, updates);
+    if (!db) db = await getDatabase();
+    return db.users.updateUserWithResponse(userId, updates);
   } catch (error) {
     console.error("Update user IPC error:", error);
     return {
@@ -138,7 +143,8 @@ ipcMain.handle("auth:updateUser", async (event, userId, updates) => {
 
 ipcMain.handle("auth:deleteUser", async (event, userId) => {
   try {
-    return await authAPI.deleteUser(userId);
+    if (!db) db = await getDatabase();
+    return db.users.deleteUserWithResponse(userId);
   } catch (error) {
     console.error("Delete user IPC error:", error);
     return {
@@ -150,7 +156,8 @@ ipcMain.handle("auth:deleteUser", async (event, userId) => {
 
 ipcMain.handle("auth:getUsersByBusiness", async (event, businessId) => {
   try {
-    return await authAPI.getUsersByBusiness(businessId);
+    if (!db) db = await getDatabase();
+    return db.users.getUsersByBusinessWithResponse(businessId);
   } catch (error) {
     console.error("Get users by business IPC error:", error);
     return {
@@ -162,7 +169,8 @@ ipcMain.handle("auth:getUsersByBusiness", async (event, businessId) => {
 
 ipcMain.handle("auth:createUser", async (event, userData) => {
   try {
-    return await authAPI.createUser(userData);
+    if (!db) db = await getDatabase();
+    return await db.users.createUserForBusiness(userData);
   } catch (error) {
     console.error("Create user IPC error:", error);
     return {
@@ -219,60 +227,65 @@ ipcMain.handle("auth:getBusinessById", async (event, businessId) => {
 // Product Management IPC handlers
 ipcMain.handle("products:create", async (event, productData) => {
   try {
-    return await authAPI.createProduct(productData);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.products.createProductWithValidation(productData);
+  } catch (error: any) {
     console.error("Create product IPC error:", error);
     return {
       success: false,
-      message: "Failed to create product",
+      message: error.message || "Failed to create product",
     };
   }
 });
 
 ipcMain.handle("products:getByBusiness", async (event, businessId) => {
   try {
-    return await authAPI.getProductsByBusiness(businessId);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.products.getProductsByBusinessWithResponse(businessId);
+  } catch (error: any) {
     console.error("Get products by business IPC error:", error);
     return {
       success: false,
-      message: "Failed to get products",
+      message: error.message || "Failed to get products",
     };
   }
 });
 
 ipcMain.handle("products:getById", async (event, id) => {
   try {
-    return await authAPI.getProductById(id);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.products.getProductByIdWithResponse(id);
+  } catch (error: any) {
     console.error("Get product by ID IPC error:", error);
     return {
       success: false,
-      message: "Failed to get product",
+      message: error.message || "Failed to get product",
     };
   }
 });
 
 ipcMain.handle("products:update", async (event, id, updates) => {
   try {
-    return await authAPI.updateProduct(id, updates);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.products.updateProductWithValidation(id, updates);
+  } catch (error: any) {
     console.error("Update product IPC error:", error);
     return {
       success: false,
-      message: "Failed to update product",
+      message: error.message || "Failed to update product",
     };
   }
 });
 
 ipcMain.handle("products:delete", async (event, id) => {
   try {
-    return await authAPI.deleteProduct(id);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.products.deleteProductWithResponse(id);
+  } catch (error: any) {
     console.error("Delete product IPC error:", error);
     return {
       success: false,
-      message: "Failed to delete product",
+      message: error.message || "Failed to delete product",
     };
   }
 });
@@ -280,108 +293,134 @@ ipcMain.handle("products:delete", async (event, id) => {
 // Category Management IPC handlers
 ipcMain.handle("categories:create", async (event, categoryData) => {
   try {
-    return await authAPI.createCategory(categoryData);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.categories.createCategoryWithResponse(categoryData);
+  } catch (error: any) {
     console.error("Create category IPC error:", error);
     return {
       success: false,
-      message: "Failed to create category",
+      message: error.message || "Failed to create category",
     };
   }
 });
 
 ipcMain.handle("categories:getByBusiness", async (event, businessId) => {
   try {
-    return await authAPI.getCategoriesByBusiness(businessId);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.categories.getCategoriesByBusinessWithResponse(businessId);
+  } catch (error: any) {
     console.error("Get categories by business IPC error:", error);
     return {
       success: false,
-      message: "Failed to get categories",
+      message: error.message || "Failed to get categories",
     };
   }
 });
 
 ipcMain.handle("categories:getById", async (event, id) => {
   try {
-    return await authAPI.getCategoryById(id);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.categories.getCategoryByIdWithResponse(id);
+  } catch (error: any) {
     console.error("Get category by ID IPC error:", error);
     return {
       success: false,
-      message: "Failed to get category",
+      message: error.message || "Failed to get category",
     };
   }
 });
 
 ipcMain.handle("categories:update", async (event, id, updates) => {
   try {
-    return await authAPI.updateCategory(id, updates);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.categories.updateCategoryWithResponse(id, updates);
+  } catch (error: any) {
     console.error("Update category IPC error:", error);
     return {
       success: false,
-      message: "Failed to update category",
+      message: error.message || "Failed to update category",
     };
   }
 });
 
 ipcMain.handle("categories:delete", async (event, id) => {
   try {
-    return await authAPI.deleteCategory(id);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.categories.deleteCategoryWithResponse(id);
+  } catch (error: any) {
     console.error("Delete category IPC error:", error);
     return {
       success: false,
-      message: "Failed to delete category",
+      message: error.message || "Failed to delete category",
     };
   }
 });
 
 ipcMain.handle("categories:reorder", async (event, businessId, categoryIds) => {
   try {
-    return await authAPI.reorderCategories(businessId, categoryIds);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    return await db.categories.reorderCategoriesWithResponse(
+      businessId,
+      categoryIds
+    );
+  } catch (error: any) {
     console.error("Reorder categories IPC error:", error);
     return {
       success: false,
-      message: "Failed to reorder categories",
+      message: error.message || "Failed to reorder categories",
     };
   }
 });
 
 ipcMain.handle("modifiers:create", async (event, modifierData) => {
   try {
-    return await authAPI.createModifier(modifierData);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    // TODO: Implement createModifier in product manager
+    return {
+      success: false,
+      message: "Modifier creation not yet implemented in new architecture",
+    };
+  } catch (error: any) {
     console.error("Create modifier IPC error:", error);
     return {
       success: false,
-      message: "Failed to create modifier",
+      message: error.message || "Failed to create modifier",
     };
   }
 });
 
 ipcMain.handle("stock:adjust", async (event, adjustmentData) => {
   try {
-    return await authAPI.createStockAdjustment(adjustmentData);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    const adjustment = db.inventory.createStockAdjustment(adjustmentData);
+    return {
+      success: true,
+      message: "Stock adjustment created successfully",
+      adjustment,
+    };
+  } catch (error: any) {
     console.error("Stock adjustment IPC error:", error);
     return {
       success: false,
-      message: "Failed to adjust stock",
+      message: error.message || "Failed to adjust stock",
     };
   }
 });
 
 ipcMain.handle("stock:getAdjustments", async (event, productId) => {
   try {
-    return await authAPI.getStockAdjustments(productId);
-  } catch (error) {
+    if (!db) db = await getDatabase();
+    const adjustments = db.inventory.getStockAdjustmentsByProduct(productId);
+    return {
+      success: true,
+      message: "Stock adjustments retrieved successfully",
+      adjustments,
+    };
+  } catch (error: any) {
     console.error("Get stock adjustments IPC error:", error);
     return {
       success: false,
-      message: "Failed to get stock adjustments",
+      message: error.message || "Failed to get stock adjustments",
     };
   }
 });
@@ -1511,8 +1550,11 @@ ipcMain.handle("app:restart", async () => {
 });
 
 // Cleanup expired sessions every hour
-
-// Cleanup expired sessions every hour// Cleanup expired sessions every hour
 setInterval(async () => {
-  await authAPI.cleanupExpiredSessions();
+  try {
+    if (!db) db = await getDatabase();
+    db.sessions.cleanupExpiredSessions();
+  } catch (error) {
+    console.error("Failed to cleanup expired sessions:", error);
+  }
 }, 60 * 60 * 1000);

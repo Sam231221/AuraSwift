@@ -4,6 +4,14 @@ import { Category, categories } from "../schema.js";
 import * as schema from "../schema.js";
 import { ca } from "zod/v4/locales";
 
+export interface CategoryResponse {
+  success: boolean;
+  message: string;
+  category?: Category;
+  categories?: Category[];
+  errors?: string[];
+}
+
 export class CategoryManager {
   private drizzle: DrizzleDB;
   private uuid: any;
@@ -312,6 +320,141 @@ export class CategoryManager {
         createdAt: now,
         updatedAt: now,
       });
+    }
+  }
+
+  // Business Logic Methods (with validation and response wrapping)
+
+  async createCategoryWithResponse(categoryData: {
+    name: string;
+    description?: string;
+    businessId: string;
+    sortOrder?: number;
+    parentId?: string | null;
+    image?: string | null;
+    vatCategoryId?: string | null;
+    color?: string | null;
+    isActive?: boolean | null;
+  }): Promise<CategoryResponse> {
+    try {
+      const category = await this.createCategory(categoryData);
+
+      return {
+        success: true,
+        message: "Category created successfully",
+        category,
+      };
+    } catch (error: any) {
+      console.error("Category creation error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to create category",
+      };
+    }
+  }
+
+  async getCategoriesByBusinessWithResponse(
+    businessId: string
+  ): Promise<CategoryResponse> {
+    try {
+      const categories = await this.getCategoriesByBusiness(businessId);
+
+      return {
+        success: true,
+        message: "Categories retrieved successfully",
+        categories,
+      };
+    } catch (error: any) {
+      console.error("Get categories error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get categories",
+      };
+    }
+  }
+
+  async getCategoryByIdWithResponse(id: string): Promise<CategoryResponse> {
+    try {
+      const category = await this.getCategoryById(id);
+
+      return {
+        success: true,
+        message: "Category retrieved successfully",
+        category,
+      };
+    } catch (error: any) {
+      console.error("Get category error:", error);
+      return {
+        success: false,
+        message: error.message || "Category not found",
+      };
+    }
+  }
+
+  async updateCategoryWithResponse(
+    id: string,
+    updates: Partial<{
+      name: string;
+      description: string;
+      parentId: string | null;
+      sortOrder: number;
+      isActive: boolean;
+      image: string | null;
+      vatCategoryId: string | null;
+      color: string | null;
+    }>
+  ): Promise<CategoryResponse> {
+    try {
+      const category = await this.updateCategory(id, updates as any);
+
+      return {
+        success: true,
+        message: "Category updated successfully",
+        category,
+      };
+    } catch (error: any) {
+      console.error("Update category error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to update category",
+      };
+    }
+  }
+
+  async deleteCategoryWithResponse(id: string): Promise<CategoryResponse> {
+    try {
+      await this.deleteCategory(id);
+
+      return {
+        success: true,
+        message: "Category deleted successfully",
+      };
+    } catch (error: any) {
+      console.error("Delete category error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to delete category",
+      };
+    }
+  }
+
+  async reorderCategoriesWithResponse(
+    businessId: string,
+    categoryIds: string[]
+  ): Promise<CategoryResponse> {
+    try {
+      await this.reorderCategories(businessId, categoryIds);
+
+      return {
+        success: true,
+        message: "Categories reordered successfully",
+      };
+    } catch (error: any) {
+      console.error("Reorder categories error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to reorder categories",
+      };
     }
   }
 }

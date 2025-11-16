@@ -91,9 +91,9 @@ export async function getDatabase(): Promise<DatabaseManagers> {
   const uuid = { v4: uuidv4 };
 
   // Create all manager instances with drizzle support
-  const users = new UserManager(drizzle, bcryptWrapper, uuid);
-  const businesses = new BusinessManager(drizzle, uuid);
   const sessions = new SessionManager(drizzle, uuid);
+  const users = new UserManager(drizzle, bcryptWrapper, uuid, sessions);
+  const businesses = new BusinessManager(drizzle, uuid);
   const products = new ProductManager(drizzle, uuid);
   const categories = new CategoryManager(drizzle, uuid);
   const inventory = new InventoryManager(drizzle, uuid);

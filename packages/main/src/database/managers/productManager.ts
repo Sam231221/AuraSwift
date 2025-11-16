@@ -1,7 +1,15 @@
-import type { Product, NewProduct } from "../schema.js";
+import type { Product, NewProduct, StockAdjustment } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
+
+export interface ProductResponse {
+  success: boolean;
+  message: string;
+  product?: Product;
+  products?: Product[];
+  errors?: string[];
+}
 
 export class ProductManager {
   private drizzle: DrizzleDB;
@@ -273,5 +281,181 @@ export class ProductManager {
       .orderBy(schema.products.stockLevel);
 
     return products;
+  }
+
+  // Business Logic Methods (with validation and response wrapping)
+
+  async createProductWithValidation(
+    productData: Omit<Product, "id" | "createdAt" | "updatedAt">
+  ): Promise<ProductResponse> {
+    try {
+      // Validate weight-based product data
+      if (productData.usesScale) {
+        if (!productData.pricePerKg || productData.pricePerKg <= 0) {
+          return {
+            success: false,
+            message: "Weight-based products must have a valid price per kg",
+          };
+        }
+      }
+
+      // Check if SKU already exists
+      try {
+        const existingProduct = await this.getProductBySKU(productData.sku);
+        if (existingProduct) {
+          return {
+            success: false,
+            message: "A product with this SKU already exists",
+          };
+        }
+      } catch (error) {
+        // SKU doesn't exist, which is good
+      }
+
+      // Check if PLU already exists (if PLU is provided)
+      if (productData.plu) {
+        try {
+          const existingProductByPLU = await this.getProductByPLU(
+            productData.plu
+          );
+          if (existingProductByPLU) {
+            return {
+              success: false,
+              message: "A product with this PLU already exists",
+            };
+          }
+        } catch (error) {
+          // PLU doesn't exist, which is good
+        }
+      }
+
+      // Create the product
+      const product = await this.createProduct(productData);
+
+      // Fetch the complete product
+      const completeProduct = await this.getProductById(product.id);
+
+      return {
+        success: true,
+        message: "Product created successfully",
+        product: completeProduct,
+      };
+    } catch (error: any) {
+      console.error("Product creation error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to create product",
+      };
+    }
+  }
+
+  async getProductsByBusinessWithResponse(
+    businessId: string
+  ): Promise<ProductResponse> {
+    try {
+      const products = await this.getProductsByBusiness(businessId);
+
+      return {
+        success: true,
+        message: "Products retrieved successfully",
+        products,
+      };
+    } catch (error: any) {
+      console.error("Get products error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get products",
+      };
+    }
+  }
+
+  async getProductByIdWithResponse(id: string): Promise<ProductResponse> {
+    try {
+      const product = await this.getProductById(id);
+
+      return {
+        success: true,
+        message: "Product retrieved successfully",
+        product,
+      };
+    } catch (error: any) {
+      console.error("Get product error:", error);
+      return {
+        success: false,
+        message: error.message || "Product not found",
+      };
+    }
+  }
+
+  async updateProductWithValidation(
+    id: string,
+    updates: Partial<Omit<Product, "id" | "createdAt" | "updatedAt">>
+  ): Promise<ProductResponse> {
+    try {
+      // If updating SKU, check it doesn't already exist
+      if (updates.sku) {
+        try {
+          const existingProduct = await this.getProductBySKU(updates.sku);
+          if (existingProduct && existingProduct.id !== id) {
+            return {
+              success: false,
+              message: "A product with this SKU already exists",
+            };
+          }
+        } catch (error) {
+          // SKU doesn't exist, which is good
+        }
+      }
+
+      // If updating PLU, check it doesn't already exist
+      if (updates.plu) {
+        try {
+          const existingProductByPLU = await this.getProductByPLU(updates.plu);
+          if (existingProductByPLU && existingProductByPLU.id !== id) {
+            return {
+              success: false,
+              message: "A product with this PLU already exists",
+            };
+          }
+        } catch (error) {
+          // PLU doesn't exist, which is good
+        }
+      }
+
+      // Update the product
+      const product = await this.updateProduct(id, updates);
+
+      // Fetch the complete updated product
+      const updatedProduct = await this.getProductById(id);
+
+      return {
+        success: true,
+        message: "Product updated successfully",
+        product: updatedProduct,
+      };
+    } catch (error: any) {
+      console.error("Product update error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to update product",
+      };
+    }
+  }
+
+  async deleteProductWithResponse(id: string): Promise<ProductResponse> {
+    try {
+      await this.deleteProduct(id);
+
+      return {
+        success: true,
+        message: "Product deleted successfully",
+      };
+    } catch (error: any) {
+      console.error("Product deletion error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to delete product",
+      };
+    }
   }
 }
