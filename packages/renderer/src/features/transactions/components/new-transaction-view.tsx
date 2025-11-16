@@ -1525,8 +1525,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                   £
                                   {product.requiresWeight &&
                                   product.pricePerUnit
-                                    ? product.pricePerUnit.toFixed(2)
-                                    : product.price.toFixed(2)}
+                                    ? product.pricePerUnit
+                                    : product.price}
                                   {product.requiresWeight && (
                                     <span className="text-xs text-slate-500 ml-1">
                                       /{product.unit}
@@ -2015,7 +2015,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                   ? `£${item.product.pricePerUnit.toFixed(
                                       2
                                     )} / ${item.product.unit}`
-                                  : `£${item.product.price.toFixed(2)}`}
+                                  : `£${item.product.price}`}
                               </TableCell>
                               <TableCell
                                 className="text-center font-semibold"
