@@ -1,0 +1,128 @@
+import { ipcRenderer } from "electron";
+
+export const transactionAPI = {
+  create: (transactionData: {
+    shiftId: string;
+    businessId: string;
+    type: "sale" | "refund" | "void";
+    subtotal: number;
+    tax: number;
+    total: number;
+    paymentMethod: "cash" | "card" | "mixed";
+    cashAmount?: number;
+    cardAmount?: number;
+    items: Array<{
+      productId: string;
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }>;
+    status: "completed" | "voided" | "pending";
+    customerId?: string;
+    receiptNumber: string;
+    timestamp: string;
+  }) => ipcRenderer.invoke("transactions:create", transactionData),
+
+  getByShift: (shiftId: string) =>
+    ipcRenderer.invoke("transactions:getByShift", shiftId),
+};
+
+export const refundAPI = {
+  getTransactionById: (transactionId: string) =>
+    ipcRenderer.invoke("refunds:getTransactionById", transactionId),
+
+  getTransactionByReceipt: (receiptNumber: string) =>
+    ipcRenderer.invoke("refunds:getTransactionByReceipt", receiptNumber),
+
+  getRecentTransactions: (businessId: string, limit?: number) =>
+    ipcRenderer.invoke("refunds:getRecentTransactions", businessId, limit),
+
+  getShiftTransactions: (shiftId: string, limit?: number) =>
+    ipcRenderer.invoke("refunds:getShiftTransactions", shiftId, limit),
+
+  validateEligibility: (
+    transactionId: string,
+    refundItems: Array<{
+      originalItemId: string;
+      productId: string;
+      productName: string;
+      originalQuantity: number;
+      refundQuantity: number;
+      unitPrice: number;
+      refundAmount: number;
+      reason: string;
+      restockable: boolean;
+    }>
+  ) =>
+    ipcRenderer.invoke(
+      "refunds:validateEligibility",
+      transactionId,
+      refundItems
+    ),
+
+  createRefundTransaction: (refundData: {
+    originalTransactionId: string;
+    shiftId: string;
+    businessId: string;
+    refundItems: Array<{
+      originalItemId: string;
+      productId: string;
+      productName: string;
+      originalQuantity: number;
+      refundQuantity: number;
+      unitPrice: number;
+      refundAmount: number;
+      reason: string;
+      restockable: boolean;
+    }>;
+    refundReason: string;
+    refundMethod: "original" | "store_credit" | "cash" | "card";
+    managerApprovalId?: string;
+    cashierId: string;
+  }) => ipcRenderer.invoke("refunds:create", refundData),
+};
+
+export const voidAPI = {
+  validateEligibility: (transactionId: string) =>
+    ipcRenderer.invoke("voids:validateEligibility", transactionId),
+
+  voidTransaction: (voidData: {
+    transactionId: string;
+    cashierId: string;
+    reason: string;
+    managerApprovalId?: string;
+  }) => ipcRenderer.invoke("voids:create", voidData),
+
+  getTransactionById: (transactionId: string) =>
+    ipcRenderer.invoke("voids:getTransactionById", transactionId),
+
+  getTransactionByReceipt: (receiptNumber: string) =>
+    ipcRenderer.invoke("voids:getTransactionByReceipt", receiptNumber),
+};
+
+export const cashDrawerAPI = {
+  getExpectedCash: (shiftId: string) =>
+    ipcRenderer.invoke("cashDrawer:getExpectedCash", shiftId),
+
+  createCount: (countData: {
+    shiftId: string;
+    countType: "opening" | "mid-shift" | "closing" | "spot-check";
+    expectedAmount: number;
+    countedAmount: number;
+    variance: number;
+    notes?: string;
+    countedBy: string;
+    denominations?: Array<{
+      value: number;
+      count: number;
+      total: number;
+      label: string;
+      type: "note" | "coin";
+    }>;
+    managerApprovalId?: string;
+  }) => ipcRenderer.invoke("cashDrawer:createCount", countData),
+
+  getCountsByShift: (shiftId: string) =>
+    ipcRenderer.invoke("cashDrawer:getCountsByShift", shiftId),
+};
