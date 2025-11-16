@@ -60,7 +60,7 @@ function copyMigrationsPlugin() {
               copyFileSync(srcPath, destPath);
             }
           }
-          console.log("✅ Migrations copied to dist/");
+          console.log("Migrations copied to dist/");
         } catch (err) {
           // Only log if it's not a "not found" error
           if (err.code !== "ENOENT") {
