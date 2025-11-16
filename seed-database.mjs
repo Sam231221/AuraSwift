@@ -42,17 +42,38 @@ const ADMIN_PIN_HASH = bcrypt.hashSync("1234", SALT);
 const MANAGER_PIN_HASH = bcrypt.hashSync("5678", SALT);
 const CASHIER_PIN_HASH = bcrypt.hashSync("9999", SALT);
 
+console.log("[DEBUG] Starting database seed script");
 try {
+  console.log("\n🌱 Checking if seed data is needed...");
+
+  console.log("[DEBUG] Checking if any users exist");
+  // Check if any users exist
+  const existingUsers = db.prepare("SELECT COUNT(*) as count FROM users").get();
+
+  console.log("[DEBUG] Users found:", existingUsers.count);
+  if (existingUsers.count > 0) {
+    console.log("⏭️  Database already seeded, skipping...");
+    db.close();
+    process.exit(0);
+  }
+
+  console.log("📦 Seeding database with default data...");
+
+  console.log("[DEBUG] Disabling foreign key constraints");
   // Disable foreign key constraints temporarily
   db.prepare("PRAGMA foreign_keys = OFF").run();
 
+  console.log("[DEBUG] Starting transaction");
   // Start transaction
   db.prepare("BEGIN").run();
 
   console.log("\n🏪 Creating default business with temp ownerId...");
 
-  const now = Date.now();
+  const now = new Date();
+  const nowTs = now.getTime();
+  console.log("[DEBUG] Timestamp for seed:", now);
 
+  console.log("[DEBUG] Creating default business");
   // Create Default Business with temp ownerId
   db.prepare(
     `
@@ -66,13 +87,14 @@ try {
     "123 Main Street, Downtown",
     "+1 (555) 123-4567",
     "VAT-123456789",
-    now,
-    now
+    nowTs,
+    nowTs
   );
 
   console.log("✅ Business created: Demo Store");
   console.log("\n👥 Creating default users...");
 
+  console.log("[DEBUG] Creating admin user");
   // Create Admin User
   db.prepare(
     `
@@ -107,8 +129,8 @@ try {
     ]),
     1,
     "",
-    now,
-    now
+    nowTs,
+    nowTs
   );
 
   console.log("✅ Admin user created");
@@ -117,6 +139,7 @@ try {
   console.log("   PIN: 1234");
   console.log("   Password: Password123!");
 
+  console.log("[DEBUG] Updating business ownerId");
   // Update Business to set correct ownerId
   db.prepare(
     `
@@ -126,6 +149,7 @@ try {
   `
   ).run("default-admin-001", "default-business-001");
 
+  console.log("[DEBUG] Creating manager user");
   // Create Manager User
   db.prepare(
     `
@@ -158,8 +182,8 @@ try {
     ]),
     1,
     "",
-    now,
-    now
+    nowTs,
+    nowTs
   );
 
   console.log("✅ Manager user created");
@@ -168,6 +192,7 @@ try {
   console.log("   PIN: 5678");
   console.log("   Password: Password123!");
 
+  console.log("[DEBUG] Creating cashier user");
   // Create Cashier User
   db.prepare(
     `
@@ -193,8 +218,8 @@ try {
     JSON.stringify(["read:sales", "write:sales"]),
     1,
     "",
-    now,
-    now
+    nowTs,
+    nowTs
   );
 
   console.log("✅ Cashier user created");
@@ -203,8 +228,77 @@ try {
   console.log("   PIN: 9999");
   console.log("   Password: Password123!");
 
+  console.log("[DEBUG] Creating default VAT categories");
+  // 6. Create Default VAT Categories
+  console.log("\n💸 Creating default VAT categories...");
+  const vatCategoryStmt = db.prepare(`
+    INSERT INTO vat_categories (
+      id, name, rate_percent, code, description, 
+      business_id, is_default, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const defaultVatCategories = [
+    [
+      "vat-standard",
+      "Standard VAT",
+      20.0,
+      "STD",
+      "Standard VAT rate",
+      "default-business-001",
+      1,
+      1,
+      nowTs,
+      nowTs,
+    ],
+    [
+      "vat-reduced",
+      "Reduced VAT",
+      5.0,
+      "RED",
+      "Reduced VAT rate",
+      "default-business-001",
+      0,
+      1,
+      nowTs,
+      nowTs,
+    ],
+    [
+      "vat-zero",
+      "Zero VAT",
+      0.0,
+      "ZERO",
+      "Zero VAT rate",
+      "default-business-001",
+      0,
+      1,
+      nowTs,
+      nowTs,
+    ],
+    [
+      "vat-exempt",
+      "Exempt VAT",
+      0.0,
+      "EXEMPT",
+      "VAT Exempt",
+      "default-business-001",
+      0,
+      1,
+      nowTs,
+      nowTs,
+    ],
+  ];
+
+  for (const vat of defaultVatCategories) {
+    console.log("[DEBUG] Inserting VAT category:", vat[0]);
+    vatCategoryStmt.run(...vat);
+  }
+
+  console.log("✅ Default VAT categories created");
+
   console.log("\n⚙️  Creating default app settings...");
 
+  console.log("[DEBUG] Creating default app settings");
   // Create Default App Settings
   const settings = [
     ["first_time_setup_complete", "true"],
@@ -219,14 +313,17 @@ try {
   `);
 
   for (const [key, value] of settings) {
-    settingsStmt.run(key, value, now, now);
+    console.log("[DEBUG] Inserting app setting:", key);
+    settingsStmt.run(key, value, nowTs, nowTs);
   }
 
   console.log("✅ App settings created");
 
+  console.log("[DEBUG] Committing transaction");
   // Commit transaction
   db.prepare("COMMIT").run();
 
+  console.log("[DEBUG] Re-enabling foreign key constraints");
   // Re-enable foreign key constraints
   db.prepare("PRAGMA foreign_keys = ON").run();
 
@@ -234,6 +331,7 @@ try {
   console.log("\n📋 Summary:");
   console.log("   • 1 Business (Demo Store)");
   console.log("   • 3 Users (Admin, Manager, Cashier)");
+  console.log("   • 4 VAT Categories (Standard, Reduced, Zero, Exempt)");
   console.log("   • 4 App Settings");
   console.log("\n🔐 Login Credentials:");
   console.log("   All users: Password123!");
@@ -241,10 +339,18 @@ try {
   console.log("   Manager PIN: 5678");
   console.log("   Cashier PIN: 9999");
 } catch (error) {
-  // Rollback on error
-  db.prepare("ROLLBACK").run();
+  // Rollback on error (if transaction was started)
+  try {
+    db.prepare("ROLLBACK").run();
+  } catch (rollbackError) {
+    // Ignore rollback errors (transaction might not have been started)
+  }
   console.error("\n❌ Error seeding database:", error);
   process.exit(1);
 } finally {
-  db.close();
+  try {
+    db.close();
+  } catch (closeError) {
+    // Ignore close errors (database might already be closed)
+  }
 }
