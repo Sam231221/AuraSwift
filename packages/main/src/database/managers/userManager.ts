@@ -1,7 +1,7 @@
-import type { User, Permission } from "../models/user.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, like, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
+import { User, Permission } from "../schema.js";
 
 export class UserManager {
   private db: DrizzleDB;
@@ -27,35 +27,37 @@ export class UserManager {
   }): Promise<User> {
     const userId = this.uuid.v4();
     const businessId = userData.businessId || this.uuid.v4();
-    const hashedPassword = await this.bcrypt.hash(userData.password, 10);
-    const hashedPin = await this.bcrypt.hash(userData.pin, 10);
-    const now = new Date().toISOString();
+    const salt = await this.bcrypt.genSalt(10);
+    const hashedPassword = await this.bcrypt.hash(userData.password, salt);
+    const hashedPin = await this.bcrypt.hash(userData.pin, salt);
+    const now = new Date();
 
     // Set permissions based on role
     let permissions: Permission[];
     switch (userData.role) {
       case "cashier":
-        permissions = [
-          { action: "read", resource: "sales" },
-          { action: "create", resource: "transactions" },
-          { action: "read", resource: "products" },
-          { action: "read", resource: "basic_reports" },
-        ];
+        permissions = ["read:sales", "write:sales"];
         break;
       case "manager":
         permissions = [
-          { action: "read", resource: "sales" },
-          { action: "create", resource: "transactions" },
-          { action: "void", resource: "transactions" },
-          { action: "apply", resource: "discounts" },
-          { action: "read", resource: "products" },
-          { action: "update", resource: "inventory" },
-          { action: "read", resource: "all_reports" },
-          { action: "manage", resource: "staff_schedules" },
+          "read:sales",
+          "write:sales",
+          "read:reports",
+          "manage:inventory",
+          "override:transactions",
         ];
         break;
       case "admin":
-        permissions = [{ action: "*", resource: "*" }];
+        permissions = [
+          "read:sales",
+          "write:sales",
+          "read:reports",
+          "manage:inventory",
+          "manage:users",
+          "view:analytics",
+          "override:transactions",
+          "manage:settings",
+        ];
         break;
     }
 
@@ -81,30 +83,40 @@ export class UserManager {
             id: businessId,
             name: userData.businessName,
             ownerId: userId,
-            createdAt: now,
-            updatedAt: now,
+            email: "",
+            phone: "",
+            website: "",
+            address: "",
+            country: "",
+            city: "",
+            postalCode: "",
+            vatNumber: "",
+            businessType: "retail",
+            currency: "USD",
+            timezone: "UTC",
+            isActive: true,
           })
           .run();
       }
 
-      // 2. Create user
+      // 2. Create user (new schema fields)
       tx.insert(schema.users)
         .values({
           id: userId,
           username: userData.username,
           email: userData.email,
-          password: hashedPassword,
-          pin: hashedPin,
+          passwordHash: hashedPassword,
+          pinHash: hashedPin,
+          salt: salt,
           firstName: userData.firstName,
           lastName: userData.lastName,
           businessName: userData.businessName,
           role: userData.role,
           businessId,
-          permissions: JSON.stringify(permissions),
+          permissions: permissions,
           isActive: true,
+          loginAttempts: 0,
           address: "",
-          createdAt: now,
-          updatedAt: now,
         })
         .run();
     });
@@ -147,13 +159,7 @@ export class UserManager {
 
     if (!user) return null;
 
-    return {
-      ...user,
-      permissions:
-        typeof user.permissions === "string"
-          ? JSON.parse(user.permissions)
-          : user.permissions,
-    } as User;
+    return user as User;
   }
 
   async authenticateUser(
@@ -163,12 +169,15 @@ export class UserManager {
     const user = this.getUserByEmail(email);
     if (!user) return null;
 
-    const isValidPassword = await this.bcrypt.compare(password, user.password);
+    const isValidPassword = await this.bcrypt.compare(
+      password,
+      user.passwordHash
+    );
     if (!isValidPassword) return null;
 
-    // Return user without password
-    const { password: _, ...userWithoutPassword } = user;
-    return userWithoutPassword as User;
+    // Return user without passwordHash and salt
+    const { passwordHash: _, salt: __, ...userWithoutSecrets } = user;
+    return userWithoutSecrets as User;
   }
 
   getUserByUsername(username: string): User | null {
@@ -186,13 +195,7 @@ export class UserManager {
 
     if (!user) return null;
 
-    return {
-      ...user,
-      permissions:
-        typeof user.permissions === "string"
-          ? JSON.parse(user.permissions)
-          : user.permissions,
-    } as User;
+    return user as User;
   }
 
   async authenticateUserByUsernamePin(
@@ -202,11 +205,16 @@ export class UserManager {
     const user = this.getUserByUsername(username);
     if (!user) return null;
 
-    const isValidPin = await this.bcrypt.compare(pin, user.pin);
+    const isValidPin = await this.bcrypt.compare(pin, user.pinHash);
     if (!isValidPin) return null;
 
-    // Return user without password and PIN
-    const { password: _, pin: __, ...userWithoutSecrets } = user;
+    // Return user without passwordHash, pinHash, and salt
+    const {
+      passwordHash: _,
+      pinHash: __,
+      salt: ___,
+      ...userWithoutSecrets
+    } = user;
     return userWithoutSecrets as User;
   }
 
@@ -223,13 +231,7 @@ export class UserManager {
       .orderBy(desc(schema.users.createdAt))
       .all();
 
-    return users.map((user) => ({
-      ...user,
-      permissions:
-        typeof user.permissions === "string"
-          ? JSON.parse(user.permissions)
-          : user.permissions,
-    })) as User[];
+    return users as User[];
   }
 
   updateUser(
@@ -238,16 +240,14 @@ export class UserManager {
       firstName: string;
       lastName: string;
       businessName: string;
-      role: "cashier" | "manager" | "admin";
+      role: "cashier" | "supervisor" | "manager" | "admin" | "owner";
       isActive: boolean;
       address: string;
     }>
   ): { changes: number } {
-    const now = new Date().toISOString();
-
     const result = this.db
       .update(schema.users)
-      .set({ ...updates, updatedAt: now })
+      .set({ ...updates })
       .where(eq(schema.users.id, id))
       .run();
 
@@ -255,13 +255,10 @@ export class UserManager {
   }
 
   deleteUser(id: string): { changes: number } {
-    const now = new Date().toISOString();
-
     const result = this.db
       .update(schema.users)
       .set({
         isActive: false,
-        updatedAt: now,
       })
       .where(eq(schema.users.id, id))
       .run();
@@ -287,13 +284,7 @@ export class UserManager {
       .orderBy(desc(schema.users.role), schema.users.firstName)
       .all();
 
-    return users.map((user) => ({
-      ...user,
-      isActive: Boolean(user.isActive),
-      address: user.address ?? "",
-      email: user.email ?? "",
-      permissions: JSON.parse(user.permissions as string) as Permission[],
-    })) as User[];
+    return users as User[];
   }
 
   /**
@@ -319,12 +310,7 @@ export class UserManager {
       .orderBy(desc(schema.users.createdAt))
       .all();
 
-    return users.map((user) => ({
-      ...user,
-      isActive: user.isActive ?? true,
-      address: user.address ?? "",
-      permissions: JSON.parse(user.permissions as string) as Permission[],
-    })) as User[];
+    return users as User[];
   }
 
   /**
@@ -349,9 +335,6 @@ export class UserManager {
 
     return {
       ...result[0].user,
-      permissions: JSON.parse(
-        result[0].user.permissions as string
-      ) as Permission[],
       business: result[0].business,
     };
   }

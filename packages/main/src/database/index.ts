@@ -12,7 +12,7 @@ import { CashDrawerManager } from "./managers/cashDrawerManager.js";
 import { ReportManager } from "./managers/reportManager.js";
 import { AuditLogManager } from "./managers/auditLogManager.js";
 import { DiscountManager } from "./managers/discountManager.js";
-import { SupplierManager } from "./managers/supplierManager.js";
+
 import { TimeTrackingManager } from "./managers/timeTrackingManager.js";
 import { AuditManager } from "./managers/auditManager.js";
 import { TimeTrackingReportManager } from "./managers/timeTrackingReportManager.js";
@@ -40,7 +40,7 @@ export interface DatabaseManagers {
   reports: ReportManager;
   auditLogs: AuditLogManager;
   discounts: DiscountManager;
-  suppliers: SupplierManager;
+
   timeTracking: TimeTrackingManager;
   audit: AuditManager;
   timeTrackingReports: TimeTrackingReportManager;
@@ -104,7 +104,6 @@ export async function getDatabase(): Promise<DatabaseManagers> {
   const reports = new ReportManager(drizzle);
   const auditLogs = new AuditLogManager(drizzle, uuid);
   const discounts = new DiscountManager(drizzle, uuid);
-  const suppliers = new SupplierManager(drizzle, uuid);
   const timeTracking = new TimeTrackingManager(drizzle, uuid);
   const audit = new AuditManager(drizzle, uuid);
   const timeTrackingReports = new TimeTrackingReportManager(drizzle);
@@ -124,7 +123,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     reports,
     auditLogs,
     discounts,
-    suppliers,
+
     timeTracking,
     audit,
     timeTrackingReports,
@@ -163,23 +162,27 @@ export async function initializeDatabase(): Promise<DatabaseManagers> {
 
 // Re-export types for convenience
 export type {
-  User,
-  Permission,
-  Business,
-  Session,
-  Product,
-  Modifier,
-  ModifierOption,
-  Category,
-  StockAdjustment,
   Schedule,
   Shift,
   Transaction,
   TransactionItem,
-  RefundItem,
-  AppliedModifier,
   CashDrawerCount,
-  ShiftReport,
   PrintJob,
   PrintJobRetry,
-} from "../../../../types/database.d.ts";
+  Product,
+  Category,
+  Business,
+  User,
+  Session,
+  Discount,
+  AuditLog,
+  ClockEvent,
+  TimeShift,
+  StockAdjustment,
+} from "./schema.js";
+
+// Re-export utility types from managers
+export type {
+  RefundItem,
+  TransactionWithItems,
+} from "./managers/transactionManager.js";

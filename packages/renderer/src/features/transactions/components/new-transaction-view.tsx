@@ -445,13 +445,14 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   // Initialize scanner hook
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { scanLog: _scanLog, clearScanLog: _clearScanLog } = useProductionScanner({
-    onScan: handleHardwareScan,
-    enableAudio: audioEnabled,
-    minBarcodeLength: 4, // Allow shorter codes for PLU
-    maxBarcodeLength: 20, // Allow longer codes for various barcode formats
-    scanTimeout: 250, // Slightly longer timeout for reliability
-  });
+  const { scanLog: _scanLog, clearScanLog: _clearScanLog } =
+    useProductionScanner({
+      onScan: handleHardwareScan,
+      enableAudio: audioEnabled,
+      minBarcodeLength: 4, // Allow shorter codes for PLU
+      maxBarcodeLength: 20, // Allow longer codes for various barcode formats
+      scanTimeout: 250, // Slightly longer timeout for reliability
+    });
 
   // Initialize audio on component mount
   useEffect(() => {
@@ -690,21 +691,20 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     });
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _updateQuantity = (productId: string, newQuantity: number) => {
-    if (newQuantity < 1) {
-      removeFromCart(productId);
-      return;
-    }
+  // const _updateQuantity = (productId: string, newQuantity: number) => {
+  //   if (newQuantity < 1) {
+  //     removeFromCart(productId);
+  //     return;
+  //   }
 
-    setCart((prevCart) =>
-      prevCart.map((item) =>
-        item.product.id === productId
-          ? { ...item, quantity: newQuantity }
-          : item
-      )
-    );
-  };
+  //   setCart((prevCart) =>
+  //     prevCart.map((item) =>
+  //       item.product.id === productId
+  //         ? { ...item, quantity: newQuantity }
+  //         : item
+  //     )
+  //   );
+  // };
 
   const removeFromCart = (productId: string) => {
     setCart((prevCart) =>

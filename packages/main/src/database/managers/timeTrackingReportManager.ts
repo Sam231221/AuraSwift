@@ -1,9 +1,26 @@
-import type { AttendanceReport } from "../../../../../types/database.d.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { getRawDatabase } from "../drizzle.js";
 import { eq, and, desc, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 import type Database from "better-sqlite3";
+
+// Define AttendanceReport type
+export interface AttendanceReport {
+  userId: string;
+  userName: string;
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  totalShifts: number;
+  totalHours: number;
+  regularHours: number;
+  overtimeHours: number;
+  lateClockIns: number;
+  missedClockOuts: number;
+  averageHoursPerShift: number;
+  tardinessMinutes: number;
+}
 
 export class TimeTrackingReportManager {
   private db: DrizzleDB;

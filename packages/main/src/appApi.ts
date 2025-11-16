@@ -1,24 +1,14 @@
 import {
   getDatabase,
   type User,
-  type Business,
   type Product,
-  type Modifier,
   type StockAdjustment,
 } from "./database/index.js";
 import {
   registerSchema,
   loginSchema,
   pinLoginSchema,
-  updateUserSchema,
-  createStaffUserSchema,
-  sessionTokenSchema,
-  userIdSchema,
   validateInput,
-  type RegisterInput,
-  type LoginInput,
-  type PinLoginInput,
-  type UpdateUserInput,
 } from "./database/validation/authSchemas.js";
 
 export interface RegisterRequest {
@@ -59,7 +49,7 @@ export interface CreateProductRequest {
   stockLevel: number;
   minStockLevel: number;
   businessId: string;
-  modifiers?: Modifier[];
+
   // Weight-based product fields
   requiresWeight?: boolean;
   unit?: "lb" | "kg" | "oz" | "g" | "each";
@@ -92,8 +82,6 @@ export interface ProductResponse {
   message: string;
   product?: Product;
   products?: Product[];
-  modifier?: Modifier;
-  modifiers?: Modifier[];
   adjustment?: StockAdjustment;
   adjustments?: StockAdjustment[];
   errors?: string[];
@@ -477,51 +465,13 @@ export class AuthAPI {
       }
 
       // Extract modifiers from product data
-      const { modifiers, ...productDataWithoutModifiers } = productData;
+      const { ...productDataWithoutModifiers } = productData;
 
       // Create the product first
       const product = await db.products.createProduct({
         ...productDataWithoutModifiers,
         isActive: true,
       });
-
-      // Handle modifiers if provided
-      if (modifiers && modifiers.length > 0) {
-        for (const modifier of modifiers) {
-          try {
-            // Create the modifier
-            const createdModifier = await db.products.createModifier({
-              name: modifier.name,
-              type: modifier.type,
-              required: modifier.required,
-              businessId: productData.businessId,
-            });
-
-            // Add modifier options
-            if (modifier.options && modifier.options.length > 0) {
-              for (const option of modifier.options) {
-                if (option.name.trim()) {
-                  const createdOption = await db.products.createModifierOption(
-                    createdModifier.id,
-                    {
-                      name: option.name,
-                      price: option.price || 0,
-                    }
-                  );
-                }
-              }
-            }
-
-            // Link modifier to product
-
-            db.addModifierToProduct(product.id, createdModifier.id);
-          } catch (modifierError: any) {
-            console.error("Error creating modifier:", modifierError);
-            console.error("Modifier data that failed:", modifier);
-            // Continue with other modifiers even if one fails
-          }
-        }
-      }
 
       // Fetch the complete product with modifiers
       const completeProduct = await db.products.getProductById(product.id);
@@ -638,57 +588,13 @@ export class AuthAPI {
       }
 
       // Extract modifiers from updates
-      const { modifiers, ...updatesWithoutModifiers } = updates;
+      const { ...updatesWithoutModifiers } = updates;
 
       // Update the product first
       const product = await db.products.updateProduct(
         id,
         updatesWithoutModifiers
       );
-
-      // Handle modifiers if provided
-      if (modifiers !== undefined) {
-        // Get current product modifiers
-        const currentModifiers = await db.products.getProductModifiers(id);
-
-        // Remove all existing modifiers for this product
-        for (const modifier of currentModifiers) {
-          await db.products.removeModifierFromProduct(id, modifier.id);
-        }
-
-        // Add new modifiers
-        if (modifiers && modifiers.length > 0) {
-          for (const modifier of modifiers) {
-            try {
-              // Create the modifier
-              const createdModifier = await db.products.createModifier({
-                name: modifier.name,
-                type: modifier.type,
-                required: modifier.required,
-                businessId: product.businessId,
-              });
-
-              // Add modifier options
-              if (modifier.options && modifier.options.length > 0) {
-                for (const option of modifier.options) {
-                  if (option.name.trim()) {
-                    await db.products.createModifierOption(createdModifier.id, {
-                      name: option.name,
-                      price: option.price || 0,
-                    });
-                  }
-                }
-              }
-
-              // Link modifier to product
-              db.addModifierToProduct(id, createdModifier.id);
-            } catch (modifierError: any) {
-              console.error("Error updating modifier:", modifierError);
-              // Continue with other modifiers even if one fails
-            }
-          }
-        }
-      }
 
       // Fetch the complete updated product with modifiers
       const updatedProduct = await db.products.getProductById(id);
@@ -936,7 +842,6 @@ export class AuthAPI {
       return {
         success: true,
         message: "Modifier created successfully",
-        modifier: completeModifier,
       };
     } catch (error: any) {
       console.error("Modifier creation error:", error);

@@ -20,7 +20,7 @@ export class SettingsManager {
    * Set a key-value pair in app settings
    */
   setSetting(key: string, value: string): void {
-    const now = new Date().toISOString();
+    const now = new Date();
 
     // Check if setting exists
     const existing = this.db
@@ -87,7 +87,18 @@ export class SettingsManager {
    * Get all settings
    */
   getAllSettings(): AppSetting[] {
-    return this.db.select().from(schema.appSettings).all() as AppSetting[];
+    const results = this.db.select().from(schema.appSettings).all() as {
+      key: string;
+      value: string;
+      createdAt: Date;
+      updatedAt: Date | null;
+    }[];
+    return results.map((row) => ({
+      key: row.key,
+      value: row.value,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : "",
+    }));
   }
 
   /**

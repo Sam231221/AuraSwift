@@ -34,7 +34,6 @@ export class AuditLogManager {
         resourceId: logData.resourceId,
         details: logData.details ? JSON.stringify(logData.details) : null,
         timestamp: now,
-        createdAt: now,
       })
       .run();
   }

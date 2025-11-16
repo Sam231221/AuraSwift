@@ -1,4 +1,4 @@
-import type { Schedule } from "../models/schedule.js";
+import type { Schedule } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, asc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
@@ -19,7 +19,6 @@ export class ScheduleManager {
     scheduleData: Omit<Schedule, "id" | "createdAt" | "updatedAt">
   ): Schedule {
     const scheduleId = this.uuid.v4();
-    const now = new Date().toISOString();
 
     this.db
       .insert(schema.schedules)
@@ -32,17 +31,18 @@ export class ScheduleManager {
         status: scheduleData.status,
         assignedRegister: scheduleData.assignedRegister ?? null,
         notes: scheduleData.notes ?? null,
-        createdAt: now,
-        updatedAt: now,
       })
       .run();
 
-    return {
-      ...scheduleData,
-      id: scheduleId,
-      createdAt: now,
-      updatedAt: now,
-    };
+    // Retrieve and return the created schedule
+    const [created] = this.db
+      .select()
+      .from(schema.schedules)
+      .where(eq(schema.schedules.id, scheduleId))
+      .limit(1)
+      .all();
+
+    return created as Schedule;
   }
 
   /**
@@ -108,14 +108,9 @@ export class ScheduleManager {
    * Update schedule status
    */
   updateScheduleStatus(scheduleId: string, status: Schedule["status"]): void {
-    const now = new Date().toISOString();
-
     this.db
       .update(schema.schedules)
-      .set({
-        status,
-        updatedAt: now,
-      })
+      .set({ status })
       .where(eq(schema.schedules.id, scheduleId))
       .run();
   }

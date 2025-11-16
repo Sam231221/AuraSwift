@@ -1,4 +1,4 @@
-import type { StockAdjustment } from "../models/inventory.js";
+import type { StockAdjustment } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";

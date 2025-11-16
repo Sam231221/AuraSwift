@@ -1,4 +1,4 @@
-import type { CashDrawerCount } from "../models/cashDrawer.js";
+import type { CashDrawerCount } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, desc, and, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";

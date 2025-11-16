@@ -1,4 +1,4 @@
-import type { Business } from "../models/business.js";
+import type { Business } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq } from "drizzle-orm";
 import * as schema from "../schema.js";
@@ -30,7 +30,7 @@ export class BusinessManager {
     vatNumber?: string;
   }): Business {
     const businessId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     this.db
       .insert(schema.businesses)
@@ -62,7 +62,7 @@ export class BusinessManager {
       vatNumber: string;
     }>
   ): boolean {
-    const now = new Date().toISOString();
+    const now = new Date();
 
     const result = this.db
       .update(schema.businesses)

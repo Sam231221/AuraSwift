@@ -1,21 +1,53 @@
-/**
- * Drizzle ORM Schema Definition for AuraSwift POS System
- *
- * This schema matches the existing SQLite database structure.
- * It provides type-safe queries and migrations using Drizzle ORM.
- *
- * @see /packages/main/src/database/docs/07_DRIZZLE_ORM_INTEGRATION.md
- */
-
 import {
   text,
   integer,
   unique,
   real,
   sqliteTableCreator,
+  SQLiteColumn,
+  SQLiteTableWithColumns,
 } from "drizzle-orm/sqlite-core";
 import { index as drizzleIndex } from "drizzle-orm/sqlite-core";
+import { relations, sql } from "drizzle-orm";
+// Permission type: update this if you add/remove permissions in the schema
+export type Permission =
+  | "read:sales"
+  | "write:sales"
+  | "read:reports"
+  | "manage:inventory"
+  | "manage:users"
+  | "view:analytics"
+  | "override:transactions"
+  | "manage:settings";
+
+export const timestampColumns = {
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .$defaultFn(() => new Date())
+    .$onUpdate(() => new Date()),
+};
+
+export const commonColumns = {
+  // Internal ID for relationships (fast)
+  id: integer("id", { mode: "number" })
+    .primaryKey({ autoIncrement: true })
+    .notNull(),
+
+  // External ID for APIs, security (safe)
+  publicId: text("public_id")
+    .unique()
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
+
+  businessId: text("business_id").notNull(),
+  // ... timestamp columns
+};
+
 export const createTable = sqliteTableCreator((name) => name);
+
 // ============================================
 // BUSINESSES & USERS
 // ============================================
@@ -50,10 +82,7 @@ export const businesses = createTable("businesses", {
 
   // Status & Metadata
   isActive: integer("isActive", { mode: "boolean" }).default(true),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-    .notNull()
-    .$onUpdate(() => new Date()),
+  ...timestampColumns,
 });
 
 export const users = createTable("users", {
@@ -75,27 +104,14 @@ export const users = createTable("users", {
   permissions: text("permissions", { mode: "json" })
     .$type<Permission[]>()
     .notNull(),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-    .notNull()
-    .$onUpdate(() => new Date()),
+
   lastLoginAt: integer("lastLoginAt", { mode: "timestamp_ms" }),
   isActive: integer("isActive", { mode: "boolean" }).default(true),
   loginAttempts: integer("login_attempts").default(0),
   lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
   address: text("address").default(""),
+  ...timestampColumns,
 });
-
-// Permission type definition
-export type Permission =
-  | "read:sales"
-  | "write:sales"
-  | "read:reports"
-  | "manage:inventory"
-  | "manage:users"
-  | "view:analytics"
-  | "override:transactions"
-  | "manage:settings";
 
 export const sessions = createTable("sessions", {
   id: text("id").primaryKey(),
@@ -104,7 +120,7 @@ export const sessions = createTable("sessions", {
     .references(() => users.id),
   token: text("token").unique().notNull(),
   expiresAt: text("expiresAt").notNull(),
-  createdAt: text("createdAt").notNull(),
+  ...timestampColumns,
 });
 
 // ============================================
@@ -124,10 +140,7 @@ export const vatCategories = createTable(
       .references(() => businesses.id, { onDelete: "cascade" }),
     isDefault: integer("is_default", { mode: "boolean" }).default(false),
     isActive: integer("is_active", { mode: "boolean" }).default(true),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .notNull()
-      .$onUpdate(() => new Date()),
+    ...timestampColumns,
   },
   (table) => ({
     businessIdx: index("vat_business_idx").on(table.businessId),
@@ -156,10 +169,7 @@ export const categories = createTable(
     color: text("color"), // For UI organization
     image: text("image"), // Category images
     isActive: integer("is_active", { mode: "boolean" }).default(true),
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .notNull()
-      .$onUpdate(() => new Date()),
+    ...timestampColumns,
   },
   (table) => [
     index("categories_business_idx").on(table.businessId),
@@ -244,10 +254,7 @@ export const products = createTable(
     allowDiscount: integer("allow_discount", { mode: "boolean" }).default(true),
 
     // Timestamps
-    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
-      .notNull()
-      .$onUpdate(() => new Date()),
+    ...timestampColumns,
   },
   (table) => [
     index("products_business_idx").on(table.businessId),
@@ -299,8 +306,7 @@ export const schedules = createTable("schedules", {
   }).notNull(),
   assignedRegister: text("assignedRegister"),
   notes: text("notes"),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  ...timestampColumns,
 });
 
 export const shifts = createTable("shifts", {
@@ -324,8 +330,7 @@ export const shifts = createTable("shifts", {
   totalRefunds: real("totalRefunds").default(0),
   totalVoids: real("totalVoids").default(0),
   notes: text("notes"),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  ...timestampColumns,
 });
 
 export const transactions = createTable("transactions", {
@@ -352,7 +357,9 @@ export const transactions = createTable("transactions", {
   customerId: text("customerId"),
   receiptNumber: text("receiptNumber").notNull(),
   timestamp: text("timestamp").notNull(),
-  createdAt: text("createdAt").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .$defaultFn(() => new Date())
+    .notNull(),
   originalTransactionId: text("originalTransactionId").references(
     (): any => transactions.id
   ),
@@ -384,28 +391,313 @@ export const transactionItems = createTable("transaction_items", {
   weight: real("weight"),
   discountAmount: real("discountAmount").default(0),
   appliedDiscounts: text("appliedDiscounts"),
-  createdAt: text("createdAt").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .$defaultFn(() => new Date())
+    .notNull(),
 });
 
-export const cashDrawerCounts = createTable("cash_drawer_counts", {
-  id: text("id").primaryKey(),
-  shiftId: text("shiftId")
-    .notNull()
-    .references(() => shifts.id),
-  businessId: text("businessId")
-    .notNull()
-    .references(() => businesses.id),
-  countType: text("countType", { enum: ["mid-shift", "end-shift"] }).notNull(),
-  expectedAmount: real("expectedAmount").notNull(),
-  countedAmount: real("countedAmount").notNull(),
-  variance: real("variance").notNull(),
-  notes: text("notes"),
-  countedBy: text("countedBy")
-    .notNull()
-    .references(() => users.id),
-  timestamp: text("timestamp").notNull(),
-  createdAt: text("createdAt").notNull(),
-});
+export const cashDrawerCounts = createTable(
+  "cash_drawer_counts",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    createdAt: text("created_at")
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    updatedAt: text("updated_at")
+      .default(sql`CURRENT_TIMESTAMP`)
+      .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
+
+    shiftId: text("shift_id").notNull(),
+    countType: text("count_type", {
+      enum: ["mid-shift", "end-shift"],
+    }).notNull(),
+    expectedAmount: real("expected_amount").notNull(),
+    countedAmount: real("counted_amount").notNull(),
+    variance: real("variance").notNull(),
+    notes: text("notes"),
+    countedBy: text("counted_by").notNull(), // userId
+    timestamp: text("timestamp").notNull(), // ISO string
+  },
+  (table) => [
+    // Index for frequent queries
+    drizzleIndex("cash_drawer_counts_shift_idx").on(table.shiftId),
+    drizzleIndex("cash_drawer_counts_business_idx").on(table.businessId),
+    drizzleIndex("cash_drawer_counts_timestamp_idx").on(table.timestamp),
+    drizzleIndex("cash_drawer_counts_counted_by_idx").on(table.countedBy),
+
+    // Ensure only one end-shift count per shift
+    unique("cash_drawer_counts_shift_type_unique").on(
+      table.shiftId,
+      table.countType
+    ),
+  ]
+);
+
+// Define standard validation issue codes for consistency
+export const VALIDATION_ISSUE_CODES = {
+  // Attendance issues
+  LATE_CLOCK_IN: "LATE_CLOCK_IN",
+  MISSED_CLOCK_OUT: "MISSED_CLOCK_OUT",
+  SHIFT_OVERLAP: "SHIFT_OVERLAP",
+
+  // Cash management issues
+  CASH_VARIANCE_HIGH: "CASH_VARIANCE_HIGH",
+  MISSING_END_SHIFT_COUNT: "MISSING_END_SHIFT_COUNT",
+  MULTIPLE_END_SHIFT_COUNTS: "MULTIPLE_END_SHIFT_COUNTS",
+
+  // Transaction issues
+  VOIDED_TRANSACTION_NO_REASON: "VOIDED_TRANSACTION_NO_REASON",
+  REFUND_WITHOUT_APPROVAL: "REFUND_WITHOUT_APPROVAL",
+  SUSPICIOUS_DISCOUNT: "SUSPICIOUS_DISCOUNT",
+
+  // Compliance issues
+  MISSING_BREAK: "MISSING_BREAK",
+  EXCESSIVE_OVERTIME: "EXCESSIVE_OVERTIME",
+} as const;
+
+export const shiftValidationIssues = createTable(
+  "shift_validation_issues",
+  {
+    ...commonColumns,
+
+    validationId: text("validation_id").notNull(),
+    type: text("type", { enum: ["violation", "warning"] }).notNull(),
+    message: text("message").notNull(),
+    code: text("code").notNull(), // Machine-readable error code for programmatic handling
+    severity: text("severity", {
+      enum: ["low", "medium", "high", "critical"],
+    }).default("medium"),
+
+    // Additional context for the issue
+    category: text("category", {
+      enum: [
+        "attendance",
+        "cash_management",
+        "transactions",
+        "compliance",
+        "system",
+      ],
+    }).notNull(),
+
+    // Resolution tracking
+    resolved: integer("resolved", { mode: "boolean" }).default(false),
+    resolvedAt: text("resolved_at"),
+    resolvedBy: text("resolved_by"), // userId
+    resolutionNotes: text("resolution_notes"),
+
+    // Additional metadata for debugging/fixing
+    relatedEntityId: text("related_entity_id"), // e.g., transactionId, userId, etc.
+    relatedEntityType: text("related_entity_type"), // e.g., 'transaction', 'user', 'cash_drawer_count'
+    dataSnapshot: text("data_snapshot"), // JSON snapshot of relevant data at time of validation
+  },
+  (table) => [
+    drizzleIndex("validation_issues_validation_idx").on(table.validationId),
+    drizzleIndex("validation_issues_type_idx").on(table.type),
+    drizzleIndex("validation_issues_severity_idx").on(table.severity),
+    drizzleIndex("validation_issues_category_idx").on(table.category),
+    drizzleIndex("validation_issues_resolved_idx").on(table.resolved),
+    drizzleIndex("validation_issues_business_idx").on(table.businessId),
+    drizzleIndex("validation_issues_related_entity_idx").on(
+      table.relatedEntityType,
+      table.relatedEntityId
+    ),
+
+    // Composite index for common query patterns
+    drizzleIndex("validation_issues_status_severity_idx").on(
+      table.resolved,
+      table.severity
+    ),
+  ]
+);
+
+export const shiftValidations = createTable(
+  "shift_validations",
+  {
+    ...commonColumns,
+
+    shiftId: text("shift_id").notNull(),
+    valid: integer("valid", { mode: "boolean" }).notNull(),
+    requiresReview: integer("requires_review", { mode: "boolean" }).notNull(),
+
+    // Computed aggregates for quick access
+    violationCount: integer("violation_count").notNull().default(0),
+    warningCount: integer("warning_count").notNull().default(0),
+    criticalIssueCount: integer("critical_issue_count").notNull().default(0),
+    unresolvedIssueCount: integer("unresolved_issue_count")
+      .notNull()
+      .default(0),
+
+    // Validation metadata
+    validatedAt: text("validated_at"),
+    validatedBy: text("validated_by"), // userId
+    validationMethod: text("validation_method", {
+      enum: ["auto", "manual"],
+    }).default("auto"),
+
+    // Resolution tracking
+    resolution: text("resolution", {
+      enum: ["approved", "rejected", "pending", "needs_review"],
+    }).default("pending"),
+    resolvedAt: text("resolved_at"),
+    resolvedBy: text("resolved_by"), // userId
+    resolutionNotes: text("resolution_notes"),
+  },
+  (table) => [
+    drizzleIndex("shift_validations_shift_idx").on(table.shiftId),
+    drizzleIndex("shift_validations_business_idx").on(table.businessId),
+    drizzleIndex("shift_validations_valid_idx").on(table.valid),
+    drizzleIndex("shift_validations_requires_review_idx").on(
+      table.requiresReview
+    ),
+    drizzleIndex("shift_validations_resolution_idx").on(table.resolution),
+    drizzleIndex("shift_validations_unresolved_count_idx").on(
+      table.unresolvedIssueCount
+    ),
+
+    // One validation record per shift
+    unique("shift_validations_shift_unique").on(table.shiftId),
+  ]
+);
+export const shiftValidationsRelations = relations(
+  shiftValidations,
+  ({ one, many }) => ({
+    issues: many(shiftValidationIssues),
+    shiftReport: one(shiftReports, {
+      fields: [shiftValidations.shiftId],
+      references: [shiftReports.shiftId],
+    }),
+    // Reference to shifts table if you have one
+    // shift: one(shifts, { fields: [shiftValidations.shiftId], references: [shifts.id] }),
+  })
+);
+
+export const shiftValidationIssuesRelations = relations(
+  shiftValidationIssues,
+  ({ one }) => ({
+    validation: one(shiftValidations, {
+      fields: [shiftValidationIssues.validationId],
+      references: [shiftValidations.id],
+    }),
+  })
+);
+
+// Shift Report View - Materialized or computed
+export const shiftReports = sqliteTableCreator((name) => `pos_${name}`)(
+  "shift_reports",
+  {
+    id: text("id").primaryKey(), // shiftId or generated ID
+    businessId: text("business_id").notNull(),
+    shiftId: text("shift_id").notNull(),
+    userId: text("user_id").notNull(),
+    userName: text("user_name").notNull(),
+
+    // Sales metrics
+    totalSales: real("total_sales").notNull().default(0),
+    totalRefunds: real("total_refunds").notNull().default(0),
+    totalVoids: real("total_voids").notNull().default(0),
+    netSales: real("net_sales").notNull().default(0),
+    transactionCount: integer("transaction_count").notNull().default(0),
+    averageTransactionValue: real("average_transaction_value")
+      .notNull()
+      .default(0),
+
+    // Cash management
+    expectedCashAmount: real("expected_cash_amount").notNull().default(0),
+    countedCashAmount: real("counted_cash_amount").notNull().default(0),
+    cashVariance: real("cash_variance").notNull().default(0),
+
+    // Timing metrics
+    plannedStart: text("planned_start"),
+    actualStart: text("actual_start").notNull(),
+    plannedEnd: text("planned_end"),
+    actualEnd: text("actual_end"),
+    shiftDurationMinutes: integer("shift_duration_minutes")
+      .notNull()
+      .default(0),
+    lateMinutes: integer("late_minutes").default(0),
+    earlyMinutes: integer("early_minutes").default(0),
+
+    // Timestamps
+    reportGeneratedAt: text("report_generated_at")
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    periodCovered: text("period_covered").notNull(), // e.g., '2024-01-day', '2024-01-week'
+  },
+  (table) => [
+    drizzleIndex("shift_report_view_shift_idx").on(table.shiftId),
+    drizzleIndex("shift_report_view_business_idx").on(table.businessId),
+    drizzleIndex("shift_report_view_user_idx").on(table.userId),
+    drizzleIndex("shift_report_view_period_idx").on(table.periodCovered),
+    drizzleIndex("shift_report_view_generated_at_idx").on(
+      table.reportGeneratedAt
+    ),
+  ]
+);
+
+export const attendanceReports = createTable(
+  "attendance_reports",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id").notNull(),
+    userId: text("user_id").notNull(),
+    userName: text("user_name").notNull(),
+
+    // Period
+    periodStartDate: text("period_start_date").notNull(),
+    periodEndDate: text("period_end_date").notNull(),
+    periodType: text("period_type", {
+      enum: ["daily", "weekly", "monthly"],
+    }).notNull(),
+
+    // Shift metrics
+    totalShifts: integer("total_shifts").notNull().default(0),
+    completedShifts: integer("completed_shifts").notNull().default(0),
+    incompleteShifts: integer("incomplete_shifts").notNull().default(0),
+
+    // Hour calculations
+    totalHours: real("total_hours").notNull().default(0),
+    regularHours: real("regular_hours").notNull().default(0),
+    overtimeHours: real("overtime_hours").notNull().default(0),
+
+    // Compliance metrics
+    lateClockIns: integer("late_clock_ins").notNull().default(0),
+    missedClockOuts: integer("missed_clock_outs").notNull().default(0),
+    tardinessMinutes: integer("tardiness_minutes").notNull().default(0),
+
+    // Averages
+    averageHoursPerShift: real("average_hours_per_shift").notNull().default(0),
+    averageTardinessMinutes: real("average_tardiness_minutes")
+      .notNull()
+      .default(0),
+
+    // Report metadata
+    reportGeneratedAt: text("report_generated_at")
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    dataUpTo: text("data_up_to").notNull(), // Last data point included
+  },
+  (table) => [
+    drizzleIndex("attendance_report_user_period_idx").on(
+      table.userId,
+      table.periodStartDate
+    ),
+    drizzleIndex("attendance_report_business_period_idx").on(
+      table.businessId,
+      table.periodType
+    ),
+    drizzleIndex("attendance_report_generated_at_idx").on(
+      table.reportGeneratedAt
+    ),
+
+    unique("attendance_report_unique").on(
+      table.userId,
+      table.periodStartDate,
+      table.periodEndDate,
+      table.businessId
+    ),
+  ]
+);
 
 // ============================================
 // DISCOUNTS & PROMOTIONS
@@ -453,8 +745,7 @@ export const discounts = createTable("discounts", {
   combinableWithOthers: integer("combinableWithOthers", {
     mode: "boolean",
   }).default(true),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  ...timestampColumns,
   createdBy: text("createdBy")
     .notNull()
     .references(() => users.id),
@@ -467,8 +758,7 @@ export const discounts = createTable("discounts", {
 export const appSettings = createTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  ...timestampColumns,
 });
 
 export const auditLogs = createTable("audit_logs", {
@@ -485,7 +775,9 @@ export const auditLogs = createTable("audit_logs", {
   ipAddress: text("ipAddress"),
   terminalId: text("terminalId"),
   timestamp: text("timestamp").notNull(),
-  createdAt: text("createdAt").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .$defaultFn(() => new Date())
+    .notNull(),
 });
 
 // ============================================
@@ -510,8 +802,7 @@ export const clockEvents = createTable("clock_events", {
   geolocation: text("geolocation"),
   ipAddress: text("ipAddress"),
   notes: text("notes"),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  ...timestampColumns,
 });
 
 export const timeShifts = createTable("time_shifts", {
@@ -535,8 +826,7 @@ export const timeShifts = createTable("time_shifts", {
   overtimeHours: real("overtimeHours"),
   breakDuration: integer("breakDuration"),
   notes: text("notes"),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  ...timestampColumns,
 });
 
 export const breaks = createTable("breaks", {
@@ -558,8 +848,7 @@ export const breaks = createTable("breaks", {
     .notNull()
     .default("active"),
   notes: text("notes"),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  ...timestampColumns,
 });
 
 export const timeCorrections = createTable("time_corrections", {
@@ -583,8 +872,7 @@ export const timeCorrections = createTable("time_corrections", {
   status: text("status", { enum: ["pending", "approved", "rejected"] })
     .notNull()
     .default("pending"),
-  createdAt: text("createdAt").notNull(),
-  updatedAt: text("updatedAt").notNull(),
+  ...timestampColumns,
 });
 
 // ============================================
@@ -698,4 +986,35 @@ export type NewPrintJob = typeof printJobs.$inferInsert;
 
 export type PrintJobRetry = typeof printJobRetries.$inferSelect;
 export type NewPrintJobRetry = typeof printJobRetries.$inferInsert;
+
+export type ShiftValidationIssue = typeof shiftValidationIssues.$inferSelect;
+export type NewShiftValidationIssue = typeof shiftValidationIssues.$inferInsert;
+
+export type ShiftValidation = typeof shiftValidations.$inferSelect;
+export type NewShiftValidation = typeof shiftValidations.$inferInsert;
+
+// Helper type for frontend consumption
+export interface ShiftValidationWithIssues extends ShiftValidation {
+  issues: ShiftValidationIssue[];
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  requiresReview: boolean;
+  issues: Array<{
+    type: "violation" | "warning";
+    code: string;
+    message: string;
+    severity: "low" | "medium" | "high" | "critical";
+    category:
+      | "attendance"
+      | "cash_management"
+      | "transactions"
+      | "compliance"
+      | "system";
+    relatedEntityId?: string;
+    relatedEntityType?: string;
+    dataSnapshot?: any;
+  }>;
+}
 export const index = drizzleIndex;

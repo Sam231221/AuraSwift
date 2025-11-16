@@ -3,8 +3,7 @@ import type {
   TimeShift,
   Break,
   TimeCorrection,
-  ShiftValidation,
-} from "../../../../../types/database.d.js";
+} from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import {
   eq,
@@ -42,20 +41,20 @@ export class TimeTrackingManager {
     notes?: string;
   }): Promise<ClockEvent> {
     const eventId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     const clockEvent: ClockEvent = {
       id: eventId,
       userId: data.userId,
       terminalId: data.terminalId,
-      locationId: data.locationId,
+      locationId: data.locationId ?? null,
       type: data.type,
-      timestamp: now,
+      timestamp: now.toISOString(),
       method: data.method || "manual",
       status: "confirmed",
-      geolocation: data.geolocation,
-      ipAddress: data.ipAddress,
-      notes: data.notes,
+      geolocation: data.geolocation ?? null,
+      ipAddress: data.ipAddress ?? null,
+      notes: data.notes ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -132,7 +131,6 @@ export class TimeTrackingManager {
     notes?: string;
   }): Promise<TimeShift> {
     const shiftId = this.uuid.v4();
-    const now = new Date().toISOString();
 
     this.db
       .insert(schema.timeShifts)
@@ -149,8 +147,6 @@ export class TimeTrackingManager {
         overtimeHours: null,
         breakDuration: null,
         notes: data.notes || null,
-        createdAt: now,
-        updatedAt: now,
       })
       .run();
 
@@ -159,16 +155,16 @@ export class TimeTrackingManager {
       userId: data.userId,
       businessId: data.businessId,
       clockInId: data.clockInId,
-      clockOutId: undefined,
-      scheduleId: data.scheduleId,
+      clockOutId: null,
+      scheduleId: data.scheduleId ?? null,
       status: "active",
-      totalHours: undefined,
-      regularHours: undefined,
-      overtimeHours: undefined,
-      breakDuration: undefined,
-      notes: data.notes,
-      createdAt: now,
-      updatedAt: now,
+      totalHours: null,
+      regularHours: null,
+      overtimeHours: null,
+      breakDuration: null,
+      notes: data.notes ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
   }
 
@@ -205,8 +201,6 @@ export class TimeTrackingManager {
     const regularHours = Math.min(totalHours, 8);
     const overtimeHours = Math.max(0, totalHours - 8);
 
-    const now = new Date().toISOString();
-
     this.db
       .update(schema.timeShifts)
       .set({
@@ -216,7 +210,6 @@ export class TimeTrackingManager {
         regularHours,
         overtimeHours,
         breakDuration: breakMinutes,
-        updatedAt: now,
       })
       .where(eq(schema.timeShifts.id, shiftId))
       .run();
@@ -334,26 +327,19 @@ export class TimeTrackingManager {
         duration: null,
         isPaid: data.isPaid || false,
         status: "active",
-        notes: data.notes || null,
-        createdAt: now,
-        updatedAt: now,
+        notes: data.notes ?? null,
       })
       .run();
 
-    return {
-      id: breakId,
-      shiftId: data.shiftId,
-      userId: data.userId,
-      type: data.type || "rest",
-      startTime: now,
-      endTime: undefined,
-      duration: undefined,
-      isPaid: data.isPaid || false,
-      status: "active",
-      notes: data.notes,
-      createdAt: now,
-      updatedAt: now,
-    };
+    // Retrieve the created break
+    const [created] = this.db
+      .select()
+      .from(schema.breaks)
+      .where(eq(schema.breaks.id, breakId))
+      .limit(1)
+      .all();
+
+    return created as Break;
   }
 
   /**
@@ -380,7 +366,6 @@ export class TimeTrackingManager {
         endTime: now,
         duration,
         status: "completed",
-        updatedAt: now,
       })
       .where(eq(schema.breaks.id, breakId))
       .run();
@@ -497,37 +482,28 @@ export class TimeTrackingManager {
       .values({
         id: correctionId,
         userId: data.userId,
-        clockEventId: data.clockEventId || null,
-        shiftId: data.shiftId || null,
+        clockEventId: data.clockEventId ?? null,
+        shiftId: data.shiftId ?? null,
         correctionType: data.correctionType,
-        originalTime: data.originalTime || null,
+        originalTime: data.originalTime ?? null,
         correctedTime: data.correctedTime,
         timeDifference,
         reason: data.reason,
         requestedBy: data.requestedBy,
         approvedBy: null,
         status: "pending",
-        createdAt: now,
-        updatedAt: now,
       })
       .run();
 
-    return {
-      id: correctionId,
-      userId: data.userId,
-      clockEventId: data.clockEventId,
-      shiftId: data.shiftId,
-      correctionType: data.correctionType,
-      originalTime: data.originalTime,
-      correctedTime: data.correctedTime,
-      timeDifference,
-      reason: data.reason,
-      requestedBy: data.requestedBy,
-      approvedBy: undefined,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-    };
+    // Retrieve the created correction
+    const [created] = this.db
+      .select()
+      .from(schema.timeCorrections)
+      .where(eq(schema.timeCorrections.id, correctionId))
+      .limit(1)
+      .all();
+
+    return created as TimeCorrection;
   }
 
   /**
@@ -547,7 +523,6 @@ export class TimeTrackingManager {
       throw new Error("Time correction has already been processed");
     }
 
-    const now = new Date().toISOString();
     const status = approved ? "approved" : "rejected";
 
     this.db
@@ -555,7 +530,6 @@ export class TimeTrackingManager {
       .set({
         status,
         approvedBy,
-        updatedAt: now,
       })
       .where(eq(schema.timeCorrections.id, correctionId))
       .run();
@@ -566,7 +540,6 @@ export class TimeTrackingManager {
         .update(schema.clockEvents)
         .set({
           timestamp: correction.correctedTime,
-          updatedAt: now,
         })
         .where(eq(schema.clockEvents.id, correction.clockEventId))
         .run();
@@ -635,7 +608,7 @@ export class TimeTrackingManager {
   /**
    * Validate a clock event for potential fraud
    */
-  async validateClockEvent(clockEvent: ClockEvent): Promise<ShiftValidation> {
+  async validateClockEvent(clockEvent: ClockEvent): Promise<any> {
     const violations: string[] = [];
     const warnings: string[] = [];
 

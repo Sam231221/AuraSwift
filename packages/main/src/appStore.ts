@@ -569,13 +569,21 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
     }
 
     const shift = db.shifts.createShift({
-      scheduleId: shiftData.scheduleId,
+      scheduleId: shiftData.scheduleId ?? null,
       cashierId: shiftData.cashierId,
       businessId: shiftData.businessId,
       startTime: new Date().toISOString(),
+      endTime: null,
       status: "active",
       startingCash: shiftData.startingCash,
-      notes: shiftData.notes,
+      finalCashDrawer: null,
+      expectedCashDrawer: null,
+      cashVariance: null,
+      totalSales: 0,
+      totalTransactions: 0,
+      totalRefunds: 0,
+      totalVoids: 0,
+      notes: shiftData.notes ?? null,
     });
 
     // Update schedule status if linked
@@ -1169,6 +1177,7 @@ ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
       notes: countData.notes,
       countedBy: countData.countedBy,
       timestamp: new Date().toISOString(),
+      updatedAt: null,
     });
 
     // Create audit log entry for the count

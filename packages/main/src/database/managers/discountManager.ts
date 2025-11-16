@@ -1,14 +1,7 @@
-import type { Database } from "better-sqlite3";
-import type {
-  Discount,
-  AppliedDiscount,
-  Product,
-  Transaction,
-  TransactionItem,
-} from "../../../../../types/database.d.ts";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, lte, gte, lt, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
+import { Discount } from "../schema.js";
 
 export class DiscountManager {
   private db: DrizzleDB;
@@ -24,14 +17,14 @@ export class DiscountManager {
    */
   createDiscount(
     discountData: Omit<
-      Discount,
+      schema.Discount,
       "id" | "createdAt" | "updatedAt" | "usageCount"
     >
-  ): Discount {
-    const now = new Date().toISOString();
+  ): schema.Discount {
+    const now = new Date();
     const id = this.uuid.v4();
 
-    const discount: Discount = {
+    const discount: schema.Discount = {
       id,
       ...discountData,
       usageCount: 0,
@@ -96,7 +89,7 @@ export class DiscountManager {
    */
   updateDiscount(
     id: string,
-    updates: Partial<Omit<Discount, "id" | "createdAt" | "usageCount">>
+    updates: Partial<Omit<schema.Discount, "id" | "createdAt" | "usageCount">>
   ): void {
     const now = new Date().toISOString();
 
@@ -214,7 +207,7 @@ export class DiscountManager {
     return activeDiscounts.filter((discount) => {
       // Check time restrictions
       if (discount.daysOfWeek && discount.daysOfWeek.length > 0) {
-        if (!discount.daysOfWeek.includes(currentDay)) return false;
+        if (!discount.daysOfWeek.includes(String(currentDay))) return false;
       }
       if (discount.timeStart && currentTime < discount.timeStart) return false;
       if (discount.timeEnd && currentTime > discount.timeEnd) return false;
@@ -325,7 +318,12 @@ export class DiscountManager {
     if (discount.endDate && discount.endDate < now) return null;
 
     // Check usage limit
-    if (discount.usageLimit && discount.usageCount >= discount.usageLimit)
+    if (
+      discount.usageLimit &&
+      discount.usageCount !== null &&
+      discount.usageCount !== undefined &&
+      discount.usageCount >= discount.usageLimit
+    )
       return null;
 
     return discount;

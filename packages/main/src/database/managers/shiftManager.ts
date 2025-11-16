@@ -1,4 +1,4 @@
-import type { Shift } from "../models/shift.js";
+import type { Shift } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
@@ -17,7 +17,7 @@ export class ShiftManager {
    */
   createShift(shiftData: Omit<Shift, "id" | "createdAt" | "updatedAt">): Shift {
     const shiftId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     this.db
       .insert(schema.shifts)
@@ -118,7 +118,7 @@ export class ShiftManager {
     }
   ): void {
     const cashVariance = endData.finalCashDrawer - endData.expectedCashDrawer;
-    const now = new Date().toISOString();
+    const now = new Date();
 
     this.db
       .update(schema.shifts)
@@ -241,7 +241,7 @@ export class ShiftManager {
             finalCashDrawer: estimatedCash,
             expectedCashDrawer: estimatedCash,
             notes: shift.notes ? `${shift.notes}; ${closeReason}` : closeReason,
-            updatedAt: nowString,
+            updatedAt: now,
           })
           .where(eq(schema.shifts.id, shift.id))
           .run();
@@ -322,7 +322,7 @@ export class ShiftManager {
             finalCashDrawer: estimatedCash,
             expectedCashDrawer: estimatedCash,
             notes: shift.notes ? `${shift.notes}; ${closeReason}` : closeReason,
-            updatedAt: nowString,
+            updatedAt: now,
           })
           .where(eq(schema.shifts.id, shift.id))
           .run();
@@ -447,7 +447,7 @@ export class ShiftManager {
       .set({
         finalCashDrawer: reconciliationData.actualCashDrawer,
         notes: updatedNotes,
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(),
       })
       .where(eq(schema.shifts.id, shiftId))
       .run();

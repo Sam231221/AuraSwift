@@ -1,4 +1,4 @@
-import type { Session } from "../models/session.js";
+import type { Session } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
@@ -27,7 +27,7 @@ export class SessionManager {
         userId,
         token,
         expiresAt: expiresAt.toISOString(),
-        createdAt: now.toISOString(),
+        createdAt: now,
       })
       .run();
 
@@ -36,7 +36,8 @@ export class SessionManager {
       userId,
       token,
       expiresAt: expiresAt.toISOString(),
-      createdAt: now.toISOString(),
+      createdAt: now,
+      updatedAt: null,
     };
   }
 
@@ -47,7 +48,7 @@ export class SessionManager {
         .update(schema.sessions)
         .set({
           token,
-          createdAt: new Date().toISOString(),
+          createdAt: new Date(),
         })
         .where(eq(schema.sessions.id, session.id))
         .run();
@@ -78,7 +79,7 @@ export class SessionManager {
           userId,
           token,
           expiresAt,
-          createdAt: new Date().toISOString(),
+          createdAt: new Date(),
         })
         .run();
     }

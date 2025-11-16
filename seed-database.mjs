@@ -51,11 +51,13 @@ try {
 
   console.log("\n🏪 Creating default business with temp ownerId...");
 
+  const now = Date.now();
+
   // Create Default Business with temp ownerId
   db.prepare(
     `
-    INSERT INTO businesses (id, name, ownerId, address, phone, vatNumber, createdAt, updatedAt) 
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    INSERT INTO businesses (id, name, ownerId, address, phone, vatNumber, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `
   ).run(
     "default-business-001",
@@ -63,11 +65,12 @@ try {
     "temp-owner",
     "123 Main Street, Downtown",
     "+1 (555) 123-4567",
-    "VAT-123456789"
+    "VAT-123456789",
+    now,
+    now
   );
 
   console.log("✅ Business created: Demo Store");
-
   console.log("\n👥 Creating default users...");
 
   // Create Admin User
@@ -77,8 +80,8 @@ try {
       id, username, email, password_hash, pin_hash, salt,
       firstName, lastName, businessName, role, 
       businessId, permissions, 
-      createdAt, updatedAt, isActive, address
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
+      isActive, address, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
   ).run(
     "default-admin-001",
@@ -92,9 +95,20 @@ try {
     "Demo Store",
     "admin",
     "default-business-001",
-    JSON.stringify(["all"]),
+    JSON.stringify([
+      "manage:users",
+      "manage:inventory",
+      "manage:settings",
+      "read:sales",
+      "write:sales",
+      "read:reports",
+      "view:analytics",
+      "override:transactions",
+    ]),
     1,
-    ""
+    "",
+    now,
+    now
   );
 
   console.log("✅ Admin user created");
@@ -119,8 +133,8 @@ try {
       id, username, email, password_hash, pin_hash, salt,
       firstName, lastName, businessName, role, 
       businessId, permissions, 
-      createdAt, updatedAt, isActive, address
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
+      isActive, address, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
   ).run(
     "default-manager-001",
@@ -135,16 +149,17 @@ try {
     "manager",
     "default-business-001",
     JSON.stringify([
-      "manage_users",
-      "manage_products",
-      "manage_inventory",
-      "view_reports",
-      "manage_shifts",
-      "approve_refunds",
-      "manage_discounts",
+      "manage:users",
+      "manage:inventory",
+      "read:sales",
+      "write:sales",
+      "read:reports",
+      "override:transactions",
     ]),
     1,
-    ""
+    "",
+    now,
+    now
   );
 
   console.log("✅ Manager user created");
@@ -160,8 +175,8 @@ try {
       id, username, email, password_hash, pin_hash, salt,
       firstName, lastName, businessName, role, 
       businessId, permissions, 
-      createdAt, updatedAt, isActive, address
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?)
+      isActive, address, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `
   ).run(
     "default-cashier-001",
@@ -175,15 +190,11 @@ try {
     "Demo Store",
     "cashier",
     "default-business-001",
-    JSON.stringify([
-      "create_transaction",
-      "process_payment",
-      "clock_in",
-      "clock_out",
-      "view_products",
-    ]),
+    JSON.stringify(["read:sales", "write:sales"]),
     1,
-    ""
+    "",
+    now,
+    now
   );
 
   console.log("✅ Cashier user created");
@@ -203,12 +214,12 @@ try {
   ];
 
   const settingsStmt = db.prepare(`
-    INSERT INTO app_settings (key, value, createdAt, updatedAt) 
-    VALUES (?, ?, datetime('now'), datetime('now'))
+    INSERT INTO app_settings (key, value, created_at, updated_at) 
+    VALUES (?, ?, ?, ?)
   `);
 
   for (const [key, value] of settings) {
-    settingsStmt.run(key, value);
+    settingsStmt.run(key, value, now, now);
   }
 
   console.log("✅ App settings created");

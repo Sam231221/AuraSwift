@@ -1,4 +1,3 @@
-import type { AuditLog } from "../../../../../types/database.d.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
@@ -29,9 +28,9 @@ export class AuditManager {
     details: any; // Will be JSON stringified
     ipAddress?: string;
     terminalId?: string;
-  }): Promise<AuditLog> {
+  }): Promise<schema.AuditLog> {
     const auditId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     this.db
       .insert(schema.auditLogs)
@@ -47,9 +46,9 @@ export class AuditManager {
           typeof data.details === "string"
             ? data.details
             : JSON.stringify(data.details),
-        ipAddress: data.ipAddress,
-        terminalId: data.terminalId,
-        timestamp: now,
+        ipAddress: data.ipAddress ?? null,
+        terminalId: data.terminalId ?? null,
+        timestamp: now.toISOString(),
         createdAt: now,
       })
       .run();
@@ -57,6 +56,8 @@ export class AuditManager {
     return {
       id: auditId,
       action: data.action,
+      resource: data.entityType, // Add resource for compatibility
+      resourceId: data.entityId, // Add resourceId for compatibility
       entityType: data.entityType,
       entityId: data.entityId,
       userId: data.userId,
@@ -64,9 +65,9 @@ export class AuditManager {
         typeof data.details === "string"
           ? data.details
           : JSON.stringify(data.details),
-      ipAddress: data.ipAddress,
-      terminalId: data.terminalId,
-      timestamp: now,
+      ipAddress: data.ipAddress ?? null,
+      terminalId: data.terminalId ?? null,
+      timestamp: now.toISOString(),
       createdAt: now,
     };
   }
@@ -81,7 +82,7 @@ export class AuditManager {
     terminalId?: string,
     ipAddress?: string,
     additionalDetails?: any
-  ): Promise<AuditLog> {
+  ): Promise<schema.AuditLog> {
     return this.createAuditLog({
       action,
       entityType: "clock_event",
@@ -110,7 +111,7 @@ export class AuditManager {
     terminalId?: string,
     ipAddress?: string,
     additionalDetails?: any
-  ): Promise<AuditLog> {
+  ): Promise<schema.AuditLog> {
     return this.createAuditLog({
       action,
       entityType: "shift",
@@ -135,7 +136,7 @@ export class AuditManager {
     terminalId?: string,
     ipAddress?: string,
     additionalDetails?: any
-  ): Promise<AuditLog> {
+  ): Promise<schema.AuditLog> {
     return this.createAuditLog({
       action,
       entityType: "break",
@@ -163,7 +164,7 @@ export class AuditManager {
     terminalId?: string,
     ipAddress?: string,
     additionalDetails?: any
-  ): Promise<AuditLog> {
+  ): Promise<schema.AuditLog> {
     return this.createAuditLog({
       action,
       entityType: "time_correction",
@@ -193,7 +194,7 @@ export class AuditManager {
     terminalId?: string,
     ipAddress?: string,
     additionalDetails?: any
-  ): Promise<AuditLog> {
+  ): Promise<schema.AuditLog> {
     return this.createAuditLog({
       action,
       entityType: "session",
@@ -222,7 +223,7 @@ export class AuditManager {
     terminalId?: string,
     ipAddress?: string,
     additionalDetails?: any
-  ): Promise<AuditLog> {
+  ): Promise<schema.AuditLog> {
     return this.createAuditLog({
       action,
       entityType: "user",
@@ -248,7 +249,7 @@ export class AuditManager {
     entityType: string,
     entityId: string,
     limit: number = 50
-  ): AuditLog[] {
+  ): schema.AuditLog[] {
     return this.db
       .select()
       .from(schema.auditLogs)
@@ -260,33 +261,33 @@ export class AuditManager {
       )
       .orderBy(desc(schema.auditLogs.timestamp))
       .limit(limit)
-      .all() as AuditLog[];
+      .all() as schema.AuditLog[];
   }
 
   /**
    * Get audit logs by user
    */
-  getAuditLogsByUser(userId: string, limit: number = 100): AuditLog[] {
+  getAuditLogsByUser(userId: string, limit: number = 100): schema.AuditLog[] {
     return this.db
       .select()
       .from(schema.auditLogs)
       .where(eq(schema.auditLogs.userId, userId))
       .orderBy(desc(schema.auditLogs.timestamp))
       .limit(limit)
-      .all() as AuditLog[];
+      .all() as schema.AuditLog[];
   }
 
   /**
    * Get audit logs by action
    */
-  getAuditLogsByAction(action: string, limit: number = 100): AuditLog[] {
+  getAuditLogsByAction(action: string, limit: number = 100): schema.AuditLog[] {
     return this.db
       .select()
       .from(schema.auditLogs)
       .where(eq(schema.auditLogs.action, action))
       .orderBy(desc(schema.auditLogs.timestamp))
       .limit(limit)
-      .all() as AuditLog[];
+      .all() as schema.AuditLog[];
   }
 
   /**
@@ -297,7 +298,7 @@ export class AuditManager {
     endDate: string,
     entityType?: string,
     limit: number = 100
-  ): AuditLog[] {
+  ): schema.AuditLog[] {
     const conditions = [
       gte(schema.auditLogs.timestamp, startDate),
       lte(schema.auditLogs.timestamp, endDate),
@@ -313,13 +314,16 @@ export class AuditManager {
       .where(and(...conditions))
       .orderBy(desc(schema.auditLogs.timestamp))
       .limit(limit)
-      .all() as AuditLog[];
+      .all() as schema.AuditLog[];
   }
 
   /**
    * Get recent suspicious activities
    */
-  getSuspiciousActivities(businessId: string, limit: number = 50): AuditLog[] {
+  getSuspiciousActivities(
+    businessId: string,
+    limit: number = 50
+  ): schema.AuditLog[] {
     const results = this.db
       .select({
         auditLog: schema.auditLogs,
@@ -339,7 +343,7 @@ export class AuditManager {
       .limit(limit)
       .all();
 
-    return results.map((r) => r.auditLog) as AuditLog[];
+    return results.map((r) => r.auditLog) as schema.AuditLog[];
   }
 
   /**
@@ -349,7 +353,7 @@ export class AuditManager {
     businessId: string,
     startDate: string,
     endDate: string
-  ): AuditLog[] {
+  ): schema.AuditLog[] {
     const results = this.db
       .select({
         auditLog: schema.auditLogs,
@@ -366,7 +370,7 @@ export class AuditManager {
       .orderBy(desc(schema.auditLogs.timestamp))
       .all();
 
-    return results.map((r) => r.auditLog) as AuditLog[];
+    return results.map((r) => r.auditLog) as schema.AuditLog[];
   }
 
   /**

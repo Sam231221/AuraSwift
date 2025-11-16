@@ -1,7 +1,8 @@
-import type { Category } from "../models/category.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql } from "drizzle-orm";
+import { Category, categories } from "../schema.js";
 import * as schema from "../schema.js";
+import { ca } from "zod/v4/locales";
 
 export class CategoryManager {
   private drizzle: DrizzleDB;
@@ -26,12 +27,7 @@ export class CategoryManager {
       throw new Error(`Category with ID ${id} not found`);
     }
 
-    return {
-      ...category,
-      isActive: Boolean(category.isActive),
-      createdAt: category.createdAt instanceof Date ? category.createdAt.toISOString() : String(category.createdAt),
-      updatedAt: category.updatedAt instanceof Date ? category.updatedAt.toISOString() : String(category.updatedAt),
-    } as Category;
+    return category as Category;
   }
 
   /**
@@ -49,12 +45,7 @@ export class CategoryManager {
       )
       .orderBy(schema.categories.sortOrder, schema.categories.name);
 
-    return categories.map((cat) => ({
-      ...cat,
-      isActive: Boolean(cat.isActive),
-      createdAt: cat.createdAt instanceof Date ? cat.createdAt.toISOString() : String(cat.createdAt),
-      updatedAt: cat.updatedAt instanceof Date ? cat.updatedAt.toISOString() : String(cat.updatedAt),
-    })) as Category[];
+    return categories as Category[];
   }
 
   /**
@@ -81,12 +72,7 @@ export class CategoryManager {
       )
       .orderBy(schema.categories.name);
 
-    return categories.map((cat) => ({
-      ...cat,
-      isActive: Boolean(cat.isActive),
-      createdAt: cat.createdAt instanceof Date ? cat.createdAt.toISOString() : String(cat.createdAt),
-      updatedAt: cat.updatedAt instanceof Date ? cat.updatedAt.toISOString() : String(cat.updatedAt),
-    })) as Category[];
+    return categories as Category[];
   }
 
   /**

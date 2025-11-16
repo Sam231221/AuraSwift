@@ -1,12 +1,22 @@
-import type {
-  Transaction,
-  TransactionItem,
-  AppliedModifier,
-  RefundItem,
-} from "../models/transaction.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc } from "drizzle-orm";
 import * as schema from "../schema.js";
+import type { Transaction, TransactionItem } from "../schema.js";
+
+// Utility types for transaction operations
+export interface RefundItem {
+  originalItemId: string;
+  productId: string;
+  productName: string;
+  refundQuantity: number;
+  unitPrice: number;
+  refundAmount: number;
+  restockable: boolean;
+}
+
+export interface TransactionWithItems extends Transaction {
+  items: TransactionItem[];
+}
 
 export class TransactionManager {
   private db: DrizzleDB;
@@ -22,9 +32,8 @@ export class TransactionManager {
    */
   async createTransaction(
     transactionData: Omit<Transaction, "id" | "createdAt">
-  ): Promise<Transaction> {
+  ): Promise<TransactionWithItems> {
     const transactionId = this.uuid.v4();
-    const now = new Date().toISOString();
 
     await this.db.insert(schema.transactions).values({
       id: transactionId,
@@ -42,7 +51,6 @@ export class TransactionManager {
       customerId: transactionData.customerId ?? null,
       receiptNumber: transactionData.receiptNumber,
       timestamp: transactionData.timestamp,
-      createdAt: now,
       originalTransactionId: transactionData.originalTransactionId ?? null,
       refundReason: transactionData.refundReason ?? null,
       refundMethod: transactionData.refundMethod ?? null,
@@ -63,7 +71,7 @@ export class TransactionManager {
   /**
    * Get transaction by ID
    */
-  async getTransactionById(id: string): Promise<Transaction | null> {
+  async getTransactionById(id: string): Promise<TransactionWithItems | null> {
     const [transaction] = await this.db
       .select()
       .from(schema.transactions)
@@ -81,7 +89,7 @@ export class TransactionManager {
       appliedDiscounts: transaction.appliedDiscounts
         ? JSON.parse(transaction.appliedDiscounts)
         : undefined,
-    } as Transaction;
+    } as TransactionWithItems;
   }
 
   /**
@@ -94,26 +102,20 @@ export class TransactionManager {
       .where(eq(schema.transactionItems.transactionId, transactionId))
       .orderBy(schema.transactionItems.createdAt);
 
-    const itemsWithModifiers = await Promise.all(
-      items.map(async (item) => {
-        const modifiers = await this.getAppliedModifiers(item.id);
-        return {
-          ...item,
-          appliedModifiers: modifiers,
-          appliedDiscounts: item.appliedDiscounts
-            ? JSON.parse(item.appliedDiscounts)
-            : undefined,
-        };
-      })
-    );
-
-    return itemsWithModifiers as TransactionItem[];
+    return items.map((item) => ({
+      ...item,
+      appliedDiscounts: item.appliedDiscounts
+        ? JSON.parse(item.appliedDiscounts)
+        : undefined,
+    })) as TransactionItem[];
   }
 
   /**
    * Get transactions by shift
    */
-  async getTransactionsByShift(shiftId: string): Promise<Transaction[]> {
+  async getTransactionsByShift(
+    shiftId: string
+  ): Promise<TransactionWithItems[]> {
     const transactions = await this.db
       .select()
       .from(schema.transactions)
@@ -130,21 +132,11 @@ export class TransactionManager {
           appliedDiscounts: tx.appliedDiscounts
             ? JSON.parse(tx.appliedDiscounts)
             : undefined,
-        } as Transaction;
+        } as TransactionWithItems;
       })
     );
 
     return transactionsWithItems;
-  }
-
-  /**
-   * Get applied modifiers for a transaction item
-   */
-  async getAppliedModifiers(
-    transactionItemId: string
-  ): Promise<AppliedModifier[]> {
-    // appliedModifiers table doesn't exist in schema - return empty array
-    return [];
   }
 
   /**
@@ -153,7 +145,7 @@ export class TransactionManager {
   async getRecentTransactions(
     businessId: string,
     limit: number = 50
-  ): Promise<Transaction[]> {
+  ): Promise<TransactionWithItems[]> {
     const transactions = await this.db
       .select()
       .from(schema.transactions)
@@ -176,7 +168,7 @@ export class TransactionManager {
           appliedDiscounts: transaction.appliedDiscounts
             ? JSON.parse(transaction.appliedDiscounts)
             : undefined,
-        } as Transaction;
+        } as TransactionWithItems;
       })
     );
 
@@ -187,10 +179,11 @@ export class TransactionManager {
    * Create transaction with items and modifiers
    */
   async createTransactionWithItems(
-    transaction: Omit<Transaction, "id" | "createdAt">
-  ): Promise<Transaction> {
+    transaction: Omit<Transaction, "id" | "createdAt"> & {
+      items?: TransactionItem[];
+    }
+  ): Promise<TransactionWithItems> {
     const id = this.uuid.v4();
-    const now = new Date().toISOString();
 
     const result = await this.db.transaction(async (tx: any) => {
       // 1. Insert main transaction
@@ -213,7 +206,6 @@ export class TransactionManager {
           ? JSON.stringify(transaction.appliedDiscounts)
           : null,
         timestamp: transaction.timestamp,
-        createdAt: now,
         originalTransactionId: null,
         refundReason: null,
         refundMethod: null,
@@ -240,38 +232,20 @@ export class TransactionManager {
             appliedDiscounts: item.appliedDiscounts
               ? JSON.stringify(item.appliedDiscounts)
               : null,
-            createdAt: now,
           });
-
-          // 3. Insert applied modifiers for each item
-          if (item.appliedModifiers && item.appliedModifiers.length > 0) {
-            for (const modifier of item.appliedModifiers) {
-              const modifierId = this.uuid.v4();
-
-              // appliedModifiers table doesn't exist in schema - commented out
-              // await tx.insert(schema.appliedModifiers).values({
-              //   id: modifierId,
-              //   transactionItemId: itemId,
-              //   modifierId: modifier.modifierId,
-              //   modifierName: modifier.modifierName,
-              //   optionId: modifier.optionId,
-              //   optionName: modifier.optionName,
-              //   price: modifier.price,
-              //   createdAt: now,
-              // });
-            }
-          }
+          // Note: appliedModifiers table doesn't exist in schema
         }
       }
 
-      return {
-        ...transaction,
-        id,
-        createdAt: now,
-      };
+      return id;
     });
 
-    return result as Transaction;
+    // Return the created transaction with items
+    const createdTransaction = await this.getTransactionById(result);
+    if (!createdTransaction) {
+      throw new Error("Failed to retrieve created transaction");
+    }
+    return createdTransaction;
   }
 
   /**
@@ -282,70 +256,25 @@ export class TransactionManager {
     item: Omit<TransactionItem, "id" | "createdAt">
   ): Promise<string> {
     const itemId = this.uuid.v4();
-    const now = new Date().toISOString();
 
-    await this.db.transaction(async (tx: any) => {
-      // Insert transaction item
-      await tx.insert(schema.transactionItems).values({
-        id: itemId,
-        transactionId,
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        refundedQuantity: item.refundedQuantity ?? null,
-        weight: item.weight ?? null,
-        discountAmount: item.discountAmount ?? null,
-        appliedDiscounts: item.appliedDiscounts
-          ? JSON.stringify(item.appliedDiscounts)
-          : null,
-        createdAt: now,
-      });
-
-      // Insert applied modifiers if any
-      if (item.appliedModifiers && item.appliedModifiers.length > 0) {
-        for (const modifier of item.appliedModifiers) {
-          const modifierId = this.uuid.v4();
-
-          await tx.insert(schema.appliedModifiers).values({
-            id: modifierId,
-            transactionItemId: itemId,
-            modifierId: modifier.modifierId,
-            modifierName: modifier.modifierName,
-            optionId: modifier.optionId,
-            optionName: modifier.optionName,
-            price: modifier.price,
-            createdAt: now,
-          });
-        }
-      }
+    await this.db.insert(schema.transactionItems).values({
+      id: itemId,
+      transactionId,
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+      refundedQuantity: item.refundedQuantity ?? null,
+      weight: item.weight ?? null,
+      discountAmount: item.discountAmount ?? null,
+      appliedDiscounts: item.appliedDiscounts
+        ? JSON.stringify(item.appliedDiscounts)
+        : null,
     });
+    // Note: appliedModifiers table doesn't exist in schema
 
     return itemId;
-  }
-
-  /**
-   * Create applied modifier
-   */
-  async createAppliedModifier(
-    transactionItemId: string,
-    modifier: Omit<AppliedModifier, "id" | "createdAt">
-  ): Promise<void> {
-    const id = this.uuid.v4();
-    const now = new Date().toISOString();
-
-    // appliedModifiers table doesn't exist in schema - commented out
-    // await this.db.insert(schema.appliedModifiers).values({
-    //   id,
-    //   transactionItemId,
-    //   modifierId: modifier.modifierId,
-    //   modifierName: modifier.modifierName,
-    //   optionId: modifier.optionId,
-    //   optionName: modifier.optionName,
-    //   price: modifier.price,
-    //   createdAt: now,
-    // });
   }
 
   /**
@@ -360,7 +289,7 @@ export class TransactionManager {
     refundMethod: "original" | "store_credit" | "cash" | "card";
     managerApprovalId?: string;
     cashierId: string;
-  }): Promise<Transaction> {
+  }): Promise<TransactionWithItems> {
     // Get original transaction to validate refund
     const originalTransaction = await this.getTransactionById(
       refundData.originalTransactionId
@@ -392,14 +321,13 @@ export class TransactionManager {
 
     const refundId = this.uuid.v4();
     const receiptNumber = `REF-${Date.now()}`;
-    const now = new Date().toISOString();
 
     // Check if partial refund
     const isPartialRefund =
       refundData.refundItems.length < originalTransaction.items.length ||
       refundData.refundItems.some((refundItem) => {
         const originalItem = originalTransaction.items.find(
-          (item) => item.id === refundItem.originalItemId
+          (item: TransactionItem) => item.id === refundItem.originalItemId
         );
         return (
           originalItem && refundItem.refundQuantity < originalItem.quantity
@@ -422,8 +350,7 @@ export class TransactionManager {
         cardAmount: paymentMethod === "card" ? -refundTotal : null,
         status: "completed",
         receiptNumber,
-        timestamp: now,
-        createdAt: now,
+        timestamp: new Date().toISOString(),
         originalTransactionId: refundData.originalTransactionId,
         refundReason: refundData.refundReason,
         refundMethod: refundData.refundMethod,
@@ -450,7 +377,6 @@ export class TransactionManager {
           weight: null,
           discountAmount: null,
           appliedDiscounts: null,
-          createdAt: now,
         });
 
         // 3. Update original item's refunded quantity
@@ -483,7 +409,6 @@ export class TransactionManager {
             .set({
               stockLevel:
                 (currentProduct?.stockLevel ?? 0) + refundItem.refundQuantity,
-              updatedAt: now,
             })
             .where(eq(schema.products.id, refundItem.productId));
         }
@@ -537,8 +462,6 @@ export class TransactionManager {
         );
       }
 
-      const now_iso = new Date().toISOString();
-
       // Use Drizzle transaction for atomicity
       await this.db.transaction(async (tx: any) => {
         // 1. Update transaction status to voided
@@ -562,7 +485,6 @@ export class TransactionManager {
             .update(schema.products)
             .set({
               stockLevel: (currentProduct?.stockLevel ?? 0) + item.quantity,
-              updatedAt: now_iso,
             })
             .where(eq(schema.products.id, item.productId));
         }
@@ -580,8 +502,7 @@ export class TransactionManager {
             managerApproval: voidData.managerApprovalId,
             originalAmount: originalTransaction.total,
           }),
-          timestamp: now_iso,
-          createdAt: now_iso,
+          timestamp: new Date().toISOString(),
         });
       });
 
@@ -603,7 +524,7 @@ export class TransactionManager {
    */
   async getTransactionByReceiptNumber(
     receiptNumber: string
-  ): Promise<Transaction | null> {
+  ): Promise<TransactionWithItems | null> {
     const [transaction] = await this.db
       .select()
       .from(schema.transactions)
@@ -627,7 +548,7 @@ export class TransactionManager {
       appliedDiscounts: transaction.appliedDiscounts
         ? JSON.parse(transaction.appliedDiscounts)
         : undefined,
-    } as Transaction;
+    } as TransactionWithItems;
   }
 
   /**
@@ -635,7 +556,7 @@ export class TransactionManager {
    */
   async getTransactionByReceiptNumberAnyStatus(
     receiptNumber: string
-  ): Promise<Transaction | null> {
+  ): Promise<TransactionWithItems | null> {
     const [transaction] = await this.db
       .select()
       .from(schema.transactions)
@@ -654,13 +575,15 @@ export class TransactionManager {
       appliedDiscounts: transaction.appliedDiscounts
         ? JSON.parse(transaction.appliedDiscounts)
         : undefined,
-    } as Transaction;
+    } as TransactionWithItems;
   }
 
   /**
    * Get transaction by ID (any status)
    */
-  async getTransactionByIdAnyStatus(id: string): Promise<Transaction | null> {
+  async getTransactionByIdAnyStatus(
+    id: string
+  ): Promise<TransactionWithItems | null> {
     const [transaction] = await this.db
       .select()
       .from(schema.transactions)
@@ -678,7 +601,7 @@ export class TransactionManager {
       appliedDiscounts: transaction.appliedDiscounts
         ? JSON.parse(transaction.appliedDiscounts)
         : undefined,
-    } as Transaction;
+    } as TransactionWithItems;
   }
 
   /**
@@ -687,7 +610,7 @@ export class TransactionManager {
   async getShiftTransactions(
     shiftId: string,
     limit: number = 50
-  ): Promise<Transaction[]> {
+  ): Promise<TransactionWithItems[]> {
     const transactions = await this.db
       .select()
       .from(schema.transactions)
@@ -710,7 +633,7 @@ export class TransactionManager {
           appliedDiscounts: transaction.appliedDiscounts
             ? JSON.parse(transaction.appliedDiscounts)
             : undefined,
-        } as Transaction;
+        } as TransactionWithItems;
       })
     );
 
@@ -803,7 +726,7 @@ export class TransactionManager {
     // Validate each refund item
     for (const refundItem of refundItems) {
       const originalItem = originalTransaction.items.find(
-        (item) => item.id === refundItem.originalItemId
+        (item: TransactionItem) => item.id === refundItem.originalItemId
       );
       if (!originalItem) {
         errors.push(

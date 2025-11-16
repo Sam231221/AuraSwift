@@ -1,43 +1,7 @@
-import type { Product, Modifier, ModifierOption } from "../models/product.js";
+import type { Product, NewProduct } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
-
-// Helper to convert schema product to Product type
-function mapSchemaProductToProduct(
-  product: typeof schema.products.$inferSelect
-): Product {
-  return {
-    id: product.id,
-    name: product.name,
-    description: product.description || "",
-    price: product.basePrice, // Map basePrice to price
-    costPrice: product.costPrice || 0,
-    taxRate: 0, // TODO: Get from vatCategoryId if needed
-    sku: product.sku,
-    plu: product.plu || undefined,
-    image: product.image || undefined,
-    category: product.categoryId || "", // Map categoryId to category
-    stockLevel: Number(product.stockLevel || 0),
-    minStockLevel: Number(product.minStockLevel || 0),
-    businessId: product.businessId,
-    modifiers: [], // Stub - modifiers table doesn't exist
-    isActive: Boolean(product.isActive),
-    requiresWeight: Boolean(product.usesScale), // Map usesScale to requiresWeight
-    unit:
-      (product.salesUnit?.toLowerCase() as "lb" | "kg" | "oz" | "g" | "each") ||
-      "each",
-    pricePerUnit: product.pricePerKg || undefined,
-    createdAt:
-      product.createdAt instanceof Date
-        ? product.createdAt.toISOString()
-        : String(product.createdAt),
-    updatedAt:
-      product.updatedAt instanceof Date
-        ? product.updatedAt.toISOString()
-        : String(product.updatedAt),
-  };
-}
 
 export class ProductManager {
   private drizzle: DrizzleDB;
@@ -49,42 +13,41 @@ export class ProductManager {
   }
 
   async createProduct(
-    productData: Omit<Product, "id" | "createdAt" | "updatedAt" | "modifiers">
+    productData: Omit<Product, "id" | "createdAt" | "updatedAt">
   ): Promise<Product> {
     const productId = this.uuid.v4();
-    const now = new Date();
 
     // Validate required fields
-    if (!productData.category || productData.category.trim() === "") {
+    if (!productData.categoryId || productData.categoryId.trim() === "") {
       throw new Error("Category is required and cannot be empty");
     }
 
     await this.drizzle.insert(schema.products).values({
       id: productId,
       name: productData.name,
-      description: productData.description || null,
-      basePrice: productData.price, // Map price to basePrice
-      costPrice: productData.costPrice || 0,
+      description: productData.description ?? null,
+      basePrice: productData.basePrice,
+      costPrice: productData.costPrice ?? 0,
       sku: productData.sku,
-      plu: productData.plu || null,
-      image: productData.image || null,
-      categoryId: productData.category, // Map category to categoryId
-      stockLevel: productData.stockLevel || 0,
-      minStockLevel: productData.minStockLevel || 0,
+      barcode: productData.barcode ?? null,
+      plu: productData.plu ?? null,
+      image: productData.image ?? null,
+      categoryId: productData.categoryId ?? null,
+      productType: productData.productType ?? "STANDARD",
+      salesUnit: productData.salesUnit ?? "PIECE",
+      usesScale: productData.usesScale ?? false,
+      pricePerKg: productData.pricePerKg ?? null,
+      isGenericButton: productData.isGenericButton ?? false,
+      genericDefaultPrice: productData.genericDefaultPrice ?? null,
+      trackInventory: productData.trackInventory ?? true,
+      stockLevel: productData.stockLevel ?? 0,
+      minStockLevel: productData.minStockLevel ?? 0,
+      reorderPoint: productData.reorderPoint ?? 0,
+      vatCategoryId: productData.vatCategoryId ?? null,
       businessId: productData.businessId,
-      isActive: productData.isActive !== false,
-      usesScale: productData.requiresWeight || false, // Map requiresWeight to usesScale
-      salesUnit:
-        (productData.unit?.toUpperCase() as
-          | "PIECE"
-          | "KG"
-          | "GRAM"
-          | "LITRE"
-          | "ML"
-          | "PACK") || "PIECE",
-      pricePerKg: productData.pricePerUnit || null,
-      createdAt: now,
-      updatedAt: now,
+      isActive: productData.isActive ?? true,
+      allowPriceOverride: productData.allowPriceOverride ?? false,
+      allowDiscount: productData.allowDiscount ?? true,
     });
 
     return this.getProductById(productId);
@@ -103,7 +66,7 @@ export class ProductManager {
       throw new Error("Product not found");
     }
 
-    return mapSchemaProductToProduct(product);
+    return product;
   }
 
   async getProductByPLU(plu: string): Promise<Product> {
@@ -119,7 +82,7 @@ export class ProductManager {
       throw new Error("Product not found");
     }
 
-    return mapSchemaProductToProduct(product);
+    return product;
   }
 
   async getProductBySKU(sku: string): Promise<Product | null> {
@@ -135,7 +98,7 @@ export class ProductManager {
       return null;
     }
 
-    return mapSchemaProductToProduct(product);
+    return product;
   }
 
   async getProductsByBusiness(businessId: string): Promise<Product[]> {
@@ -150,15 +113,13 @@ export class ProductManager {
       )
       .orderBy(schema.products.name);
 
-    return products.map(mapSchemaProductToProduct);
+    return products;
   }
 
   async updateProduct(
     id: string,
     updates: Partial<Omit<Product, "id" | "createdAt" | "modifiers">>
   ): Promise<Product> {
-    const now = new Date();
-
     if (Object.keys(updates).length === 0) {
       return this.getProductById(id);
     }
@@ -170,36 +131,10 @@ export class ProductManager {
       throw new Error("Product not found");
     }
 
-    // Map Product fields to schema fields
-    const schemaUpdates: any = {};
-    if (updates.price !== undefined) schemaUpdates.basePrice = updates.price;
-    if (updates.costPrice !== undefined)
-      schemaUpdates.costPrice = updates.costPrice;
-    if (updates.category !== undefined)
-      schemaUpdates.categoryId = updates.category;
-    if (updates.requiresWeight !== undefined)
-      schemaUpdates.usesScale = updates.requiresWeight;
-    if (updates.unit !== undefined)
-      schemaUpdates.salesUnit = updates.unit.toUpperCase();
-    if (updates.pricePerUnit !== undefined)
-      schemaUpdates.pricePerKg = updates.pricePerUnit;
-    if (updates.name !== undefined) schemaUpdates.name = updates.name;
-    if (updates.description !== undefined)
-      schemaUpdates.description = updates.description;
-    if (updates.sku !== undefined) schemaUpdates.sku = updates.sku;
-    if (updates.plu !== undefined) schemaUpdates.plu = updates.plu;
-    if (updates.image !== undefined) schemaUpdates.image = updates.image;
-    if (updates.stockLevel !== undefined)
-      schemaUpdates.stockLevel = updates.stockLevel;
-    if (updates.minStockLevel !== undefined)
-      schemaUpdates.minStockLevel = updates.minStockLevel;
-    if (updates.isActive !== undefined)
-      schemaUpdates.isActive = updates.isActive;
-    schemaUpdates.updatedAt = now;
-
+    // updatedAt will be handled by $onUpdate in schema
     await this.drizzle
       .update(schema.products)
-      .set(schemaUpdates)
+      .set(updates)
       .where(eq(schema.products.id, id));
 
     return this.getProductById(id);
@@ -222,15 +157,13 @@ export class ProductManager {
   }
 
   // Stub modifier functions - modifiers table doesn't exist in schema
-  async createModifier(
-    modifierData: Omit<Modifier, "id" | "createdAt" | "updatedAt" | "options">
-  ): Promise<Modifier> {
+  async createModifier(modifierData: any): Promise<any> {
     throw new Error(
       "Modifiers feature not implemented - table does not exist in schema"
     );
   }
 
-  async getModifierById(id: string): Promise<Modifier> {
+  async getModifierById(id: string): Promise<any> {
     throw new Error(
       "Modifiers feature not implemented - table does not exist in schema"
     );
@@ -238,14 +171,14 @@ export class ProductManager {
 
   async createModifierOption(
     modifierId: string,
-    optionData: Omit<ModifierOption, "id" | "createdAt">
-  ): Promise<ModifierOption> {
+    optionData: any
+  ): Promise<any> {
     throw new Error(
       "Modifiers feature not implemented - table does not exist in schema"
     );
   }
 
-  async getProductModifiers(productId: string): Promise<Modifier[]> {
+  async getProductModifiers(productId: string): Promise<any[]> {
     // Return empty array since modifiers table doesn't exist
     return [];
   }
@@ -292,7 +225,7 @@ export class ProductManager {
       )
       .orderBy(schema.products.name);
 
-    return products.map(mapSchemaProductToProduct);
+    return products;
   }
 
   /**
@@ -339,6 +272,6 @@ export class ProductManager {
       )
       .orderBy(schema.products.stockLevel);
 
-    return products.map(mapSchemaProductToProduct);
+    return products;
   }
 }
