@@ -57,6 +57,26 @@ export class CategoryManager {
   }
 
   /**
+   * Get all VAT categories for a business (type-safe)
+   */
+  async getVatCategoriesByBusiness(
+    businessId: string
+  ): Promise<schema.VatCategory[]> {
+    const vatCategories = await this.drizzle
+      .select()
+      .from(schema.vatCategories)
+      .where(
+        and(
+          eq(schema.vatCategories.businessId, businessId),
+          eq(schema.vatCategories.isActive, true)
+        )
+      )
+      .orderBy(schema.vatCategories.name);
+
+    return vatCategories as schema.VatCategory[];
+  }
+
+  /**
    * Search categories by name (type-safe)
    */
   async searchCategories(
@@ -135,6 +155,11 @@ export class CategoryManager {
     businessId: string;
     sortOrder?: number;
     parentId?: string | null;
+    vatCategoryId?: string | null;
+    vatOverridePercent?: number | null;
+    image?: string | null;
+    color?: string | null;
+    isActive?: boolean | null;
   }): Promise<Category> {
     const categoryId = this.uuid.v4();
     const now = new Date();
@@ -152,7 +177,12 @@ export class CategoryManager {
       description: categoryData.description || null,
       businessId: categoryData.businessId,
       sortOrder: nextSortOrder,
-      isActive: true,
+      vatCategoryId: categoryData.vatCategoryId || null,
+      vatOverridePercent: categoryData.vatOverridePercent ?? null,
+      image: categoryData.image || null,
+      color: categoryData.color || null,
+      isActive:
+        categoryData.isActive !== undefined ? categoryData.isActive : true,
       createdAt: now,
       updatedAt: now,
     });
@@ -171,16 +201,36 @@ export class CategoryManager {
       parentId: string | null;
       sortOrder: number;
       isActive: boolean;
+      vatCategoryId: string | null;
+      vatOverridePercent: number | null;
+      image: string | null;
+      color: string | null;
     }>
   ): Promise<Category> {
     const now = new Date();
 
+    // Prepare update object, only including defined fields
+    const updateData: any = {
+      updatedAt: now,
+    };
+
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.description !== undefined)
+      updateData.description = updates.description;
+    if (updates.parentId !== undefined) updateData.parentId = updates.parentId;
+    if (updates.sortOrder !== undefined)
+      updateData.sortOrder = updates.sortOrder;
+    if (updates.isActive !== undefined) updateData.isActive = updates.isActive;
+    if (updates.vatCategoryId !== undefined)
+      updateData.vatCategoryId = updates.vatCategoryId;
+    if (updates.vatOverridePercent !== undefined)
+      updateData.vatOverridePercent = updates.vatOverridePercent;
+    if (updates.image !== undefined) updateData.image = updates.image;
+    if (updates.color !== undefined) updateData.color = updates.color;
+
     await this.drizzle
       .update(schema.categories)
-      .set({
-        ...updates,
-        updatedAt: now,
-      })
+      .set(updateData)
       .where(eq(schema.categories.id, id));
 
     return this.getCategoryById(id);
@@ -333,6 +383,7 @@ export class CategoryManager {
     parentId?: string | null;
     image?: string | null;
     vatCategoryId?: string | null;
+    vatOverridePercent?: number | null;
     color?: string | null;
     isActive?: boolean | null;
   }): Promise<CategoryResponse> {
@@ -401,6 +452,7 @@ export class CategoryManager {
       isActive: boolean;
       image: string | null;
       vatCategoryId: string | null;
+      vatOverridePercent: number | null;
       color: string | null;
     }>
   ): Promise<CategoryResponse> {

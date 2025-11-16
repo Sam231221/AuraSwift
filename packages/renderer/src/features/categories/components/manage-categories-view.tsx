@@ -16,7 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { validateCategory } from "@/features/categories/schemas/category-schema";
-import type { Category } from "../../../../../../types/db";
+import type { Category, VatCategory } from "../../../../../../types/db";
+
 import { buildCategoryTree, focusFirstErrorField } from "./utilities";
 import { CategoryRow } from "./utilities/category-row";
 
@@ -44,10 +45,13 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     description: "",
     parentId: "",
     vatCategoryId: "",
+    vatOverridePercent: "",
     color: "",
     image: "",
     isActive: true,
   });
+
+  const [vatCategories, setVatCategories] = useState<VatCategory[]>([]);
 
   // Build hierarchical category tree
   const categoryTree = useMemo(
@@ -92,6 +96,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                 ? new Date(c.updatedAt as string | Date)
                 : null,
               description: c.description ?? "",
+              vatOverridePercent: c.vatOverridePercent ?? null,
             } as Category;
           }
         );
@@ -111,6 +116,32 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     }
   }, [user]);
 
+  // Load VAT categories from backend
+  const loadVatCategories = useCallback(async () => {
+    if (!user?.businessId) {
+      setVatCategories([]);
+      return;
+    }
+    try {
+      const response = await window.categoryAPI.getVatCategories(
+        user.businessId
+      );
+      if (response.success && response.vatCategories) {
+        setVatCategories(response.vatCategories);
+      } else {
+        console.error("Failed to load VAT categories:", response.message);
+        setVatCategories([]);
+      }
+    } catch (error) {
+      console.error("Error loading VAT categories:", error);
+      setVatCategories([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadVatCategories();
+  }, [loadVatCategories]);
+
   // Load categories on component mount
   useEffect(() => {
     if (user?.businessId) {
@@ -124,6 +155,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       description: "",
       parentId: "",
       vatCategoryId: "",
+      vatOverridePercent: "",
       color: "",
       image: "",
       isActive: true,
@@ -141,32 +173,47 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     }
 
     // Prepare data for validation and API
-    const categoryPayload = {
-      ...newCategory,
+    // For validation, convert empty strings to undefined
+    const validationPayload = {
+      name: newCategory.name,
+      description: newCategory.description || undefined,
       businessId: user.businessId,
-      sortOrder:
-        editingCategory && typeof editingCategory.sortOrder === "number"
-          ? editingCategory.sortOrder
-          : categories.length + 1,
       parentId: newCategory.parentId ? newCategory.parentId : undefined,
-      vatCategoryId: newCategory.vatCategoryId
-        ? newCategory.vatCategoryId
-        : undefined,
-      color: newCategory.color ? newCategory.color : undefined,
-      image: newCategory.image ? newCategory.image : undefined,
-      isActive:
-        typeof newCategory.isActive === "boolean" ? newCategory.isActive : true,
       ...(editingCategory && { id: editingCategory.id }),
     };
 
-    // Validate using Zod schema
-    const validationResult = validateCategory(categoryPayload);
+    // Validate using Zod schema (only validates basic fields)
+    const validationResult = validateCategory(validationPayload);
     if (!validationResult.success && validationResult.errors) {
       setFormErrors(validationResult.errors);
       focusFirstErrorField(validationResult.errors);
       toast.error("Please fix the errors in the form");
       return;
     }
+
+    // Prepare full payload for API (with all fields, using null for empty values)
+    const categoryPayload = {
+      name: newCategory.name,
+      description: newCategory.description || undefined,
+      businessId: user.businessId,
+      sortOrder:
+        editingCategory && typeof editingCategory.sortOrder === "number"
+          ? editingCategory.sortOrder
+          : categories.length + 1,
+      parentId: newCategory.parentId ? newCategory.parentId : null,
+      vatCategoryId: newCategory.vatCategoryId
+        ? newCategory.vatCategoryId
+        : null,
+      vatOverridePercent:
+        newCategory.vatOverridePercent !== ""
+          ? parseFloat(newCategory.vatOverridePercent)
+          : null,
+      color: newCategory.color ? newCategory.color : null,
+      image: newCategory.image ? newCategory.image : null,
+      isActive:
+        typeof newCategory.isActive === "boolean" ? newCategory.isActive : true,
+      ...(editingCategory && { id: editingCategory.id }),
+    };
 
     try {
       setLoading(true);
@@ -255,6 +302,11 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       description: category.description || "",
       parentId: category.parentId ?? "",
       vatCategoryId: category.vatCategoryId ?? "",
+      vatOverridePercent:
+        category.vatOverridePercent !== null &&
+        category.vatOverridePercent !== undefined
+          ? category.vatOverridePercent.toString()
+          : "",
       color: category.color ?? "",
       image: category.image ?? "",
       isActive:
@@ -651,8 +703,11 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
 
               <div>
                 <Label htmlFor="vatCategoryId">VAT Category</Label>
-                <Input
+                <select
                   id="vatCategoryId"
+                  className={`w-full border rounded px-3 py-2 mt-1 ${
+                    formErrors.vatCategoryId ? "border-red-500" : ""
+                  }`}
                   value={newCategory.vatCategoryId}
                   onChange={(e) => {
                     setNewCategory({
@@ -661,14 +716,45 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                     });
                     clearFieldError("vatCategoryId");
                   }}
-                  placeholder="Enter VAT category ID (optional)"
-                  className={formErrors.vatCategoryId ? "border-red-500" : ""}
-                />
+                >
+                  <option value="">None</option>
+                  {vatCategories.map((vat) => (
+                    <option key={vat.id} value={vat.id}>
+                      {vat.name} ({vat.ratePercent}%)
+                    </option>
+                  ))}
+                </select>
                 {formErrors.vatCategoryId && (
                   <p className="text-red-500 text-sm mt-1">
                     {formErrors.vatCategoryId}
                   </p>
                 )}
+                <div>
+                  <Label htmlFor="vatOverridePercent">VAT Override (%)</Label>
+                  <Input
+                    id="vatOverridePercent"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newCategory.vatOverridePercent}
+                    onChange={(e) => {
+                      setNewCategory({
+                        ...newCategory,
+                        vatOverridePercent: e.target.value,
+                      });
+                      clearFieldError("vatOverridePercent");
+                    }}
+                    placeholder="Override VAT percent (optional)"
+                    className={
+                      formErrors.vatOverridePercent ? "border-red-500" : ""
+                    }
+                  />
+                  {formErrors.vatOverridePercent && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.vatOverridePercent}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div>

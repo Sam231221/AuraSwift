@@ -931,7 +931,7 @@ export const printJobRetries = createTable("print_job_retries", {
 // ============================================
 // TYPE EXPORTS
 // ============================================
-
+export type VatCategory = typeof vatCategories.$inferSelect;
 export type Business = typeof businesses.$inferSelect;
 export type NewBusiness = typeof businesses.$inferInsert;
 

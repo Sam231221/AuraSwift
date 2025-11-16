@@ -174,6 +174,11 @@ declare global {
         businessId: string,
         categoryIds: string[]
       ) => Promise<{ success: boolean; message: string }>;
+      getVatCategories: (businessId: string) => Promise<{
+        success: boolean;
+        vatCategories?: import("../../../../types/db").VatCategory[];
+        message?: string;
+      }>;
     };
   }
 }

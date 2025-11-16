@@ -20,4 +20,6 @@ export const categoryAPI = {
 
   reorder: (businessId: string, categoryIds: string[]) =>
     ipcRenderer.invoke("categories:reorder", businessId, categoryIds),
+  getVatCategories: (businessId: string) =>
+    ipcRenderer.invoke("categories:getVatCategories", businessId),
 };
