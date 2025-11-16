@@ -106,8 +106,17 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     "add" | "remove"
   >("add");
   const [stockAdjustmentQuantity, setStockAdjustmentQuantity] = useState("");
-  const [stockAdjustmentReason, setStockAdjustmentReason] =
-    useState("Stock received");
+  const [stockAdjustmentReason, setStockAdjustmentReason] = useState("");
+
+  // Reset stock adjustment form when modal opens
+  useEffect(() => {
+    if (stockAdjustmentProduct) {
+      // Reset form when modal opens with a new product
+      setStockAdjustmentQuantity("");
+      setStockAdjustmentReason("");
+      setStockAdjustmentType("add");
+    }
+  }, [stockAdjustmentProduct]);
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [activeTab, setActiveTab] = useState<string>("basic");
 
@@ -821,6 +830,21 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     });
   }, []);
 
+  // Stock adjustment input handlers - memoized to prevent re-renders
+  const handleStockQuantityChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setStockAdjustmentQuantity(e.target.value);
+    },
+    []
+  );
+
+  const handleStockReasonChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setStockAdjustmentReason(e.target.value);
+    },
+    []
+  );
+
   const ProductDashboardView = React.memo(() => (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -1427,8 +1451,19 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
       {/* Stock Adjustment Modal */}
       {stockAdjustmentProduct && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-md mx-4">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={(e) => {
+            // Close modal when clicking outside
+            if (e.target === e.currentTarget) {
+              setStockAdjustmentProduct(null);
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-lg p-6 w-96 max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-lg font-semibold mb-4">
               Adjust Stock: {stockAdjustmentProduct.name}
             </h3>
@@ -1456,7 +1491,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   variant={
                     stockAdjustmentType === "add" ? "default" : "outline"
                   }
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setStockAdjustmentType("add");
                   }}
                 >
@@ -1468,7 +1505,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   variant={
                     stockAdjustmentType === "remove" ? "default" : "outline"
                   }
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setStockAdjustmentType("remove");
                   }}
                 >
@@ -1487,7 +1526,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   min="1"
                   placeholder="Enter quantity"
                   value={stockAdjustmentQuantity}
-                  onChange={(e) => setStockAdjustmentQuantity(e.target.value)}
+                  onChange={handleStockQuantityChange}
                   className="mt-1"
                 />
               </div>
@@ -1498,10 +1537,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                 <Input
                   id="stock-reason"
                   type="text"
-                  placeholder="Reason for adjustment"
+                  placeholder="Stock received"
                   value={stockAdjustmentReason}
-                  onChange={(e) => setStockAdjustmentReason(e.target.value)}
+                  onChange={handleStockReasonChange}
                   className="mt-1"
+                  autoComplete="off"
                 />
               </div>
 
@@ -1512,17 +1552,20 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   className="flex-1"
                   onClick={() => {
                     const quantity = parseInt(stockAdjustmentQuantity);
-                    if (quantity > 0 && stockAdjustmentReason.trim()) {
+                    // Use default "Stock received" if reason is empty
+                    const reason =
+                      stockAdjustmentReason.trim() || "Stock received";
+                    if (quantity > 0 && reason) {
                       handleStockAdjustment(
                         stockAdjustmentProduct.id,
                         stockAdjustmentType,
                         quantity,
-                        stockAdjustmentReason
+                        reason
                       );
                       // Reset form
                       setStockAdjustmentProduct(null);
                       setStockAdjustmentQuantity("");
-                      setStockAdjustmentReason("Stock received");
+                      setStockAdjustmentReason("");
                       setStockAdjustmentType("add");
                     } else {
                       toast.error("Please enter a valid quantity and reason");
@@ -1538,7 +1581,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                   onClick={() => {
                     setStockAdjustmentProduct(null);
                     setStockAdjustmentQuantity("");
-                    setStockAdjustmentReason("Stock received");
+                    setStockAdjustmentReason("");
                     setStockAdjustmentType("add");
                   }}
                 >
