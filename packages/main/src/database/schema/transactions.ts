@@ -1,10 +1,13 @@
 import { text, integer, real } from "drizzle-orm/sqlite-core";
-import { createTable, timestampColumns } from "./common.js";
+import { createTable } from "./common.js";
 import { businesses } from "./auth.js";
 import { users } from "./auth.js";
 import { products } from "./products.js";
 import { shifts } from "./shifts.js";
 
+// Define transactions table with self-reference
+// TypeScript limitation: self-referencing tables cause circular type inference
+// @ts-ignore - Circular reference in self-referencing table
 export const transactions = createTable("transactions", {
   id: text("id").primaryKey(),
   shiftId: text("shiftId")
@@ -33,6 +36,7 @@ export const transactions = createTable("transactions", {
     .$defaultFn(() => new Date())
     .notNull(),
   originalTransactionId: text("originalTransactionId").references(
+    // @ts-expect-error - Circular reference in self-referencing table
     () => transactions.id
   ),
   refundReason: text("refundReason"),
@@ -67,4 +71,3 @@ export const transactionItems = createTable("transaction_items", {
     .$defaultFn(() => new Date())
     .notNull(),
 });
-

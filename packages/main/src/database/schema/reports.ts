@@ -1,9 +1,15 @@
-import { text, integer, real, unique } from "drizzle-orm/sqlite-core";
-import { sql, sqliteTableCreator } from "drizzle-orm";
+import {
+  text,
+  integer,
+  real,
+  unique,
+  sqliteTableCreator,
+} from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import { createTable, index } from "./common.js";
 
 // Shift Report View - Materialized or computed
-export const shiftReports = sqliteTableCreator((name) => `pos_${name}`)(
+export const shiftReports = sqliteTableCreator((name: string) => `pos_${name}`)(
   "shift_reports",
   {
     id: text("id").primaryKey(), // shiftId or generated ID
@@ -44,14 +50,12 @@ export const shiftReports = sqliteTableCreator((name) => `pos_${name}`)(
       .notNull(),
     periodCovered: text("period_covered").notNull(), // e.g., '2024-01-day', '2024-01-week'
   },
-  (table) => [
+  (table: any) => [
     index("shift_report_view_shift_idx").on(table.shiftId),
     index("shift_report_view_business_idx").on(table.businessId),
     index("shift_report_view_user_idx").on(table.userId),
     index("shift_report_view_period_idx").on(table.periodCovered),
-    index("shift_report_view_generated_at_idx").on(
-      table.reportGeneratedAt
-    ),
+    index("shift_report_view_generated_at_idx").on(table.reportGeneratedAt),
   ]
 );
 
@@ -106,9 +110,7 @@ export const attendanceReports = createTable(
       table.businessId,
       table.periodType
     ),
-    index("attendance_report_generated_at_idx").on(
-      table.reportGeneratedAt
-    ),
+    index("attendance_report_generated_at_idx").on(table.reportGeneratedAt),
 
     unique("attendance_report_unique").on(
       table.userId,
@@ -118,4 +120,3 @@ export const attendanceReports = createTable(
     ),
   ]
 );
-

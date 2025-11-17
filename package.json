@@ -50,8 +50,7 @@
     "db:drop": "drizzle-kit drop",
     "db:check": "drizzle-kit check",
     "db:introspect": "drizzle-kit introspect",
-    "db:bridge": "node scripts/bridge-migration.mjs",
-    "db:seed": "node seed-database.mjs"
+    "db:bridge": "node scripts/bridge-migration.mjs"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
