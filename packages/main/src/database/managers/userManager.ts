@@ -234,10 +234,17 @@ export class UserManager {
     this.db.transaction((tx) => {
       // 1. Create business if not provided
       if (!userData.businessId) {
+        // Split businessName into firstName and lastName for the business
+        const businessNameParts = (userData.businessName || "Business").split(" ");
+        const businessFirstName = businessNameParts[0] || "Business";
+        const businessLastName = businessNameParts.slice(1).join(" ") || "Name";
+        
         tx.insert(schema.businesses)
           .values({
             id: businessId,
-            name: userData.businessName,
+            firstName: businessFirstName,
+            lastName: businessLastName,
+            businessName: userData.businessName,
             ownerId: userId,
             email: "",
             phone: "",

@@ -1789,3 +1789,59 @@ export type NewCategory = InferInsertModel<typeof categories>;
 // VatCategory types
 export type VatCategory = InferSelectModel<typeof vatCategories>;
 export type NewVatCategory = InferInsertModel<typeof vatCategories>;
+
+// Business types
+export type Business = InferSelectModel<typeof businesses>;
+export type NewBusiness = InferInsertModel<typeof businesses>;
+
+// User types
+export type User = InferSelectModel<typeof users>;
+export type NewUser = InferInsertModel<typeof users>;
+
+// Product types
+export type Product = InferSelectModel<typeof products>;
+export type NewProduct = InferInsertModel<typeof products>;
+
+// Transaction types
+export type Transaction = InferSelectModel<typeof transactions>;
+export type NewTransaction = InferInsertModel<typeof transactions>;
+export type TransactionItem = InferSelectModel<typeof transactionItems>;
+export type NewTransactionItem = InferInsertModel<typeof transactionItems>;
+
+// Audit types
+export type AuditLog = InferSelectModel<typeof auditLogs>;
+export type NewAuditLog = InferInsertModel<typeof auditLogs>;
+
+// Discount types
+export type Discount = InferSelectModel<typeof discounts>;
+export type NewDiscount = InferInsertModel<typeof discounts>;
+
+// Stock Adjustment types
+export type StockAdjustment = InferSelectModel<typeof stockAdjustments>;
+export type NewStockAdjustment = InferInsertModel<typeof stockAdjustments>;
+
+// Schedule types
+export type Schedule = InferSelectModel<typeof schedules>;
+export type NewSchedule = InferInsertModel<typeof schedules>;
+
+// Shift types
+export type Shift = InferSelectModel<typeof shifts>;
+export type NewShift = InferInsertModel<typeof shifts>;
+
+// Session types
+export type Session = InferSelectModel<typeof sessions>;
+export type NewSession = InferInsertModel<typeof sessions>;
+
+// Cash Drawer Count types
+export type CashDrawerCount = InferSelectModel<typeof cashDrawerCounts>;
+export type NewCashDrawerCount = InferInsertModel<typeof cashDrawerCounts>;
+
+// Time Tracking types
+export type ClockEvent = InferSelectModel<typeof clockEvents>;
+export type NewClockEvent = InferInsertModel<typeof clockEvents>;
+export type TimeShift = InferSelectModel<typeof timeShifts>;
+export type NewTimeShift = InferInsertModel<typeof timeShifts>;
+export type Break = InferSelectModel<typeof breaks>;
+export type NewBreak = InferInsertModel<typeof breaks>;
+export type TimeCorrection = InferSelectModel<typeof timeCorrections>;
+export type NewTimeCorrection = InferInsertModel<typeof timeCorrections>;

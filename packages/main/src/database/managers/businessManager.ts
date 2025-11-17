@@ -23,7 +23,9 @@ export class BusinessManager {
   }
 
   createBusiness(businessData: {
-    name: string;
+    firstName: string;
+    lastName: string;
+    businessName: string;
     ownerId: string;
     address?: string;
     phone?: string;
@@ -36,7 +38,9 @@ export class BusinessManager {
       .insert(schema.businesses)
       .values({
         id: businessId,
-        name: businessData.name,
+        firstName: businessData.firstName,
+        lastName: businessData.lastName,
+        businessName: businessData.businessName,
         ownerId: businessData.ownerId,
         address: businessData.address || "",
         phone: businessData.phone || "",
@@ -56,7 +60,9 @@ export class BusinessManager {
   updateBusiness(
     id: string,
     updates: Partial<{
-      name: string;
+      firstName: string;
+      lastName: string;
+      businessName: string;
       address: string;
       phone: string;
       vatNumber: string;
