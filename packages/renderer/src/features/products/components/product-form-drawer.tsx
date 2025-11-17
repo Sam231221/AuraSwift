@@ -51,6 +51,11 @@ interface ProductFormData {
   allowPriceOverride: boolean;
   allowDiscount: boolean;
   modifiers: Modifier[];
+  // Expiry tracking fields
+  hasExpiry: boolean;
+  shelfLifeDays: number;
+  requiresBatchTracking: boolean;
+  stockRotationMethod: "FIFO" | "FEFO" | "NONE";
 }
 
 interface ProductFormDrawerProps {
@@ -90,6 +95,11 @@ const getDefaultFormData = (categories: Category[]): ProductFormData => ({
   allowPriceOverride: false,
   allowDiscount: true,
   modifiers: [],
+  // Expiry tracking defaults
+  hasExpiry: false,
+  shelfLifeDays: 0,
+  requiresBatchTracking: false,
+  stockRotationMethod: "FIFO",
 });
 
 const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
@@ -215,6 +225,14 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
             ? (dbProduct.allowDiscount as boolean)
             : true,
         modifiers: normalizedModifiers,
+        // Expiry tracking fields
+        hasExpiry: (dbProduct.hasExpiry as boolean | undefined) || false,
+        shelfLifeDays: (dbProduct.shelfLifeDays as number | undefined) || 0,
+        requiresBatchTracking:
+          (dbProduct.requiresBatchTracking as boolean | undefined) || false,
+        stockRotationMethod:
+          (dbProduct.stockRotationMethod as "FIFO" | "FEFO" | "NONE" | undefined) ||
+          "FIFO",
       });
 
       if (!validCategory) {
@@ -392,6 +410,15 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
         allowPriceOverride: formData.allowPriceOverride || false,
         allowDiscount:
           formData.allowDiscount !== undefined ? formData.allowDiscount : true,
+        // Expiry tracking fields
+        hasExpiry: formData.hasExpiry || false,
+        shelfLifeDays: formData.hasExpiry && formData.shelfLifeDays > 0
+          ? formData.shelfLifeDays
+          : undefined,
+        requiresBatchTracking: formData.requiresBatchTracking || false,
+        stockRotationMethod: formData.requiresBatchTracking
+          ? formData.stockRotationMethod
+          : undefined,
       };
 
       if (editingProduct) {
@@ -502,9 +529,10 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
 
         <div className="p-6 overflow-y-auto flex-1">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="pricing">Pricing & Stock</TabsTrigger>
+              <TabsTrigger value="expiry">Expiry Tracking</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4 mt-6">
@@ -1022,6 +1050,99 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <Label htmlFor="isActive">Active</Label>
                   </div>
                 </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="expiry" className="space-y-4 mt-6">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-lg font-medium mb-4">Expiry Tracking Settings</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Configure batch tracking and expiry date management for this product.
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="hasExpiry"
+                    checked={formData.hasExpiry}
+                    onCheckedChange={(checked) => {
+                      handleInputChange("hasExpiry", checked);
+                      if (!checked) {
+                        handleInputChange("requiresBatchTracking", false);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="hasExpiry">Product Has Expiry Date</Label>
+                </div>
+
+                {formData.hasExpiry && (
+                  <>
+                    <div>
+                      <Label htmlFor="shelfLifeDays">Expected Shelf Life (Days)</Label>
+                      <Input
+                        id="shelfLifeDays"
+                        type="number"
+                        min="1"
+                        value={formData.shelfLifeDays}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "shelfLifeDays",
+                            parseInt(e.target.value) || 0
+                          )
+                        }
+                        placeholder="e.g., 30"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Expected number of days before product expires
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="requiresBatchTracking"
+                        checked={formData.requiresBatchTracking}
+                        onCheckedChange={(checked) =>
+                          handleInputChange("requiresBatchTracking", checked)
+                        }
+                      />
+                      <Label htmlFor="requiresBatchTracking">
+                        Require Batch/Lot Tracking
+                      </Label>
+                    </div>
+                    <p className="text-xs text-gray-500 -mt-2">
+                      When enabled, stock must be tracked by batch numbers with expiry dates
+                    </p>
+
+                    {formData.requiresBatchTracking && (
+                      <div>
+                        <Label htmlFor="stockRotationMethod">Stock Rotation Method</Label>
+                        <Select
+                          value={formData.stockRotationMethod}
+                          onValueChange={(value: "FIFO" | "FEFO" | "NONE") =>
+                            handleInputChange("stockRotationMethod", value)
+                          }
+                        >
+                          <SelectTrigger id="stockRotationMethod">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="FEFO">
+                              FEFO (First Expiry, First Out) - Recommended
+                            </SelectItem>
+                            <SelectItem value="FIFO">
+                              FIFO (First In, First Out)
+                            </SelectItem>
+                            <SelectItem value="NONE">No Automatic Rotation</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          FEFO automatically sells items with the earliest expiry date first
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </TabsContent>
           </Tabs>

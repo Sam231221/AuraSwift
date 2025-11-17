@@ -9,6 +9,7 @@ import ProductDashboardView from "./product-dashboard-view";
 import ProductDetailsView from "./product-details-view";
 import StockAdjustmentModal from "./stock-adjustment-modal";
 import ProductFormDrawer from "./product-form-drawer";
+import BatchManagementView from "./batch-management-view";
 import { useProductData } from "../hooks/use-product-data";
 import {
   filterProducts,
@@ -28,7 +29,10 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   // View state
   const [currentView, setCurrentView] = useState<
-    "productDashboard" | "productManagement" | "categoryManagement"
+    | "productDashboard"
+    | "productManagement"
+    | "categoryManagement"
+    | "batchManagement"
   >("productDashboard");
 
   // Data loading
@@ -235,9 +239,14 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               onManageCategories={() => setCurrentView("categoryManagement")}
               onAddProduct={openAddProductDrawer}
               onRestockProduct={setStockAdjustmentProduct}
+              onManageBatches={() => setCurrentView("batchManagement")}
             />
           ) : currentView === "categoryManagement" ? (
             <ManageCategoriesView
+              onBack={() => setCurrentView("productDashboard")}
+            />
+          ) : currentView === "batchManagement" ? (
+            <BatchManagementView
               onBack={() => setCurrentView("productDashboard")}
             />
           ) : (

@@ -10,6 +10,7 @@ import {
   TrendingDown,
   Plus,
   Tag,
+  PackageCheck,
 } from "lucide-react";
 import type { Product } from "@/features/products/types/product.types";
 
@@ -33,6 +34,7 @@ interface ProductDashboardViewProps {
   onManageCategories: () => void;
   onAddProduct: () => void;
   onRestockProduct: (product: Product) => void;
+  onManageBatches?: () => void;
 }
 
 const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
@@ -44,6 +46,7 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
   onManageCategories,
   onAddProduct,
   onRestockProduct,
+  onManageBatches,
 }) => {
   return (
     <div className="p-6 space-y-6">
@@ -182,6 +185,17 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
               <Plus className="w-4 h-4 mr-3" />
               Add New Product
             </Button>
+
+            {onManageBatches && (
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={onManageBatches}
+              >
+                <PackageCheck className="w-4 h-4 mr-3" />
+                Batch & Expiry Management
+              </Button>
+            )}
           </div>
         </div>
 

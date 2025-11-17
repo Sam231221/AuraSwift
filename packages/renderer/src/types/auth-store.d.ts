@@ -127,6 +127,150 @@ declare global {
         adjustments?: import("../types/product.types").StockAdjustment[];
       }>;
     };
+    batchAPI: {
+      create: (batchData: {
+        productId: string;
+        batchNumber?: string;
+        manufacturingDate?: string;
+        expiryDate: string;
+        initialQuantity: number;
+        currentQuantity: number;
+        supplierId?: string;
+        purchaseOrderNumber?: string;
+        costPrice?: number;
+        businessId: string;
+      }) => Promise<{
+        success: boolean;
+        message?: string;
+        batch?: import("../features/products/types/batch.types").ProductBatch;
+        error?: string;
+      }>;
+      update: (
+        batchId: string,
+        updates: {
+          batchNumber?: string;
+          manufacturingDate?: string;
+          expiryDate?: string;
+          currentQuantity?: number;
+          supplierId?: string;
+          purchaseOrderNumber?: string;
+          costPrice?: number;
+          status?: "ACTIVE" | "EXPIRED" | "SOLD_OUT" | "REMOVED";
+        }
+      ) => Promise<{
+        success: boolean;
+        message?: string;
+        batch?: import("../features/products/types/batch.types").ProductBatch;
+        error?: string;
+      }>;
+      delete: (batchId: string) => Promise<{
+        success: boolean;
+        message?: string;
+        error?: string;
+      }>;
+      getByBusiness: (businessId: string, productId?: string) => Promise<{
+        success: boolean;
+        batches?: import("../features/products/types/batch.types").ProductBatch[];
+        error?: string;
+      }>;
+      getById: (batchId: string) => Promise<{
+        success: boolean;
+        batch?: import("../features/products/types/batch.types").ProductBatch;
+        error?: string;
+      }>;
+      adjustStock: (adjustmentData: {
+        batchId: string;
+        quantity: number;
+        reason: string;
+        userId: string;
+        businessId: string;
+      }) => Promise<{
+        success: boolean;
+        message?: string;
+        error?: string;
+      }>;
+    };
+    supplierAPI: {
+      create: (supplierData: {
+        name: string;
+        contactPerson?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
+        businessId: string;
+      }) => Promise<{
+        success: boolean;
+        message?: string;
+        supplier?: import("../features/products/types/batch.types").Supplier;
+        error?: string;
+      }>;
+      update: (
+        supplierId: string,
+        updates: {
+          name?: string;
+          contactPerson?: string;
+          email?: string;
+          phone?: string;
+          address?: string;
+          isActive?: boolean;
+        }
+      ) => Promise<{
+        success: boolean;
+        message?: string;
+        supplier?: import("../features/products/types/batch.types").Supplier;
+        error?: string;
+      }>;
+      delete: (supplierId: string) => Promise<{
+        success: boolean;
+        message?: string;
+        error?: string;
+      }>;
+      getByBusiness: (businessId: string) => Promise<{
+        success: boolean;
+        suppliers?: import("../features/products/types/batch.types").Supplier[];
+        error?: string;
+      }>;
+    };
+    expirySettingsAPI: {
+      get: (businessId: string) => Promise<{
+        success: boolean;
+        settings?: import("../features/products/types/batch.types").ExpirySettings;
+        error?: string;
+      }>;
+      update: (
+        businessId: string,
+        settings: Partial<{
+          criticalAlertDays: number;
+          warningAlertDays: number;
+          infoAlertDays: number;
+          notifyViaEmail: boolean;
+          notifyViaPush: boolean;
+          notifyViaDashboard: boolean;
+          autoDisableExpired: boolean;
+          allowSellNearExpiry: boolean;
+          nearExpiryThreshold: number;
+          notificationRecipients: string[];
+        }>
+      ) => Promise<{
+        success: boolean;
+        message?: string;
+        settings?: import("../features/products/types/batch.types").ExpirySettings;
+        error?: string;
+      }>;
+    };
+    expiryNotificationsAPI: {
+      get: (businessId: string, status?: string) => Promise<{
+        success: boolean;
+        notifications?: import("../features/products/types/batch.types").ExpiryNotification[];
+        alerts?: import("../features/products/types/batch.types").ExpiryAlert[];
+        error?: string;
+      }>;
+      acknowledge: (notificationId: string, userId: string) => Promise<{
+        success: boolean;
+        message?: string;
+        error?: string;
+      }>;
+    };
     categoryAPI: {
       create: (categoryData: {
         name: string;
