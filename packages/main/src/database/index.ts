@@ -19,12 +19,12 @@ import { TimeTrackingReportManager } from "./managers/timeTrackingReportManager.
 import { SettingsManager } from "./managers/settingsManager.js";
 import { initializeDrizzle } from "./drizzle.js";
 import { getDatabaseInfo } from "./utils/dbInfo.js";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
+import bcrypt from "bcryptjs";
+import { v4 as uuidv4 } from "uuid";
 
 let dbManagerInstance: DBManager | null = null;
 let managersInstance: DatabaseManagers | null = null;
+let initializationPromise: Promise<DatabaseManagers> | null = null;
 
 export interface DatabaseManagers {
   users: UserManager;
@@ -56,95 +56,209 @@ export interface DatabaseManagers {
   emptyAllTables(): Promise<any>;
 }
 export async function getDatabase(): Promise<DatabaseManagers> {
+  // Return existing instance if already initialized
   if (managersInstance) {
     return managersInstance;
   }
 
-  // Initialize database
-  dbManagerInstance = new DBManager();
-  await dbManagerInstance.initialize();
-
-  const db = dbManagerInstance.getDb();
-
-  // Initialize Drizzle ORM
-  const drizzle = initializeDrizzle(db);
-
-  // Load dependencies
-  const bcrypt = require("bcryptjs");
-  const { v4: uuidv4 } = require("uuid");
-
-  // Seed database with default data if needed
-  const { seedDefaultData } = await import("./seed.js");
-  const schema = await import("./schema.js");
-  try {
-    await seedDefaultData(drizzle, schema);
-  } catch (error) {
-    console.error("Error seeding database:", error);
-    // Don't throw - allow app to continue even if seeding fails
+  // If initialization is in progress, wait for it to complete
+  if (initializationPromise) {
+    return initializationPromise;
   }
 
-  const bcryptWrapper = {
-    hash: bcrypt.hash,
-    compare: bcrypt.compare,
-  };
+  // Start initialization and store the promise to prevent concurrent initializations
+  initializationPromise = (async (): Promise<DatabaseManagers> => {
+    // Initialize database
+    dbManagerInstance = new DBManager();
+    await dbManagerInstance.initialize();
 
-  const uuid = { v4: uuidv4 };
+    const db = dbManagerInstance.getDb();
 
-  // Create all manager instances with drizzle support
-  const sessions = new SessionManager(drizzle, uuid);
-  const users = new UserManager(drizzle, bcryptWrapper, uuid, sessions);
-  const businesses = new BusinessManager(drizzle, uuid);
-  const products = new ProductManager(drizzle, uuid);
-  const categories = new CategoryManager(drizzle, uuid);
-  const inventory = new InventoryManager(drizzle, uuid);
-  const schedules = new ScheduleManager(drizzle, uuid);
-  const shifts = new ShiftManager(drizzle, uuid);
-  const transactions = new TransactionManager(drizzle, uuid);
-  const cashDrawers = new CashDrawerManager(drizzle, uuid);
-  const reports = new ReportManager(drizzle);
-  const auditLogs = new AuditLogManager(drizzle, uuid);
-  const discounts = new DiscountManager(drizzle, uuid);
-  const timeTracking = new TimeTrackingManager(drizzle, uuid);
-  const audit = new AuditManager(drizzle, uuid);
-  const timeTrackingReports = new TimeTrackingReportManager(drizzle);
-  const settings = new SettingsManager(drizzle);
+    // Initialize Drizzle ORM
+    const drizzle = initializeDrizzle(db);
 
-  managersInstance = {
-    users,
-    businesses,
-    sessions,
-    products,
-    categories,
-    inventory,
-    schedules,
-    shifts,
-    transactions,
-    cashDrawers,
-    reports,
-    auditLogs,
-    discounts,
+    // Seed database with default data if needed
+    const { seedDefaultData } = await import("./seed.js");
+    const schema = await import("./schema.js");
+    try {
+      await seedDefaultData(drizzle, schema);
+    } catch (error) {
+      // Provide detailed error context for seeding failures
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
 
-    timeTracking,
-    audit,
-    timeTrackingReports,
-    settings,
-
-    // Database info methods
-    getDatabaseInfo: () => {
-      if (!dbManagerInstance) {
-        throw new Error("Database not initialized");
+      console.error("❌ Database seeding failed:");
+      console.error(`   Error: ${errorMessage}`);
+      if (errorStack) {
+        console.error(`   Stack: ${errorStack}`);
       }
-      const dbPath = dbManagerInstance.getDatabasePath();
-      return getDatabaseInfo(dbPath);
-    },
-    emptyAllTables: async () => {
-      throw new Error(
-        "emptyAllTables not yet implemented in modular architecture"
+      console.error(
+        "   ⚠️  Warning: Database may be partially initialized. Some default data may be missing."
       );
-    },
-  };
+      console.error(
+        "   💡 You may need to manually seed the database or restart the application."
+      );
 
-  return managersInstance as DatabaseManagers;
+      // Don't throw - allow app to continue even if seeding fails
+      // This is intentional for production resilience, but we log detailed context
+    }
+
+    const bcryptWrapper = {
+      hash: bcrypt.hash,
+      compare: bcrypt.compare,
+    };
+
+    const uuid = { v4: uuidv4 };
+
+    // Create all manager instances with drizzle support
+    const sessions = new SessionManager(drizzle, uuid);
+    const users = new UserManager(drizzle, bcryptWrapper, uuid, sessions);
+    const businesses = new BusinessManager(drizzle, uuid);
+    const products = new ProductManager(drizzle, uuid);
+    const categories = new CategoryManager(drizzle, uuid);
+    const inventory = new InventoryManager(drizzle, uuid);
+    const schedules = new ScheduleManager(drizzle, uuid);
+    const shifts = new ShiftManager(drizzle, uuid);
+    const transactions = new TransactionManager(drizzle, uuid);
+    const cashDrawers = new CashDrawerManager(drizzle, uuid);
+    const reports = new ReportManager(drizzle);
+    const auditLogs = new AuditLogManager(drizzle, uuid);
+    const discounts = new DiscountManager(drizzle, uuid);
+    const timeTracking = new TimeTrackingManager(drizzle, uuid);
+    const audit = new AuditManager(drizzle, uuid);
+    const timeTrackingReports = new TimeTrackingReportManager(drizzle);
+    const settings = new SettingsManager(drizzle);
+
+    managersInstance = {
+      users,
+      businesses,
+      sessions,
+      products,
+      categories,
+      inventory,
+      schedules,
+      shifts,
+      transactions,
+      cashDrawers,
+      reports,
+      auditLogs,
+      discounts,
+
+      timeTracking,
+      audit,
+      timeTrackingReports,
+      settings,
+
+      // Database info methods
+      getDatabaseInfo: () => {
+        if (!dbManagerInstance) {
+          throw new Error("Database not initialized");
+        }
+        const dbPath = dbManagerInstance.getDatabasePath();
+        return getDatabaseInfo(dbPath);
+      },
+      emptyAllTables: async () => {
+        if (!dbManagerInstance) {
+          throw new Error("Database not initialized");
+        }
+
+        const rawDb = dbManagerInstance.getDb();
+        const schemaModule = await import("./schema.js");
+
+        try {
+          console.log("🗑️  Emptying all database tables...");
+
+          // Disable foreign key constraints temporarily for faster deletion
+          rawDb.prepare("PRAGMA foreign_keys = OFF").run();
+
+          // Delete in order: child tables first, then parent tables
+          // This order respects foreign key relationships
+          const tablesToEmpty = [
+            // Child tables (with foreign keys) - delete first
+            schemaModule.printJobRetries,
+            schemaModule.printJobs,
+            schemaModule.attendanceReports,
+            schemaModule.shiftReports,
+            schemaModule.shiftValidationIssues,
+            schemaModule.shiftValidations,
+            schemaModule.timeCorrections,
+            schemaModule.breaks,
+            schemaModule.timeShifts,
+            schemaModule.clockEvents,
+            schemaModule.transactionItems,
+            schemaModule.transactions,
+            schemaModule.cashDrawerCounts,
+            schemaModule.shifts,
+            schemaModule.schedules,
+            schemaModule.stockMovements,
+            schemaModule.expiryNotifications,
+            schemaModule.expirySettings,
+            schemaModule.productBatches,
+            schemaModule.stockAdjustments,
+            schemaModule.suppliers,
+            schemaModule.discounts,
+            schemaModule.auditLogs,
+            schemaModule.sessions,
+            // Parent tables (referenced by others) - delete last
+            schemaModule.products,
+            schemaModule.categories,
+            schemaModule.vatCategories,
+            schemaModule.users,
+            schemaModule.businesses,
+            // System tables (usually keep app_settings, but empty if requested)
+            schemaModule.appSettings,
+          ];
+
+          let deletedCount = 0;
+          for (const table of tablesToEmpty) {
+            try {
+              // Use Drizzle's delete API - delete all rows from table
+              await drizzle.delete(table);
+              deletedCount++;
+            } catch (error) {
+              // Try to get table name for error reporting
+              const tableAny = table as any;
+              const tableName =
+                tableAny._?.name ||
+                tableAny[Symbol.for("drizzle:Name")] ||
+                "unknown";
+              console.warn(
+                `⚠️  Warning: Failed to empty table ${tableName}:`,
+                error instanceof Error ? error.message : String(error)
+              );
+              // Continue with other tables even if one fails
+            }
+          }
+
+          // Re-enable foreign key constraints
+          rawDb.prepare("PRAGMA foreign_keys = ON").run();
+
+          console.log(
+            `✅ Successfully emptied ${deletedCount} of ${tablesToEmpty.length} tables`
+          );
+          return { deletedCount, totalTables: tablesToEmpty.length };
+        } catch (error) {
+          // Re-enable foreign key constraints even on error
+          try {
+            rawDb.prepare("PRAGMA foreign_keys = ON").run();
+          } catch {
+            // Ignore errors when re-enabling
+          }
+
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          throw new Error(`Failed to empty all tables: ${errorMessage}`, {
+            cause: error,
+          });
+        }
+      },
+    };
+
+    return managersInstance as DatabaseManagers;
+  })();
+
+  return initializationPromise;
 }
 
 export function closeDatabase(): void {
@@ -152,36 +266,33 @@ export function closeDatabase(): void {
     dbManagerInstance.close();
     dbManagerInstance = null;
     managersInstance = null;
+    initializationPromise = null;
   }
 }
 
-// Keep old function name for backward compatibility
+/**
+ * Backward Compatibility
+ * @deprecated Use getDatabase() instead. This function is kept for backward compatibility.
+ */
 export async function initializeDatabase(): Promise<DatabaseManagers> {
   return getDatabase();
 }
 
-// Re-export types for convenience
-export type {
-  Schedule,
-  Shift,
-  Transaction,
-  TransactionItem,
-  CashDrawerCount,
-  PrintJob,
-  PrintJobRetry,
-  Product,
-  Category,
-  Business,
-  User,
-  Session,
-  Discount,
-  AuditLog,
-  ClockEvent,
-  TimeShift,
-  StockAdjustment,
-} from "./schema.js";
+/**
+ * Type Exports
+ *
+ * Note: Database schema types should be imported directly from "./schema.js"
+ * Manager utility types should be imported directly from their respective manager files.
+ *
+ * This module only exports:
+ * - DatabaseManagers interface (database manager instances)
+ * - getDatabase() function
+ * - closeDatabase() function
+ * - initializeDatabase() function (deprecated)
+ */
 
-// Re-export utility types from managers
+// Re-export manager utility types for convenience
+// These are commonly used across the application
 export type {
   RefundItem,
   TransactionWithItems,

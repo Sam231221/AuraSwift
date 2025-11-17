@@ -2,12 +2,12 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { app, dialog } from "electron";
-import { createRequire } from "module";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { runDrizzleMigrations } from "./drizzle-migrator.js";
 import Database from "better-sqlite3";
+import semver from "semver";
+import * as schema from "./schema.js";
 
-const require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -37,63 +37,104 @@ const __dirname = path.dirname(__filename);
  * which provides manager classes for domain-specific operations.
  */
 export class DBManager {
-  private db: any;
+  private db: Database.Database | null = null;
   private initialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
 
-  async initialize() {
-    if (this.initialized) return;
-
-    try {
-      const Database = require("better-sqlite3");
-      const dbPath = this.getDatabasePath();
-      console.log("Database path:", dbPath);
-
-      // Ensure the directory exists
-      const dbDir = path.dirname(dbPath);
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-      }
-
-      this.db = new Database(dbPath);
-
-      // Initialize Drizzle ORM wrapper
-      const drizzleDb = drizzle(this.db);
-
-      // Check for downgrade scenario (newer database, older app)
-      const isDowngradeAttempt = this.checkForDowngrade(this.db, dbPath);
-      if (isDowngradeAttempt) {
-        console.error(
-          "❌ Database downgrade detected - app version is older than database schema"
-        );
-        dialog.showErrorBox(
-          "Cannot Open Database",
-          "This database was created with a newer version of AuraSwift.\n\n" +
-            "Please update the application to the latest version to continue.\n\n" +
-            `Current app version: ${app.getVersion()}\n` +
-            "Database requires a newer version."
-        );
-        app.quit();
-        return;
-      }
-
-      // Run Drizzle migrations automatically
-      // Pass both Drizzle wrapper (for migrate()) and raw DB (for transactions/integrity checks)
-      const migrationSuccess = await runDrizzleMigrations(
-        drizzleDb,
-        this.db,
-        dbPath
-      );
-
-      if (!migrationSuccess) {
-        throw new Error("Database migration failed");
-      }
-
-      this.initialized = true;
-      console.log("✅ Database initialized successfully\n");
-    } catch (error) {
-      console.error("Database initialization error:", error);
-      throw error;
+  async initialize(): Promise<void> {
+    // Return existing promise if initialization is in progress
+    if (this.initializationPromise) {
+      return this.initializationPromise;
     }
+
+    // Return immediately if already initialized
+    if (this.initialized) {
+      return;
+    }
+
+    // Start initialization and store the promise to prevent concurrent initializations
+    this.initializationPromise = (async (): Promise<void> => {
+      try {
+        const dbPath = this.getDatabasePath();
+        console.log("Database path:", dbPath);
+
+        // Ensure the directory exists
+        const dbDir = path.dirname(dbPath);
+        if (!fs.existsSync(dbDir)) {
+          fs.mkdirSync(dbDir, { recursive: true });
+        }
+
+        this.db = new Database(dbPath);
+
+        // Initialize Drizzle ORM wrapper with schema
+        const drizzleDb = drizzle(this.db, { schema });
+
+        // Check for downgrade scenario (newer database, older app)
+        const isDowngradeAttempt = this.checkForDowngrade(this.db, dbPath);
+        if (isDowngradeAttempt) {
+          console.error(
+            "❌ Database downgrade detected - app version is older than database schema"
+          );
+          // Close database connection before quitting
+          this.db.close();
+          this.db = null;
+          dialog.showErrorBox(
+            "Cannot Open Database",
+            "This database was created with a newer version of AuraSwift.\n\n" +
+              "Please update the application to the latest version to continue.\n\n" +
+              `Current app version: ${app.getVersion()}\n` +
+              "Database requires a newer version."
+          );
+          app.quit();
+          return;
+        }
+
+        // Run Drizzle migrations automatically
+        // Pass both Drizzle wrapper (for migrate()) and raw DB (for transactions/integrity checks)
+        const migrationSuccess = await runDrizzleMigrations(
+          drizzleDb,
+          this.db,
+          dbPath
+        );
+
+        if (!migrationSuccess) {
+          const errorMessage = `Database migration failed. Check the migration logs above for details. Database path: ${dbPath}`;
+          console.error(`❌ ${errorMessage}`);
+          throw new Error(errorMessage);
+        }
+
+        this.initialized = true;
+        console.log("✅ Database initialized successfully\n");
+      } catch (error) {
+        // Reset state on error to allow retry
+        this.initialized = false;
+        this.initializationPromise = null;
+        if (this.db) {
+          this.db.close();
+          this.db = null;
+        }
+
+        // Provide detailed error context
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        const dbPath = this.getDatabasePath();
+
+        console.error("❌ Database initialization error:");
+        console.error(`   Path: ${dbPath}`);
+        console.error(`   Error: ${errorMessage}`);
+        if (errorStack) {
+          console.error(`   Stack: ${errorStack}`);
+        }
+
+        throw new Error(
+          `Database initialization failed at ${dbPath}: ${errorMessage}`,
+          { cause: error }
+        );
+      }
+    })();
+
+    return this.initializationPromise;
   }
 
   /**
@@ -192,27 +233,42 @@ export class DBManager {
   /**
    * Compare two semver version strings
    * Returns true if newVersion < storedVersion (downgrade attempt)
+   * Uses semver library for proper version comparison
    */
   private isVersionDowngrade(
     storedVersion: string,
     newVersion: string
   ): boolean {
     try {
-      const stored = storedVersion.split(".").map(Number);
-      const current = newVersion.split(".").map(Number);
+      // Validate versions are valid semver
+      if (!semver.valid(storedVersion) || !semver.valid(newVersion)) {
+        console.warn(
+          `Invalid semver format - stored: ${storedVersion}, current: ${newVersion}. Falling back to simple comparison.`
+        );
+        // Fallback to simple comparison for non-semver versions
+        const stored = storedVersion.split(".").map(Number);
+        const current = newVersion.split(".").map(Number);
 
-      for (let i = 0; i < Math.max(stored.length, current.length); i++) {
-        const s = stored[i] || 0;
-        const c = current[i] || 0;
+        for (let i = 0; i < Math.max(stored.length, current.length); i++) {
+          const s = stored[i] || 0;
+          const c = current[i] || 0;
 
-        if (c < s) return true; // Downgrade detected
-        if (c > s) return false; // Upgrade, OK
+          if (c < s) return true; // Downgrade detected
+          if (c > s) return false; // Upgrade, OK
+        }
+
+        return false; // Same version, OK
       }
 
-      return false; // Same version, OK
+      // Use semver for proper comparison (handles pre-release, build metadata, etc.)
+      return semver.lt(newVersion, storedVersion);
     } catch (error) {
-      console.error("Version comparison error:", error);
-      return false; // On error, don't block
+      console.error(
+        `Version comparison error - stored: ${storedVersion}, current: ${newVersion}:`,
+        error
+      );
+      // On error, don't block (allow to proceed)
+      return false;
     }
   }
 
@@ -248,8 +304,8 @@ export class DBManager {
     }
   }
 
-  getDb(): any {
-    if (!this.initialized) {
+  getDb(): Database.Database {
+    if (!this.initialized || !this.db) {
       throw new Error("Database not initialized. Call initialize() first.");
     }
     return this.db;
