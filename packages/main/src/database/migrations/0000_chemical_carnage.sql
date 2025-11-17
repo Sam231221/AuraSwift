@@ -82,8 +82,7 @@ CREATE TABLE `businesses` (
 	`timezone` text DEFAULT 'UTC' NOT NULL,
 	`isActive` integer DEFAULT true,
 	`created_at` integer NOT NULL,
-	`updated_at` integer,
-	FOREIGN KEY (`ownerId`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+	`updated_at` integer
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `businesses_vatNumber_unique` ON `businesses` (`vatNumber`);--> statement-breakpoint
@@ -99,7 +98,9 @@ CREATE TABLE `cash_drawer_counts` (
 	`variance` real NOT NULL,
 	`notes` text,
 	`counted_by` text NOT NULL,
-	`timestamp` text NOT NULL
+	`timestamp` text NOT NULL,
+	FOREIGN KEY (`shift_id`) REFERENCES `shifts`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`counted_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `cash_drawer_counts_shift_idx` ON `cash_drawer_counts` (`shift_id`);--> statement-breakpoint
@@ -184,6 +185,51 @@ CREATE TABLE `discounts` (
 	FOREIGN KEY (`createdBy`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
+CREATE TABLE `expiry_notifications` (
+	`id` text PRIMARY KEY NOT NULL,
+	`product_batch_id` text NOT NULL,
+	`notification_type` text NOT NULL,
+	`days_until_expiry` integer NOT NULL,
+	`message` text NOT NULL,
+	`status` text DEFAULT 'PENDING' NOT NULL,
+	`channels` text DEFAULT '[]' NOT NULL,
+	`acknowledged_by` text,
+	`acknowledged_at` integer,
+	`business_id` text NOT NULL,
+	`scheduled_for` integer NOT NULL,
+	`sent_at` integer,
+	`created_at` integer NOT NULL,
+	`updated_at` integer,
+	FOREIGN KEY (`product_batch_id`) REFERENCES `product_batches`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`acknowledged_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `notifications_batch_idx` ON `expiry_notifications` (`product_batch_id`);--> statement-breakpoint
+CREATE INDEX `notifications_status_idx` ON `expiry_notifications` (`status`);--> statement-breakpoint
+CREATE INDEX `notifications_scheduled_idx` ON `expiry_notifications` (`scheduled_for`);--> statement-breakpoint
+CREATE INDEX `notifications_business_idx` ON `expiry_notifications` (`business_id`);--> statement-breakpoint
+CREATE INDEX `notifications_type_idx` ON `expiry_notifications` (`notification_type`);--> statement-breakpoint
+CREATE TABLE `expiry_settings` (
+	`id` text PRIMARY KEY NOT NULL,
+	`business_id` text NOT NULL,
+	`critical_alert_days` integer DEFAULT 3 NOT NULL,
+	`warning_alert_days` integer DEFAULT 7 NOT NULL,
+	`info_alert_days` integer DEFAULT 14 NOT NULL,
+	`notify_via_email` integer DEFAULT true,
+	`notify_via_push` integer DEFAULT true,
+	`notify_via_dashboard` integer DEFAULT true,
+	`auto_disable_expired` integer DEFAULT true,
+	`allow_sell_near_expiry` integer DEFAULT false,
+	`near_expiry_threshold` integer DEFAULT 2,
+	`notification_recipients` text DEFAULT '[]' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer,
+	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `expiry_settings_business_idx` ON `expiry_settings` (`business_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `expiry_settings_business_unique` ON `expiry_settings` (`business_id`);--> statement-breakpoint
 CREATE TABLE `print_job_retries` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`job_id` text NOT NULL,
@@ -217,6 +263,36 @@ CREATE TABLE `print_jobs` (
 	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
+CREATE TABLE `product_batches` (
+	`id` text PRIMARY KEY NOT NULL,
+	`product_id` text NOT NULL,
+	`batch_number` text NOT NULL,
+	`manufacturing_date` integer,
+	`expiry_date` integer NOT NULL,
+	`initial_quantity` real NOT NULL,
+	`current_quantity` real NOT NULL,
+	`supplier_id` text,
+	`purchase_order_number` text,
+	`cost_price` real,
+	`status` text DEFAULT 'ACTIVE' NOT NULL,
+	`business_id` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer,
+	FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`supplier_id`) REFERENCES `suppliers`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `batches_product_idx` ON `product_batches` (`product_id`);--> statement-breakpoint
+CREATE INDEX `batches_expiry_idx` ON `product_batches` (`expiry_date`);--> statement-breakpoint
+CREATE INDEX `batches_status_idx` ON `product_batches` (`status`);--> statement-breakpoint
+CREATE INDEX `batches_business_idx` ON `product_batches` (`business_id`);--> statement-breakpoint
+CREATE INDEX `batches_number_idx` ON `product_batches` (`batch_number`);--> statement-breakpoint
+CREATE INDEX `batches_supplier_idx` ON `product_batches` (`supplier_id`);--> statement-breakpoint
+CREATE INDEX `batches_product_status_expiry_idx` ON `product_batches` (`product_id`,`status`,`expiry_date`);--> statement-breakpoint
+CREATE INDEX `batches_business_status_expiry_idx` ON `product_batches` (`business_id`,`status`,`expiry_date`);--> statement-breakpoint
+CREATE INDEX `batches_product_status_quantity_idx` ON `product_batches` (`product_id`,`status`,`current_quantity`);--> statement-breakpoint
+CREATE UNIQUE INDEX `batch_number_product_business_unique` ON `product_batches` (`batch_number`,`product_id`,`business_id`);--> statement-breakpoint
 CREATE TABLE `products` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -244,6 +320,10 @@ CREATE TABLE `products` (
 	`is_active` integer DEFAULT true,
 	`allow_price_override` integer DEFAULT false,
 	`allow_discount` integer DEFAULT true,
+	`has_expiry` integer DEFAULT false,
+	`shelf_life_days` integer,
+	`requires_batch_tracking` integer DEFAULT false,
+	`stock_rotation_method` text DEFAULT 'FIFO',
 	`created_at` integer NOT NULL,
 	`updated_at` integer,
 	FOREIGN KEY (`category_id`) REFERENCES `categories`(`id`) ON UPDATE no action ON DELETE set null,
@@ -334,6 +414,7 @@ CREATE TABLE `shift_validation_issues` (
 	`data_snapshot` text
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `shift_validation_issues_public_id_unique` ON `shift_validation_issues` (`public_id`);--> statement-breakpoint
 CREATE INDEX `validation_issues_validation_idx` ON `shift_validation_issues` (`validation_id`);--> statement-breakpoint
 CREATE INDEX `validation_issues_type_idx` ON `shift_validation_issues` (`type`);--> statement-breakpoint
 CREATE INDEX `validation_issues_severity_idx` ON `shift_validation_issues` (`severity`);--> statement-breakpoint
@@ -342,7 +423,6 @@ CREATE INDEX `validation_issues_resolved_idx` ON `shift_validation_issues` (`res
 CREATE INDEX `validation_issues_business_idx` ON `shift_validation_issues` (`business_id`);--> statement-breakpoint
 CREATE INDEX `validation_issues_related_entity_idx` ON `shift_validation_issues` (`related_entity_type`,`related_entity_id`);--> statement-breakpoint
 CREATE INDEX `validation_issues_status_severity_idx` ON `shift_validation_issues` (`resolved`,`severity`);--> statement-breakpoint
-CREATE UNIQUE INDEX `validation_issues_public_id_unique` ON `shift_validation_issues` (`public_id`);--> statement-breakpoint
 CREATE TABLE `shift_validations` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`public_id` text NOT NULL,
@@ -410,6 +490,53 @@ CREATE TABLE `stock_adjustments` (
 	FOREIGN KEY (`businessId`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
+CREATE TABLE `stock_movements` (
+	`id` text PRIMARY KEY NOT NULL,
+	`product_id` text NOT NULL,
+	`batch_id` text,
+	`movement_type` text NOT NULL,
+	`quantity` real NOT NULL,
+	`reason` text,
+	`reference` text,
+	`from_batch_id` text,
+	`to_batch_id` text,
+	`user_id` text NOT NULL,
+	`business_id` text NOT NULL,
+	`timestamp` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer,
+	FOREIGN KEY (`product_id`) REFERENCES `products`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`batch_id`) REFERENCES `product_batches`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`from_batch_id`) REFERENCES `product_batches`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`to_batch_id`) REFERENCES `product_batches`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `movements_product_idx` ON `stock_movements` (`product_id`);--> statement-breakpoint
+CREATE INDEX `movements_batch_idx` ON `stock_movements` (`batch_id`);--> statement-breakpoint
+CREATE INDEX `movements_timestamp_idx` ON `stock_movements` (`timestamp`);--> statement-breakpoint
+CREATE INDEX `movements_type_idx` ON `stock_movements` (`movement_type`);--> statement-breakpoint
+CREATE INDEX `movements_business_idx` ON `stock_movements` (`business_id`);--> statement-breakpoint
+CREATE INDEX `movements_batch_timestamp_idx` ON `stock_movements` (`batch_id`,`timestamp`);--> statement-breakpoint
+CREATE INDEX `movements_product_timestamp_idx` ON `stock_movements` (`product_id`,`timestamp`);--> statement-breakpoint
+CREATE INDEX `movements_reference_idx` ON `stock_movements` (`reference`);--> statement-breakpoint
+CREATE TABLE `suppliers` (
+	`id` text PRIMARY KEY NOT NULL,
+	`name` text NOT NULL,
+	`contact_person` text,
+	`email` text,
+	`phone` text,
+	`address` text,
+	`business_id` text NOT NULL,
+	`is_active` integer DEFAULT true,
+	`created_at` integer NOT NULL,
+	`updated_at` integer,
+	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `suppliers_business_idx` ON `suppliers` (`business_id`);--> statement-breakpoint
+CREATE INDEX `suppliers_name_idx` ON `suppliers` (`name`);--> statement-breakpoint
 CREATE TABLE `time_corrections` (
 	`id` text PRIMARY KEY NOT NULL,
 	`clockEventId` text,

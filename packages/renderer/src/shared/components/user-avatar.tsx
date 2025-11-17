@@ -68,8 +68,13 @@ export function BusinessAvatar({
   className,
 }: BusinessAvatarProps) {
   const getInitials = () => {
-    if (!business?.name) return "B";
-    return business.name
+    if (!business?.businessName && !business?.firstName) return "B";
+    // Use businessName if available, otherwise combine firstName and lastName
+    const name = business.businessName || 
+      (business.firstName && business.lastName 
+        ? `${business.firstName} ${business.lastName}` 
+        : business.firstName || business.lastName || "");
+    return name
       .split(" ")
       .slice(0, 2)
       .map((word) => word[0])
@@ -77,9 +82,14 @@ export function BusinessAvatar({
       .toUpperCase();
   };
 
+  const businessDisplayName = business?.businessName || 
+    (business?.firstName && business?.lastName 
+      ? `${business.firstName} ${business.lastName}` 
+      : business?.firstName || business?.lastName || "Business");
+
   return (
     <Avatar className={cn(sizeConfig[size], className)}>
-      <AvatarImage src={business?.avatar} alt={business?.name || "Business"} />
+      <AvatarImage src={business?.avatar} alt={businessDisplayName} />
       <AvatarFallback className="bg-blue-100 text-blue-600">
         {business?.avatar ? (
           getInitials()

@@ -1,5 +1,5 @@
 import type React from "react";
-import type { CategoryRowProps } from ".";
+import type { CategoryRowProps, CategoryWithChildren } from ".";
 import {
   ChevronDown,
   ChevronRight,
@@ -154,7 +154,7 @@ export const CategoryRow: React.FC<CategoryRowProps> = ({
       {/* Render children if expanded */}
       {hasChildren && isExpanded && (
         <>
-          {category.children.map((child) => (
+          {category.children.map((child: CategoryWithChildren) => (
             <CategoryRow
               key={child.id}
               category={child}

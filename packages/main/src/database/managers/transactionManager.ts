@@ -1,7 +1,7 @@
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc } from "drizzle-orm";
-import * as schema from "../schema/index.js";
-import type { Transaction, TransactionItem } from "../schema/index.js";
+import * as schema from "../schema.js";
+import type { Transaction, TransactionItem } from "../schema.js";
 
 // Utility types for transaction operations
 export interface RefundItem {

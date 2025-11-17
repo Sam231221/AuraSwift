@@ -1,6 +1,6 @@
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, gte, lte, sql as drizzleSql } from "drizzle-orm";
-import * as schema from "../schema/index.js";
+import * as schema from "../schema.js";
 
 export class AuditManager {
   private db: DrizzleDB;

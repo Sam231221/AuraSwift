@@ -1,7 +1,7 @@
-import type { Product, NewProduct, StockAdjustment } from "../schema/index.js";
+import type { Product, NewProduct, StockAdjustment } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql } from "drizzle-orm";
-import * as schema from "../schema/index.js";
+import * as schema from "../schema.js";
 
 export interface ProductResponse {
   success: boolean;

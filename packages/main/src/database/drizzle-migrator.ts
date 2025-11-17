@@ -25,7 +25,7 @@ import {
 import { app } from "electron";
 import Database from "better-sqlite3";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import type * as schema from "../schema/index.js";
+import * as schema from "./schema.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

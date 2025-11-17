@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { users } from "../schema/index.js";
+import { users } from "../schema.js";
 
 // ============================================
 // BASE USER SCHEMA (from Drizzle)

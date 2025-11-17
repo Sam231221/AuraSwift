@@ -1,7 +1,7 @@
-import type { StockAdjustment } from "../schema/index.js";
+import type { StockAdjustment } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, desc, sql as drizzleSql } from "drizzle-orm";
-import * as schema from "../schema/index.js";
+import * as schema from "../schema.js";
 
 export class InventoryManager {
   private db: DrizzleDB;

@@ -1119,7 +1119,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           );
           if (businessResponse.success && businessResponse.business) {
             businessDetails = {
-              name: businessResponse.business.name,
+              name: businessResponse.business.businessName,
               address:
                 businessResponse.business.address ||
                 "123 Main Street, London, W1A 1AA",

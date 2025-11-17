@@ -21,6 +21,8 @@ import { initializeDrizzle } from "./drizzle.js";
 import { getDatabaseInfo } from "./utils/dbInfo.js";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
+import * as schema from "./schema.js";
+import { seedDefaultData } from "./seed.js";
 
 let dbManagerInstance: DBManager | null = null;
 let managersInstance: DatabaseManagers | null = null;
@@ -78,8 +80,6 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const drizzle = initializeDrizzle(db);
 
     // Seed database with default data if needed
-    const { seedDefaultData } = await import("./seed.js");
-    const schema = await import("./schema/index.js");
     try {
       await seedDefaultData(drizzle, schema);
     } catch (error) {
@@ -164,7 +164,6 @@ export async function getDatabase(): Promise<DatabaseManagers> {
         }
 
         const rawDb = dbManagerInstance.getDb();
-        const schemaModule = await import("./schema/index.js");
 
         try {
           console.log("🗑️  Emptying all database tables...");
@@ -176,38 +175,38 @@ export async function getDatabase(): Promise<DatabaseManagers> {
           // This order respects foreign key relationships
           const tablesToEmpty = [
             // Child tables (with foreign keys) - delete first
-            schemaModule.printJobRetries,
-            schemaModule.printJobs,
-            schemaModule.attendanceReports,
-            schemaModule.shiftReports,
-            schemaModule.shiftValidationIssues,
-            schemaModule.shiftValidations,
-            schemaModule.timeCorrections,
-            schemaModule.breaks,
-            schemaModule.timeShifts,
-            schemaModule.clockEvents,
-            schemaModule.transactionItems,
-            schemaModule.transactions,
-            schemaModule.cashDrawerCounts,
-            schemaModule.shifts,
-            schemaModule.schedules,
-            schemaModule.stockMovements,
-            schemaModule.expiryNotifications,
-            schemaModule.expirySettings,
-            schemaModule.productBatches,
-            schemaModule.stockAdjustments,
-            schemaModule.suppliers,
-            schemaModule.discounts,
-            schemaModule.auditLogs,
-            schemaModule.sessions,
+            schema.printJobRetries,
+            schema.printJobs,
+            schema.attendanceReports,
+            schema.shiftReports,
+            schema.shiftValidationIssues,
+            schema.shiftValidations,
+            schema.timeCorrections,
+            schema.breaks,
+            schema.timeShifts,
+            schema.clockEvents,
+            schema.transactionItems,
+            schema.transactions,
+            schema.cashDrawerCounts,
+            schema.shifts,
+            schema.schedules,
+            schema.stockMovements,
+            schema.expiryNotifications,
+            schema.expirySettings,
+            schema.productBatches,
+            schema.stockAdjustments,
+            schema.suppliers,
+            schema.discounts,
+            schema.auditLogs,
+            schema.sessions,
             // Parent tables (referenced by others) - delete last
-            schemaModule.products,
-            schemaModule.categories,
-            schemaModule.vatCategories,
-            schemaModule.users,
-            schemaModule.businesses,
+            schema.products,
+            schema.categories,
+            schema.vatCategories,
+            schema.users,
+            schema.businesses,
             // System tables (usually keep app_settings, but empty if requested)
-            schemaModule.appSettings,
+            schema.appSettings,
           ];
 
           let deletedCount = 0;
@@ -281,7 +280,7 @@ export async function initializeDatabase(): Promise<DatabaseManagers> {
 /**
  * Type Exports
  *
- * Note: Database schema types should be imported directly from "../schema/index.js"
+ * Note: Database schema types should be imported directly from "./schema.js"
  * Manager utility types should be imported directly from their respective manager files.
  *
  * This module only exports:

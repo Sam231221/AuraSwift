@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "42b1cd41-092a-4bac-a2b1-c9a8bf7fe2d5",
-  "prevId": "79c6b8fc-430b-49f7-a51a-a139659f95e7",
+  "id": "79c6b8fc-430b-49f7-a51a-a139659f95e7",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "app_settings": {
       "name": "app_settings",
@@ -480,22 +480,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "firstName": {
-          "name": "firstName",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lastName": {
-          "name": "lastName",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "businessName": {
-          "name": "businessName",
+        "name": {
+          "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -3000,6 +2986,13 @@
         }
       },
       "indexes": {
+        "shift_validation_issues_public_id_unique": {
+          "name": "shift_validation_issues_public_id_unique",
+          "columns": [
+            "public_id"
+          ],
+          "isUnique": true
+        },
         "validation_issues_validation_idx": {
           "name": "validation_issues_validation_idx",
           "columns": [
@@ -3058,8 +3051,8 @@
           ],
           "isUnique": false
         },
-        "shift_validation_issues_public_id_unique": {
-          "name": "shift_validation_issues_public_id_unique",
+        "validation_issues_public_id_unique": {
+          "name": "validation_issues_public_id_unique",
           "columns": [
             "public_id"
           ],
@@ -3201,6 +3194,13 @@
         }
       },
       "indexes": {
+        "shift_validation_issues_public_id_unique": {
+          "name": "shift_validation_issues_public_id_unique",
+          "columns": [
+            "public_id"
+          ],
+          "isUnique": true
+        },
         "shift_validations_shift_idx": {
           "name": "shift_validations_shift_idx",
           "columns": [
@@ -4903,9 +4903,7 @@
   "_meta": {
     "schemas": {},
     "tables": {},
-    "columns": {
-      "\"businesses\".\"name\"": "\"businesses\".\"businessName\""
-    }
+    "columns": {}
   },
   "internal": {
     "indexes": {}

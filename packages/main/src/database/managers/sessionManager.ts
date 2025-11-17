@@ -1,7 +1,7 @@
-import type { Session } from "../schema/index.js";
+import type { Session } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
-import * as schema from "../schema/index.js";
+import * as schema from "../schema.js";
 
 export class SessionManager {
   private drizzle: DrizzleDB;

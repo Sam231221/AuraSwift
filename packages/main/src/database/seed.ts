@@ -6,11 +6,11 @@
  */
 
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import type * as schemaType from "../schema/index.js";
+import * as schemaType from "./schema.js";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getRawDatabase } from "./drizzle.js";
-import type { Permission } from "./schema/common.js";
+import type { Permission } from "./schema.js";
 
 /**
  * Seed the database with default business and users

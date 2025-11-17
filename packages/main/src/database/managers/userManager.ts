@@ -1,7 +1,8 @@
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, like, desc, sql as drizzleSql } from "drizzle-orm";
-import * as schema from "../schema/index.js";
-import { User, Permission } from "../schema/index.js";
+import * as schema from "../schema.js";
+import type { User, Permission } from "../schema.js";
+
 import {
   registerSchema,
   loginSchema,
@@ -12,8 +13,8 @@ import {
 export interface AuthResponse {
   success: boolean;
   message: string;
-  user?: User;
-  users?: User[];
+  user?: schema.User;
+  users?: schema.User[];
   token?: string;
   errors?: string[];
 }
@@ -749,7 +750,7 @@ export class UserManager {
 
       const user = await this.createUser({
         ...userData,
-        businessName: business.name,
+        businessName: business.businessName,
       });
 
       // Return user without sensitive fields

@@ -12,7 +12,7 @@ import {
   type BetterSQLite3Database,
 } from "drizzle-orm/better-sqlite3";
 import type Database from "better-sqlite3";
-import * as schema from "./schema/index.js";
+import * as schema from "./schema.js";
 
 let drizzleInstance: BetterSQLite3Database<typeof schema> | null = null;
 let rawDatabaseInstance: Database.Database | null = null;

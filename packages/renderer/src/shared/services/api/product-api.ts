@@ -7,17 +7,30 @@ import type { Product } from "@/features/products/types/product.types";
 
 export interface CreateProductData {
   name: string;
-  description: string;
-  price: number;
-  costPrice: number;
-  taxRate: number;
+  description?: string;
+  basePrice: number;
+  costPrice?: number;
   sku: string;
+  barcode?: string;
   plu?: string;
   image?: string;
-  category: string;
-  stockLevel: number;
-  minStockLevel: number;
+  categoryId: string;
+  productType?: "STANDARD" | "WEIGHTED" | "GENERIC";
+  salesUnit?: "PIECE" | "KG" | "GRAM" | "LITRE" | "ML" | "PACK";
+  usesScale?: boolean;
+  pricePerKg?: number;
+  isGenericButton?: boolean;
+  genericDefaultPrice?: number;
+  trackInventory?: boolean;
+  stockLevel?: number;
+  minStockLevel?: number;
+  reorderPoint?: number;
+  vatCategoryId?: string;
+  vatOverridePercent?: number;
   businessId: string;
+  isActive?: boolean;
+  allowPriceOverride?: boolean;
+  allowDiscount?: boolean;
 }
 
 export interface UpdateProductData {
