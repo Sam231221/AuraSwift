@@ -1,0 +1,116 @@
+import { useState, useCallback, useEffect } from "react";
+import type { Product } from "@/features/products/types/product.types";
+
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  businessId: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface VatCategory {
+  id: string;
+  name: string;
+  ratePercent: number;
+}
+
+interface UseProductDataProps {
+  businessId?: string;
+}
+
+export const useProductData = ({ businessId }: UseProductDataProps) => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vatCategories, setVatCategories] = useState<VatCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadProducts = useCallback(async () => {
+    if (!businessId) {
+      console.warn("Cannot load products: businessId is missing");
+      setProducts([]);
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await window.productAPI.getByBusiness(businessId);
+      if (response.success && response.products) {
+        setProducts(Array.isArray(response.products) ? response.products : []);
+      } else {
+        console.warn("Failed to load products");
+        setProducts([]);
+      }
+    } catch (error) {
+      console.error("Error loading products:", error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [businessId]);
+
+  const loadCategories = useCallback(async () => {
+    if (!businessId) {
+      console.warn("Cannot load categories: businessId is missing");
+      setCategories([]);
+      return;
+    }
+    try {
+      const response = await window.categoryAPI.getByBusiness(businessId);
+      if (response.success && response.categories) {
+        setCategories(
+          Array.isArray(response.categories) ? response.categories : []
+        );
+      } else {
+        console.warn("Failed to load categories");
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      setCategories([]);
+    }
+  }, [businessId]);
+
+  const loadVatCategories = useCallback(async () => {
+    if (!businessId) {
+      setVatCategories([]);
+      return;
+    }
+    try {
+      const response = await window.categoryAPI.getVatCategories(businessId);
+      if (response.success && response.vatCategories) {
+        setVatCategories(response.vatCategories);
+      } else {
+        console.error("Failed to load VAT categories");
+        setVatCategories([]);
+      }
+    } catch (error) {
+      console.error("Error loading VAT categories:", error);
+      setVatCategories([]);
+    }
+  }, [businessId]);
+
+  useEffect(() => {
+    if (businessId) {
+      loadProducts();
+      loadCategories();
+      loadVatCategories();
+    }
+  }, [businessId, loadProducts, loadCategories, loadVatCategories]);
+
+  return {
+    products,
+    categories,
+    vatCategories,
+    loading,
+    setProducts,
+    loadProducts,
+    loadCategories,
+    loadVatCategories,
+  };
+};
+
+export type { Category, VatCategory };
+
