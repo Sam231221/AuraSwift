@@ -17,9 +17,14 @@ export interface User {
 
 export interface Business {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  businessName: string;
   avatar?: string;
   ownerId: string;
+  address?: string;
+  phone?: string;
+  vatNumber?: string;
   createdAt: string;
   updatedAt: string;
 }

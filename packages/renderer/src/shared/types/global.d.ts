@@ -42,8 +42,14 @@ export interface APIResponse {
   }>;
   business?: {
     id: string;
-    name: string;
+    firstName: string;
+    lastName: string;
+    businessName: string;
     avatar?: string;
+    ownerId?: string;
+    address?: string;
+    phone?: string;
+    vatNumber?: string;
   };
   errors?: string[];
 }
@@ -104,7 +110,9 @@ declare global {
         success: boolean;
         business?: {
           id: string;
-          name: string;
+          firstName: string;
+          lastName: string;
+          businessName: string;
           ownerId: string;
           address?: string;
           phone?: string;

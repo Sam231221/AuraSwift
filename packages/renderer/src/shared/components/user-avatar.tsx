@@ -14,7 +14,9 @@ interface UserAvatarProps {
 
 interface BusinessAvatarProps {
   business?: {
-    name?: string;
+    firstName?: string;
+    lastName?: string;
+    businessName?: string;
     avatar?: string;
   };
   size?: "sm" | "md" | "lg" | "xl";
@@ -77,7 +79,7 @@ export function BusinessAvatar({
     return name
       .split(" ")
       .slice(0, 2)
-      .map((word) => word[0])
+      .map((word: string) => word[0])
       .join("")
       .toUpperCase();
   };
