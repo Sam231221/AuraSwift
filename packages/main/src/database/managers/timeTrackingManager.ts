@@ -3,7 +3,7 @@ import type {
   TimeShift,
   Break,
   TimeCorrection,
-} from "../schema.js";
+} from "../schema/index.js";
 import type { DrizzleDB } from "../drizzle.js";
 import {
   eq,
@@ -14,7 +14,7 @@ import {
   isNull,
   sql as drizzleSql,
 } from "drizzle-orm";
-import * as schema from "../schema.js";
+import * as schema from "../schema/index.js";
 
 export class TimeTrackingManager {
   private db: DrizzleDB;

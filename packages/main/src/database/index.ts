@@ -79,7 +79,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
 
     // Seed database with default data if needed
     const { seedDefaultData } = await import("./seed.js");
-    const schema = await import("./schema.js");
+    const schema = await import("./schema/index.js");
     try {
       await seedDefaultData(drizzle, schema);
     } catch (error) {
@@ -164,7 +164,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
         }
 
         const rawDb = dbManagerInstance.getDb();
-        const schemaModule = await import("./schema.js");
+        const schemaModule = await import("./schema/index.js");
 
         try {
           console.log("🗑️  Emptying all database tables...");
@@ -281,7 +281,7 @@ export async function initializeDatabase(): Promise<DatabaseManagers> {
 /**
  * Type Exports
  *
- * Note: Database schema types should be imported directly from "./schema.js"
+ * Note: Database schema types should be imported directly from "../schema/index.js"
  * Manager utility types should be imported directly from their respective manager files.
  *
  * This module only exports:

@@ -6,7 +6,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { runDrizzleMigrations } from "./drizzle-migrator.js";
 import Database from "better-sqlite3";
 import semver from "semver";
-import * as schema from "./schema.js";
+import * as schema from "./schema/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

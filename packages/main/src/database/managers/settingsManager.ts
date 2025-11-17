@@ -1,6 +1,6 @@
 import type { DrizzleDB } from "../drizzle.js";
 import { eq } from "drizzle-orm";
-import * as schema from "../schema.js";
+import * as schema from "../schema/index.js";
 
 export interface AppSetting {
   key: string;

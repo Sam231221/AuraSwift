@@ -1,8 +1,7 @@
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql } from "drizzle-orm";
-import { Category, categories } from "../schema.js";
-import * as schema from "../schema.js";
-import { ca } from "zod/v4/locales";
+import { Category, categories } from "../schema/index.js";
+import * as schema from "../schema/index.js";
 
 export interface CategoryResponse {
   success: boolean;

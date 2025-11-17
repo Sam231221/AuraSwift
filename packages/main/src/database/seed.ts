@@ -6,7 +6,7 @@
  */
 
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import type * as schemaType from "./schema.js";
+import type * as schemaType from "../schema/index.js";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getRawDatabase } from "./drizzle.js";

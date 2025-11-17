@@ -1,7 +1,7 @@
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, like, desc, sql as drizzleSql } from "drizzle-orm";
-import * as schema from "../schema.js";
-import { User, Permission } from "../schema.js";
+import * as schema from "../schema/index.js";
+import { User, Permission } from "../schema/index.js";
 import {
   registerSchema,
   loginSchema,
