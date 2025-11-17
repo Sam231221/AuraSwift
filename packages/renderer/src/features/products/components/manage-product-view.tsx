@@ -150,19 +150,23 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   // API functions
   const loadProducts = useCallback(async () => {
+    if (!user?.businessId) {
+      console.warn("Cannot load products: user or businessId is missing");
+      setProducts([]);
+      return;
+    }
     try {
       setLoading(true);
-      const response = await window.productAPI.getByBusiness(user!.businessId);
+      const response = await window.productAPI.getByBusiness(user.businessId);
       if (response.success && response.products) {
         // Ensure products is always an array
         setProducts(Array.isArray(response.products) ? response.products : []);
       } else {
-        toast.error("Failed to load products");
+        console.warn("Failed to load products");
         setProducts([]); // Set to empty array on error
       }
     } catch (error) {
       console.error("Error loading products:", error);
-      toast.error("Failed to load products");
       setProducts([]); // Set to empty array on error
     } finally {
       setLoading(false);
@@ -170,20 +174,24 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   }, [user]);
 
   const loadCategories = useCallback(async () => {
+    if (!user?.businessId) {
+      console.warn("Cannot load categories: user or businessId is missing");
+      setCategories([]);
+      return;
+    }
     try {
-      const response = await window.categoryAPI.getByBusiness(user!.businessId);
+      const response = await window.categoryAPI.getByBusiness(user.businessId);
       if (response.success && response.categories) {
         // Ensure categories is always an array
         setCategories(
           Array.isArray(response.categories) ? response.categories : []
         );
       } else {
-        toast.error("Failed to load categories");
+        console.warn("Failed to load categories");
         setCategories([]); // Set to empty array on error
       }
     } catch (error) {
       console.error("Error loading categories:", error);
-      toast.error("Failed to load categories");
       setCategories([]); // Set to empty array on error
     }
   }, [user]);
@@ -1598,6 +1606,18 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   if (!user) {
     navigate("/");
     return null;
+  }
+
+  // Show loading state while initial data is being fetched
+  if (loading && products.length === 0 && categories.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading product management...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
