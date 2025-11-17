@@ -60,7 +60,9 @@ export async function seedDefaultData(
       db.insert(businesses)
         .values({
           id: businessId,
-          name: "Demo Store",
+          firstName: "Demo",
+          lastName: "Store",
+          businessName: "Demo Store",
           ownerId: "temp-owner", // temp value, will update after admin user is created
           address: "123 Main Street, Downtown",
           phone: "+1 (555) 123-4567",
