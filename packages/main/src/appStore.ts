@@ -974,18 +974,61 @@ ipcMain.handle("shift:getTodaySchedule", async (event, cashierId) => {
   try {
     if (!db) db = await getDatabase();
 
-    const today = new Date();
-    const dateString = today.toISOString().split("T")[0];
+    const now = new Date();
+    const dateString = now.toISOString().split("T")[0];
 
     // Get schedules for this cashier today
     const schedules = db.schedules.getSchedulesByStaffId(cashierId);
-    const todaySchedule = schedules.find(
+    const todaySchedules = schedules.filter(
       (schedule) => schedule.startTime.split("T")[0] === dateString
     );
 
+    if (todaySchedules.length === 0) {
+      return {
+        success: true,
+        data: null,
+      };
+    }
+
+    if (todaySchedules.length === 1) {
+      return {
+        success: true,
+        data: todaySchedules[0],
+      };
+    }
+
+    // Multiple schedules today - find the most relevant one
+    // Priority:
+    // 1. Schedules that haven't ended yet (current or future)
+    // 2. Among those, prefer the one that starts later (most recent)
+    // 3. If all have ended, prefer the one that starts later (most recent)
+    const activeSchedules = todaySchedules.filter(
+      (schedule) => new Date(schedule.endTime) > now
+    );
+
+    if (activeSchedules.length > 0) {
+      // Return the one with the latest start time among active schedules
+      const mostRecentActive = activeSchedules.reduce((latest, current) => {
+        return new Date(current.startTime) > new Date(latest.startTime)
+          ? current
+          : latest;
+      });
+      return {
+        success: true,
+        data: mostRecentActive,
+      };
+    }
+
+    // All schedules have ended - return the most recent one
+    const mostRecent = todaySchedules.reduce((latest, current) => {
+      return new Date(current.startTime) > new Date(latest.startTime)
+        ? current
+        : latest;
+    });
+
     return {
       success: true,
-      data: todaySchedule || null,
+      data: mostRecent,
     };
   } catch (error) {
     console.error("Get today's schedule IPC error:", error);

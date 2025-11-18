@@ -23,7 +23,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Calculator,
   CreditCard,
   CheckCircle,
   Search,
@@ -38,11 +37,9 @@ import {
   Download,
   Mail,
   X,
-  RotateCcw,
-  XCircle,
-  LayoutDashboard,
   RefreshCw,
   Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
@@ -71,6 +68,7 @@ import type {
 import { ScaleDisplay } from "@/components/scale/ScaleDisplay";
 import { AgeVerificationModal } from "./age-verification-modal";
 import { GenericItemPriceModal } from "./generic-item-price-modal";
+import { QuickActionsCarousel } from "./quick-actions-transaction-carousel";
 
 interface PaymentMethod {
   type: "cash" | "card" | "mobile" | "voucher" | "split";
@@ -94,227 +92,61 @@ interface BreadcrumbItem {
   name: string;
 }
 
-// Quick Actions Carousel Component
-interface QuickActionsCarouselProps {
-  onRefund: () => void;
-  onVoid: () => void;
-  onCount: () => void;
-  onDashboard: () => void;
+/**
+ * SHIFT vs SCHEDULE DISTINCTION (as per shifttimeCase.md):
+ *
+ * Scenario Implemented:
+ * 1. Manager creates schedule: 2 PM - 9 PM (Sept 26)
+ * 2. Cashier logs in late at 3:33 PM
+ * 3. Manager later extends end time to 10 PM and sets start time to 1 PM
+ * 4. Dashboard shows:
+ *    - Scheduled Shift: 1:00 PM – 10:00 PM
+ *    - Clocked In: 3:33 PM (33m late)
+ *    - Ends: 10:00 PM
+ *    - Time Remaining: 6h 27m (calculated from scheduled end time)
+ *
+ * Key Implementation:
+ * - Schedule = What manager planned (can be updated live)
+ * - Shift = What actually happened (actual clock-in/out times - never overwritten)
+ * - Time remaining calculated from SCHEDULED end time
+ * - Progress calculated from ACTUAL start time to SCHEDULED end time
+ * - Manager changes update live every 30 seconds while preserving actual work times
+ * - Reports will show variance between scheduled vs actual hours
+ */
+
+interface Shift {
+  id: string;
+  scheduleId?: string; // Links to the planned schedule
+  cashierId: string;
+  businessId: string;
+  startTime: string; // ACTUAL clock-in time (when cashier really started)
+  endTime?: string; // ACTUAL clock-out time (when cashier really ended)
+  status: "active" | "ended";
+  startingCash: number;
+  finalCashDrawer?: number;
+  expectedCashDrawer?: number;
+  cashVariance?: number;
+  totalSales?: number;
+  totalTransactions?: number;
+  totalRefunds?: number;
+  totalVoids?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
-const CarouselCard: React.FC<{
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  onClick: () => void;
-  hoverColor: string;
-}> = ({ icon: Icon, title, onClick, hoverColor }) => (
-  <button
-    onClick={onClick}
-    className={`shrink-0 basis-1/3 w-16 h-16 p-2 bg-gray-100 rounded-lg flex flex-col items-center justify-center gap-1  transition-all hover:shadow-md ${hoverColor}`}
-    style={{ minWidth: "0" }}
-  >
-    <Icon className="w-6 h-6" />
-    <span className="text-sm">{title}</span>
-  </button>
-);
-
-const QuickActionsCarousel: React.FC<QuickActionsCarouselProps> = ({
-  onRefund,
-  onVoid,
-  onCount,
-  onDashboard,
-}) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [dragStart, setDragStart] = useState(0);
-  const [dragEnd, setDragEnd] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  const items = [
-    {
-      icon: RotateCcw,
-      title: "Refund",
-      onClick: onRefund,
-      hoverColor: "hover:bg-blue-50",
-    },
-    {
-      icon: XCircle,
-      title: "Void",
-      onClick: onVoid,
-      hoverColor: "hover:bg-red-50",
-    },
-    {
-      icon: Calculator,
-      title: "Count",
-      onClick: onCount,
-      hoverColor: "hover:bg-green-50",
-    },
-    {
-      icon: LayoutDashboard,
-      title: "Dashboard",
-      onClick: onDashboard,
-      hoverColor: "hover:bg-purple-50",
-    },
-  ];
-
-  const itemsPerView = 4;
-  const maxIndex = Math.max(0, items.length - itemsPerView);
-  const minSwipeDistance = 50;
-
-  const handlePrev = () => {
-    setCurrentIndex((prev) => Math.max(0, prev - 1));
-  };
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => Math.min(maxIndex, prev + 1));
-  };
-
-  // Touch events
-  const onTouchStart = (e: React.TouchEvent) => {
-    setDragEnd(0);
-    setDragStart(e.targetTouches[0].clientX);
-    setIsDragging(true);
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    setDragEnd(e.targetTouches[0].clientX);
-  };
-
-  const onTouchEnd = () => {
-    handleDragEnd();
-  };
-
-  // Mouse events for trackpad/mouse support
-  const onMouseDown = (e: React.MouseEvent) => {
-    setDragEnd(0);
-    setDragStart(e.clientX);
-    setIsDragging(true);
-    e.preventDefault(); // Prevent text selection
-  };
-
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setDragEnd(e.clientX);
-  };
-
-  const onMouseUp = () => {
-    if (!isDragging) return;
-    handleDragEnd();
-  };
-
-  const onMouseLeave = () => {
-    if (!isDragging) return;
-    handleDragEnd();
-  };
-
-  const handleDragEnd = () => {
-    if (!dragStart || !dragEnd) {
-      setIsDragging(false);
-      return;
-    }
-
-    const distance = dragStart - dragEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe && currentIndex < maxIndex) {
-      handleNext();
-    }
-    if (isRightSwipe && currentIndex > 0) {
-      handlePrev();
-    }
-
-    setIsDragging(false);
-    setDragStart(0);
-    setDragEnd(0);
-  };
-
-  // Calculate exact transform based on container width
-  const getTransform = () => {
-    if (!containerRef.current) return "translateX(0)";
-
-    const container = containerRef.current;
-    const containerWidth = container.offsetWidth;
-
-    // Each card takes up 1/3 of the container width (for 3 items view)
-    // Plus we need to account for gaps between items
-    const cardWidth = containerWidth / itemsPerView;
-    const offset = currentIndex * cardWidth;
-
-    return `translateX(-${offset}px)`;
-  };
-
-  return (
-    <div className="mb-4 p-2 bg-white rounded-lg shadow-sm">
-      <div className="flex items-center w-full gap-2">
-        {/* Left Arrow */}
-        <button
-          onClick={handlePrev}
-          disabled={currentIndex === 0}
-          className="shrink-0 w-8 h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-          style={{
-            clipPath: "polygon(30% 0, 100% 0, 100% 100%, 30% 100%, 0 50%)",
-          }}
-        >
-          <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-gray-700 rotate-180" />
-        </button>
-
-        {/* Carousel Container */}
-        <div
-          ref={containerRef}
-          className="overflow-hidden flex-1 cursor-grab active:cursor-grabbing select-none"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseLeave}
-        >
-          <div
-            className="flex gap-2 transition-transform duration-300 ease-in-out"
-            style={{
-              transform: getTransform(),
-              width: `${(items.length / itemsPerView) * 100}%`,
-            }}
-          >
-            {items.map((item, index) => (
-              <div
-                key={index}
-                className="shrink-0"
-                style={{
-                  width: `calc(${100 / items.length}% - ${
-                    ((items.length - 1) * 0.5) / items.length
-                  }rem)`,
-                }}
-              >
-                <CarouselCard
-                  icon={item.icon}
-                  title={item.title}
-                  onClick={item.onClick}
-                  hoverColor={item.hoverColor}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Right Arrow */}
-        <button
-          onClick={handleNext}
-          disabled={currentIndex === maxIndex}
-          className="shrink-0 w-8 h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-          style={{
-            clipPath: "polygon(0 0, 70% 0, 100% 50%, 70% 100%, 0 100%)",
-          }}
-        >
-          <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-gray-700" />
-        </button>
-      </div>
-    </div>
-  );
-  // ...existing code...
-};
+interface Schedule {
+  id: string;
+  staffId: string;
+  businessId: string;
+  startTime: string; // PLANNED start time (what manager scheduled)
+  endTime: string; // PLANNED end time (what manager scheduled - can be updated live)
+  status: "upcoming" | "active" | "completed" | "missed";
+  assignedRegister?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string; // Changes when manager modifies scheduled times
+}
 
 //const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
@@ -323,24 +155,16 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [cartItems, setCartItems] = useState<CartItemWithProduct[]>([]);
   const [loadingCart, setLoadingCart] = useState(false);
 
-  // Shift State - Check if cashier has active shift
-  const [hasActiveShift, setHasActiveShift] = useState<boolean | null>(null);
-  const [hasScheduledShift, setHasScheduledShift] = useState<boolean | null>(
-    null
-  );
-  const [isCheckingShift, setIsCheckingShift] = useState(true);
-  const [todaySchedule, setTodaySchedule] = useState<{
-    id: string;
-    staffId: string;
-    businessId: string;
-    startTime: string;
-    endTime: string;
-    status: string;
-  } | null>(null);
-
-  // Start Shift Dialog State
+  // Shift State - Using logic from cashier-dashboard-view.tsx
+  const [activeShift, setActiveShift] = useState<Shift | null>(null);
+  const [todaySchedule, setTodaySchedule] = useState<Schedule | null>(null);
+  const [isLoadingShift, setIsLoadingShift] = useState(true);
   const [showStartShiftDialog, setShowStartShiftDialog] = useState(false);
+  const [showLateStartConfirm, setShowLateStartConfirm] = useState(false);
   const [startingCash, setStartingCash] = useState("");
+  const [lateStartMinutes, setLateStartMinutes] = useState(0);
+  const [showOvertimeWarning, setShowOvertimeWarning] = useState(false);
+  const [overtimeMinutes, setOvertimeMinutes] = useState(0);
 
   // Age Verification Modal State
   const [showAgeVerificationModal, setShowAgeVerificationModal] =
@@ -453,55 +277,144 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const tax = cartItems.reduce((sum, item) => sum + item.taxAmount, 0);
   const total = subtotal + tax;
 
-  // Check for active shift and scheduled shift (must be defined before initializeCartSession)
-  const checkActiveShift = useCallback(async () => {
-    if (!user?.id) return false;
+  // Load shift data function with smart updates to prevent flickering (from cashier-dashboard-view.tsx)
+  const loadShiftData = useCallback(
+    async (isInitialLoad = false) => {
+      try {
+        if (isInitialLoad) {
+          setIsLoadingShift(true);
+        }
 
-    try {
-      setIsCheckingShift(true);
+        if (!user?.id) return;
 
-      // Check for active POS shift
-      const shiftResponse = await window.shiftAPI.getActive(user.id);
-      const hasActive = shiftResponse.success && !!shiftResponse.data;
-      setHasActiveShift(hasActive);
+        // Load active shift
+        const activeShiftResponse = await window.shiftAPI.getActive(user.id);
+        if (activeShiftResponse.success && activeShiftResponse.data) {
+          const shiftData = activeShiftResponse.data as Shift;
 
-      // If no active shift, check for scheduled shift today
-      if (!hasActive) {
+          // Only update if data has actually changed
+          setActiveShift((prevShift) => {
+            if (
+              !prevShift ||
+              JSON.stringify(prevShift) !== JSON.stringify(shiftData)
+            ) {
+              return shiftData;
+            }
+            return prevShift;
+          });
+        } else {
+          // Only update if currently there is an active shift
+          setActiveShift((prevShift) => (prevShift ? null : prevShift));
+        }
+
+        // Load today's schedule
         const scheduleResponse = await window.shiftAPI.getTodaySchedule(
           user.id
         );
-        const hasScheduled =
-          scheduleResponse.success && !!scheduleResponse.data;
-        setHasScheduledShift(hasScheduled);
-        if (hasScheduled && scheduleResponse.data) {
-          setTodaySchedule(
-            scheduleResponse.data as {
-              id: string;
-              staffId: string;
-              businessId: string;
-              startTime: string;
-              endTime: string;
-              status: string;
+        if (scheduleResponse.success && scheduleResponse.data) {
+          const newSchedule = scheduleResponse.data as Schedule;
+          setTodaySchedule((prevSchedule) => {
+            if (!prevSchedule) return newSchedule;
+
+            const now = new Date();
+            const newShiftStart = new Date(newSchedule.startTime);
+            const newShiftEnd = new Date(newSchedule.endTime);
+            const prevScheduleEnd = prevSchedule
+              ? new Date(prevSchedule.endTime)
+              : null;
+
+            // If schedules are the same (by ID), always prefer the new one (might have been updated)
+            if (prevSchedule.id === newSchedule.id) {
+              return newSchedule;
             }
-          );
+
+            // Priority logic: always prefer the most relevant schedule
+            // 1. Prefer schedules that haven't ended yet (current or future)
+            const newScheduleNotEnded = newShiftEnd > now;
+            const prevScheduleNotEnded =
+              prevScheduleEnd && prevScheduleEnd > now;
+
+            if (newScheduleNotEnded && !prevScheduleNotEnded) {
+              // New schedule is current/future, old one is ended - use new
+              return newSchedule;
+            }
+
+            if (!newScheduleNotEnded && prevScheduleNotEnded) {
+              // Old schedule is current/future, new one is ended - keep old
+              return prevSchedule;
+            }
+
+            if (newScheduleNotEnded && prevScheduleNotEnded) {
+              // Both are current/future - prefer the one that starts later (more recent)
+              if (newShiftStart > new Date(prevSchedule.startTime)) {
+                return newSchedule;
+              }
+              return prevSchedule;
+            }
+
+            // Both are ended - prefer the one that starts later (more recent)
+            if (newShiftStart > new Date(prevSchedule.startTime)) {
+              return newSchedule;
+            }
+
+            return prevSchedule;
+          });
         } else {
+          // If API returns no schedule, clear it
           setTodaySchedule(null);
         }
-      } else {
-        setHasScheduledShift(null); // Don't need to check if already has active shift
-        setTodaySchedule(null);
+      } catch (error) {
+        console.error("Failed to load shift data:", error);
+      } finally {
+        if (isInitialLoad) {
+          setIsLoadingShift(false);
+        }
       }
+    },
+    [user?.id]
+  );
 
-      return hasActive;
-    } catch (error) {
-      console.error("Error checking active shift:", error);
-      setHasActiveShift(false);
-      setHasScheduledShift(null);
-      return false;
-    } finally {
-      setIsCheckingShift(false);
-    }
-  }, [user?.id]);
+  // Check for overtime and handle automatic shift ending (from cashier-dashboard-view.tsx)
+  useEffect(() => {
+    if (!activeShift || !todaySchedule) return;
+
+    const checkOvertime = () => {
+      const now = new Date();
+      const scheduledEnd = new Date(todaySchedule.endTime);
+      const timeDifference = now.getTime() - scheduledEnd.getTime();
+      const minutesOvertime = Math.floor(timeDifference / (1000 * 60));
+
+      if (minutesOvertime > 0) {
+        setOvertimeMinutes(minutesOvertime);
+
+        // Show warning after 15 minutes of overtime
+        if (minutesOvertime >= 15 && !showOvertimeWarning) {
+          setShowOvertimeWarning(true);
+        }
+      } else {
+        setOvertimeMinutes(0);
+        setShowOvertimeWarning(false);
+      }
+    };
+
+    checkOvertime(); // Check immediately
+    const overtimeInterval = setInterval(checkOvertime, 60000); // Check every minute
+
+    return () => clearInterval(overtimeInterval);
+  }, [activeShift, todaySchedule, showOvertimeWarning]);
+
+  // Load shift data on component mount and periodically (from cashier-dashboard-view.tsx)
+  useEffect(() => {
+    loadShiftData(true); // Initial load with loading indicator
+
+    // Refresh data every 30 seconds to pick up schedule changes made by manager
+    const interval = setInterval(() => {
+      if (user?.id) {
+        loadShiftData(false); // Background refresh without loading indicator
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [loadShiftData, user?.id]);
 
   // Initialize or recover cart session (must be defined before addToCart)
   const initializeCartSession =
@@ -513,8 +426,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
       // For cashiers/managers, check if shift exists first
       if (user.role === "cashier" || user.role === "manager") {
-        const shiftExists = await checkActiveShift();
-        if (!shiftExists) {
+        if (!activeShift) {
           setLoadingCart(false);
           return null; // Don't proceed if no shift
         }
@@ -546,15 +458,10 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         } else {
           // Create new session
           if (user.role === "cashier" || user.role === "manager") {
-            const shiftResponse = await window.shiftAPI.getActive(user.id);
-            if (!shiftResponse.success || !shiftResponse.data) {
-              // Don't show error if user just needs to start shift
-              setHasActiveShift(false);
+            if (!activeShift) {
               setLoadingCart(false);
               return null;
             }
-
-            const activeShift = shiftResponse.data as { id: string };
 
             const newSessionResponse = await window.cartAPI.createSession({
               cashierId: user.id,
@@ -602,7 +509,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       } finally {
         setLoadingCart(false);
       }
-    }, [user?.businessId, user?.id, user?.role, checkActiveShift]);
+    }, [user?.businessId, user?.id, user?.role, activeShift]);
 
   // Functions for cart operations using cart API (must be defined before handleHardwareScan)
   const addToCart = useCallback(
@@ -616,8 +523,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       // Check if operations are disabled (no active shift but has scheduled shift)
       const operationsDisabled =
         (user?.role === "cashier" || user?.role === "manager") &&
-        !hasActiveShift &&
-        hasScheduledShift;
+        !activeShift &&
+        todaySchedule;
 
       if (operationsDisabled) {
         toast.error("Please start your shift before adding items to cart");
@@ -847,8 +754,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       cartSession,
       cartItems,
       user?.role,
-      hasActiveShift,
-      hasScheduledShift,
+      activeShift,
+      todaySchedule,
       initializeCartSession,
     ]
   );
@@ -859,8 +766,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       // Check if operations are disabled
       const operationsDisabled =
         (user?.role === "cashier" || user?.role === "manager") &&
-        !hasActiveShift &&
-        hasScheduledShift;
+        !activeShift &&
+        todaySchedule;
 
       if (operationsDisabled) {
         toast.error("Please start your shift before adding items to cart");
@@ -917,8 +824,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     },
     [
       user?.role,
-      hasActiveShift,
-      hasScheduledShift,
+      activeShift,
+      todaySchedule,
       addToCart,
       cartSession,
       initializeCartSession,
@@ -931,8 +838,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       // Check if operations are disabled
       const operationsDisabled =
         (user?.role === "cashier" || user?.role === "manager") &&
-        !hasActiveShift &&
-        hasScheduledShift;
+        !activeShift &&
+        todaySchedule;
 
       if (operationsDisabled) {
         toast.error("Please start your shift before adding items to cart");
@@ -969,8 +876,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     },
     [
       user?.role,
-      hasActiveShift,
-      hasScheduledShift,
+      activeShift,
+      todaySchedule,
       addToCart,
       cartSession,
       initializeCartSession,
@@ -1209,19 +1116,88 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   }, [user?.businessId]);
 
-  // Check for active shift on mount and periodically
-  useEffect(() => {
-    if (!user?.id) return;
+  // Calculate shift timing validation (from cashier-dashboard-view.tsx)
+  const shiftTimingInfo = todaySchedule
+    ? (() => {
+        const now = new Date();
+        const scheduledStart = new Date(todaySchedule.startTime);
+        const scheduledEnd = new Date(todaySchedule.endTime);
+        const timeDifference = now.getTime() - scheduledStart.getTime();
+        const minutesDifference = timeDifference / (1000 * 60);
 
-    checkActiveShift();
+        // Check if shift has already ended
+        const timeFromEnd = now.getTime() - scheduledEnd.getTime();
+        const minutesAfterEnd = timeFromEnd / (1000 * 60);
 
-    // Check periodically (every 30 seconds) to catch shift changes
-    const interval = setInterval(() => {
-      checkActiveShift();
-    }, 30000);
+        const EARLY_START_MINUTES = 15;
+        const LATE_START_MINUTES = 30;
 
-    return () => clearInterval(interval);
-  }, [user?.id, checkActiveShift]);
+        // Don't allow starting shifts that are more than 1 hour past their end time
+        if (minutesAfterEnd > 60) {
+          const hoursAfterEnd = Math.floor(minutesAfterEnd / 60);
+          const remainingMinutes = Math.floor(minutesAfterEnd % 60);
+
+          let overdueText;
+          if (hoursAfterEnd > 0) {
+            if (remainingMinutes === 0) {
+              overdueText =
+                hoursAfterEnd === 1 ? "1 hour" : `${hoursAfterEnd} hours`;
+            } else {
+              overdueText = `${hoursAfterEnd}h ${remainingMinutes}m`;
+            }
+          } else {
+            overdueText = `${Math.floor(minutesAfterEnd)} minutes`;
+          }
+
+          return {
+            canStart: false,
+            buttonText: "Shift Ended",
+            reason: `Shift ended ${overdueText} ago`,
+          };
+        }
+
+        if (minutesDifference < -EARLY_START_MINUTES) {
+          const minutesUntilStart = Math.ceil(-minutesDifference);
+          return {
+            canStart: false,
+            buttonText: `Start in ${minutesUntilStart}m`,
+            reason: `Too early - wait ${minutesUntilStart} minutes`,
+          };
+        } else if (minutesDifference > LATE_START_MINUTES) {
+          const minutesLate = Math.floor(minutesDifference);
+          const hoursLate = Math.floor(minutesLate / 60);
+          const remainingMinutes = minutesLate % 60;
+
+          let lateText;
+          if (hoursLate > 0) {
+            if (remainingMinutes === 0) {
+              lateText =
+                hoursLate === 1 ? "1 hour late" : `${hoursLate} hours late`;
+            } else {
+              lateText = `${hoursLate}h ${remainingMinutes}m late`;
+            }
+          } else {
+            lateText = `${minutesLate} minutes late`;
+          }
+
+          return {
+            canStart: true,
+            buttonText: `Start Shift (Late)`,
+            reason: lateText,
+          };
+        } else {
+          return {
+            canStart: true,
+            buttonText: "Start Shift",
+            reason: "Ready to start",
+          };
+        }
+      })()
+    : {
+        canStart: false,
+        buttonText: "No Schedule",
+        reason: "No schedule found",
+      };
 
   // Load products on component mount
   useEffect(() => {
@@ -1943,18 +1919,81 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     completeTransaction();
   };
 
-  // Start Shift Handler
-  const handleStartShift = async () => {
-    if (
-      !startingCash ||
-      isNaN(Number(startingCash)) ||
-      Number(startingCash) < 0
-    ) {
-      toast.error("Please enter a valid starting cash amount");
+  // Start Shift Handler (from cashier-dashboard-view.tsx)
+  const handleStartShiftClick = () => {
+    if (!user) {
+      alert("User not authenticated");
       return;
     }
 
+    if (!todaySchedule) {
+      alert("No schedule found for today. Please contact your manager.");
+      return;
+    }
+
+    // Validate shift timing
+    const now = new Date();
+    const scheduledStart = new Date(todaySchedule.startTime);
+    const scheduledEnd = new Date(todaySchedule.endTime);
+    const timeDifference = now.getTime() - scheduledStart.getTime();
+    const minutesDifference = timeDifference / (1000 * 60);
+
+    // Check if the scheduled shift has already ended
+    const timeFromEnd = now.getTime() - scheduledEnd.getTime();
+    const minutesAfterEnd = timeFromEnd / (1000 * 60);
+
+    // Don't allow starting shifts that are more than 1 hour past their scheduled end time
+    if (minutesAfterEnd > 60) {
+      alert(
+        `This shift ended at ${scheduledEnd.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })} and is now ${Math.floor(minutesAfterEnd / 60)}h ${Math.floor(
+          minutesAfterEnd % 60
+        )}m overdue. Please contact your manager to reschedule or create a new shift.`
+      );
+      return;
+    }
+
+    // Allow starting 15 minutes early or up to 30 minutes late
+    const EARLY_START_MINUTES = 15;
+    const LATE_START_MINUTES = 30;
+
+    if (minutesDifference < -EARLY_START_MINUTES) {
+      const minutesUntilStart = Math.ceil(-minutesDifference);
+      alert(
+        `Cannot start shift yet. Your shift is scheduled to start at ${scheduledStart.toLocaleTimeString(
+          [],
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }
+        )}. Please wait ${minutesUntilStart} more minutes.`
+      );
+      return;
+    }
+
+    if (minutesDifference > LATE_START_MINUTES) {
+      const minutesLate = Math.floor(minutesDifference);
+      setLateStartMinutes(minutesLate);
+      setShowLateStartConfirm(true);
+      return;
+    }
+
+    // Show start shift dialog
+    setStartingCash("");
+    setShowStartShiftDialog(true);
+  };
+
+  const confirmStartShift = async () => {
     try {
+      if (!startingCash || isNaN(Number(startingCash))) {
+        alert("Please enter a valid cash amount");
+        return;
+      }
+
       const response = await window.shiftAPI.start({
         scheduleId: todaySchedule?.id,
         cashierId: user!.id,
@@ -1963,20 +2002,28 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       });
 
       if (response.success && response.data) {
-        toast.success("Shift started successfully!");
+        const shiftData = response.data as Shift;
+        setActiveShift(shiftData);
         setShowStartShiftDialog(false);
+        setShowLateStartConfirm(false);
         setStartingCash("");
-        // Refresh shift status
-        await checkActiveShift();
+        // Refresh shift data
+        await loadShiftData(false);
         // Initialize cart session now that shift is active
         await initializeCartSession();
       } else {
-        toast.error(response.message || "Failed to start shift");
+        alert(response.message || "Failed to start shift");
       }
     } catch (error) {
       console.error("Failed to start shift:", error);
-      toast.error("Failed to start shift. Please try again.");
+      alert("Failed to start shift. Please try again.");
     }
+  };
+
+  const confirmLateStart = () => {
+    setShowLateStartConfirm(false);
+    setStartingCash("");
+    setShowStartShiftDialog(true);
   };
 
   const navigate = useNavigate();
@@ -1986,12 +2033,24 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     return;
   }
 
+  // Show loading state while checking shift
+  if (isLoadingShift && (user.role === "cashier" || user.role === "manager")) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-600">Loading shift data...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show blocking UI only if no scheduled shift (for cashiers and managers)
   if (
     (user.role === "cashier" || user.role === "manager") &&
-    !isCheckingShift &&
-    hasActiveShift === false &&
-    !hasScheduledShift
+    !isLoadingShift &&
+    !activeShift &&
+    !todaySchedule
   ) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 p-6">
@@ -2009,7 +2068,11 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-center">
-              <Button onClick={checkActiveShift} variant="outline" size="lg">
+              <Button
+                onClick={() => loadShiftData(true)}
+                variant="outline"
+                size="lg"
+              >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
@@ -2020,26 +2083,32 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     );
   }
 
-  // Show loading state while checking shift
-  if (isCheckingShift && (user.role === "cashier" || user.role === "manager")) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-600">Checking shift status...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Check if operations should be disabled (no active shift but has scheduled shift)
   const isOperationsDisabled =
     (user.role === "cashier" || user.role === "manager") &&
-    !hasActiveShift &&
-    hasScheduledShift;
+    !activeShift &&
+    todaySchedule;
 
   return (
     <>
+      {/* Overtime Warning Banner */}
+      {showOvertimeWarning && activeShift && (
+        <div className="bg-red-50 border-b-2 border-red-300 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+            <div>
+              <h3 className="font-semibold text-red-800">
+                Shift Overtime Warning
+              </h3>
+              <p className="text-sm text-red-700">
+                Your shift is {overtimeMinutes} minutes past the scheduled end
+                time. Please end your shift as soon as possible.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Start Shift Banner - Show when scheduled shift exists but no active shift */}
       {isOperationsDisabled && (
         <div className="bg-amber-50 border-b-2 border-amber-300 p-4 flex items-center justify-between">
@@ -2050,18 +2119,36 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 Start Your Shift to Begin Transactions
               </p>
               <p className="text-sm text-amber-700">
-                You have a scheduled shift today. Please start your shift to
-                perform transactions.
+                {todaySchedule
+                  ? `Scheduled: ${new Date(
+                      todaySchedule.startTime
+                    ).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })} - ${new Date(todaySchedule.endTime).toLocaleTimeString(
+                      [],
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      }
+                    )}. ${shiftTimingInfo.reason}`
+                  : "You have a scheduled shift today. Please start your shift to perform transactions."}
               </p>
             </div>
           </div>
           <Button
-            onClick={() => setShowStartShiftDialog(true)}
-            className="bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={handleStartShiftClick}
+            className={`bg-amber-600 hover:bg-amber-700 text-white ${
+              !shiftTimingInfo.canStart ? "opacity-50" : ""
+            }`}
             size="lg"
+            disabled={!todaySchedule || !shiftTimingInfo.canStart}
+            title={shiftTimingInfo.reason}
           >
             <Clock className="h-4 w-4 mr-2" />
-            Start Shift
+            {shiftTimingInfo.buttonText}
           </Button>
         </div>
       )}
@@ -2665,35 +2752,18 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         {/* Right Column - Cart & Payment */}
 
         <div className="flex flex-col flex-[0_1_480px] w-full lg:w-[480px] max-w-[520px] gap-2 h-full overflow-hidden">
-          {/* Quick Actions Carousel */}
-
           <QuickActionsCarousel
             onRefund={() => {
-              if (isOperationsDisabled) {
-                toast.error(
-                  "Please start your shift before performing refunds"
-                );
-                return;
-              }
               setShowRefundModal(true);
             }}
             onVoid={() => {
-              if (isOperationsDisabled) {
-                toast.error(
-                  "Please start your shift before voiding transactions"
-                );
-                return;
-              }
               setShowVoidModal(true);
             }}
             onCount={() => {
-              if (isOperationsDisabled) {
-                toast.error("Please start your shift before counting cash");
-                return;
-              }
               setShowCountModal(true);
             }}
             onDashboard={onBack}
+            hasActiveShift={!!activeShift}
           />
 
           <div className="bg-white border-t-black-200 shadow-lg shrink-0">
@@ -3335,7 +3405,51 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             >
               Cancel
             </Button>
-            <Button onClick={handleStartShift}>Start Shift</Button>
+            <Button onClick={confirmStartShift}>Start Shift</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Late Start Confirmation Dialog */}
+      <Dialog
+        open={showLateStartConfirm}
+        onOpenChange={setShowLateStartConfirm}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Late Shift Start</DialogTitle>
+            <DialogDescription>
+              You are{" "}
+              {(() => {
+                const hours = Math.floor(lateStartMinutes / 60);
+                const minutes = lateStartMinutes % 60;
+
+                if (hours > 0) {
+                  if (minutes === 0) {
+                    return hours === 1 ? "1 hour" : `${hours} hours`;
+                  } else {
+                    return `${hours}h ${minutes}m`;
+                  }
+                } else {
+                  return `${lateStartMinutes} minutes`;
+                }
+              })()}{" "}
+              late for your scheduled shift.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p>
+              Do you want to start your shift now and mark it as a late start?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowLateStartConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmLateStart}>Start Late</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
