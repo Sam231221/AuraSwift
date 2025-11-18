@@ -2992,7 +2992,9 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                   : "-"}
                               </TableCell>
                               <TableCell className="font-medium">
-                                {item.product?.name || "Unknown Product"}
+                                {item.product?.name ||
+                                  item.itemName ||
+                                  "Unknown Product"}
                                 {item.ageRestrictionLevel !== "NONE" && (
                                   <Badge
                                     variant="outline"
