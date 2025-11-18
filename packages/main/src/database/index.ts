@@ -113,7 +113,14 @@ export async function getDatabase(): Promise<DatabaseManagers> {
 
     // Create all manager instances with drizzle support
     const sessions = new SessionManager(drizzle, uuid);
-    const users = new UserManager(drizzle, bcryptWrapper, uuid, sessions);
+    const timeTracking = new TimeTrackingManager(drizzle, uuid);
+    const users = new UserManager(
+      drizzle,
+      bcryptWrapper,
+      uuid,
+      sessions,
+      timeTracking
+    );
     const businesses = new BusinessManager(drizzle, uuid);
     const products = new ProductManager(drizzle, uuid);
     const categories = new CategoryManager(drizzle, uuid);
@@ -125,7 +132,6 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const reports = new ReportManager(drizzle);
     const auditLogs = new AuditLogManager(drizzle, uuid);
     const discounts = new DiscountManager(drizzle, uuid);
-    const timeTracking = new TimeTrackingManager(drizzle, uuid);
     const audit = new AuditManager(drizzle, uuid);
     const timeTrackingReports = new TimeTrackingReportManager(drizzle);
     const settings = new SettingsManager(drizzle);

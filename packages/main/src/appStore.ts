@@ -102,10 +102,10 @@ ipcMain.handle("auth:validateSession", async (event, token) => {
   }
 });
 
-ipcMain.handle("auth:logout", async (event, token) => {
+ipcMain.handle("auth:logout", async (event, token, options) => {
   try {
     if (!db) db = await getDatabase();
-    return db.users.logout(token);
+    return db.users.logout(token, options);
   } catch (error) {
     console.error("Logout IPC error:", error);
     return {
@@ -607,8 +607,18 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
       };
     }
 
+    // Get active time shift (user should be clocked in)
+    const activeTimeShift = db.timeTracking.getActiveShift(shiftData.cashierId);
+    if (!activeTimeShift) {
+      return {
+        success: false,
+        message: "Please clock in before starting a shift",
+      };
+    }
+
     const shift = db.shifts.createShift({
       scheduleId: shiftData.scheduleId ?? null,
+      timeShiftId: activeTimeShift.id, // Link to time shift
       cashierId: shiftData.cashierId,
       businessId: shiftData.businessId,
       startTime: new Date().toISOString(),
@@ -623,7 +633,7 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
       totalRefunds: 0,
       totalVoids: 0,
       notes: shiftData.notes ?? null,
-    });
+    } as any);
 
     // Update schedule status if linked
     if (shiftData.scheduleId) {
@@ -1545,6 +1555,154 @@ ipcMain.handle("app:restart", async () => {
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to restart app",
+    };
+  }
+});
+
+// Time Tracking IPC Handlers
+ipcMain.handle("timeTracking:clockIn", async (event, data) => {
+  try {
+    if (!db) db = await getDatabase();
+    const clockEvent = await db.timeTracking.createClockEvent({
+      ...data,
+      type: "in",
+    });
+
+    // Check if shift should be created
+    const activeShift = db.timeTracking.getActiveShift(data.userId);
+    if (!activeShift && data.businessId) {
+      const shift = await db.timeTracking.createShift({
+        userId: data.userId,
+        businessId: data.businessId,
+        clockInId: clockEvent.id,
+      });
+      return {
+        success: true,
+        clockEvent,
+        shift,
+      };
+    }
+
+    return {
+      success: true,
+      clockEvent,
+      shift: activeShift,
+    };
+  } catch (error) {
+    console.error("Clock-in IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to clock in",
+    };
+  }
+});
+
+ipcMain.handle("timeTracking:clockOut", async (event, data) => {
+  try {
+    if (!db) db = await getDatabase();
+    const activeShift = db.timeTracking.getActiveShift(data.userId);
+
+    if (!activeShift) {
+      return {
+        success: false,
+        message: "No active shift found",
+      };
+    }
+
+    // End any active breaks
+    const activeBreak = db.timeTracking.getActiveBreak(activeShift.id);
+    if (activeBreak) {
+      await db.timeTracking.endBreak(activeBreak.id);
+    }
+
+    // Create clock-out event
+    const clockEvent = await db.timeTracking.createClockEvent({
+      ...data,
+      type: "out",
+    });
+
+    // Complete shift
+    const completedShift = await db.timeTracking.completeShift(
+      activeShift.id,
+      clockEvent.id
+    );
+
+    return {
+      success: true,
+      clockEvent,
+      shift: completedShift,
+    };
+  } catch (error) {
+    console.error("Clock-out IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to clock out",
+    };
+  }
+});
+
+ipcMain.handle("timeTracking:getActiveShift", async (event, userId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const shift = db.timeTracking.getActiveShift(userId);
+
+    if (!shift) {
+      return {
+        success: false,
+        message: "No active shift found",
+      };
+    }
+
+    const breaks = db.timeTracking.getBreaksByShift(shift.id);
+
+    return {
+      success: true,
+      shift,
+      breaks,
+    };
+  } catch (error) {
+    console.error("Get active shift IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get active shift",
+    };
+  }
+});
+
+ipcMain.handle("timeTracking:startBreak", async (event, data) => {
+  try {
+    if (!db) db = await getDatabase();
+    const breakRecord = await db.timeTracking.startBreak(data);
+    return {
+      success: true,
+      break: breakRecord,
+    };
+  } catch (error) {
+    console.error("Start break IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to start break",
+    };
+  }
+});
+
+ipcMain.handle("timeTracking:endBreak", async (event, breakId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const breakRecord = await db.timeTracking.endBreak(breakId);
+    return {
+      success: true,
+      break: breakRecord,
+    };
+  } catch (error) {
+    console.error("End break IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to end break",
     };
   }
 });

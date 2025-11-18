@@ -17,6 +17,11 @@ export interface AuthResponse {
   users?: schema.User[];
   token?: string;
   errors?: string[];
+  clockEvent?: any; // Clock event created on login
+  shift?: any; // Active time shift
+  requiresClockIn?: boolean; // Flag if clock-in is required
+  isClockedIn?: boolean; // Flag if user is clocked in (on logout)
+  activeShift?: any; // Active shift (on logout)
 }
 
 export class UserManager {
@@ -24,21 +29,28 @@ export class UserManager {
   private bcrypt: any;
   private uuid: any;
   private sessionManager: any;
+  private timeTrackingManager: any;
 
   constructor(
     drizzle: DrizzleDB,
     bcrypt: any,
     uuid: any,
-    sessionManager?: any
+    sessionManager?: any,
+    timeTrackingManager?: any
   ) {
     this.db = drizzle;
     this.bcrypt = bcrypt;
     this.uuid = uuid;
     this.sessionManager = sessionManager;
+    this.timeTrackingManager = timeTrackingManager;
   }
 
   setSessionManager(sessionManager: any): void {
     this.sessionManager = sessionManager;
+  }
+
+  setTimeTrackingManager(timeTrackingManager: any): void {
+    this.timeTrackingManager = timeTrackingManager;
   }
 
   getUserByEmail(email: string): User | null {
@@ -443,6 +455,10 @@ export class UserManager {
     username?: string;
     pin?: string;
     rememberMe?: boolean;
+    terminalId?: string;
+    ipAddress?: string;
+    locationId?: string;
+    autoClockIn?: boolean; // Default true for cashier/manager
   }): Promise<AuthResponse> {
     try {
       let user: User | null = null;
@@ -520,11 +536,74 @@ export class UserManager {
         rememberMe ? 30 : 0.5 // 30 days or 12 hours
       );
 
+      // Auto clock-in for cashiers and managers (if enabled)
+      let clockEvent = null;
+      let shift = null;
+      let requiresClockIn = false;
+
+      if (this.timeTrackingManager) {
+        const shouldClockIn =
+          data.autoClockIn !== false &&
+          (user.role === "cashier" || user.role === "manager");
+
+        if (shouldClockIn) {
+          // Check for existing active shift
+          const activeShift = this.timeTrackingManager.getActiveShift(user.id);
+
+          if (!activeShift) {
+            try {
+              // Create clock-in event
+              clockEvent = await this.timeTrackingManager.createClockEvent({
+                userId: user.id,
+                terminalId: data.terminalId || "unknown",
+                locationId: data.locationId,
+                type: "in",
+                method: "login",
+                ipAddress: data.ipAddress,
+              });
+
+              // Validate clock event
+              const validation =
+                await this.timeTrackingManager.validateClockEvent(clockEvent);
+
+              if (!validation.valid) {
+                // Log warnings but don't fail login
+                console.warn(
+                  "Clock-in validation warnings:",
+                  validation.warnings
+                );
+              }
+
+              // Get business ID
+              const userWithBusiness = this.getUserWithBusiness(user.id);
+              if (userWithBusiness?.businessId) {
+                // Create time shift
+                shift = await this.timeTrackingManager.createShift({
+                  userId: user.id,
+                  businessId: userWithBusiness.businessId,
+                  clockInId: clockEvent.id,
+                });
+              }
+            } catch (error) {
+              // Don't fail login if clock-in fails, but log it
+              console.error("Auto clock-in failed:", error);
+              requiresClockIn = true;
+            }
+          } else {
+            // User already has active shift
+            shift = activeShift;
+          }
+        }
+      }
+
       return {
         success: true,
         message: "Login successful",
         user,
         token: session.token,
+        clockEvent: clockEvent as any,
+        shift: shift as any,
+        requiresClockIn,
       };
     } catch (error) {
       console.error("Login error:", error);
@@ -579,16 +658,83 @@ export class UserManager {
     }
   }
 
-  logout(token: string): AuthResponse {
+  async logout(
+    token: string,
+    options?: {
+      terminalId?: string;
+      ipAddress?: string;
+      autoClockOut?: boolean; // Default true for cashier/manager
+    }
+  ): Promise<AuthResponse> {
     try {
       if (!this.sessionManager) {
         throw new Error("Session manager not initialized");
       }
 
+      // Get user from session before deleting
+      const session = this.sessionManager.getSessionByToken(token);
+      if (!session) {
+        return {
+          success: false,
+          message: "Session not found",
+        };
+      }
+
+      const user = this.getUserById(session.userId);
+
+      // Check if user is clocked in (for warning, but don't force clock-out)
+      let activeShift = null;
+      let isClockedIn = false;
+
+      if (this.timeTrackingManager && user) {
+        activeShift = this.timeTrackingManager.getActiveShift(user.id);
+        isClockedIn = !!activeShift;
+
+        // Auto clock-out if enabled and user is clocked in
+        const shouldClockOut =
+          options?.autoClockOut !== false &&
+          (user.role === "cashier" || user.role === "manager") &&
+          isClockedIn;
+
+        if (shouldClockOut && activeShift) {
+          try {
+            // End any active breaks
+            const activeBreak = this.timeTrackingManager.getActiveBreak(
+              activeShift.id
+            );
+            if (activeBreak) {
+              await this.timeTrackingManager.endBreak(activeBreak.id);
+            }
+
+            // Create clock-out event
+            const clockEvent = await this.timeTrackingManager.createClockEvent({
+              userId: user.id,
+              terminalId: options?.terminalId || "unknown",
+              type: "out",
+              method: "logout",
+              ipAddress: options?.ipAddress,
+            });
+
+            // Complete shift
+            await this.timeTrackingManager.completeShift(
+              activeShift.id,
+              clockEvent.id
+            );
+          } catch (error) {
+            // Don't fail logout if clock-out fails, but log it
+            console.error("Auto clock-out failed:", error);
+          }
+        }
+      }
+
+      // Delete session
       const deleted = this.sessionManager.deleteSession(token);
+
       return {
         success: deleted,
         message: deleted ? "Logged out successfully" : "Session not found",
+        isClockedIn: isClockedIn as any, // Flag to show warning in UI
+        activeShift: activeShift as any,
       };
     } catch (error) {
       console.error("Logout error:", error);

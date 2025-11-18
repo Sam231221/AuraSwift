@@ -1031,10 +1031,14 @@ export const schedules = createTable("schedules", {
 
 /**
  * Cashier shifts for POS operations
+ * Linked to timeShifts for clock-in/clock-out tracking
  */
 export const shifts = createTable("shifts", {
   id: text("id").primaryKey(),
   scheduleId: text("scheduleId").references(() => schedules.id),
+  timeShiftId: text("timeShiftId").references(() => timeShifts.id, {
+    onDelete: "set null",
+  }), // Link to time tracking shift
   cashierId: text("cashierId")
     .notNull()
     .references(() => users.id),
@@ -1919,6 +1923,10 @@ export const schedulesRelations = relations(schedules, ({ one, many }) => ({
 }));
 
 export const shiftsRelations = relations(shifts, ({ one, many }) => ({
+  timeShift: one(timeShifts, {
+    fields: [shifts.timeShiftId],
+    references: [timeShifts.id],
+  }),
   schedule: one(schedules, {
     fields: [shifts.scheduleId],
     references: [schedules.id],
@@ -2043,6 +2051,9 @@ export const timeShiftsRelations = relations(timeShifts, ({ one, many }) => ({
     references: [schedules.id],
   }),
   breaks: many(breaks),
+  posShifts: many(shifts, {
+    relationName: "timeShift",
+  }),
   corrections: many(timeCorrections),
 }));
 

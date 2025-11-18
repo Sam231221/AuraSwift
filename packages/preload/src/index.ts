@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import { sha256sum } from "./nodeCrypto.js";
 import { versions } from "./versions.js";
 
-import { authAPI, authStore } from "./api/auth.js";
+import { authAPI, authStore, timeTrackingAPI } from "./api/auth.js";
 import { productAPI } from "./api/products.js";
 import { categoryAPI } from "./api/categories.js";
 import { scheduleAPI, shiftAPI } from "./api/shifts.js";
@@ -25,6 +25,7 @@ import {
 // Expose APIs to renderer process
 contextBridge.exposeInMainWorld("authStore", authStore);
 contextBridge.exposeInMainWorld("authAPI", authAPI);
+contextBridge.exposeInMainWorld("timeTrackingAPI", timeTrackingAPI);
 contextBridge.exposeInMainWorld("productAPI", productAPI);
 contextBridge.exposeInMainWorld("categoryAPI", categoryAPI);
 contextBridge.exposeInMainWorld("scheduleAPI", scheduleAPI);

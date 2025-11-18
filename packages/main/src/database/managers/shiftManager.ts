@@ -24,6 +24,7 @@ export class ShiftManager {
       .values({
         id: shiftId,
         scheduleId: shiftData.scheduleId ?? null,
+        timeShiftId: (shiftData as any).timeShiftId ?? null, // Link to time shift
         cashierId: shiftData.cashierId,
         businessId: shiftData.businessId,
         startTime: shiftData.startTime,
