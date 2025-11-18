@@ -95,9 +95,27 @@ declare global {
         username: string;
         pin: string;
         rememberMe?: boolean;
-      }) => Promise<APIResponse>;
+        terminalId?: string;
+        ipAddress?: string;
+        locationId?: string;
+        autoClockIn?: boolean;
+      }) => Promise<APIResponse & {
+        clockEvent?: any;
+        shift?: any;
+        requiresClockIn?: boolean;
+      }>;
       validateSession: (token: string) => Promise<APIResponse>;
-      logout: (token: string) => Promise<APIResponse>;
+      logout: (
+        token: string,
+        options?: {
+          terminalId?: string;
+          ipAddress?: string;
+          autoClockOut?: boolean;
+        }
+      ) => Promise<APIResponse & {
+        isClockedIn?: boolean;
+        activeShift?: any;
+      }>;
       getUserById: (userId: string) => Promise<APIResponse>;
       updateUser: (
         userId: string,
@@ -556,6 +574,41 @@ declare global {
           rawReadings?: number[];
         }) => void
       ) => () => void;
+    };
+    timeTrackingAPI: {
+      clockIn: (data: {
+        userId: string;
+        terminalId: string;
+        locationId?: string;
+        businessId: string;
+        ipAddress?: string;
+      }) => Promise<APIResponse & {
+        clockEvent?: any;
+        shift?: any;
+      }>;
+      clockOut: (data: {
+        userId: string;
+        terminalId: string;
+        ipAddress?: string;
+      }) => Promise<APIResponse & {
+        clockEvent?: any;
+        shift?: any;
+      }>;
+      getActiveShift: (userId: string) => Promise<APIResponse & {
+        shift?: any;
+        breaks?: any[];
+      }>;
+      startBreak: (data: {
+        shiftId: string;
+        userId: string;
+        type?: "meal" | "rest" | "other";
+        isPaid?: boolean;
+      }) => Promise<APIResponse & {
+        break?: any;
+      }>;
+      endBreak: (breakId: string) => Promise<APIResponse & {
+        break?: any;
+      }>;
     };
   }
 }

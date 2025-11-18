@@ -105,7 +105,99 @@ ipcMain.handle("auth:validateSession", async (event, token) => {
 ipcMain.handle("auth:logout", async (event, token, options) => {
   try {
     if (!db) db = await getDatabase();
-    return db.users.logout(token, options);
+    
+    // Get user from session before logout to check for active POS shifts
+    const session = db.sessions.getSessionByToken(token);
+    if (session) {
+      const user = db.users.getUserById(session.userId);
+      
+      // Check for active POS shifts before allowing clock-out
+      if (user && (user.role === "cashier" || user.role === "manager")) {
+        const activeTimeShift = db.timeTracking.getActiveShift(user.id);
+        
+        if (activeTimeShift) {
+          // Check if there are active POS shifts for this TimeShift
+          const activePosShifts = db.shifts.getActiveShiftsByTimeShift(activeTimeShift.id);
+          
+          if (activePosShifts.length > 0 && options?.autoClockOut !== false) {
+            // User has active POS shifts - auto-end them before clock-out
+            console.log(
+              `Auto-ending ${activePosShifts.length} active POS shift(s) before clock-out for user ${user.id}`
+            );
+            
+            const failedShifts: string[] = [];
+            
+            for (const posShift of activePosShifts) {
+              try {
+                // Estimate final cash (starting cash + sales)
+                const estimatedCash = posShift.startingCash + (posShift.totalSales || 0);
+                
+                db.shifts.endShift(posShift.id, {
+                  endTime: new Date().toISOString(),
+                  finalCashDrawer: estimatedCash,
+                  expectedCashDrawer: estimatedCash,
+                  totalSales: posShift.totalSales || 0,
+                  totalTransactions: posShift.totalTransactions || 0,
+                  totalRefunds: posShift.totalRefunds || 0,
+                  totalVoids: posShift.totalVoids || 0,
+                  notes: posShift.notes
+                    ? `${posShift.notes}; Auto-ended on logout`
+                    : "Auto-ended on logout",
+                });
+                
+                console.log(`Auto-ended POS shift ${posShift.id} on logout`);
+              } catch (error) {
+                failedShifts.push(posShift.id);
+                console.error(
+                  `Failed to auto-end POS shift ${posShift.id} on logout:`,
+                  error
+                );
+              }
+            }
+            
+            // After ending all POS shifts, check if TimeShift should be clocked out
+            // Only clock out if all shifts were successfully ended
+            if (failedShifts.length === 0) {
+              const remainingActiveShifts = db.shifts.getActiveShiftsByTimeShift(activeTimeShift.id);
+              if (remainingActiveShifts.length === 0) {
+                // All shifts ended successfully, clock out TimeShift
+                try {
+                  const activeBreak = db.timeTracking.getActiveBreak(activeTimeShift.id);
+                  if (activeBreak) {
+                    await db.timeTracking.endBreak(activeBreak.id);
+                  }
+
+                  const clockOutEvent = await db.timeTracking.createClockEvent({
+                    userId: user.id,
+                    terminalId: options?.terminalId || "unknown",
+                    type: "out",
+                    method: "logout",
+                    ipAddress: options?.ipAddress,
+                    notes: "Auto clock-out: All POS shifts ended on logout",
+                  });
+
+                  await db.timeTracking.completeShift(activeTimeShift.id, clockOutEvent.id);
+                  console.log(
+                    `Auto clocked out TimeShift ${activeTimeShift.id} after ending all POS shifts on logout`
+                  );
+                } catch (error) {
+                  console.error(
+                    "Failed to clock out TimeShift after ending POS shifts:",
+                    error
+                  );
+                }
+              }
+            } else {
+              console.warn(
+                `Cannot clock out TimeShift ${activeTimeShift.id}: ${failedShifts.length} POS shift(s) failed to end: ${failedShifts.join(", ")}`
+              );
+            }
+          }
+        }
+      }
+    }
+    
+    return await db.users.logout(token, options);
   } catch (error) {
     console.error("Logout IPC error:", error);
     return {
@@ -583,16 +675,83 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
   try {
     if (!db) db = await getDatabase();
 
-    // Clean up overdue and old unclosed shifts first to prevent conflicts
-    const overdueCount = db.shifts.autoEndOverdueShiftsToday();
-    if (overdueCount > 0) {
-      // auto-ended overdue shifts
-    }
+    // Helper function to handle clock-out after closing shifts
+    const handleClockOutAfterShiftClose = async (
+      closedShifts: Array<{ id: string; timeShiftId: string | null; cashierId: string }>
+    ) => {
+      if (closedShifts.length === 0) return;
 
-    const closedCount = db.shifts.autoCloseOldActiveShifts();
-    if (closedCount > 0) {
-      // auto-closed old active shifts
-    }
+      // Group closed shifts by timeShiftId to check if we need to clock out
+      const timeShiftGroups = new Map<string, Array<{ id: string; cashierId: string }>>();
+      
+      for (const closedShift of closedShifts) {
+        if (closedShift.timeShiftId && closedShift.timeShiftId.trim() !== "") {
+          if (!timeShiftGroups.has(closedShift.timeShiftId)) {
+            timeShiftGroups.set(closedShift.timeShiftId, []);
+          }
+          timeShiftGroups.get(closedShift.timeShiftId)!.push({
+            id: closedShift.id,
+            cashierId: closedShift.cashierId,
+          });
+        }
+      }
+      
+      // For each TimeShift, check if all POS shifts are now closed
+      for (const [timeShiftId, closedPosShifts] of timeShiftGroups.entries()) {
+        const remainingActiveShifts = db.shifts.getActiveShiftsByTimeShift(timeShiftId);
+        
+        if (remainingActiveShifts.length === 0) {
+          // All POS shifts for this TimeShift are closed, clock out TimeShift
+          const timeShift = db.timeTracking.getShiftById(timeShiftId);
+          if (timeShift && timeShift.status === "active") {
+            // Validate cashierId before clock-out
+            const cashierId = closedPosShifts[0]?.cashierId;
+            if (!cashierId) {
+              console.error(
+                `Cannot clock out TimeShift ${timeShiftId}: closed shifts have no cashierId`
+              );
+            } else {
+              try {
+                // End any active breaks
+                const activeBreak = db.timeTracking.getActiveBreak(timeShiftId);
+                if (activeBreak) {
+                  await db.timeTracking.endBreak(activeBreak.id);
+                }
+
+                // Create clock-out event
+                const clockOutEvent = await db.timeTracking.createClockEvent({
+                  userId: cashierId,
+                  terminalId: "system",
+                  type: "out",
+                  method: "auto",
+                  notes: "Auto clock-out: All POS shifts auto-closed",
+                });
+
+                // Complete the TimeShift
+                await db.timeTracking.completeShift(timeShiftId, clockOutEvent.id);
+
+                console.log(
+                  `Auto clocked out TimeShift ${timeShiftId} after all POS shifts were auto-closed`
+                );
+              } catch (error) {
+                console.error(
+                  `Failed to clock out TimeShift ${timeShiftId} after auto-closing shifts:`,
+                  error
+                );
+              }
+            }
+          }
+        }
+      }
+    };
+
+    // Clean up overdue and old unclosed shifts first to prevent conflicts
+    const overdueShifts = db.shifts.autoEndOverdueShiftsToday();
+    await handleClockOutAfterShiftClose(overdueShifts);
+
+    // Auto-close old active shifts and clock out TimeShifts if needed
+    const closedShifts = db.shifts.autoCloseOldActiveShifts();
+    await handleClockOutAfterShiftClose(closedShifts);
 
     // Check if cashier already has an active shift (only check today's shifts)
     const existingShift = db.shifts.getTodaysActiveShift(shiftData.cashierId);
@@ -665,6 +824,11 @@ ipcMain.handle("shift:end", async (event, shiftId, endData) => {
   try {
     if (!db) db = await getDatabase();
 
+    // Get the shift being ended to check its timeShiftId
+    const shift = db.shifts.getShiftById(shiftId);
+    const timeShiftId = shift.timeShiftId;
+
+    // End the POS shift
     db.shifts.endShift(shiftId, {
       endTime: new Date().toISOString(),
       finalCashDrawer: endData.finalCashDrawer,
@@ -675,6 +839,57 @@ ipcMain.handle("shift:end", async (event, shiftId, endData) => {
       totalVoids: endData.totalVoids,
       notes: endData.notes,
     });
+
+    // Check if this was the last active POS shift for this TimeShift
+    // If so, automatically clock out the TimeShift
+    if (timeShiftId && timeShiftId.trim() !== "") {
+      // Check for remaining active shifts (current shift is already ended)
+      const remainingActiveShifts = db.shifts.getActiveShiftsByTimeShift(timeShiftId);
+
+      if (remainingActiveShifts.length === 0) {
+        // This is the last active POS shift for this TimeShift
+        // Check if TimeShift is still active
+        const timeShift = db.timeTracking.getShiftById(timeShiftId);
+        if (timeShift && timeShift.status === "active") {
+          // Validate cashierId before clock-out
+          if (!shift.cashierId) {
+            console.error(
+              `Cannot clock out TimeShift ${timeShiftId}: shift ${shiftId} has no cashierId`
+            );
+          } else {
+            try {
+              // End any active breaks first
+              const activeBreak = db.timeTracking.getActiveBreak(timeShiftId);
+              if (activeBreak) {
+                await db.timeTracking.endBreak(activeBreak.id);
+              }
+
+              // Create clock-out event
+              const clockOutEvent = await db.timeTracking.createClockEvent({
+                userId: shift.cashierId,
+                terminalId: "system",
+                type: "out",
+                method: "auto",
+                notes: "Auto clock-out: Last POS shift ended",
+              });
+
+              // Complete the TimeShift
+              await db.timeTracking.completeShift(timeShiftId, clockOutEvent.id);
+
+              console.log(
+                `Auto clocked out TimeShift ${timeShiftId} after last POS shift ended`
+              );
+            } catch (error) {
+              // Log error but don't fail shift end
+              console.error(
+                "Failed to auto clock-out TimeShift after shift end:",
+                error
+              );
+            }
+          }
+        }
+      }
+    }
 
     // Note: Schedule status will need to be updated separately if needed
 
@@ -1657,9 +1872,18 @@ ipcMain.handle("timeTracking:getActiveShift", async (event, userId) => {
 
     const breaks = db.timeTracking.getBreaksByShift(shift.id);
 
+    // Get clock-in event for timestamp
+    let clockInEvent = null;
+    if (shift.clockInId) {
+      clockInEvent = db.timeTracking.getClockEventById(shift.clockInId);
+    }
+
     return {
       success: true,
-      shift,
+      shift: {
+        ...shift,
+        clockInEvent, // Include clock-in event info
+      },
       breaks,
     };
   } catch (error) {
@@ -1703,6 +1927,783 @@ ipcMain.handle("timeTracking:endBreak", async (event, breakId) => {
       success: false,
       message:
         error instanceof Error ? error.message : "Failed to end break",
+    };
+  }
+});
+
+// Age Verification IPC handlers
+ipcMain.handle("ageVerification:create", async (event, verificationData) => {
+  try {
+    if (!db) db = await getDatabase();
+    const record = await db.ageVerification.createAgeVerification(
+      verificationData
+    );
+
+    return {
+      success: true,
+      record: JSON.parse(JSON.stringify(record)),
+    };
+  } catch (error) {
+    console.error("Create age verification IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to create age verification record",
+    };
+  }
+});
+
+ipcMain.handle(
+  "ageVerification:getByTransaction",
+  async (event, transactionId) => {
+    try {
+      if (!db) db = await getDatabase();
+      const records = await db.ageVerification.getAgeVerificationsByTransaction(
+        transactionId
+      );
+
+      return {
+        success: true,
+        records: JSON.parse(JSON.stringify(records)),
+      };
+    } catch (error) {
+      console.error("Get age verifications by transaction IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to get age verification records",
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  "ageVerification:getByTransactionItem",
+  async (event, transactionItemId) => {
+    try {
+      if (!db) db = await getDatabase();
+      const records =
+        await db.ageVerification.getAgeVerificationsByTransactionItem(
+          transactionItemId
+        );
+
+      return {
+        success: true,
+        records: JSON.parse(JSON.stringify(records)),
+      };
+    } catch (error) {
+      console.error(
+        "Get age verifications by transaction item IPC error:",
+        error
+      );
+      return {
+        success: false,
+        message: "Failed to get age verification records",
+      };
+    }
+  }
+);
+
+ipcMain.handle("ageVerification:getByBusiness", async (event, businessId, options) => {
+  try {
+    if (!db) db = await getDatabase();
+    const records = await db.ageVerification.getAgeVerificationsByBusiness(
+      businessId,
+      options
+    );
+
+    return {
+      success: true,
+      records: JSON.parse(JSON.stringify(records)),
+    };
+  } catch (error) {
+    console.error("Get age verifications by business IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get age verification records",
+    };
+  }
+});
+
+ipcMain.handle("ageVerification:getByProduct", async (event, productId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const records = await db.ageVerification.getAgeVerificationsByProduct(
+      productId
+    );
+
+    return {
+      success: true,
+      records: JSON.parse(JSON.stringify(records)),
+    };
+  } catch (error) {
+    console.error("Get age verifications by product IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get age verification records",
+    };
+  }
+});
+
+ipcMain.handle("ageVerification:getByStaff", async (event, staffId, options) => {
+  try {
+    if (!db) db = await getDatabase();
+    const records = await db.ageVerification.getAgeVerificationsByStaff(
+      staffId,
+      options
+    );
+
+    return {
+      success: true,
+      records: JSON.parse(JSON.stringify(records)),
+    };
+  } catch (error) {
+    console.error("Get age verifications by staff IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get age verification records",
+    };
+  }
+});
+
+// ============================================================================
+// BATCH MANAGEMENT IPC HANDLERS
+// ============================================================================
+
+ipcMain.handle("batches:create", async (event, batchData) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batch = await db.batches.createBatch(batchData);
+
+    return {
+      success: true,
+      batch: JSON.parse(JSON.stringify(batch)),
+    };
+  } catch (error) {
+    console.error("Create batch IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to create batch",
+    };
+  }
+});
+
+ipcMain.handle("batches:getById", async (event, batchId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batch = await db.batches.getBatchById(batchId);
+
+    return {
+      success: true,
+      batch: JSON.parse(JSON.stringify(batch)),
+    };
+  } catch (error) {
+    console.error("Get batch IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get batch",
+    };
+  }
+});
+
+ipcMain.handle("batches:getByProduct", async (event, productId, options) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batches = await db.batches.getBatchesByProduct(productId, options);
+
+    return {
+      success: true,
+      batches: JSON.parse(JSON.stringify(batches)),
+    };
+  } catch (error) {
+    console.error("Get batches by product IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get batches",
+    };
+  }
+});
+
+ipcMain.handle("batches:getByBusiness", async (event, businessId, options) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batches = await db.batches.getBatchesByBusiness(businessId, options);
+
+    return {
+      success: true,
+      batches: JSON.parse(JSON.stringify(batches)),
+    };
+  } catch (error) {
+    console.error("Get batches by business IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get batches",
+    };
+  }
+});
+
+ipcMain.handle("batches:getActiveBatches", async (event, productId, rotationMethod) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batches = await db.batches.getActiveBatchesByProduct(
+      productId,
+      rotationMethod || "FEFO"
+    );
+
+    return {
+      success: true,
+      batches: JSON.parse(JSON.stringify(batches)),
+    };
+  } catch (error) {
+    console.error("Get active batches IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get active batches",
+    };
+  }
+});
+
+ipcMain.handle("batches:selectForSale", async (event, productId, quantity, rotationMethod) => {
+  try {
+    if (!db) db = await getDatabase();
+    const selected = await db.batches.selectBatchesForSale(
+      productId,
+      quantity,
+      rotationMethod || "FEFO"
+    );
+
+    return {
+      success: true,
+      batches: JSON.parse(JSON.stringify(selected)),
+    };
+  } catch (error) {
+    console.error("Select batches for sale IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to select batches",
+    };
+  }
+});
+
+ipcMain.handle("batches:updateQuantity", async (event, batchId, quantity, movementType) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batch = await db.batches.updateBatchQuantity(
+      batchId,
+      quantity,
+      movementType
+    );
+
+    return {
+      success: true,
+      batch: JSON.parse(JSON.stringify(batch)),
+    };
+  } catch (error) {
+    console.error("Update batch quantity IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to update batch quantity",
+    };
+  }
+});
+
+ipcMain.handle("batches:updateStatus", async (event, batchId, status) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batch = await db.batches.updateBatchStatus(batchId, status);
+
+    return {
+      success: true,
+      batch: JSON.parse(JSON.stringify(batch)),
+    };
+  } catch (error) {
+    console.error("Update batch status IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to update batch status",
+    };
+  }
+});
+
+ipcMain.handle("batches:getExpiringSoon", async (event, businessId, days) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batches = await db.batches.getBatchesExpiringSoon(businessId, days);
+
+    return {
+      success: true,
+      batches: JSON.parse(JSON.stringify(batches)),
+    };
+  } catch (error) {
+    console.error("Get expiring batches IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get expiring batches",
+    };
+  }
+});
+
+ipcMain.handle("batches:calculateProductStock", async (event, productId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const stock = await db.batches.calculateProductStock(productId);
+
+    return {
+      success: true,
+      stock,
+    };
+  } catch (error) {
+    console.error("Calculate product stock IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to calculate product stock",
+    };
+  }
+});
+
+ipcMain.handle("batches:autoUpdateExpired", async (event, businessId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const count = await db.batches.autoUpdateExpiredBatches(businessId);
+
+    return {
+      success: true,
+      updatedCount: count,
+    };
+  } catch (error) {
+    console.error("Auto-update expired batches IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to auto-update expired batches",
+    };
+  }
+});
+
+ipcMain.handle("batches:remove", async (event, batchId) => {
+  try {
+    if (!db) db = await getDatabase();
+    await db.batches.removeBatch(batchId);
+
+    return {
+      success: true,
+      message: "Batch removed successfully",
+    };
+  } catch (error) {
+    console.error("Remove batch IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to remove batch",
+    };
+  }
+});
+
+ipcMain.handle("batches:getByNumber", async (event, batchNumber, productId, businessId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const batch = await db.batches.getBatchByNumber(batchNumber, productId, businessId);
+
+    if (!batch) {
+      return {
+        success: false,
+        message: "Batch not found",
+      };
+    }
+
+    return {
+      success: true,
+      batch: JSON.parse(JSON.stringify(batch)),
+    };
+  } catch (error) {
+    console.error("Get batch by number IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get batch",
+    };
+  }
+});
+
+// ============================================================================
+// SUPPLIER MANAGEMENT IPC HANDLERS
+// ============================================================================
+
+ipcMain.handle("suppliers:create", async (event, supplierData) => {
+  try {
+    if (!db) db = await getDatabase();
+    const supplier = await db.suppliers.createSupplier(supplierData);
+
+    return {
+      success: true,
+      supplier: JSON.parse(JSON.stringify(supplier)),
+    };
+  } catch (error) {
+    console.error("Create supplier IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to create supplier",
+    };
+  }
+});
+
+ipcMain.handle("suppliers:getById", async (event, supplierId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const supplier = await db.suppliers.getSupplierById(supplierId);
+
+    return {
+      success: true,
+      supplier: JSON.parse(JSON.stringify(supplier)),
+    };
+  } catch (error) {
+    console.error("Get supplier IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get supplier",
+    };
+  }
+});
+
+ipcMain.handle("suppliers:getByBusiness", async (event, businessId, includeInactive) => {
+  try {
+    if (!db) db = await getDatabase();
+    const suppliers = await db.suppliers.getSuppliersByBusiness(
+      businessId,
+      includeInactive
+    );
+
+    return {
+      success: true,
+      suppliers: JSON.parse(JSON.stringify(suppliers)),
+    };
+  } catch (error) {
+    console.error("Get suppliers by business IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get suppliers",
+    };
+  }
+});
+
+ipcMain.handle("suppliers:update", async (event, supplierId, updates) => {
+  try {
+    if (!db) db = await getDatabase();
+    const supplier = await db.suppliers.updateSupplier(supplierId, updates);
+
+    return {
+      success: true,
+      supplier: JSON.parse(JSON.stringify(supplier)),
+    };
+  } catch (error) {
+    console.error("Update supplier IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error ? error.message : "Failed to update supplier",
+    };
+  }
+});
+
+ipcMain.handle("suppliers:delete", async (event, supplierId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const deleted = await db.suppliers.deleteSupplier(supplierId);
+
+    return {
+      success: deleted,
+      message: deleted ? "Supplier deleted successfully" : "Supplier not found",
+    };
+  } catch (error) {
+    console.error("Delete supplier IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to delete supplier",
+    };
+  }
+});
+
+// ============================================================================
+// EXPIRY SETTINGS IPC HANDLERS
+// ============================================================================
+
+ipcMain.handle("expirySettings:get", async (event, businessId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const settings = await db.expirySettings.getOrCreateSettings(businessId);
+
+    return {
+      success: true,
+      settings: JSON.parse(JSON.stringify(settings)),
+    };
+  } catch (error) {
+    console.error("Get expiry settings IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get expiry settings",
+    };
+  }
+});
+
+ipcMain.handle("expirySettings:createOrUpdate", async (event, businessId, settingsData) => {
+  try {
+    if (!db) db = await getDatabase();
+    const settings = await db.expirySettings.createOrUpdateSettings(
+      businessId,
+      settingsData
+    );
+
+    return {
+      success: true,
+      settings: JSON.parse(JSON.stringify(settings)),
+    };
+  } catch (error) {
+    console.error("Create/update expiry settings IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to create/update expiry settings",
+    };
+  }
+});
+
+// ============================================================================
+// EXPIRY NOTIFICATION IPC HANDLERS
+// ============================================================================
+
+ipcMain.handle("expiryNotifications:create", async (event, notificationData) => {
+  try {
+    if (!db) db = await getDatabase();
+    const notification = await db.expiryNotifications.createNotification(
+      notificationData
+    );
+
+    return {
+      success: true,
+      notification: JSON.parse(JSON.stringify(notification)),
+    };
+  } catch (error) {
+    console.error("Create expiry notification IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to create expiry notification",
+    };
+  }
+});
+
+ipcMain.handle("expiryNotifications:getByBatch", async (event, batchId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const notifications = await db.expiryNotifications.getNotificationsByBatch(
+      batchId
+    );
+
+    return {
+      success: true,
+      notifications: JSON.parse(JSON.stringify(notifications)),
+    };
+  } catch (error) {
+    console.error("Get notifications by batch IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get notifications",
+    };
+  }
+});
+
+ipcMain.handle("expiryNotifications:getByBusiness", async (event, businessId, filters) => {
+  try {
+    if (!db) db = await getDatabase();
+    const notifications =
+      await db.expiryNotifications.getNotificationsByBusiness(
+        businessId,
+        filters
+      );
+
+    return {
+      success: true,
+      notifications: JSON.parse(JSON.stringify(notifications)),
+    };
+  } catch (error) {
+    console.error("Get notifications by business IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get notifications",
+    };
+  }
+});
+
+ipcMain.handle("expiryNotifications:getPending", async (event, businessId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const notifications = await db.expiryNotifications.getPendingNotifications(
+      businessId
+    );
+
+    return {
+      success: true,
+      notifications: JSON.parse(JSON.stringify(notifications)),
+    };
+  } catch (error) {
+    console.error("Get pending notifications IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get pending notifications",
+    };
+  }
+});
+
+ipcMain.handle("expiryNotifications:acknowledge", async (event, notificationId, userId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const notification = await db.expiryNotifications.acknowledgeNotification(
+      notificationId,
+      userId
+    );
+
+    return {
+      success: true,
+      notification: JSON.parse(JSON.stringify(notification)),
+    };
+  } catch (error) {
+    console.error("Acknowledge notification IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to acknowledge notification",
+    };
+  }
+});
+
+// ============================================================================
+// STOCK MOVEMENT IPC HANDLERS
+// ============================================================================
+
+ipcMain.handle("stockMovements:create", async (event, movementData) => {
+  try {
+    if (!db) db = await getDatabase();
+    const movement = await db.stockMovements.createStockMovement(movementData);
+
+    return {
+      success: true,
+      movement: JSON.parse(JSON.stringify(movement)),
+    };
+  } catch (error) {
+    console.error("Create stock movement IPC error:", error);
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to create stock movement",
+    };
+  }
+});
+
+ipcMain.handle("stockMovements:getByProduct", async (event, productId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const movements = await db.stockMovements.getMovementsByProduct(productId);
+
+    return {
+      success: true,
+      movements: JSON.parse(JSON.stringify(movements)),
+    };
+  } catch (error) {
+    console.error("Get movements by product IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get stock movements",
+    };
+  }
+});
+
+ipcMain.handle("stockMovements:getByBatch", async (event, batchId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const movements = await db.stockMovements.getMovementsByBatch(batchId);
+
+    return {
+      success: true,
+      movements: JSON.parse(JSON.stringify(movements)),
+    };
+  } catch (error) {
+    console.error("Get movements by batch IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get stock movements",
+    };
+  }
+});
+
+ipcMain.handle("stockMovements:getByBusiness", async (event, businessId, filters) => {
+  try {
+    if (!db) db = await getDatabase();
+    const movements = await db.stockMovements.getMovementsByBusiness(
+      businessId,
+      filters
+    );
+
+    return {
+      success: true,
+      movements: JSON.parse(JSON.stringify(movements)),
+    };
+  } catch (error) {
+    console.error("Get movements by business IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get stock movements",
+    };
+  }
+});
+
+// ============================================================================
+// EXPIRY NOTIFICATION SERVICE IPC HANDLERS
+// ============================================================================
+
+ipcMain.handle("expiryNotifications:scanAndCreate", async (event, businessId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const { ExpiryNotificationService } = await import(
+      "../services/expiryNotificationService.js"
+    );
+    const service = new ExpiryNotificationService(db);
+    const count = await service.scanAndCreateNotifications(businessId);
+
+    return {
+      success: true,
+      notificationsCreated: count,
+    };
+  } catch (error) {
+    console.error("Scan and create notifications IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to scan and create notifications",
+    };
+  }
+});
+
+ipcMain.handle("expiryNotifications:processTasks", async (event, businessId) => {
+  try {
+    if (!db) db = await getDatabase();
+    const { ExpiryNotificationService } = await import(
+      "../services/expiryNotificationService.js"
+    );
+    const service = new ExpiryNotificationService(db);
+    const result = await service.processExpiryTasks(businessId);
+
+    return {
+      success: true,
+      ...result,
+    };
+  } catch (error) {
+    console.error("Process expiry tasks IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to process expiry tasks",
     };
   }
 });

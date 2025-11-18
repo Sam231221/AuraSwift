@@ -21,10 +21,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
+      // Get terminal ID (use a default or generate one)
+      const terminalId = `TERMINAL-${navigator.userAgent.slice(0, 10)}`;
+      const ipAddress = "127.0.0.1"; // Could be enhanced to get actual IP
+
       const response = await window.authAPI.login({
         username,
         pin,
         rememberMe,
+        terminalId,
+        ipAddress,
+        autoClockIn: true, // Auto clock-in for cashiers/managers
       });
 
       if (response.success && response.user && response.token) {
@@ -32,6 +39,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Persist user and token for session restoration
         await window.authStore.set("user", JSON.stringify(response.user));
         await window.authStore.set("token", response.token);
+
+        // Store clock-in info if available
+        if (response.clockEvent) {
+          await window.authStore.set(
+            "clockEvent",
+            JSON.stringify(response.clockEvent)
+          );
+        }
+        if (response.shift) {
+          await window.authStore.set("activeShift", JSON.stringify(response.shift));
+        }
+
+        // Show message if clock-in is required
+        if (response.requiresClockIn) {
+          return {
+            success: true,
+            message: "Login successful. Please clock in to track your time.",
+          };
+        }
+
         return { success: true, message: response.message };
       } else {
         setError(response.message);
@@ -173,14 +200,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = async (): Promise<void> => {
+  const logout = async (
+    options?: { clockOut?: boolean }
+  ): Promise<{ needsClockOutWarning?: boolean }> => {
     setIsLoading(true);
     setError(null);
 
     try {
       const token = await window.authStore.get("token");
       if (token) {
-        await window.authAPI.logout(token);
+        const terminalId = `TERMINAL-${navigator.userAgent.slice(0, 10)}`;
+        const ipAddress = "127.0.0.1";
+
+        const response = await window.authAPI.logout(token, {
+          terminalId,
+          ipAddress,
+          autoClockOut: options?.clockOut ?? false, // Only clock out if explicitly requested
+        });
+
+        // Check if user is still clocked in
+        if (response.isClockedIn && !options?.clockOut) {
+          return { needsClockOutWarning: true };
+        }
       }
     } catch (error) {
       console.error("Logout error:", error);
@@ -188,8 +229,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       await window.authStore.delete("user");
       await window.authStore.delete("token");
+      await window.authStore.delete("clockEvent");
+      await window.authStore.delete("activeShift");
       setIsLoading(false);
     }
+
+    return { needsClockOutWarning: false };
   };
 
   // Validate session on app start
@@ -226,6 +271,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validateSession();
   }, []);
 
+  const clockIn = async (
+    userId: string,
+    businessId: string
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const terminalId = `TERMINAL-${navigator.userAgent.slice(0, 10)}`;
+      const ipAddress = "127.0.0.1";
+
+      const response = await window.timeTrackingAPI.clockIn({
+        userId,
+        terminalId,
+        businessId,
+        ipAddress,
+      });
+
+      if (response.success) {
+        if (response.shift) {
+          await window.authStore.set(
+            "activeShift",
+            JSON.stringify(response.shift)
+          );
+        }
+        return { success: true, message: "Clocked in successfully" };
+      }
+
+      return {
+        success: false,
+        message: response.message || "Failed to clock in",
+      };
+    } catch (error) {
+      console.error("Clock-in error:", error);
+      return { success: false, message: "Failed to clock in" };
+    }
+  };
+
+  const clockOut = async (
+    userId: string
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const terminalId = `TERMINAL-${navigator.userAgent.slice(0, 10)}`;
+      const ipAddress = "127.0.0.1";
+
+      const response = await window.timeTrackingAPI.clockOut({
+        userId,
+        terminalId,
+        ipAddress,
+      });
+
+      if (response.success) {
+        await window.authStore.delete("activeShift");
+        await window.authStore.delete("clockEvent");
+        return { success: true, message: "Clocked out successfully" };
+      }
+
+      return {
+        success: false,
+        message: response.message || "Failed to clock out",
+      };
+    } catch (error) {
+      console.error("Clock-out error:", error);
+      return { success: false, message: "Failed to clock out" };
+    }
+  };
+
+  const getActiveShift = async (userId: string): Promise<any> => {
+    try {
+      const response = await window.timeTrackingAPI.getActiveShift(userId);
+      return response.shift || null;
+    } catch (error) {
+      console.error("Get active shift error:", error);
+      return null;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -235,6 +354,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         registerBusiness,
         createUser,
         logout,
+        clockIn,
+        clockOut,
+        getActiveShift,
         isLoading,
         error,
         isInitializing,

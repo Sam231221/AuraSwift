@@ -17,6 +17,12 @@ import { TimeTrackingManager } from "./managers/timeTrackingManager.js";
 import { AuditManager } from "./managers/auditManager.js";
 import { TimeTrackingReportManager } from "./managers/timeTrackingReportManager.js";
 import { SettingsManager } from "./managers/settingsManager.js";
+import { AgeVerificationManager } from "./managers/ageVerificationManager.js";
+import { BatchManager } from "./managers/batchManager.js";
+import { SupplierManager } from "./managers/supplierManager.js";
+import { ExpirySettingsManager } from "./managers/expirySettingsManager.js";
+import { ExpiryNotificationManager } from "./managers/expiryNotificationManager.js";
+import { StockMovementManager } from "./managers/stockMovementManager.js";
 import { initializeDrizzle } from "./drizzle.js";
 import { getDatabaseInfo } from "./utils/dbInfo.js";
 import bcrypt from "bcryptjs";
@@ -47,6 +53,12 @@ export interface DatabaseManagers {
   audit: AuditManager;
   timeTrackingReports: TimeTrackingReportManager;
   settings: SettingsManager;
+  ageVerification: AgeVerificationManager;
+  batches: BatchManager;
+  suppliers: SupplierManager;
+  expirySettings: ExpirySettingsManager;
+  expiryNotifications: ExpiryNotificationManager;
+  stockMovements: StockMovementManager;
 
   getDatabaseInfo: () => {
     path: string;
@@ -135,6 +147,12 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const audit = new AuditManager(drizzle, uuid);
     const timeTrackingReports = new TimeTrackingReportManager(drizzle);
     const settings = new SettingsManager(drizzle);
+    const ageVerification = new AgeVerificationManager(drizzle, uuid);
+    const batches = new BatchManager(drizzle, uuid);
+    const suppliers = new SupplierManager(drizzle, uuid);
+    const expirySettings = new ExpirySettingsManager(drizzle, uuid);
+    const expiryNotifications = new ExpiryNotificationManager(drizzle, uuid);
+    const stockMovements = new StockMovementManager(drizzle, uuid, batches);
 
     managersInstance = {
       users,
@@ -155,6 +173,12 @@ export async function getDatabase(): Promise<DatabaseManagers> {
       audit,
       timeTrackingReports,
       settings,
+      ageVerification,
+      batches,
+      suppliers,
+      expirySettings,
+      expiryNotifications,
+      stockMovements,
 
       // Database info methods
       getDatabaseInfo: () => {

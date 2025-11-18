@@ -6,6 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
   Table,
   TableBody,
   TableCell,
@@ -32,6 +41,8 @@ import {
   RotateCcw,
   XCircle,
   LayoutDashboard,
+  RefreshCw,
+  Clock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
@@ -309,7 +320,26 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [cartSession, setCartSession] = useState<CartSession | null>(null);
   const [cartItems, setCartItems] = useState<CartItemWithProduct[]>([]);
   const [loadingCart, setLoadingCart] = useState(false);
-  
+
+  // Shift State - Check if cashier has active shift
+  const [hasActiveShift, setHasActiveShift] = useState<boolean | null>(null);
+  const [hasScheduledShift, setHasScheduledShift] = useState<boolean | null>(
+    null
+  );
+  const [isCheckingShift, setIsCheckingShift] = useState(true);
+  const [todaySchedule, setTodaySchedule] = useState<{
+    id: string;
+    staffId: string;
+    businessId: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+  } | null>(null);
+
+  // Start Shift Dialog State
+  const [showStartShiftDialog, setShowStartShiftDialog] = useState(false);
+  const [startingCash, setStartingCash] = useState("");
+
   // State management
   const [barcodeInput, setBarcodeInput] = useState("");
   const [searchQuery] = useState("");
@@ -400,121 +430,141 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const total = subtotal + tax;
 
   // Functions for cart operations using cart API (must be defined before handleHardwareScan)
-  const addToCart = useCallback(async (product: Product, weight?: number) => {
-    if (!cartSession) {
-      toast.error("Cart session not initialized");
-      return;
-    }
+  const addToCart = useCallback(
+    async (product: Product, weight?: number) => {
+      // Check if operations are disabled (no active shift but has scheduled shift)
+      const operationsDisabled =
+        (user?.role === "cashier" || user?.role === "manager") &&
+        !hasActiveShift &&
+        hasScheduledShift;
 
-    console.log(
-      "🛒 Adding to cart:",
-      product.name,
-      weight ? `(${weight} ${product.unit})` : ""
-    );
-
-    try {
-      // Determine item type
-      const itemType = product.requiresWeight ? "WEIGHT" : "UNIT";
-      
-      // Calculate pricing
-      let unitPrice = product.price;
-      let totalPrice = product.price;
-      let taxAmount = 0;
-      
-      if (product.requiresWeight && weight && product.pricePerUnit) {
-        unitPrice = product.pricePerUnit;
-        totalPrice = product.pricePerUnit * weight;
-      } else if (!product.requiresWeight) {
-        totalPrice = product.price * 1; // Default quantity 1
+      if (operationsDisabled) {
+        toast.error("Please start your shift before adding items to cart");
+        return;
       }
-      
-      // Calculate tax (simplified - should use product's tax rate)
-      taxAmount = totalPrice * 0.08; // Example 8% tax
-      totalPrice = totalPrice + taxAmount;
 
-      // Check for existing item to update quantity/weight
-      const existingItem = cartItems.find(
-        (item) => item.productId === product.id && item.itemType === itemType
+      if (!cartSession) {
+        toast.error("Cart session not initialized");
+        return;
+      }
+
+      console.log(
+        "🛒 Adding to cart:",
+        product.name,
+        weight ? `(${weight} ${product.unit})` : ""
       );
 
-      if (existingItem) {
-        // Update existing item
-        const newQuantity = existingItem.itemType === "UNIT" 
-          ? (existingItem.quantity || 0) + 1 
-          : existingItem.quantity;
-        const newWeight = existingItem.itemType === "WEIGHT"
-          ? (existingItem.weight || 0) + (weight || 0)
-          : existingItem.weight;
-        
-        const newTotalPrice = existingItem.itemType === "UNIT"
-          ? unitPrice * (newQuantity || 1)
-          : unitPrice * (newWeight || 0);
-        const newTaxAmount = newTotalPrice * 0.08;
-        const finalTotalPrice = newTotalPrice + newTaxAmount;
+      try {
+        // Determine item type
+        const itemType = product.requiresWeight ? "WEIGHT" : "UNIT";
 
-        const updateResponse = await window.cartAPI.updateItem(existingItem.id, {
-          quantity: newQuantity,
-          weight: newWeight,
-          totalPrice: finalTotalPrice,
-          taxAmount: newTaxAmount,
-        });
+        // Calculate pricing
+        let unitPrice = product.price;
+        let totalPrice = product.price;
+        let taxAmount = 0;
 
-        if (updateResponse.success) {
-          // Reload cart items
-          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
-          if (itemsResponse.success && itemsResponse.data) {
-            setCartItems(itemsResponse.data as CartItemWithProduct[]);
-          }
-          
-          toast.success(
-            `Added ${product.name} (${newQuantity}x)${
-              product.requiresWeight && newWeight
-                ? ` - ${newWeight.toFixed(2)} ${product.unit}`
-                : ""
-            }`
-          );
-        } else {
-          toast.error("Failed to update cart item");
+        if (product.requiresWeight && weight && product.pricePerUnit) {
+          unitPrice = product.pricePerUnit;
+          totalPrice = product.pricePerUnit * weight;
+        } else if (!product.requiresWeight) {
+          totalPrice = product.price * 1; // Default quantity 1
         }
-      } else {
-        // Add new item
-        const addResponse = await window.cartAPI.addItem({
-          cartSessionId: cartSession.id,
-          productId: product.id,
-          itemType,
-          quantity: itemType === "UNIT" ? 1 : undefined,
-          weight: itemType === "WEIGHT" ? weight : undefined,
-          unitOfMeasure: product.unit || "each",
-          unitPrice,
-          totalPrice,
-          taxAmount,
-          ageRestrictionLevel: product.ageRestrictionLevel || "NONE",
-          ageVerified: false,
-        });
 
-        if (addResponse.success) {
-          // Reload cart items
-          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
-          if (itemsResponse.success && itemsResponse.data) {
-            setCartItems(itemsResponse.data as CartItemWithProduct[]);
-          }
-          
-          toast.success(
-            `Added ${product.name}${
-              product.requiresWeight && weight
-                ? ` - ${weight.toFixed(2)} ${product.unit}`
-                : ""
-            }`
+        // Calculate tax (simplified - should use product's tax rate)
+        taxAmount = totalPrice * 0.08; // Example 8% tax
+        totalPrice = totalPrice + taxAmount;
+
+        // Check for existing item to update quantity/weight
+        const existingItem = cartItems.find(
+          (item) => item.productId === product.id && item.itemType === itemType
+        );
+
+        if (existingItem) {
+          // Update existing item
+          const newQuantity =
+            existingItem.itemType === "UNIT"
+              ? (existingItem.quantity || 0) + 1
+              : existingItem.quantity;
+          const newWeight =
+            existingItem.itemType === "WEIGHT"
+              ? (existingItem.weight || 0) + (weight || 0)
+              : existingItem.weight;
+
+          const newTotalPrice =
+            existingItem.itemType === "UNIT"
+              ? unitPrice * (newQuantity || 1)
+              : unitPrice * (newWeight || 0);
+          const newTaxAmount = newTotalPrice * 0.08;
+          const finalTotalPrice = newTotalPrice + newTaxAmount;
+
+          const updateResponse = await window.cartAPI.updateItem(
+            existingItem.id,
+            {
+              quantity: newQuantity,
+              weight: newWeight,
+              totalPrice: finalTotalPrice,
+              taxAmount: newTaxAmount,
+            }
           );
+
+          if (updateResponse.success) {
+            // Reload cart items
+            const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+            if (itemsResponse.success && itemsResponse.data) {
+              setCartItems(itemsResponse.data as CartItemWithProduct[]);
+            }
+
+            toast.success(
+              `Added ${product.name} (${newQuantity}x)${
+                product.requiresWeight && newWeight
+                  ? ` - ${newWeight.toFixed(2)} ${product.unit}`
+                  : ""
+              }`
+            );
+          } else {
+            toast.error("Failed to update cart item");
+          }
         } else {
-          toast.error("Failed to add item to cart");
+          // Add new item
+          const addResponse = await window.cartAPI.addItem({
+            cartSessionId: cartSession.id,
+            productId: product.id,
+            itemType,
+            quantity: itemType === "UNIT" ? 1 : undefined,
+            weight: itemType === "WEIGHT" ? weight : undefined,
+            unitOfMeasure: product.unit || "each",
+            unitPrice,
+            totalPrice,
+            taxAmount,
+            ageRestrictionLevel: product.ageRestrictionLevel || "NONE",
+            ageVerified: false,
+          });
+
+          if (addResponse.success) {
+            // Reload cart items
+            const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+            if (itemsResponse.success && itemsResponse.data) {
+              setCartItems(itemsResponse.data as CartItemWithProduct[]);
+            }
+
+            toast.success(
+              `Added ${product.name}${
+                product.requiresWeight && weight
+                  ? ` - ${weight.toFixed(2)} ${product.unit}`
+                  : ""
+              }`
+            );
+          } else {
+            toast.error("Failed to add item to cart");
+          }
         }
+      } catch (error) {
+        console.error("Error adding to cart:", error);
+        toast.error("Failed to add item to cart");
       }
-    } catch (error) {
-      console.error("Error adding to cart:", error);
-      toast.error("Failed to add item to cart");
-    }
-  }, [cartSession, cartItems]);
+    },
+    [cartSession, cartItems, user?.role, hasActiveShift, hasScheduledShift]
+  );
 
   // Hardware barcode scanner integration
   const handleHardwareScan = useCallback(
@@ -639,21 +689,80 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   }, [user?.businessId]);
 
+  // Check for active shift and scheduled shift
+  const checkActiveShift = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      setIsCheckingShift(true);
+
+      // Check for active POS shift
+      const shiftResponse = await window.shiftAPI.getActive(user.id);
+      const hasActive = shiftResponse.success && !!shiftResponse.data;
+      setHasActiveShift(hasActive);
+
+      // If no active shift, check for scheduled shift today
+      if (!hasActive) {
+        const scheduleResponse = await window.shiftAPI.getTodaySchedule(
+          user.id
+        );
+        const hasScheduled =
+          scheduleResponse.success && !!scheduleResponse.data;
+        setHasScheduledShift(hasScheduled);
+        if (hasScheduled && scheduleResponse.data) {
+          setTodaySchedule(
+            scheduleResponse.data as {
+              id: string;
+              staffId: string;
+              businessId: string;
+              startTime: string;
+              endTime: string;
+              status: string;
+            }
+          );
+        } else {
+          setTodaySchedule(null);
+        }
+      } else {
+        setHasScheduledShift(null); // Don't need to check if already has active shift
+        setTodaySchedule(null);
+      }
+
+      return hasActive;
+    } catch (error) {
+      console.error("Error checking active shift:", error);
+      setHasActiveShift(false);
+      setHasScheduledShift(null);
+      return false;
+    } finally {
+      setIsCheckingShift(false);
+    }
+  }, [user?.id]);
+
   // Initialize or recover cart session
   const initializeCartSession = useCallback(async () => {
     if (!user?.businessId || !user?.id) return;
 
+    // First check if shift exists
+    const shiftExists = await checkActiveShift();
+    if (!shiftExists) {
+      setLoadingCart(false);
+      return; // Don't proceed if no shift
+    }
+
     try {
       setLoadingCart(true);
-      
+
       // Try to get active session first
-      const activeSessionResponse = await window.cartAPI.getActiveSession(user.id);
-      
+      const activeSessionResponse = await window.cartAPI.getActiveSession(
+        user.id
+      );
+
       if (activeSessionResponse.success && activeSessionResponse.data) {
         // Recover existing session
         const session = activeSessionResponse.data as CartSession;
         setCartSession(session);
-        
+
         // Load items for this session
         const itemsResponse = await window.cartAPI.getItems(session.id);
         if (itemsResponse.success && itemsResponse.data) {
@@ -666,11 +775,12 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         const shiftResponse = await window.shiftAPI.getActive(user.id);
         if (!shiftResponse.success || !shiftResponse.data) {
           toast.error("No active shift found. Please start your shift first.");
+          setHasActiveShift(false);
           return;
         }
 
         const activeShift = shiftResponse.data as { id: string };
-        
+
         const newSessionResponse = await window.cartAPI.createSession({
           cashierId: user.id,
           shiftId: activeShift.id,
@@ -691,7 +801,21 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     } finally {
       setLoadingCart(false);
     }
-  }, [user?.businessId, user?.id]);
+  }, [user?.businessId, user?.id, checkActiveShift]);
+
+  // Check for active shift on mount and periodically
+  useEffect(() => {
+    if (!user?.id) return;
+
+    checkActiveShift();
+
+    // Check periodically (every 30 seconds) to catch shift changes
+    const interval = setInterval(() => {
+      checkActiveShift();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [user?.id, checkActiveShift]);
 
   // Load products on component mount
   useEffect(() => {
@@ -800,10 +924,12 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   // Update cart session totals when items change
   useEffect(() => {
     if (cartSession && cartSession.status === "ACTIVE") {
-      window.cartAPI.updateSession(cartSession.id, {
-        totalAmount: total,
-        taxAmount: tax,
-      }).catch(console.error);
+      window.cartAPI
+        .updateSession(cartSession.id, {
+          totalAmount: total,
+          taxAmount: tax,
+        })
+        .catch(console.error);
     }
   }, [total, tax, cartSession]);
 
@@ -822,26 +948,29 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   //   );
   // };
 
-  const removeFromCart = useCallback(async (itemId: string) => {
-    if (!cartSession) return;
+  const removeFromCart = useCallback(
+    async (itemId: string) => {
+      if (!cartSession) return;
 
-    try {
-      const response = await window.cartAPI.removeItem(itemId);
-      if (response.success) {
-        // Reload cart items
-        const itemsResponse = await window.cartAPI.getItems(cartSession.id);
-        if (itemsResponse.success && itemsResponse.data) {
-          setCartItems(itemsResponse.data as CartItemWithProduct[]);
+      try {
+        const response = await window.cartAPI.removeItem(itemId);
+        if (response.success) {
+          // Reload cart items
+          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+          if (itemsResponse.success && itemsResponse.data) {
+            setCartItems(itemsResponse.data as CartItemWithProduct[]);
+          }
+          toast.success("Item removed from cart");
+        } else {
+          toast.error("Failed to remove item from cart");
         }
-        toast.success("Item removed from cart");
-      } else {
+      } catch (error) {
+        console.error("Error removing from cart:", error);
         toast.error("Failed to remove item from cart");
       }
-    } catch (error) {
-      console.error("Error removing from cart:", error);
-      toast.error("Failed to remove item from cart");
-    }
-  }, [cartSession]);
+    },
+    [cartSession]
+  );
 
   const handleBarcodeScan = async () => {
     if (barcodeInput.trim() === "") return;
@@ -1072,7 +1201,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         items: cartItems.map((item) => ({
           id: item.productId,
           name: item.product?.name || "Unknown Product",
-          quantity: item.itemType === "UNIT" ? (item.quantity || 1) : 1,
+          quantity: item.itemType === "UNIT" ? item.quantity || 1 : 1,
           price: item.unitPrice,
           total: item.totalPrice,
           sku: item.product?.sku || "",
@@ -1408,6 +1537,42 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     completeTransaction();
   };
 
+  // Start Shift Handler
+  const handleStartShift = async () => {
+    if (
+      !startingCash ||
+      isNaN(Number(startingCash)) ||
+      Number(startingCash) < 0
+    ) {
+      toast.error("Please enter a valid starting cash amount");
+      return;
+    }
+
+    try {
+      const response = await window.shiftAPI.start({
+        scheduleId: todaySchedule?.id,
+        cashierId: user!.id,
+        businessId: user!.businessId,
+        startingCash: Number(startingCash),
+      });
+
+      if (response.success && response.data) {
+        toast.success("Shift started successfully!");
+        setShowStartShiftDialog(false);
+        setStartingCash("");
+        // Refresh shift status
+        await checkActiveShift();
+        // Initialize cart session now that shift is active
+        await initializeCartSession();
+      } else {
+        toast.error(response.message || "Failed to start shift");
+      }
+    } catch (error) {
+      console.error("Failed to start shift:", error);
+      toast.error("Failed to start shift. Please try again.");
+    }
+  };
+
   const navigate = useNavigate();
 
   if (!user) {
@@ -1415,8 +1580,86 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     return;
   }
 
+  // Show blocking UI only if no scheduled shift (for cashiers and managers)
+  if (
+    (user.role === "cashier" || user.role === "manager") &&
+    !isCheckingShift &&
+    hasActiveShift === false &&
+    !hasScheduledShift
+  ) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 p-6">
+        <Card className="max-w-md w-full shadow-lg">
+          <CardHeader className="text-center pb-4">
+            <div className="mx-auto mb-4 p-3 bg-amber-100 rounded-full w-16 h-16 flex items-center justify-center">
+              <AlertCircle className="h-8 w-8 text-amber-600" />
+            </div>
+            <CardTitle className="text-2xl text-slate-900">
+              No Active Shift
+            </CardTitle>
+            <p className="text-slate-600 mt-2">
+              You don't have any shift today.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-center">
+              <Button onClick={checkActiveShift} variant="outline" size="lg">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show loading state while checking shift
+  if (isCheckingShift && (user.role === "cashier" || user.role === "manager")) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-600">Checking shift status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if operations should be disabled (no active shift but has scheduled shift)
+  const isOperationsDisabled =
+    (user.role === "cashier" || user.role === "manager") &&
+    !hasActiveShift &&
+    hasScheduledShift;
+
   return (
     <>
+      {/* Start Shift Banner - Show when scheduled shift exists but no active shift */}
+      {isOperationsDisabled && (
+        <div className="bg-amber-50 border-b-2 border-amber-300 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600" />
+            <div>
+              <p className="font-semibold text-amber-900">
+                Start Your Shift to Begin Transactions
+              </p>
+              <p className="text-sm text-amber-700">
+                You have a scheduled shift today. Please start your shift to
+                perform transactions.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => setShowStartShiftDialog(true)}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+            size="lg"
+          >
+            <Clock className="h-4 w-4 mr-2" />
+            Start Shift
+          </Button>
+        </div>
+      )}
+
       {/* Hardware Scanner Status Bar */}
       {/* <ScannerStatusBar
         scannerStatus={scannerStatus}
@@ -1918,9 +2161,31 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           {/* Quick Actions Carousel */}
 
           <QuickActionsCarousel
-            onRefund={() => setShowRefundModal(true)}
-            onVoid={() => setShowVoidModal(true)}
-            onCount={() => setShowCountModal(true)}
+            onRefund={() => {
+              if (isOperationsDisabled) {
+                toast.error(
+                  "Please start your shift before performing refunds"
+                );
+                return;
+              }
+              setShowRefundModal(true);
+            }}
+            onVoid={() => {
+              if (isOperationsDisabled) {
+                toast.error(
+                  "Please start your shift before voiding transactions"
+                );
+                return;
+              }
+              setShowVoidModal(true);
+            }}
+            onCount={() => {
+              if (isOperationsDisabled) {
+                toast.error("Please start your shift before counting cash");
+                return;
+              }
+              setShowCountModal(true);
+            }}
             onDashboard={onBack}
           />
 
@@ -2149,11 +2414,13 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 style={{ width: "120px" }}
                               >
                                 £{item.unitPrice.toFixed(2)}
-                                {item.itemType === "WEIGHT" && item.unitOfMeasure && (
-                                  <span className="text-xs text-slate-500">
-                                    {" "}/ {item.unitOfMeasure}
-                                  </span>
-                                )}
+                                {item.itemType === "WEIGHT" &&
+                                  item.unitOfMeasure && (
+                                    <span className="text-xs text-slate-500">
+                                      {" "}
+                                      / {item.unitOfMeasure}
+                                    </span>
+                                  )}
                               </TableCell>
                               <TableCell
                                 className="text-center font-semibold"
@@ -2192,7 +2459,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </span>
                   </span>
                   <span>
-                    Items: <span className="font-semibold">{cartItems.length}</span>
+                    Items:{" "}
+                    <span className="font-semibold">{cartItems.length}</span>
                   </span>
                   <span className="text-slate-500">
                     Tax (8%):{" "}
@@ -2504,6 +2772,50 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           startingCash={0}
         />
       )}
+
+      {/* Start Shift Dialog */}
+      <Dialog
+        open={showStartShiftDialog}
+        onOpenChange={setShowStartShiftDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start Shift</DialogTitle>
+            <DialogDescription>
+              Enter the starting cash amount for your shift.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="starting-cash" className="text-right">
+                Starting Cash
+              </Label>
+              <Input
+                id="starting-cash"
+                type="number"
+                step="0.01"
+                value={startingCash}
+                onChange={(e) => setStartingCash(e.target.value)}
+                className="col-span-3"
+                placeholder="0.00"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowStartShiftDialog(false);
+                setStartingCash("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleStartShift}>Start Shift</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

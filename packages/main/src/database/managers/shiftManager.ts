@@ -103,6 +103,27 @@ export class ShiftManager {
   }
 
   /**
+   * Get active POS shifts by timeShiftId
+   */
+  getActiveShiftsByTimeShift(timeShiftId: string): Shift[] {
+    if (!timeShiftId) {
+      return [];
+    }
+
+    return this.db
+      .select()
+      .from(schema.shifts)
+      .where(
+        and(
+          eq(schema.shifts.timeShiftId, timeShiftId),
+          eq(schema.shifts.status, "active")
+        )
+      )
+      .orderBy(desc(schema.shifts.startTime))
+      .all() as Shift[];
+  }
+
+  /**
    * End shift with final calculations
    */
   endShift(
@@ -168,9 +189,9 @@ export class ShiftManager {
 
   /**
    * Auto-close old unclosed shifts that are more than 24 hours old
-   * Returns the number of shifts closed
+   * Returns array of closed shift info (id, timeShiftId, cashierId) for clock-out handling
    */
-  autoCloseOldActiveShifts(): number {
+  autoCloseOldActiveShifts(): Array<{ id: string; timeShiftId: string | null; cashierId: string }> {
     const now = new Date();
     const nowString = now.toISOString();
 
@@ -192,7 +213,7 @@ export class ShiftManager {
       .where(eq(schema.shifts.status, "active"))
       .all();
 
-    let closedCount = 0;
+    const closedShifts: Array<{ id: string; timeShiftId: string | null; cashierId: string }> = [];
 
     for (const { shift, scheduledEndTime } of activeShifts) {
       let shouldClose = false;
@@ -247,19 +268,25 @@ export class ShiftManager {
           .where(eq(schema.shifts.id, shift.id))
           .run();
 
-        closedCount++;
+        // Store closed shift info for clock-out handling
+        closedShifts.push({
+          id: shift.id,
+          timeShiftId: shift.timeShiftId,
+          cashierId: shift.cashierId,
+        });
+        
         console.log(`Auto-closed shift ${shift.id}: ${closeReason}`);
       }
     }
 
-    return closedCount;
+    return closedShifts;
   }
 
   /**
    * Auto-end overdue shifts today (more aggressive than 24-hour cleanup)
-   * Returns the number of shifts ended
+   * Returns array of closed shift info (id, timeShiftId, cashierId) for clock-out handling
    */
-  autoEndOverdueShiftsToday(): number {
+  autoEndOverdueShiftsToday(): Array<{ id: string; timeShiftId: string | null; cashierId: string }> {
     const now = new Date();
     const nowString = now.toISOString();
 
@@ -281,7 +308,7 @@ export class ShiftManager {
       )
       .all();
 
-    let closedCount = 0;
+    const closedShifts: Array<{ id: string; timeShiftId: string | null; cashierId: string }> = [];
 
     for (const { shift, scheduledEndTime } of activeShifts) {
       let shouldClose = false;
@@ -328,12 +355,18 @@ export class ShiftManager {
           .where(eq(schema.shifts.id, shift.id))
           .run();
 
-        closedCount++;
+        // Store closed shift info for clock-out handling
+        closedShifts.push({
+          id: shift.id,
+          timeShiftId: shift.timeShiftId,
+          cashierId: shift.cashierId,
+        });
+        
         console.log(`Auto-ended overdue shift ${shift.id}: ${closeReason}`);
       }
     }
 
-    return closedCount;
+    return closedShifts;
   }
 
   /**

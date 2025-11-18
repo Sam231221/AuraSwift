@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { User, ArrowLeft, Delete } from "lucide-react";
+import { User, ArrowLeft, Delete, Clock, Timer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/shared/hooks";
 
@@ -37,7 +37,10 @@ export function AuthUserSelection() {
   const [pin, setPin] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-  const { login, isLoading } = useAuth();
+  const [isClockingIn, setIsClockingIn] = useState(false);
+  const [isClockingOut, setIsClockingOut] = useState(false);
+  const [clockMessage, setClockMessage] = useState("");
+  const { login, isLoading, clockIn, clockOut } = useAuth();
 
   // Fetch users on mount
   useEffect(() => {
@@ -228,7 +231,7 @@ export function AuthUserSelection() {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 mb-3">
               <Button
                 onClick={handleBack}
                 disabled={isLoading}
@@ -247,6 +250,85 @@ export function AuthUserSelection() {
                 DELETE
               </Button>
             </div>
+
+            {/* Clock In/Out Buttons - Only for Cashiers and Managers */}
+            {(selectedUser.role === "cashier" ||
+              selectedUser.role === "manager") && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={async () => {
+                    setIsClockingIn(true);
+                    setClockMessage("");
+                    try {
+                      // Get business ID from user (would need to fetch it)
+                      // For now, we'll need to get it from the user data
+                      const response = await window.authAPI.getUserById(
+                        selectedUser.id
+                      );
+                      if (response.success && response.user?.businessId) {
+                        const result = await clockIn(
+                          selectedUser.id,
+                          response.user.businessId
+                        );
+                        if (result.success) {
+                          setClockMessage("✓ Clocked in successfully");
+                        } else {
+                          setClockMessage(
+                            result.message || "Failed to clock in"
+                          );
+                        }
+                      }
+                    } catch {
+                      setClockMessage("Failed to clock in");
+                    } finally {
+                      setIsClockingIn(false);
+                    }
+                  }}
+                  disabled={isLoading || isClockingIn || isClockingOut}
+                  className="h-12 text-sm font-medium bg-green-100 hover:bg-green-200 text-green-700 border-0 rounded-lg disabled:opacity-50"
+                >
+                  <Clock className="w-4 h-4 mr-2" />
+                  {isClockingIn ? "CLOCKING IN..." : "CLOCK IN"}
+                </Button>
+                <Button
+                  onClick={async () => {
+                    setIsClockingOut(true);
+                    setClockMessage("");
+                    try {
+                      const result = await clockOut(selectedUser.id);
+                      if (result.success) {
+                        setClockMessage("✓ Clocked out successfully");
+                      } else {
+                        setClockMessage(
+                          result.message || "Failed to clock out"
+                        );
+                      }
+                    } catch {
+                      setClockMessage("Failed to clock out");
+                    } finally {
+                      setIsClockingOut(false);
+                    }
+                  }}
+                  disabled={isLoading || isClockingIn || isClockingOut}
+                  className="h-12 text-sm font-medium bg-orange-100 hover:bg-orange-200 text-orange-700 border-0 rounded-lg disabled:opacity-50"
+                >
+                  <Timer className="w-4 h-4 mr-2" />
+                  {isClockingOut ? "CLOCKING OUT..." : "CLOCK OUT"}
+                </Button>
+              </div>
+            )}
+
+            {clockMessage && (
+              <div
+                className={`mt-2 p-2 rounded-lg text-xs text-center ${
+                  clockMessage.startsWith("✓")
+                    ? "bg-green-50 text-green-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {clockMessage}
+              </div>
+            )}
           </div>
         </Card>
       )}

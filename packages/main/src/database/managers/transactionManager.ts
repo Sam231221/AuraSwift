@@ -233,10 +233,19 @@ export class TransactionManager {
             taxAmount: item.taxAmount ?? 0,
             refundedQuantity: item.refundedQuantity ?? null,
             weight: item.weight ?? null,
+            unitOfMeasure: item.unitOfMeasure ?? null,
             discountAmount: item.discountAmount ?? null,
             appliedDiscounts: item.appliedDiscounts
               ? JSON.stringify(item.appliedDiscounts)
               : null,
+            // Batch tracking
+            batchId: item.batchId ?? null,
+            batchNumber: item.batchNumber ?? null,
+            expiryDate: item.expiryDate ?? null,
+            // Age restriction tracking
+            ageRestrictionLevel: item.ageRestrictionLevel ?? "NONE",
+            ageVerified: item.ageVerified ?? false,
+            cartItemId: item.cartItemId ?? null,
           });
           // Note: appliedModifiers table doesn't exist in schema
         }
@@ -275,8 +284,17 @@ export class TransactionManager {
       unitPrice: item.unitPrice,
       totalPrice: item.totalPrice,
       taxAmount: item.taxAmount ?? 0,
-      refundedQuantity: item.refundedQuantity ?? null,
+      unitOfMeasure: item.unitOfMeasure ?? null,
       weight: item.weight ?? null,
+      // Batch tracking
+      batchId: item.batchId ?? null,
+      batchNumber: item.batchNumber ?? null,
+      expiryDate: item.expiryDate ?? null,
+      // Age restriction tracking
+      ageRestrictionLevel: item.ageRestrictionLevel ?? "NONE",
+      ageVerified: item.ageVerified ?? false,
+      cartItemId: item.cartItemId ?? null,
+      refundedQuantity: item.refundedQuantity ?? null,
       discountAmount: item.discountAmount ?? null,
       appliedDiscounts: item.appliedDiscounts
         ? JSON.stringify(item.appliedDiscounts)

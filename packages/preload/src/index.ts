@@ -21,6 +21,12 @@ import {
   scaleAPI,
   appAPI,
 } from "./api/system.js";
+import { ageVerificationAPI } from "./api/ageVerification.js";
+import { batchesAPI } from "./api/batches.js";
+import { suppliersAPI } from "./api/suppliers.js";
+import { expirySettingsAPI } from "./api/expirySettings.js";
+import { expiryNotificationsAPI } from "./api/expiryNotifications.js";
+import { stockMovementsAPI } from "./api/stockMovements.js";
 
 // Expose APIs to renderer process
 contextBridge.exposeInMainWorld("authStore", authStore);
@@ -41,6 +47,12 @@ contextBridge.exposeInMainWorld("paymentAPI", paymentAPI);
 contextBridge.exposeInMainWorld("pdfReceiptAPI", pdfReceiptAPI);
 contextBridge.exposeInMainWorld("scaleAPI", scaleAPI);
 contextBridge.exposeInMainWorld("appAPI", appAPI);
+contextBridge.exposeInMainWorld("ageVerificationAPI", ageVerificationAPI);
+contextBridge.exposeInMainWorld("batchesAPI", batchesAPI);
+contextBridge.exposeInMainWorld("suppliersAPI", suppliersAPI);
+contextBridge.exposeInMainWorld("expirySettingsAPI", expirySettingsAPI);
+contextBridge.exposeInMainWorld("expiryNotificationsAPI", expiryNotificationsAPI);
+contextBridge.exposeInMainWorld("stockMovementsAPI", stockMovementsAPI);
 
 // Generic IPC send function for testing and general IPC communication
 export const send = (channel: string, ...args: any[]) =>

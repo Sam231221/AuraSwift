@@ -70,7 +70,18 @@ export interface AuthContextType {
     avatar?: string;
     address?: string;
   }) => Promise<{ success: boolean; message: string; errors?: string[] }>;
-  logout: () => Promise<void>;
+  logout: (options?: { clockOut?: boolean }) => Promise<{
+    needsClockOutWarning?: boolean;
+  }>;
+  clockIn: (userId: string, businessId: string) => Promise<{
+    success: boolean;
+    message?: string;
+  }>;
+  clockOut: (userId: string) => Promise<{
+    success: boolean;
+    message?: string;
+  }>;
+  getActiveShift: (userId: string) => Promise<any>;
   isLoading: boolean;
   error: string | null;
   isInitializing: boolean;

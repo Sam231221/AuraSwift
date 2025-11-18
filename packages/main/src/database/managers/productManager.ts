@@ -57,6 +57,15 @@ export class ProductManager {
       isActive: productData.isActive ?? true,
       allowPriceOverride: productData.allowPriceOverride ?? false,
       allowDiscount: productData.allowDiscount ?? true,
+      // Age restriction fields
+      ageRestrictionLevel: productData.ageRestrictionLevel ?? "NONE",
+      requireIdScan: productData.requireIdScan ?? false,
+      restrictionReason: productData.restrictionReason ?? null,
+      // Expiry tracking fields
+      hasExpiry: productData.hasExpiry ?? false,
+      shelfLifeDays: productData.shelfLifeDays ?? null,
+      requiresBatchTracking: productData.requiresBatchTracking ?? false,
+      stockRotationMethod: productData.stockRotationMethod ?? "FIFO",
     });
 
     return this.getProductById(productId);
