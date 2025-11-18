@@ -56,6 +56,15 @@ declare global {
         isActive?: boolean;
         allowPriceOverride?: boolean;
         allowDiscount?: boolean;
+        // Expiry tracking fields
+        hasExpiry?: boolean;
+        shelfLifeDays?: number;
+        requiresBatchTracking?: boolean;
+        stockRotationMethod?: "FIFO" | "FEFO" | "NONE";
+        // Age restriction fields
+        ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
+        requireIdScan?: boolean;
+        restrictionReason?: string;
       }) => Promise<{
         success: boolean;
         message: string;
@@ -96,6 +105,15 @@ declare global {
           isActive: boolean;
           allowPriceOverride: boolean;
           allowDiscount: boolean;
+          // Expiry tracking fields
+          hasExpiry?: boolean;
+          shelfLifeDays?: number;
+          requiresBatchTracking?: boolean;
+          stockRotationMethod?: "FIFO" | "FEFO" | "NONE";
+          // Age restriction fields
+          ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
+          requireIdScan?: boolean;
+          restrictionReason?: string;
         }>
       ) => Promise<{
         success: boolean;

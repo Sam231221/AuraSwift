@@ -226,6 +226,16 @@ export const categories = createTable(
     color: text("color"), // For UI organization
     image: text("image"), // Category images
     isActive: integer("is_active", { mode: "boolean" }).default(true),
+
+    // Age Restriction Fields (for category-level defaults)
+    // Products can inherit from category or override with their own restriction
+    ageRestrictionLevel: text("age_restriction_level", {
+      enum: ["NONE", "AGE_16", "AGE_18", "AGE_21"],
+    }).default("NONE"), // Default age restriction for products in this category
+    requireIdScan: integer("require_id_scan", { mode: "boolean" }).default(
+      false
+    ),
+
     ...timestampColumns,
   },
   (table) => [
@@ -328,6 +338,17 @@ export const products = createTable(
       enum: ["FIFO", "FEFO", "NONE"],
     }).default("FIFO"),
 
+    // Age Restriction Fields
+    ageRestrictionLevel: text("age_restriction_level", {
+      enum: ["NONE", "AGE_16", "AGE_18", "AGE_21"],
+    })
+      .notNull()
+      .default("NONE"),
+    requireIdScan: integer("require_id_scan", { mode: "boolean" }).default(
+      false
+    ),
+    restrictionReason: text("restriction_reason"), // e.g., "Alcoholic beverage", "Tobacco product"
+
     // Timestamps
     ...timestampColumns,
   },
@@ -338,6 +359,7 @@ export const products = createTable(
     index("products_barcode_idx").on(table.barcode),
     index("products_plu_idx").on(table.plu),
     index("products_type_idx").on(table.productType),
+    index("products_age_restriction_idx").on(table.ageRestrictionLevel),
     // Ensure SKU is unique per business
     unique("product_sku_business_unique").on(table.sku, table.businessId),
   ]
@@ -767,6 +789,70 @@ export const transactionItems = createTable("transaction_items", {
     .$defaultFn(() => new Date())
     .notNull(),
 });
+
+/**
+ * Age Verification Records - Audit trail for age-restricted product sales
+ */
+export const ageVerificationRecords = createTable(
+  "age_verification_records",
+  {
+    id: text("id").primaryKey(),
+    transactionId: text("transaction_id").references(() => transactions.id, {
+      onDelete: "set null",
+    }),
+    transactionItemId: text("transaction_item_id").references(
+      () => transactionItems.id,
+      { onDelete: "set null" }
+    ),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+
+    // Verification method
+    verificationMethod: text("verification_method", {
+      enum: ["manual", "scan", "override"],
+    }).notNull(),
+
+    // Customer age information
+    customerBirthdate: integer("customer_birthdate", { mode: "timestamp_ms" }), // Date of birth from ID or manual entry
+    calculatedAge: integer("calculated_age"), // Calculated age at time of verification
+
+    // ID scan data (if method was "scan")
+    idScanData: text("id_scan_data", { mode: "json" }), // JSON data from ID scanner
+
+    // Staff information
+    verifiedBy: text("verified_by")
+      .notNull()
+      .references(() => users.id), // Staff member who verified
+    managerOverrideId: text("manager_override_id").references(() => users.id), // Manager who approved override (if method was "override")
+    overrideReason: text("override_reason"), // Reason for manager override
+
+    // Business reference
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+
+    // Verification timestamp
+    verifiedAt: integer("verified_at", { mode: "timestamp_ms" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+
+    ...timestampColumns,
+  },
+  (table) => [
+    index("age_verification_transaction_idx").on(table.transactionId),
+    index("age_verification_transaction_item_idx").on(table.transactionItemId),
+    index("age_verification_product_idx").on(table.productId),
+    index("age_verification_verified_by_idx").on(table.verifiedBy),
+    index("age_verification_business_idx").on(table.businessId),
+    index("age_verification_verified_at_idx").on(table.verifiedAt),
+    // Composite index for compliance reporting
+    index("age_verification_business_date_idx").on(
+      table.businessId,
+      table.verifiedAt
+    ),
+  ]
+);
 
 // ============================================================================
 // SHIFT MANAGEMENT
@@ -1312,6 +1398,7 @@ export const businessesRelations = relations(businesses, ({ one, many }) => ({
   cashDrawerCounts: many(cashDrawerCounts),
   attendanceReports: many(attendanceReports),
   timeShifts: many(timeShifts),
+  ageVerificationRecords: many(ageVerificationRecords),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -1338,6 +1425,12 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   timeCorrectionsApproved: many(timeCorrections, {
     relationName: "approvedBy",
+  }),
+  ageVerificationsPerformed: many(ageVerificationRecords, {
+    relationName: "verifiedBy",
+  }),
+  ageVerificationOverrides: many(ageVerificationRecords, {
+    relationName: "managerOverride",
   }),
 }));
 
@@ -1401,6 +1494,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   stockAdjustments: many(stockAdjustments),
   productBatches: many(productBatches),
   stockMovements: many(stockMovements),
+  ageVerificationRecords: many(ageVerificationRecords),
 }));
 
 export const discountsRelations = relations(discounts, ({ one }) => ({
@@ -1552,12 +1646,13 @@ export const transactionsRelations = relations(
       references: [users.id],
     }),
     items: many(transactionItems),
+    ageVerifications: many(ageVerificationRecords),
   })
 );
 
 export const transactionItemsRelations = relations(
   transactionItems,
-  ({ one }) => ({
+  ({ one, many }) => ({
     transaction: one(transactions, {
       fields: [transactionItems.transactionId],
       references: [transactions.id],
@@ -1565,6 +1660,39 @@ export const transactionItemsRelations = relations(
     product: one(products, {
       fields: [transactionItems.productId],
       references: [products.id],
+    }),
+    ageVerifications: many(ageVerificationRecords),
+  })
+);
+
+export const ageVerificationRecordsRelations = relations(
+  ageVerificationRecords,
+  ({ one }) => ({
+    transaction: one(transactions, {
+      fields: [ageVerificationRecords.transactionId],
+      references: [transactions.id],
+    }),
+    transactionItem: one(transactionItems, {
+      fields: [ageVerificationRecords.transactionItemId],
+      references: [transactionItems.id],
+    }),
+    product: one(products, {
+      fields: [ageVerificationRecords.productId],
+      references: [products.id],
+    }),
+    verifiedByUser: one(users, {
+      fields: [ageVerificationRecords.verifiedBy],
+      references: [users.id],
+      relationName: "verifiedBy",
+    }),
+    managerOverride: one(users, {
+      fields: [ageVerificationRecords.managerOverrideId],
+      references: [users.id],
+      relationName: "managerOverride",
+    }),
+    business: one(businesses, {
+      fields: [ageVerificationRecords.businessId],
+      references: [businesses.id],
     }),
   })
 );
@@ -1807,6 +1935,14 @@ export type Transaction = InferSelectModel<typeof transactions>;
 export type NewTransaction = InferInsertModel<typeof transactions>;
 export type TransactionItem = InferSelectModel<typeof transactionItems>;
 export type NewTransactionItem = InferInsertModel<typeof transactionItems>;
+
+// Age Verification types
+export type AgeVerificationRecord = InferSelectModel<
+  typeof ageVerificationRecords
+>;
+export type NewAgeVerificationRecord = InferInsertModel<
+  typeof ageVerificationRecords
+>;
 
 // Audit types
 export type AuditLog = InferSelectModel<typeof auditLogs>;

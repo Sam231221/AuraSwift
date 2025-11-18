@@ -56,6 +56,10 @@ interface ProductFormData {
   shelfLifeDays: number;
   requiresBatchTracking: boolean;
   stockRotationMethod: "FIFO" | "FEFO" | "NONE";
+  // Age restriction fields
+  ageRestrictionLevel: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
+  requireIdScan: boolean;
+  restrictionReason: string;
 }
 
 interface ProductFormDrawerProps {
@@ -100,6 +104,10 @@ const getDefaultFormData = (categories: Category[]): ProductFormData => ({
   shelfLifeDays: 0,
   requiresBatchTracking: false,
   stockRotationMethod: "FIFO",
+  // Age restriction defaults
+  ageRestrictionLevel: "NONE",
+  requireIdScan: false,
+  restrictionReason: "",
 });
 
 const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
@@ -233,6 +241,21 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
         stockRotationMethod:
           (dbProduct.stockRotationMethod as "FIFO" | "FEFO" | "NONE" | undefined) ||
           "FIFO",
+        // Age restriction fields
+        ageRestrictionLevel:
+          (dbProduct.ageRestrictionLevel as
+            | "NONE"
+            | "AGE_16"
+            | "AGE_18"
+            | "AGE_21"
+            | undefined) ||
+          (editingProduct.ageRestrictionLevel || "NONE"),
+        requireIdScan:
+          (dbProduct.requireIdScan as boolean | undefined) ??
+          (editingProduct.requireIdScan || false),
+        restrictionReason:
+          (dbProduct.restrictionReason as string | undefined) ||
+          (editingProduct.restrictionReason || ""),
       });
 
       if (!validCategory) {
@@ -419,6 +442,13 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
         stockRotationMethod: formData.requiresBatchTracking
           ? formData.stockRotationMethod
           : undefined,
+        // Age restriction fields
+        ageRestrictionLevel: formData.ageRestrictionLevel || "NONE",
+        requireIdScan: formData.requireIdScan || false,
+        restrictionReason:
+          formData.ageRestrictionLevel !== "NONE" && formData.restrictionReason
+            ? formData.restrictionReason.trim()
+            : undefined,
       };
 
       if (editingProduct) {
@@ -529,10 +559,19 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
 
         <div className="p-6 overflow-y-auto flex-1">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="pricing">Pricing & Stock</TabsTrigger>
-              <TabsTrigger value="expiry">Expiry Tracking</TabsTrigger>
+            <TabsList className="flex w-full gap-1 h-auto py-1.5 overflow-x-auto">
+              <TabsTrigger value="basic" className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm">
+                Basic Info
+              </TabsTrigger>
+              <TabsTrigger value="pricing" className="flex-1 min-w-[100px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm">
+                Pricing & Stock
+              </TabsTrigger>
+              <TabsTrigger value="expiry" className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm">
+                Expiry
+              </TabsTrigger>
+              <TabsTrigger value="age-restriction" className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm">
+                Age
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-4 mt-6">
@@ -1141,6 +1180,96 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                         </p>
                       </div>
                     )}
+                  </>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="age-restriction" className="space-y-4 mt-6">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-lg font-medium mb-4">Age Verification Settings</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Configure age restrictions for this product. Age-restricted items require
+                    verification at checkout.
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="ageRestrictionLevel">Minimum Age Requirement</Label>
+                  <Select
+                    value={formData.ageRestrictionLevel}
+                    onValueChange={(value: "NONE" | "AGE_16" | "AGE_18" | "AGE_21") => {
+                      handleInputChange("ageRestrictionLevel", value);
+                      if (value === "NONE") {
+                        handleInputChange("requireIdScan", false);
+                        handleInputChange("restrictionReason", "");
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="ageRestrictionLevel">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">No Restriction</SelectItem>
+                      <SelectItem value="AGE_16">16+ (Age 16 and above)</SelectItem>
+                      <SelectItem value="AGE_18">18+ (Age 18 and above)</SelectItem>
+                      <SelectItem value="AGE_21">21+ (Age 21 and above)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select the minimum age required to purchase this product
+                  </p>
+                </div>
+
+                {formData.ageRestrictionLevel !== "NONE" && (
+                  <>
+                    <div>
+                      <Label htmlFor="restrictionReason">Restriction Reason</Label>
+                      <Input
+                        id="restrictionReason"
+                        value={formData.restrictionReason}
+                        onChange={(e) =>
+                          handleInputChange("restrictionReason", e.target.value)
+                        }
+                        placeholder="e.g., Alcoholic beverage, Tobacco product..."
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Brief reason for the age restriction (for reporting and compliance)
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="requireIdScan"
+                        checked={formData.requireIdScan}
+                        onCheckedChange={(checked) =>
+                          handleInputChange("requireIdScan", checked)
+                        }
+                      />
+                      <Label htmlFor="requireIdScan">
+                        Require ID Scan for Verification
+                      </Label>
+                    </div>
+                    <p className="text-xs text-gray-500 -mt-2">
+                      When enabled, staff must scan a valid ID for verification. If disabled,
+                      manual date entry is allowed.
+                    </p>
+
+                    <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <div className="text-orange-600 text-lg">⚠️</div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-orange-900 mb-1">
+                            Age Verification Required
+                          </p>
+                          <p className="text-xs text-orange-700">
+                            This product will require age verification at checkout. Staff must
+                            verify the customer's age before completing the sale.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>

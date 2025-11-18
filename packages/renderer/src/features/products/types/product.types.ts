@@ -37,6 +37,10 @@ export interface Product {
   requiresWeight?: boolean;
   unit?: "lb" | "kg" | "oz" | "g" | "each";
   pricePerUnit?: number; // Price per weight unit (e.g., £1.99/lb)
+  // Age restriction fields
+  ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
+  requireIdScan?: boolean;
+  restrictionReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +73,10 @@ export interface CreateProductRequest {
   requiresWeight?: boolean;
   unit?: "lb" | "kg" | "oz" | "g" | "each";
   pricePerUnit?: number;
+  // Age restriction fields
+  ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
+  requireIdScan?: boolean;
+  restrictionReason?: string;
 }
 
 export interface ProductResponse {
