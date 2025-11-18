@@ -56,7 +56,6 @@ import { NumericKeypad } from "./numeric-keypad";
 import type {
   CartSession,
   CartItemWithProduct,
-  CartSessionWithItems,
 } from "@/features/transactions/types/cart.types";
 
 interface PaymentMethod {
@@ -394,6 +393,128 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [showCountModal, setShowCountModal] = useState(false);
 
+  // Calculate total from cart items (needed for addToCart)
+  const subtotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
+  const tax = cartItems.reduce((sum, item) => sum + item.taxAmount, 0);
+  const total = subtotal + tax;
+
+  // Functions for cart operations using cart API (must be defined before handleHardwareScan)
+  const addToCart = useCallback(async (product: Product, weight?: number) => {
+    if (!cartSession) {
+      toast.error("Cart session not initialized");
+      return;
+    }
+
+    console.log(
+      "🛒 Adding to cart:",
+      product.name,
+      weight ? `(${weight} ${product.unit})` : ""
+    );
+
+    try {
+      // Determine item type
+      const itemType = product.requiresWeight ? "WEIGHT" : "UNIT";
+      
+      // Calculate pricing
+      let unitPrice = product.price;
+      let totalPrice = product.price;
+      let taxAmount = 0;
+      
+      if (product.requiresWeight && weight && product.pricePerUnit) {
+        unitPrice = product.pricePerUnit;
+        totalPrice = product.pricePerUnit * weight;
+      } else if (!product.requiresWeight) {
+        totalPrice = product.price * 1; // Default quantity 1
+      }
+      
+      // Calculate tax (simplified - should use product's tax rate)
+      taxAmount = totalPrice * 0.08; // Example 8% tax
+      totalPrice = totalPrice + taxAmount;
+
+      // Check for existing item to update quantity/weight
+      const existingItem = cartItems.find(
+        (item) => item.productId === product.id && item.itemType === itemType
+      );
+
+      if (existingItem) {
+        // Update existing item
+        const newQuantity = existingItem.itemType === "UNIT" 
+          ? (existingItem.quantity || 0) + 1 
+          : existingItem.quantity;
+        const newWeight = existingItem.itemType === "WEIGHT"
+          ? (existingItem.weight || 0) + (weight || 0)
+          : existingItem.weight;
+        
+        const newTotalPrice = existingItem.itemType === "UNIT"
+          ? unitPrice * (newQuantity || 1)
+          : unitPrice * (newWeight || 0);
+        const newTaxAmount = newTotalPrice * 0.08;
+        const finalTotalPrice = newTotalPrice + newTaxAmount;
+
+        const updateResponse = await window.cartAPI.updateItem(existingItem.id, {
+          quantity: newQuantity,
+          weight: newWeight,
+          totalPrice: finalTotalPrice,
+          taxAmount: newTaxAmount,
+        });
+
+        if (updateResponse.success) {
+          // Reload cart items
+          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+          if (itemsResponse.success && itemsResponse.data) {
+            setCartItems(itemsResponse.data as CartItemWithProduct[]);
+          }
+          
+          toast.success(
+            `Added ${product.name} (${newQuantity}x)${
+              product.requiresWeight && newWeight
+                ? ` - ${newWeight.toFixed(2)} ${product.unit}`
+                : ""
+            }`
+          );
+        } else {
+          toast.error("Failed to update cart item");
+        }
+      } else {
+        // Add new item
+        const addResponse = await window.cartAPI.addItem({
+          cartSessionId: cartSession.id,
+          productId: product.id,
+          itemType,
+          quantity: itemType === "UNIT" ? 1 : undefined,
+          weight: itemType === "WEIGHT" ? weight : undefined,
+          unitOfMeasure: product.unit || "each",
+          unitPrice,
+          totalPrice,
+          taxAmount,
+          ageRestrictionLevel: product.ageRestrictionLevel || "NONE",
+          ageVerified: false,
+        });
+
+        if (addResponse.success) {
+          // Reload cart items
+          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+          if (itemsResponse.success && itemsResponse.data) {
+            setCartItems(itemsResponse.data as CartItemWithProduct[]);
+          }
+          
+          toast.success(
+            `Added ${product.name}${
+              product.requiresWeight && weight
+                ? ` - ${weight.toFixed(2)} ${product.unit}`
+                : ""
+            }`
+          );
+        } else {
+          toast.error("Failed to add item to cart");
+        }
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      toast.error("Failed to add item to cart");
+    }
+  }, [cartSession, cartItems]);
+
   // Hardware barcode scanner integration
   const handleHardwareScan = useCallback(
     async (barcode: string): Promise<boolean> => {
@@ -675,11 +796,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       product.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Calculate total from cart items
-  const subtotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  const tax = cartItems.reduce((sum, item) => sum + item.taxAmount, 0);
-  const total = subtotal + tax;
-  
   // Update cart session totals when items change
   useEffect(() => {
     if (cartSession && cartSession.status === "ACTIVE") {
@@ -689,123 +805,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }).catch(console.error);
     }
   }, [total, tax, cartSession]);
-
-  // Functions for cart operations using cart API
-  const addToCart = useCallback(async (product: Product, weight?: number) => {
-    if (!cartSession) {
-      toast.error("Cart session not initialized");
-      return;
-    }
-
-    console.log(
-      "🛒 Adding to cart:",
-      product.name,
-      weight ? `(${weight} ${product.unit})` : ""
-    );
-
-    try {
-      // Determine item type
-      const itemType = product.requiresWeight ? "WEIGHT" : "UNIT";
-      
-      // Calculate pricing
-      let unitPrice = product.price;
-      let totalPrice = product.price;
-      let taxAmount = 0;
-      
-      if (product.requiresWeight && weight && product.pricePerUnit) {
-        unitPrice = product.pricePerUnit;
-        totalPrice = product.pricePerUnit * weight;
-      } else if (!product.requiresWeight) {
-        totalPrice = product.price * 1; // Default quantity 1
-      }
-      
-      // Calculate tax (simplified - should use product's tax rate)
-      taxAmount = totalPrice * 0.08; // Example 8% tax
-      totalPrice = totalPrice + taxAmount;
-
-      // Check for existing item to update quantity/weight
-      const existingItem = cartItems.find(
-        (item) => item.productId === product.id && item.itemType === itemType
-      );
-
-      if (existingItem) {
-        // Update existing item
-        const newQuantity = existingItem.itemType === "UNIT" 
-          ? (existingItem.quantity || 0) + 1 
-          : existingItem.quantity;
-        const newWeight = existingItem.itemType === "WEIGHT"
-          ? (existingItem.weight || 0) + (weight || 0)
-          : existingItem.weight;
-        
-        const newTotalPrice = existingItem.itemType === "UNIT"
-          ? unitPrice * (newQuantity || 1)
-          : unitPrice * (newWeight || 0);
-        const newTaxAmount = newTotalPrice * 0.08;
-        const finalTotalPrice = newTotalPrice + newTaxAmount;
-
-        const updateResponse = await window.cartAPI.updateItem(existingItem.id, {
-          quantity: newQuantity,
-          weight: newWeight,
-          totalPrice: finalTotalPrice,
-          taxAmount: newTaxAmount,
-        });
-
-        if (updateResponse.success) {
-          // Reload cart items
-          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
-          if (itemsResponse.success && itemsResponse.data) {
-            setCartItems(itemsResponse.data as CartItemWithProduct[]);
-          }
-          
-          toast.success(
-            `Added ${product.name} (${newQuantity}x)${
-              product.requiresWeight && newWeight
-                ? ` - ${newWeight.toFixed(2)} ${product.unit}`
-                : ""
-            }`
-          );
-        } else {
-          toast.error("Failed to update cart item");
-        }
-      } else {
-        // Add new item
-        const addResponse = await window.cartAPI.addItem({
-          cartSessionId: cartSession.id,
-          productId: product.id,
-          itemType,
-          quantity: itemType === "UNIT" ? 1 : undefined,
-          weight: itemType === "WEIGHT" ? weight : undefined,
-          unitOfMeasure: product.unit || "each",
-          unitPrice,
-          totalPrice,
-          taxAmount,
-          ageRestrictionLevel: product.ageRestrictionLevel || "NONE",
-          ageVerified: false,
-        });
-
-        if (addResponse.success) {
-          // Reload cart items
-          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
-          if (itemsResponse.success && itemsResponse.data) {
-            setCartItems(itemsResponse.data as CartItemWithProduct[]);
-          }
-          
-          toast.success(
-            `Added ${product.name}${
-              product.requiresWeight && weight
-                ? ` - ${weight.toFixed(2)} ${product.unit}`
-                : ""
-            }`
-          );
-        } else {
-          toast.error("Failed to add item to cart");
-        }
-      }
-    } catch (error) {
-      console.error("Error adding to cart:", error);
-      toast.error("Failed to add item to cart");
-    }
-  }, [cartSession, cartItems]);
 
   // const _updateQuantity = (productId: string, newQuantity: number) => {
   //   if (newQuantity < 1) {

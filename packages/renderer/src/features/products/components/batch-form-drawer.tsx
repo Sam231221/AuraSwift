@@ -219,7 +219,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             : formData.initialQuantity,
           supplierId: formData.supplierId && formData.supplierId !== "none" ? formData.supplierId : undefined,
           purchaseOrderNumber: formData.purchaseOrderNumber || undefined,
-          costPrice: formData.costPrice > 0 ? formData.costPrice : undefined,
+          costPrice: formData.costPrice && formData.costPrice > 0 ? formData.costPrice : undefined,
           businessId,
         };
 

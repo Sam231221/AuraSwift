@@ -11,9 +11,7 @@ import {
 import {
   Plus,
   Search,
-  Filter,
   ChevronLeft,
-  Package,
   AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
@@ -58,7 +56,6 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     expirySettings,
     loading,
     loadBatches,
-    createBatch,
     updateBatch,
     deleteBatch,
   } = useBatchData({
@@ -146,14 +143,14 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
   );
 
   const handleSaveBatch = useCallback(
-    (batch: ProductBatch) => {
+    (_batch: ProductBatch) => {
       loadBatches();
     },
     [loadBatches]
   );
 
   const handleUpdateBatch = useCallback(
-    (batchId: string, batch: ProductBatch) => {
+    (_batchId: string, _batch: ProductBatch) => {
       loadBatches();
     },
     [loadBatches]
@@ -190,10 +187,10 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           criticalAlerts={criticalAlerts}
           warningAlerts={warningAlerts}
           infoAlerts={infoAlerts}
-          onAcknowledge={(alert) => {
+          onAcknowledge={(_alert) => {
             toast.info("Acknowledgment coming soon");
           }}
-          onCreatePromotion={(alert) => {
+          onCreatePromotion={(_alert) => {
             toast.info("Promotion creation coming soon");
           }}
           onAdjustStock={(alert) => {
@@ -324,7 +321,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
                 setIsBatchFormOpen(true);
               }}
               onAdjustStock={handleEditBatch}
-              onCreatePromotion={(batch) => {
+              onCreatePromotion={(_batch) => {
                 toast.info("Promotion creation coming soon");
               }}
               onMarkAsWaste={(batch) => {

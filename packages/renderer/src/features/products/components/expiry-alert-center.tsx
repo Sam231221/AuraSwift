@@ -7,9 +7,7 @@ import {
   AlertTriangle,
   AlertCircle,
   Info,
-  X,
   CheckCircle2,
-  TrendingDown,
 } from "lucide-react";
 import type { ExpiryAlert } from "../types/batch.types";
 import { formatExpiryDate } from "../utils/expiry-calculations";

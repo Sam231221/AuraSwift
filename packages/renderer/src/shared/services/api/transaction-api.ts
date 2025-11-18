@@ -8,9 +8,19 @@ import type { APIResponse } from "@/shared/types/global";
 export interface TransactionItem {
   productId: string;
   productName: string;
-  quantity: number;
+  itemType: "UNIT" | "WEIGHT";
+  quantity?: number;
+  weight?: number;
+  unitOfMeasure?: string;
   unitPrice: number;
   totalPrice: number;
+  taxAmount: number;
+  batchId?: string;
+  batchNumber?: string;
+  expiryDate?: Date | string;
+  ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
+  ageVerified?: boolean;
+  cartItemId?: string;
 }
 
 export interface CreateTransactionData {

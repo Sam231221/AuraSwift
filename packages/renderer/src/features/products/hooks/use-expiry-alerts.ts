@@ -3,7 +3,6 @@ import type {
   ProductBatch,
   ExpiryAlert,
   ExpirySettings,
-  ExpiryNotificationResponse,
 } from "../types/batch.types";
 import {
   generateExpiryAlert,

@@ -14,10 +14,10 @@ export interface AgeRestrictionConfig {
 }
 
 export const AGE_RESTRICTIONS: Record<AgeRestrictionLevel, AgeRestrictionConfig> = {
-  NONE: { id: "NONE", minAge: 0, label: "No Restriction", color: "gray" },
-  AGE_16: { id: "AGE_16", minAge: 16, label: "16+", color: "blue" },
-  AGE_18: { id: "AGE_18", minAge: 18, label: "18+", color: "orange" },
-  AGE_21: { id: "AGE_21", minAge: 21, label: "21+", color: "red" },
+  NONE: { level: "NONE", minAge: 0, label: "No Restriction", color: "gray" },
+  AGE_16: { level: "AGE_16", minAge: 16, label: "16+", color: "blue" },
+  AGE_18: { level: "AGE_18", minAge: 18, label: "18+", color: "orange" },
+  AGE_21: { level: "AGE_21", minAge: 21, label: "21+", color: "red" },
 } as const;
 
 export interface AgeVerificationData {

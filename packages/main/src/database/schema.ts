@@ -935,6 +935,9 @@ export const transactionItems = createTable("transaction_items", {
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .$defaultFn(() => new Date())
     .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .$defaultFn(() => new Date())
+    .$onUpdate(() => new Date()),
 });
 
 /**

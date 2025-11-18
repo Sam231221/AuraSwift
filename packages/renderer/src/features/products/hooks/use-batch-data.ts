@@ -3,9 +3,7 @@ import type {
   ProductBatch,
   BatchResponse,
   ExpirySettings,
-  ExpirySettingsResponse,
   Supplier,
-  SupplierResponse,
 } from "../types/batch.types";
 
 interface UseBatchDataProps {
@@ -160,6 +158,7 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
         const response = await window.batchAPI.create({
           ...batchData,
           businessId,
+          currentQuantity: batchData.initialQuantity, // Set currentQuantity to initialQuantity for new batches
         });
 
         if (response.success && response.batch) {

@@ -61,7 +61,7 @@ const BatchList: React.FC<BatchListProps> = ({
   onMarkAsWaste,
 }) => {
   const getStatusBadge = (batch: ProductBatch) => {
-    const { status, daysUntil } = getExpiryStatus(
+    const { status } = getExpiryStatus(
       batch.expiryDate,
       expirySettings.criticalAlertDays,
       expirySettings.warningAlertDays,
