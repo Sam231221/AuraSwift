@@ -218,14 +218,19 @@ export class TransactionManager {
         for (const item of transaction.items) {
           const itemId = this.uuid.v4();
 
+          // Determine itemType from quantity vs weight
+          const itemType = item.weight != null ? "WEIGHT" : "UNIT";
+
           await tx.insert(schema.transactionItems).values({
             id: itemId,
             transactionId: id,
             productId: item.productId,
             productName: item.productName,
+            itemType,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
+            taxAmount: item.taxAmount ?? 0,
             refundedQuantity: item.refundedQuantity ?? null,
             weight: item.weight ?? null,
             discountAmount: item.discountAmount ?? null,
@@ -257,14 +262,19 @@ export class TransactionManager {
   ): Promise<string> {
     const itemId = this.uuid.v4();
 
+    // Determine itemType from quantity vs weight
+    const itemType = item.weight != null ? "WEIGHT" : "UNIT";
+
     await this.db.insert(schema.transactionItems).values({
       id: itemId,
       transactionId,
       productId: item.productId,
       productName: item.productName,
+      itemType,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       totalPrice: item.totalPrice,
+      taxAmount: item.taxAmount ?? 0,
       refundedQuantity: item.refundedQuantity ?? null,
       weight: item.weight ?? null,
       discountAmount: item.discountAmount ?? null,
@@ -330,7 +340,9 @@ export class TransactionManager {
           (item: TransactionItem) => item.id === refundItem.originalItemId
         );
         return (
-          originalItem && refundItem.refundQuantity < originalItem.quantity
+          originalItem &&
+          originalItem.quantity != null &&
+          refundItem.refundQuantity < originalItem.quantity
         );
       });
 
@@ -365,14 +377,25 @@ export class TransactionManager {
       for (const refundItem of refundData.refundItems) {
         const itemId = this.uuid.v4();
 
+        // Determine itemType - refunds are typically UNIT items
+        const itemType = "UNIT";
+
+        // Calculate proportional tax for this item
+        const itemTaxAmount =
+          refundSubtotal > 0
+            ? -refundTax * (refundItem.refundAmount / refundSubtotal)
+            : 0;
+
         await tx.insert(schema.transactionItems).values({
           id: itemId,
           transactionId: refundId,
           productId: refundItem.productId,
           productName: refundItem.productName,
+          itemType,
           quantity: -refundItem.refundQuantity, // Negative for refund
           unitPrice: refundItem.unitPrice,
           totalPrice: -refundItem.refundAmount,
+          taxAmount: itemTaxAmount,
           refundedQuantity: null,
           weight: null,
           discountAmount: null,
@@ -736,6 +759,10 @@ export class TransactionManager {
       }
 
       // Check if refund quantity exceeds available quantity
+      if (originalItem.quantity == null) {
+        errors.push(`Item ${refundItem.productName} has no quantity to refund`);
+        continue;
+      }
       const availableQuantity =
         originalItem.quantity - (originalItem.refundedQuantity || 0);
       if (refundItem.refundQuantity > availableQuantity) {
