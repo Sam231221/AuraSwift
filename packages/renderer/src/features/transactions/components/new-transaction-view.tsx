@@ -53,12 +53,11 @@ import VoidTransactionModal from "./void-transaction-view";
 import CashDrawerCountModal from "./cash-drawer-count-modal";
 import { QuickActionButtons } from "./quick-actions-buttons";
 import { NumericKeypad } from "./numeric-keypad";
-
-interface CartItem {
-  product: Product;
-  quantity: number;
-  weight?: number;
-}
+import type {
+  CartSession,
+  CartItemWithProduct,
+  CartSessionWithItems,
+} from "@/features/transactions/types/cart.types";
 
 interface PaymentMethod {
   type: "cash" | "card" | "mobile" | "voucher" | "split";
@@ -306,8 +305,12 @@ const QuickActionsCarousel: React.FC<QuickActionsCarouselProps> = ({
 
 //const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+  // Cart Session State
+  const [cartSession, setCartSession] = useState<CartSession | null>(null);
+  const [cartItems, setCartItems] = useState<CartItemWithProduct[]>([]);
+  const [loadingCart, setLoadingCart] = useState(false);
+  
   // State management
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [barcodeInput, setBarcodeInput] = useState("");
   const [searchQuery] = useState("");
   const [paymentStep, setPaymentStep] = useState(false);
@@ -414,7 +417,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             parseFloat(weightInput) > 0
           ) {
             // If we already have the weight input for this product
-            addToCart(product, parseFloat(weightInput));
+            await addToCart(product, parseFloat(weightInput));
             setWeightInput("");
             setSelectedWeightProduct(null);
             return true;
@@ -430,7 +433,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           }
         } else {
           // Normal product, add directly to cart
-          addToCart(product);
+          await addToCart(product);
           console.log("✅ Product added to cart:", product.name);
           return true; // Success!
         }
@@ -440,7 +443,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         return false; // Product not found
       }
     },
-    [products, selectedWeightProduct, weightInput]
+    [products, selectedWeightProduct, weightInput, addToCart]
   );
 
   // Initialize scanner hook
@@ -514,11 +517,66 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   }, [user?.businessId]);
 
+  // Initialize or recover cart session
+  const initializeCartSession = useCallback(async () => {
+    if (!user?.businessId || !user?.id) return;
+
+    try {
+      setLoadingCart(true);
+      
+      // Try to get active session first
+      const activeSessionResponse = await window.cartAPI.getActiveSession(user.id);
+      
+      if (activeSessionResponse.success && activeSessionResponse.data) {
+        // Recover existing session
+        const session = activeSessionResponse.data as CartSession;
+        setCartSession(session);
+        
+        // Load items for this session
+        const itemsResponse = await window.cartAPI.getItems(session.id);
+        if (itemsResponse.success && itemsResponse.data) {
+          const items = itemsResponse.data as CartItemWithProduct[];
+          setCartItems(items);
+          toast.info(`Recovered cart with ${items.length} item(s)`);
+        }
+      } else {
+        // Create new session
+        const shiftResponse = await window.shiftAPI.getActive(user.id);
+        if (!shiftResponse.success || !shiftResponse.data) {
+          toast.error("No active shift found. Please start your shift first.");
+          return;
+        }
+
+        const activeShift = shiftResponse.data as { id: string };
+        
+        const newSessionResponse = await window.cartAPI.createSession({
+          cashierId: user.id,
+          shiftId: activeShift.id,
+          businessId: user.businessId,
+        });
+
+        if (newSessionResponse.success && newSessionResponse.data) {
+          const session = newSessionResponse.data as CartSession;
+          setCartSession(session);
+          setCartItems([]);
+        } else {
+          toast.error("Failed to create cart session");
+        }
+      }
+    } catch (error) {
+      console.error("Error initializing cart session:", error);
+      toast.error("Failed to initialize cart");
+    } finally {
+      setLoadingCart(false);
+    }
+  }, [user?.businessId, user?.id]);
+
   // Load products on component mount
   useEffect(() => {
     loadProducts();
     loadCategories();
-  }, [loadProducts, loadCategories]);
+    initializeCartSession();
+  }, [loadProducts, loadCategories, initializeCartSession]);
 
   // Category navigation functions
   const handleCategoryClick = (category: Category) => {
@@ -617,79 +675,137 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       product.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Calculate total
-  const subtotal = cart.reduce((sum, item) => {
-    let itemPrice = item.product.price;
+  // Calculate total from cart items
+  const subtotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
+  const tax = cartItems.reduce((sum, item) => sum + item.taxAmount, 0);
+  const total = subtotal + tax;
+  
+  // Update cart session totals when items change
+  useEffect(() => {
+    if (cartSession && cartSession.status === "ACTIVE") {
+      window.cartAPI.updateSession(cartSession.id, {
+        totalAmount: total,
+        taxAmount: tax,
+      }).catch(console.error);
+    }
+  }, [total, tax, cartSession]);
 
-    // For weight-based products, use pricePerUnit if available
-    if (item.product.requiresWeight && item.product.pricePerUnit) {
-      itemPrice = item.product.pricePerUnit;
+  // Functions for cart operations using cart API
+  const addToCart = useCallback(async (product: Product, weight?: number) => {
+    if (!cartSession) {
+      toast.error("Cart session not initialized");
+      return;
     }
 
-    const itemTotal = itemPrice * (item.quantity || 1) * (item.weight || 1);
-    return sum + itemTotal;
-  }, 0);
-
-  const tax = subtotal * 0.08; // Example tax rate
-  const total = subtotal + tax;
-
-  // Functions for cart operations
-  const addToCart = (product: Product, weight?: number) => {
     console.log(
       "🛒 Adding to cart:",
       product.name,
       weight ? `(${weight} ${product.unit})` : ""
     );
 
-    setCart((prevCart) => {
-      const existingItemIndex = prevCart.findIndex(
-        (item) => item.product.id === product.id
+    try {
+      // Determine item type
+      const itemType = product.requiresWeight ? "WEIGHT" : "UNIT";
+      
+      // Calculate pricing
+      let unitPrice = product.price;
+      let totalPrice = product.price;
+      let taxAmount = 0;
+      
+      if (product.requiresWeight && weight && product.pricePerUnit) {
+        unitPrice = product.pricePerUnit;
+        totalPrice = product.pricePerUnit * weight;
+      } else if (!product.requiresWeight) {
+        totalPrice = product.price * 1; // Default quantity 1
+      }
+      
+      // Calculate tax (simplified - should use product's tax rate)
+      taxAmount = totalPrice * 0.08; // Example 8% tax
+      totalPrice = totalPrice + taxAmount;
+
+      // Check for existing item to update quantity/weight
+      const existingItem = cartItems.find(
+        (item) => item.productId === product.id && item.itemType === itemType
       );
 
-      if (existingItemIndex >= 0) {
-        const updatedCart = [...prevCart];
-        const existingItem = updatedCart[existingItemIndex];
-        const newQuantity = existingItem.quantity + 1;
-        const newWeight = product.requiresWeight
+      if (existingItem) {
+        // Update existing item
+        const newQuantity = existingItem.itemType === "UNIT" 
+          ? (existingItem.quantity || 0) + 1 
+          : existingItem.quantity;
+        const newWeight = existingItem.itemType === "WEIGHT"
           ? (existingItem.weight || 0) + (weight || 0)
-          : undefined;
+          : existingItem.weight;
+        
+        const newTotalPrice = existingItem.itemType === "UNIT"
+          ? unitPrice * (newQuantity || 1)
+          : unitPrice * (newWeight || 0);
+        const newTaxAmount = newTotalPrice * 0.08;
+        const finalTotalPrice = newTotalPrice + newTaxAmount;
 
-        updatedCart[existingItemIndex] = {
-          ...existingItem,
+        const updateResponse = await window.cartAPI.updateItem(existingItem.id, {
           quantity: newQuantity,
           weight: newWeight,
-        };
+          totalPrice: finalTotalPrice,
+          taxAmount: newTaxAmount,
+        });
 
-        // Show success toast for scanner feedback
-        toast.success(
-          `Added ${product.name} (${newQuantity}x)${
-            product.requiresWeight && newWeight
-              ? ` - ${newWeight.toFixed(2)} ${product.unit}`
-              : ""
-          }`
-        );
-
-        return updatedCart;
+        if (updateResponse.success) {
+          // Reload cart items
+          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+          if (itemsResponse.success && itemsResponse.data) {
+            setCartItems(itemsResponse.data as CartItemWithProduct[]);
+          }
+          
+          toast.success(
+            `Added ${product.name} (${newQuantity}x)${
+              product.requiresWeight && newWeight
+                ? ` - ${newWeight.toFixed(2)} ${product.unit}`
+                : ""
+            }`
+          );
+        } else {
+          toast.error("Failed to update cart item");
+        }
       } else {
-        const newItem = {
-          product,
-          quantity: 1,
-          weight: product.requiresWeight ? weight : undefined,
-        };
+        // Add new item
+        const addResponse = await window.cartAPI.addItem({
+          cartSessionId: cartSession.id,
+          productId: product.id,
+          itemType,
+          quantity: itemType === "UNIT" ? 1 : undefined,
+          weight: itemType === "WEIGHT" ? weight : undefined,
+          unitOfMeasure: product.unit || "each",
+          unitPrice,
+          totalPrice,
+          taxAmount,
+          ageRestrictionLevel: product.ageRestrictionLevel || "NONE",
+          ageVerified: false,
+        });
 
-        // Show success toast for scanner feedback
-        toast.success(
-          `Added ${product.name}${
-            product.requiresWeight && weight
-              ? ` - ${weight.toFixed(2)} ${product.unit}`
-              : ""
-          }`
-        );
-
-        return [...prevCart, newItem];
+        if (addResponse.success) {
+          // Reload cart items
+          const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+          if (itemsResponse.success && itemsResponse.data) {
+            setCartItems(itemsResponse.data as CartItemWithProduct[]);
+          }
+          
+          toast.success(
+            `Added ${product.name}${
+              product.requiresWeight && weight
+                ? ` - ${weight.toFixed(2)} ${product.unit}`
+                : ""
+            }`
+          );
+        } else {
+          toast.error("Failed to add item to cart");
+        }
       }
-    });
-  };
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      toast.error("Failed to add item to cart");
+    }
+  }, [cartSession, cartItems]);
 
   // const _updateQuantity = (productId: string, newQuantity: number) => {
   //   if (newQuantity < 1) {
@@ -706,13 +822,28 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   //   );
   // };
 
-  const removeFromCart = (productId: string) => {
-    setCart((prevCart) =>
-      prevCart.filter((item) => item.product.id !== productId)
-    );
-  };
+  const removeFromCart = useCallback(async (itemId: string) => {
+    if (!cartSession) return;
 
-  const handleBarcodeScan = () => {
+    try {
+      const response = await window.cartAPI.removeItem(itemId);
+      if (response.success) {
+        // Reload cart items
+        const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+        if (itemsResponse.success && itemsResponse.data) {
+          setCartItems(itemsResponse.data as CartItemWithProduct[]);
+        }
+        toast.success("Item removed from cart");
+      } else {
+        toast.error("Failed to remove item from cart");
+      }
+    } catch (error) {
+      console.error("Error removing from cart:", error);
+      toast.error("Failed to remove item from cart");
+    }
+  }, [cartSession]);
+
+  const handleBarcodeScan = async () => {
     if (barcodeInput.trim() === "") return;
 
     // Search by ID, SKU, or PLU
@@ -726,7 +857,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (product) {
       if (product.requiresWeight) {
         if (weightInput && parseFloat(weightInput) > 0) {
-          addToCart(product, parseFloat(weightInput));
+          await addToCart(product, parseFloat(weightInput));
           setWeightInput("");
           setSelectedWeightProduct(null);
         } else {
@@ -738,7 +869,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           );
         }
       } else {
-        addToCart(product);
+        await addToCart(product);
       }
       setBarcodeInput("");
     } else {
@@ -862,7 +993,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
 
     // Validate cart
-    if (cart.length === 0) {
+    if (!cartSession || cartItems.length === 0) {
       toast.error("Cart is empty");
       return;
     }
@@ -885,30 +1016,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       // Generate receipt number
       const receiptNumber = `RCP-${Date.now()}`;
 
-      // Prepare transaction items
-      const transactionItems = cart.map((item) => {
-        let unitPrice = item.product.price;
-        let totalPrice = item.product.price * item.quantity;
-
-        // Handle weight-based products
-        if (
-          item.product.requiresWeight &&
-          item.weight &&
-          item.product.pricePerUnit
-        ) {
-          unitPrice = item.product.pricePerUnit;
-          totalPrice = item.product.pricePerUnit * item.weight * item.quantity;
-        }
-
-        return {
-          productId: item.product.id,
-          productName: item.product.name,
-          quantity: item.quantity,
-          unitPrice,
-          totalPrice,
-        };
-      });
-
       // Map payment method to backend format
       let backendPaymentMethod: "cash" | "card" | "mixed";
       if (skipPaymentValidation) {
@@ -925,14 +1032,11 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         backendPaymentMethod = "mixed"; // For voucher/split payments
       }
 
-      // Create transaction
-      const transactionResponse = await window.transactionAPI.create({
+      // Use createFromCart API to create transaction from cart session
+      const transactionResponse = await window.transactionAPI.createFromCart({
+        cartSessionId: cartSession.id,
         shiftId: activeShift.id,
         businessId: user.businessId,
-        type: "sale",
-        subtotal,
-        tax,
-        total,
         paymentMethod: backendPaymentMethod,
         cashAmount: skipPaymentValidation
           ? undefined
@@ -944,16 +1048,16 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           : paymentMethod?.type === "card" || paymentMethod?.type === "mobile"
           ? total
           : undefined,
-        items: transactionItems,
-        status: "completed",
         receiptNumber,
-        timestamp: new Date().toISOString(),
       });
 
       if (!transactionResponse.success) {
         toast.error("Failed to record transaction");
         return;
       }
+
+      // Complete the cart session
+      await window.cartAPI.completeSession(cartSession.id);
 
       setTransactionComplete(true);
 
@@ -965,29 +1069,15 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         cashierName: `${user.firstName} ${user.lastName}`,
         businessId: user.businessId,
         businessName: user.businessName,
-        items: cart.map((item) => {
-          let unitPrice = item.product.price;
-          let itemTotal = item.product.price * item.quantity;
-
-          if (
-            item.product.requiresWeight &&
-            item.weight &&
-            item.product.pricePerUnit
-          ) {
-            unitPrice = item.product.pricePerUnit;
-            itemTotal = item.product.pricePerUnit * item.weight * item.quantity;
-          }
-
-          return {
-            id: item.product.id,
-            name: item.product.name,
-            quantity: item.quantity,
-            price: unitPrice,
-            total: itemTotal,
-            sku: item.product.sku || "",
-            category: item.product.category || "",
-          };
-        }),
+        items: cartItems.map((item) => ({
+          id: item.productId,
+          name: item.product?.name || "Unknown Product",
+          quantity: item.itemType === "UNIT" ? (item.quantity || 1) : 1,
+          price: item.unitPrice,
+          total: item.totalPrice,
+          sku: item.product?.sku || "",
+          category: item.product?.category || "",
+        })),
         subtotal,
         tax,
         discount: 0,
@@ -1084,9 +1174,9 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     // Only reset automatically if no printer modal is showing
     if (!isShowingStatus) {
-      setTimeout(() => {
-        // Reset for next customer
-        setCart([]);
+      setTimeout(async () => {
+        // Create new cart session for next customer
+        await initializeCartSession();
         setPaymentStep(false);
         setPaymentMethod(null);
         setTransactionComplete(false);
@@ -1274,11 +1364,11 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   };
 
   // Handler for closing receipt options modal (skip receipt)
-  const handleCloseReceiptOptions = () => {
+  const handleCloseReceiptOptions = async () => {
     setShowReceiptOptions(false);
 
-    // Reset for next customer
-    setCart([]);
+    // Create new cart session for next customer
+    await initializeCartSession();
     setPaymentStep(false);
     setPaymentMethod(null);
     setTransactionComplete(false);
@@ -1289,7 +1379,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   };
 
   // Handler for canceling payment from receipt modal
-  const handleCancelPayment = () => {
+  const handleCancelPayment = async () => {
     // Show confirmation dialog
     const confirmed = window.confirm(
       "⚠️ Cancel Receipt?\n\n" +
@@ -1303,8 +1393,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       setCompletedTransactionData(null);
       setTransactionComplete(false);
 
-      // Reset for next customer
-      setCart([]);
+      // Create new cart session for next customer
+      await initializeCartSession();
       setPaymentStep(false);
       setPaymentMethod(null);
       setCashAmount(0);
@@ -1480,7 +1570,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     ? "bg-blue-50 border-blue-300 hover:bg-blue-100"
                                     : "bg-white border-slate-200 hover:bg-slate-50"
                                 }`}
-                                onClick={() => {
+                                onClick={async () => {
                                   if (product.requiresWeight) {
                                     if (
                                       selectedWeightProduct?.id ===
@@ -1488,7 +1578,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                       weightInput &&
                                       parseFloat(weightInput) > 0
                                     ) {
-                                      addToCart(
+                                      await addToCart(
                                         product,
                                         parseFloat(weightInput)
                                       );
@@ -1501,7 +1591,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                       );
                                     }
                                   } else {
-                                    addToCart(product);
+                                    await addToCart(product);
                                   }
                                 }}
                               >
@@ -1906,8 +1996,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     {weightInput && parseFloat(weightInput) > 0 && (
                       <Button
                         size="sm"
-                        onClick={() => {
-                          addToCart(
+                        onClick={async () => {
+                          await addToCart(
                             selectedWeightProduct,
                             parseFloat(weightInput)
                           );
@@ -1978,7 +2068,17 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   <Table>
                     <TableBody>
                       <AnimatePresence>
-                        {cart.length === 0 ? (
+                        {loadingCart ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={5}
+                              className="text-slate-400 text-center py-8"
+                            >
+                              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                              Loading cart...
+                            </TableCell>
+                          </TableRow>
+                        ) : cartItems.length === 0 ? (
                           <TableRow>
                             <TableCell
                               colSpan={5}
@@ -1988,50 +2088,50 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          cart.map((item) => (
+                          cartItems.map((item) => (
                             <TableRow
-                              key={item.product.id}
+                              key={item.id}
                               className="border-b border-slate-200"
                             >
                               <TableCell
                                 className="text-center"
                                 style={{ width: "100px" }}
                               >
-                                {item.product.requiresWeight && item.weight
+                                {item.itemType === "WEIGHT" && item.weight
                                   ? `${item.weight.toFixed(2)} ${
-                                      item.product.unit || "lbs"
+                                      item.unitOfMeasure || "kg"
                                     }`
+                                  : item.itemType === "UNIT" && item.quantity
+                                  ? `${item.quantity}x`
                                   : "-"}
                               </TableCell>
                               <TableCell className="font-medium">
-                                {item.product.name}
+                                {item.product?.name || "Unknown Product"}
+                                {item.ageRestrictionLevel !== "NONE" && (
+                                  <Badge
+                                    variant="outline"
+                                    className="ml-2 text-xs bg-orange-50 text-orange-700 border-orange-200"
+                                  >
+                                    {item.ageRestrictionLevel}
+                                  </Badge>
+                                )}
                               </TableCell>
                               <TableCell
                                 className="text-center"
                                 style={{ width: "120px" }}
                               >
-                                {item.product.requiresWeight &&
-                                item.product.pricePerUnit
-                                  ? `£${item.product.pricePerUnit.toFixed(
-                                      2
-                                    )} / ${item.product.unit}`
-                                  : `£${item.product.price}`}
+                                £{item.unitPrice.toFixed(2)}
+                                {item.itemType === "WEIGHT" && item.unitOfMeasure && (
+                                  <span className="text-xs text-slate-500">
+                                    {" "}/ {item.unitOfMeasure}
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell
                                 className="text-center font-semibold"
                                 style={{ width: "100px" }}
                               >
-                                {item.product.requiresWeight &&
-                                item.weight &&
-                                item.product.pricePerUnit
-                                  ? `£${(
-                                      item.product.pricePerUnit *
-                                      item.weight *
-                                      item.quantity
-                                    ).toFixed(2)}`
-                                  : `£${(
-                                      item.product.price * item.quantity
-                                    ).toFixed(2)}`}
+                                £{item.totalPrice.toFixed(2)}
                               </TableCell>
                               <TableCell
                                 className="text-center"
@@ -2040,9 +2140,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() =>
-                                    removeFromCart(item.product.id)
-                                  }
+                                  onClick={() => removeFromCart(item.id)}
                                   className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
                                 >
                                   <Trash2 className="h-3 w-3" />
@@ -2066,7 +2164,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </span>
                   </span>
                   <span>
-                    Items: <span className="font-semibold">{cart.length}</span>
+                    Items: <span className="font-semibold">{cartItems.length}</span>
                   </span>
                   <span className="text-slate-500">
                     Tax (8%):{" "}
@@ -2097,7 +2195,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       className="w-full h-full py-4 font-semibold text-lg rounded transition-colors bg-sky-600 hover:bg-sky-700 text-white"
                       style={{ minHeight: 0, minWidth: 0 }}
                       onClick={() => setPaymentStep(true)}
-                      disabled={cart.length === 0}
+                      disabled={cartItems.length === 0 || !cartSession}
                     >
                       Checkout
                     </Button>
@@ -2135,10 +2233,10 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           onRetryPrint={handleRetryPrint}
           onSkipReceipt={handleSkipReceipt}
           onEmailReceipt={handleEmailReceipt}
-          onNewSale={() => {
+          onNewSale={async () => {
             handleNewSale();
-            // Reset transaction state
-            setCart([]);
+            // Create new cart session for next customer
+            await initializeCartSession();
             setPaymentStep(false);
             setPaymentMethod(null);
             setTransactionComplete(false);

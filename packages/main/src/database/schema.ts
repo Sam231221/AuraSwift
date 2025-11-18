@@ -715,6 +715,124 @@ export const stockAdjustments = createTable("stock_adjustments", {
 });
 
 // ============================================================================
+// CART MANAGEMENT
+// ============================================================================
+
+/**
+ * Cart sessions - Active shopping carts before payment
+ * Supports cart persistence, recovery, and multi-station operations
+ */
+export const cartSessions = createTable(
+  "cart_sessions",
+  {
+    id: text("id").primaryKey(),
+    cashierId: text("cashier_id")
+      .notNull()
+      .references(() => users.id),
+    shiftId: text("shift_id")
+      .notNull()
+      .references(() => shifts.id),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id),
+    stationId: text("station_id"), // Optional: POS station identifier
+
+    // Session status
+    status: text("status", {
+      enum: ["ACTIVE", "COMPLETED", "CANCELLED"],
+    })
+      .notNull()
+      .default("ACTIVE"),
+
+    // Totals
+    totalAmount: real("total_amount").default(0),
+    taxAmount: real("tax_amount").default(0),
+
+    // Age verification tracking (session-level)
+    customerAgeVerified: integer("customer_age_verified", {
+      mode: "boolean",
+    }).default(false),
+    verificationMethod: text("verification_method", {
+      enum: ["NONE", "MANUAL", "SCAN", "OVERRIDE"],
+    }).default("NONE"),
+    verifiedBy: text("verified_by").references(() => users.id),
+
+    // Timestamps
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("cart_sessions_status_idx").on(table.status, table.cashierId),
+    index("cart_sessions_created_idx").on(table.createdAt),
+    index("cart_sessions_shift_idx").on(table.shiftId),
+    index("cart_sessions_business_idx").on(table.businessId),
+  ]
+);
+
+/**
+ * Cart items - Individual items in a cart session
+ * Supports both UNIT and WEIGHT item types, batch tracking, age restrictions, and scale integration
+ */
+export const cartItems = createTable(
+  "cart_items",
+  {
+    id: text("id").primaryKey(),
+    cartSessionId: text("cart_session_id")
+      .notNull()
+      .references(() => cartSessions.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id),
+
+    // Item type and quantity
+    itemType: text("item_type", {
+      enum: ["UNIT", "WEIGHT"],
+    }).notNull(),
+    quantity: integer("quantity"), // For UNIT items
+    weight: real("weight"), // For WEIGHT items (kg)
+    unitOfMeasure: text("unit_of_measure"), // 'kg', 'g', 'lb', etc.
+
+    // Pricing
+    unitPrice: real("unit_price").notNull(), // Price per unit/kg
+    totalPrice: real("total_price").notNull(), // Calculated total
+    taxAmount: real("tax_amount").notNull(),
+
+    // Batch tracking (for expiry)
+    batchId: text("batch_id").references(() => productBatches.id, {
+      onDelete: "set null",
+    }),
+    batchNumber: text("batch_number"),
+    expiryDate: integer("expiry_date", { mode: "timestamp_ms" }),
+
+    // Age restriction tracking
+    ageRestrictionLevel: text("age_restriction_level", {
+      enum: ["NONE", "AGE_16", "AGE_18", "AGE_21"],
+    }).default("NONE"),
+    ageVerified: integer("age_verified", { mode: "boolean" }).default(false),
+
+    // Scale data (for weighted items audit)
+    scaleReadingWeight: real("scale_reading_weight"),
+    scaleReadingStable: integer("scale_reading_stable", {
+      mode: "boolean",
+    }).default(true),
+
+    // Timestamps
+    addedAt: integer("added_at", { mode: "timestamp_ms" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .$defaultFn(() => new Date())
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("cart_items_session_idx").on(table.cartSessionId),
+    index("cart_items_product_idx").on(table.productId),
+    index("cart_items_batch_idx").on(table.batchId),
+    index("cart_items_type_idx").on(table.itemType),
+  ]
+);
+
+// ============================================================================
 // SALES & TRANSACTIONS
 // ============================================================================
 
@@ -768,6 +886,7 @@ export const transactions = createTable("transactions", {
 
 /**
  * Individual items within a transaction
+ * Enhanced with fields from cart_items for complete audit trail
  */
 export const transactionItems = createTable("transaction_items", {
   id: text("id").primaryKey(),
@@ -778,13 +897,41 @@ export const transactionItems = createTable("transaction_items", {
     .notNull()
     .references(() => products.id),
   productName: text("productName").notNull(),
-  quantity: integer("quantity").notNull(),
+
+  // Item type and quantity (from cart_items)
+  itemType: text("item_type", {
+    enum: ["UNIT", "WEIGHT"],
+  }).notNull(),
+  quantity: integer("quantity"), // For UNIT items
+  weight: real("weight"), // For WEIGHT items (kg)
+  unitOfMeasure: text("unit_of_measure"), // 'kg', 'g', 'lb', etc.
+
+  // Pricing
   unitPrice: real("unitPrice").notNull(),
   totalPrice: real("totalPrice").notNull(),
+  taxAmount: real("tax_amount").notNull(),
   refundedQuantity: integer("refundedQuantity").default(0),
-  weight: real("weight"),
   discountAmount: real("discountAmount").default(0),
   appliedDiscounts: text("appliedDiscounts"),
+
+  // Batch info (for recalls/audits) - copied from cart_items
+  batchId: text("batch_id").references(() => productBatches.id, {
+    onDelete: "set null",
+  }),
+  batchNumber: text("batch_number"),
+  expiryDate: integer("expiry_date", { mode: "timestamp_ms" }),
+
+  // Age restriction info - copied from cart_items
+  ageRestrictionLevel: text("age_restriction_level", {
+    enum: ["NONE", "AGE_16", "AGE_18", "AGE_21"],
+  }).default("NONE"),
+  ageVerified: integer("age_verified", { mode: "boolean" }).default(false),
+
+  // Reference to original cart item (if applicable)
+  cartItemId: text("cart_item_id").references(() => cartItems.id, {
+    onDelete: "set null",
+  }),
+
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .$defaultFn(() => new Date())
     .notNull(),
@@ -1399,6 +1546,7 @@ export const businessesRelations = relations(businesses, ({ one, many }) => ({
   attendanceReports: many(attendanceReports),
   timeShifts: many(timeShifts),
   ageVerificationRecords: many(ageVerificationRecords),
+  cartSessions: many(cartSessions),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -1432,6 +1580,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   ageVerificationOverrides: many(ageVerificationRecords, {
     relationName: "managerOverride",
   }),
+  cartSessions: many(cartSessions),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -1495,6 +1644,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   productBatches: many(productBatches),
   stockMovements: many(stockMovements),
   ageVerificationRecords: many(ageVerificationRecords),
+  cartItems: many(cartItems),
 }));
 
 export const discountsRelations = relations(discounts, ({ one }) => ({
@@ -1661,9 +1811,60 @@ export const transactionItemsRelations = relations(
       fields: [transactionItems.productId],
       references: [products.id],
     }),
+    batch: one(productBatches, {
+      fields: [transactionItems.batchId],
+      references: [productBatches.id],
+    }),
+    cartItem: one(cartItems, {
+      fields: [transactionItems.cartItemId],
+      references: [cartItems.id],
+    }),
     ageVerifications: many(ageVerificationRecords),
   })
 );
+
+// ----------------------------------------------------------------------------
+// Cart Relations
+// ----------------------------------------------------------------------------
+
+export const cartSessionsRelations = relations(
+  cartSessions,
+  ({ one, many }) => ({
+    cashier: one(users, {
+      fields: [cartSessions.cashierId],
+      references: [users.id],
+    }),
+    shift: one(shifts, {
+      fields: [cartSessions.shiftId],
+      references: [shifts.id],
+    }),
+    business: one(businesses, {
+      fields: [cartSessions.businessId],
+      references: [businesses.id],
+    }),
+    verifiedByUser: one(users, {
+      fields: [cartSessions.verifiedBy],
+      references: [users.id],
+      relationName: "cartVerifiedBy",
+    }),
+    items: many(cartItems),
+  })
+);
+
+export const cartItemsRelations = relations(cartItems, ({ one }) => ({
+  cartSession: one(cartSessions, {
+    fields: [cartItems.cartSessionId],
+    references: [cartSessions.id],
+  }),
+  product: one(products, {
+    fields: [cartItems.productId],
+    references: [products.id],
+  }),
+  batch: one(productBatches, {
+    fields: [cartItems.batchId],
+    references: [productBatches.id],
+  }),
+}));
 
 export const ageVerificationRecordsRelations = relations(
   ageVerificationRecords,
@@ -1728,6 +1929,7 @@ export const shiftsRelations = relations(shifts, ({ one, many }) => ({
     references: [businesses.id],
   }),
   transactions: many(transactions),
+  cartSessions: many(cartSessions),
   cashDrawerCounts: many(cashDrawerCounts),
   shiftValidations: one(shiftValidations),
   shiftReports: one(shiftReports, {
@@ -1929,6 +2131,12 @@ export type NewUser = InferInsertModel<typeof users>;
 // Product types
 export type Product = InferSelectModel<typeof products>;
 export type NewProduct = InferInsertModel<typeof products>;
+
+// Cart types
+export type CartSession = InferSelectModel<typeof cartSessions>;
+export type NewCartSession = InferInsertModel<typeof cartSessions>;
+export type CartItem = InferSelectModel<typeof cartItems>;
+export type NewCartItem = InferInsertModel<typeof cartItems>;
 
 // Transaction types
 export type Transaction = InferSelectModel<typeof transactions>;

@@ -181,6 +181,70 @@ declare global {
       ) => Promise<APIResponse>;
       getPendingReconciliation: (businessId: string) => Promise<APIResponse>;
     };
+    cartAPI: {
+      // Cart Session Operations
+      createSession: (sessionData: {
+        cashierId: string;
+        shiftId: string;
+        businessId: string;
+        stationId?: string;
+      }) => Promise<APIResponse>;
+      getSession: (sessionId: string) => Promise<APIResponse>;
+      getSessionWithItems: (sessionId: string) => Promise<APIResponse>;
+      getActiveSession: (cashierId: string) => Promise<APIResponse>;
+      updateSession: (
+        sessionId: string,
+        updates: {
+          status?: "ACTIVE" | "COMPLETED" | "CANCELLED";
+          totalAmount?: number;
+          taxAmount?: number;
+          customerAgeVerified?: boolean;
+          verificationMethod?: "NONE" | "MANUAL" | "SCAN" | "OVERRIDE";
+          verifiedBy?: string;
+          completedAt?: Date | string;
+        }
+      ) => Promise<APIResponse>;
+      completeSession: (sessionId: string) => Promise<APIResponse>;
+      cancelSession: (sessionId: string) => Promise<APIResponse>;
+      
+      // Cart Item Operations
+      addItem: (itemData: {
+        cartSessionId: string;
+        productId: string;
+        itemType: "UNIT" | "WEIGHT";
+        quantity?: number;
+        weight?: number;
+        unitOfMeasure?: string;
+        unitPrice: number;
+        totalPrice: number;
+        taxAmount: number;
+        batchId?: string;
+        batchNumber?: string;
+        expiryDate?: Date | string;
+        ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
+        ageVerified?: boolean;
+        scaleReadingWeight?: number;
+        scaleReadingStable?: boolean;
+      }) => Promise<APIResponse>;
+      updateItem: (
+        itemId: string,
+        updates: {
+          quantity?: number;
+          weight?: number;
+          unitPrice?: number;
+          totalPrice?: number;
+          taxAmount?: number;
+          batchId?: string;
+          batchNumber?: string;
+          expiryDate?: Date | string;
+          scaleReadingWeight?: number;
+          scaleReadingStable?: boolean;
+        }
+      ) => Promise<APIResponse>;
+      removeItem: (itemId: string) => Promise<APIResponse>;
+      getItems: (sessionId: string) => Promise<APIResponse>;
+      getItem: (itemId: string) => Promise<APIResponse>;
+    };
     transactionAPI: {
       create: (transactionData: {
         shiftId: string;
@@ -195,16 +259,36 @@ declare global {
         items: Array<{
           productId: string;
           productName: string;
-          quantity: number;
+          itemType: "UNIT" | "WEIGHT";
+          quantity?: number;
+          weight?: number;
+          unitOfMeasure?: string;
           unitPrice: number;
           totalPrice: number;
+          taxAmount: number;
+          batchId?: string;
+          batchNumber?: string;
+          expiryDate?: Date | string;
+          ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
+          ageVerified?: boolean;
+          cartItemId?: string;
         }>;
         status: "completed" | "voided" | "pending";
         customerId?: string;
         receiptNumber: string;
         timestamp: string;
+        cartSessionId?: string;
       }) => Promise<APIResponse>;
       getByShift: (shiftId: string) => Promise<APIResponse>;
+      createFromCart: (data: {
+        cartSessionId: string;
+        shiftId: string;
+        businessId: string;
+        paymentMethod: "cash" | "card" | "mixed";
+        cashAmount?: number;
+        cardAmount?: number;
+        receiptNumber: string;
+      }) => Promise<APIResponse>;
     };
     refundAPI: {
       getTransactionById: (transactionId: string) => Promise<APIResponse>;
