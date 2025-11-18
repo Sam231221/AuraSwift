@@ -18,6 +18,7 @@ import {
   officePrinterAPI,
   paymentAPI,
   pdfReceiptAPI,
+  scaleAPI,
   appAPI,
 } from "./api/system.js";
 
@@ -37,6 +38,7 @@ contextBridge.exposeInMainWorld("printerAPI", printerAPI);
 contextBridge.exposeInMainWorld("officePrinterAPI", officePrinterAPI);
 contextBridge.exposeInMainWorld("paymentAPI", paymentAPI);
 contextBridge.exposeInMainWorld("pdfReceiptAPI", pdfReceiptAPI);
+contextBridge.exposeInMainWorld("scaleAPI", scaleAPI);
 contextBridge.exposeInMainWorld("appAPI", appAPI);
 
 // Generic IPC send function for testing and general IPC communication

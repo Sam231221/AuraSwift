@@ -39,6 +39,9 @@ export async function initApp(initConfig: AppInitConfig) {
   // Initialize payment service for BBPOS WisePad 3 and Stripe integration
   await import("./services/paymentService.js");
 
+  // Initialize scale hardware service for weight measurement
+  await import("./services/scaleService.js");
+
   // Set up periodic cleanup of old unclosed shifts
   // Run cleanup every 30 minutes
   const cleanupInterval = setInterval(() => {

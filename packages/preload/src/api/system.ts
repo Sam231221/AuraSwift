@@ -89,6 +89,49 @@ export const pdfReceiptAPI = {
     ipcRenderer.invoke("receipt:generate-pdf", receiptData),
 };
 
+export const scaleAPI = {
+  // Scale Discovery & Connection
+  discover: () => ipcRenderer.invoke("scale:discover"),
+  connect: (config: {
+    device: {
+      id: string;
+      type: "HID" | "SERIAL" | "TCP_IP";
+      path?: string;
+      vendorId?: number;
+      productId?: number;
+      manufacturer?: string;
+      product?: string;
+      serialNumber?: string;
+      baudRate?: number;
+      address?: string;
+      port?: number;
+    };
+    tareWeight?: number;
+    minWeight?: number;
+    maxWeight?: number;
+    stabilityThreshold?: number;
+    stabilityReadings?: number;
+    unit?: "g" | "kg" | "lb" | "oz";
+    simulated?: boolean;
+  }) => ipcRenderer.invoke("scale:connect", config),
+  disconnect: () => ipcRenderer.invoke("scale:disconnect"),
+  getStatus: () => ipcRenderer.invoke("scale:status"),
+  tare: () => ipcRenderer.invoke("scale:tare"),
+  startReading: () => ipcRenderer.send("scale:start-reading"),
+  stopReading: () => ipcRenderer.send("scale:stop-reading"),
+  // Event listeners
+  onReading: (callback: (reading: {
+    weight: number;
+    stable: boolean;
+    unit: "g" | "kg" | "lb" | "oz";
+    timestamp: string;
+    rawReadings?: number[];
+  }) => void) => {
+    ipcRenderer.on("scale:reading", (_event, reading) => callback(reading));
+    return () => ipcRenderer.removeAllListeners("scale:reading");
+  },
+};
+
 export const appAPI = {
   restart: () => ipcRenderer.invoke("app:restart"),
 };

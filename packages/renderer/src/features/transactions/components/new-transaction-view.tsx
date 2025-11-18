@@ -57,6 +57,7 @@ import type {
   CartSession,
   CartItemWithProduct,
 } from "@/features/transactions/types/cart.types";
+import { ScaleDisplay } from "@/components/scale/ScaleDisplay";
 
 interface PaymentMethod {
   type: "cash" | "card" | "mobile" | "voucher" | "split";
@@ -1941,87 +1942,115 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 </Button>
               </div>
 
-              <div
-                className={`mt-1 flex items-center gap-2 p-2 rounded ${
-                  selectedWeightProduct
-                    ? "bg-blue-50 border border-blue-200"
-                    : ""
-                }`}
-              >
-                <Scale
-                  className={`h-4 w-4 ${
-                    selectedWeightProduct ? "text-blue-600" : "text-slate-500"
-                  }`}
-                />
-                <span
-                  className={`text-sm ${
+              {/* Scale Display for Weighted Products */}
+              {selectedWeightProduct && (selectedWeightProduct.requiresWeight || selectedWeightProduct.productType === "WEIGHTED") ? (
+                <div className="mt-2">
+                  <ScaleDisplay
+                    selectedProduct={{
+                      id: selectedWeightProduct.id,
+                      name: selectedWeightProduct.name,
+                      productType: selectedWeightProduct.productType,
+                      basePrice: selectedWeightProduct.price,
+                      pricePerUnit: selectedWeightProduct.pricePerUnit,
+                      unitOfMeasure: selectedWeightProduct.unitOfMeasure || "kg",
+                    }}
+                    onWeightConfirmed={async (weight) => {
+                      await addToCart(selectedWeightProduct, weight);
+                      setSelectedWeightProduct(null);
+                      setWeightInput("");
+                    }}
+                    onCancel={() => {
+                      setSelectedWeightProduct(null);
+                      setWeightInput("");
+                    }}
+                    autoAddOnStable={true}
+                    minWeight={0.001} // Minimum 1g
+                    maxWeight={50} // Maximum 50kg (adjust as needed)
+                  />
+                </div>
+              ) : (
+                <div
+                  className={`mt-1 flex items-center gap-2 p-2 rounded ${
                     selectedWeightProduct
-                      ? "text-blue-700 font-medium"
-                      : "text-slate-600"
-                  }`}
-                >
-                  {selectedWeightProduct
-                    ? `Weight for ${selectedWeightProduct.name}:`
-                    : "Weight (for produce):"}
-                </span>
-                <Input
-                  type="number"
-                  placeholder={
-                    selectedWeightProduct
-                      ? `Enter weight in ${
-                          selectedWeightProduct.unit || "units"
-                        }`
-                      : "Enter weight"
-                  }
-                  value={weightInput}
-                  onChange={(e) => setWeightInput(e.target.value)}
-                  className={`w-24 ${
-                    selectedWeightProduct
-                      ? "border-blue-300"
-                      : "border-slate-300"
-                  } bg-white`}
-                />
-                <span
-                  className={`text-sm ${
-                    selectedWeightProduct
-                      ? "text-blue-600 font-medium"
-                      : "text-slate-600"
+                      ? "bg-blue-50 border border-blue-200"
+                      : ""
                   }`}
                 >
-                  {selectedWeightProduct?.unit || "units"}
-                </span>
-                {selectedWeightProduct && (
-                  <>
-                    {weightInput && parseFloat(weightInput) > 0 && (
+                  <Scale
+                    className={`h-4 w-4 ${
+                      selectedWeightProduct ? "text-blue-600" : "text-slate-500"
+                    }`}
+                  />
+                  <span
+                    className={`text-sm ${
+                      selectedWeightProduct
+                        ? "text-blue-700 font-medium"
+                        : "text-slate-600"
+                    }`}
+                  >
+                    {selectedWeightProduct
+                      ? `Weight for ${selectedWeightProduct.name}:`
+                      : "Weight (for produce):"}
+                  </span>
+                  <Input
+                    type="number"
+                    placeholder={
+                      selectedWeightProduct
+                        ? `Enter weight in ${
+                            selectedWeightProduct.unit || "units"
+                          }`
+                        : "Enter weight"
+                    }
+                    value={weightInput}
+                    onChange={(e) => setWeightInput(e.target.value)}
+                    className={`w-24 ${
+                      selectedWeightProduct
+                        ? "border-blue-300"
+                        : "border-slate-300"
+                    } bg-white`}
+                  />
+                  <span
+                    className={`text-sm ${
+                      selectedWeightProduct
+                        ? "text-blue-600 font-medium"
+                        : "text-slate-600"
+                    }`}
+                  >
+                    {selectedWeightProduct?.unit || "units"}
+                  </span>
+                  {selectedWeightProduct && (
+                    <>
+                      {weightInput && parseFloat(weightInput) > 0 && (
+                        <Button
+                          size="sm"
+                          onClick={async () => {
+                            await addToCart(
+                              selectedWeightProduct,
+                              parseFloat(weightInput)
+                            );
+                            setWeightInput("");
+                            setSelectedWeightProduct(null);
+                          }}
+                          className="h-8 px-3 bg-sky-600 hover:bg-sky-700 text-white"
+                        >
+                          Add to Cart
+                        </Button>
+                      )}
                       <Button
+                        variant="outline"
                         size="sm"
-                        onClick={async () => {
-                          await addToCart(
-                            selectedWeightProduct,
-                            parseFloat(weightInput)
-                          );
-                          setWeightInput("");
+                        onClick={() => {
                           setSelectedWeightProduct(null);
+                          setWeightInput("");
                         }}
-                        className="h-8 px-3 bg-sky-600 hover:bg-sky-700 text-white"
+                        className="h-8 px-2 text-slate-600 hover:text-slate-800"
                       >
-                        Add to Cart
+                        Clear
                       </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedWeightProduct(null);
-                        setWeightInput("");
-                      }}
-                      className="h-8 px-2 text-slate-600 hover:text-slate-800"
-                    >
-                      Clear
-                    </Button>
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              )}
             </CardContent>
           </div>
           {/* table of cart items */}
