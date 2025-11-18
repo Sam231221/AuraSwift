@@ -2,7 +2,8 @@ import { getNodeMajorVersion } from "@app/electron-versions";
 import { spawn } from "child_process";
 import electronPath from "electron";
 import { copyFileSync, mkdirSync, readdirSync, statSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
 export default /**
  * @type {import('vite').UserConfig}
@@ -38,15 +39,20 @@ function copyMigrationsPlugin() {
   return {
     name: "@app/copy-migrations",
     closeBundle() {
-      // Use absolute paths from the vite config location (packages/main/)
-      const srcMigrations = new URL("src/database/migrations", import.meta.url)
-        .pathname;
-      const destMigrations = new URL("dist/migrations", import.meta.url)
-        .pathname;
+      // Get the directory of this config file (packages/main/)
+      const configDir = dirname(fileURLToPath(import.meta.url));
+      const srcMigrations = join(configDir, "src", "database", "migrations");
+      const destMigrations = join(configDir, "dist", "migrations");
 
       // Recursively copy directory
       function copyDir(src, dest) {
         try {
+          // Check if source exists
+          if (!statSync(src).isDirectory()) {
+            console.warn(`Migrations source not found: ${src}`);
+            return;
+          }
+
           mkdirSync(dest, { recursive: true });
           const entries = readdirSync(src);
 
@@ -60,11 +66,17 @@ function copyMigrationsPlugin() {
               copyFileSync(srcPath, destPath);
             }
           }
-          console.log("Migrations copied to dist/");
+          console.log(`✅ Migrations copied from ${src} to ${dest}`);
         } catch (err) {
           // Only log if it's not a "not found" error
           if (err.code !== "ENOENT") {
-            console.error("Failed to copy migrations:", err.message);
+            console.error(`❌ Failed to copy migrations: ${err.message}`);
+            console.error(`   Source: ${src}`);
+            console.error(`   Dest: ${dest}`);
+          } else {
+            console.warn(
+              `⚠️  Migrations source not found: ${src} (this is OK if no migrations exist yet)`
+            );
           }
         }
       }

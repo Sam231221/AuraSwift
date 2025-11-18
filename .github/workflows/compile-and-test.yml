@@ -42,10 +42,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Node.js 18
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "npm"
 
       - name: Cache node_modules for typecheck
@@ -77,10 +77,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Node.js 18 for native module compatibility
+      - name: Setup Node.js 22 for native module compatibility
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "npm"
 
       - name: Setup MSBuild (Windows)
@@ -92,12 +92,19 @@ jobs:
           python-version: "3.x"
 
       # Cache global npm packages
+      - name: Get npm global prefix
+        id: npm-global-prefix
+        run: |
+          $prefix = npm config get prefix
+          echo "prefix=$prefix" >> $env:GITHUB_OUTPUT
+        shell: powershell
+
       - name: Cache global npm packages
         uses: actions/cache@v4
         with:
           path: |
             ${{ runner.temp }}/npm-cache
-            C:\Users\runneradmin\AppData\Roaming\npm
+            ${{ steps.npm-global-prefix.outputs.prefix }}/npm
           key: npm-global-${{ runner.os }}-${{ hashFiles('package.json') }}
           restore-keys: |
             npm-global-${{ runner.os }}-
@@ -124,10 +131,10 @@ jobs:
             **/node_modules/serialport/build
             **/node_modules/usb/build
             node_modules/electron/dist
-          key: node-deps-${{ runner.os }}-node18-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
+          key: node-deps-${{ runner.os }}-node22-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
           restore-keys: |
-            node-deps-${{ runner.os }}-node18-electron-
-            node-deps-${{ runner.os }}-node18-
+            node-deps-${{ runner.os }}-node22-electron-
+            node-deps-${{ runner.os }}-node22-
 
       - name: Install project dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -175,12 +182,36 @@ jobs:
           restore-keys: |
             vite-build-${{ runner.os }}-
 
+      - name: Verify migrations are copied
+        run: |
+          Write-Host "Checking if migrations were copied during build..."
+          if (Test-Path "packages/main/dist/migrations") {
+            $migrationFiles = Get-ChildItem -Path "packages/main/dist/migrations" -Filter "*.sql" -Recurse
+            Write-Host "✅ Found $($migrationFiles.Count) migration file(s):"
+            $migrationFiles | ForEach-Object { Write-Host "   - $($_.Name)" }
+          } else {
+            Write-Host "⚠️  WARNING: Migrations folder not found at packages/main/dist/migrations"
+            Write-Host "   This might cause database initialization to fail in production"
+          }
+        shell: powershell
+
       - name: Build and compile Electron app (Windows only)
         run: |
           Write-Host "Building Electron app with NSIS + Squirrel targets..."
           npm run build
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: npm build failed"
+            exit 1
+          }
+          
+          # Verify migrations are still present after build
+          Write-Host ""
+          Write-Host "Verifying migrations after build..."
+          if (Test-Path "packages/main/dist/migrations") {
+            $migrationFiles = Get-ChildItem -Path "packages/main/dist/migrations" -Filter "*.sql" -Recurse
+            Write-Host "✅ Migrations present: $($migrationFiles.Count) file(s)"
+          } else {
+            Write-Host "❌ ERROR: Migrations missing after build!"
             exit 1
           }
 

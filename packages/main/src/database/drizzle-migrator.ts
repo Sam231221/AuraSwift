@@ -40,16 +40,29 @@ function getMigrationsFolder(): string {
   }
 
   // In production, migrations are bundled in the app
-  // Option 1: If migrations are in app.asar, use app path
-  const appPath = app.getAppPath();
-  const asarMigrationsPath = join(appPath, "database", "migrations");
+  // Try multiple locations in order of preference
 
-  if (existsSync(asarMigrationsPath)) {
-    return asarMigrationsPath;
+  // Option 1: Check relative to current file (inside asar: node_modules/@app/main/dist/migrations)
+  const distMigrationsPath = join(__dirname, "migrations");
+  if (existsSync(distMigrationsPath)) {
+    return distMigrationsPath;
   }
 
-  // Option 2: If using extraResources in electron-builder
-  // This requires electron-builder config to copy migrations to resources
+  // Option 2: Check in app path (if migrations are at app root)
+  const appPath = app.getAppPath();
+  const appMigrationsPath = join(
+    appPath,
+    "node_modules",
+    "@app",
+    "main",
+    "dist",
+    "migrations"
+  );
+  if (existsSync(appMigrationsPath)) {
+    return appMigrationsPath;
+  }
+
+  // Option 3: Check using extraResources (outside asar)
   const resourcesPath = process.resourcesPath;
   if (resourcesPath) {
     const resourcesMigrationsPath = join(resourcesPath, "migrations");
@@ -58,14 +71,14 @@ function getMigrationsFolder(): string {
     }
   }
 
-  // Fallback: Try relative to current directory
-  const fallbackPath = join(__dirname, "migrations");
-  if (existsSync(fallbackPath)) {
-    return fallbackPath;
+  // Option 4: Try app path with database subfolder (legacy)
+  const asarMigrationsPath = join(appPath, "database", "migrations");
+  if (existsSync(asarMigrationsPath)) {
+    return asarMigrationsPath;
   }
 
   // Last resort: Return expected path (will be checked later)
-  return join(__dirname, "migrations");
+  return distMigrationsPath;
 }
 
 /**
@@ -260,6 +273,28 @@ export async function runDrizzleMigrations(
       console.error(
         "   💡 Make sure migrations are bundled with the app in production"
       );
+      console.error(`   📍 Current __dirname: ${__dirname}`);
+      console.error(
+        `   📍 App path: ${
+          app.isPackaged ? app.getAppPath() : "N/A (dev mode)"
+        }`
+      );
+      console.error(`   📍 Resources path: ${process.resourcesPath || "N/A"}`);
+
+      // Try to list what's actually in the dist directory
+      if (existsSync(__dirname)) {
+        try {
+          const distContents = readdirSync(__dirname);
+          console.error(
+            `   📂 Contents of dist directory: ${distContents.join(", ")}`
+          );
+        } catch (e) {
+          const errorMessage = e instanceof Error ? e.message : String(e);
+          console.error(
+            `   ⚠️  Could not read dist directory: ${errorMessage}`
+          );
+        }
+      }
       return false;
     }
 

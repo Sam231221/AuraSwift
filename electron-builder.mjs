@@ -81,6 +81,14 @@ export default /** @type import('electron-builder').Configuration */
     '!node_modules/@app/**',
     ...await getListOfFilesFromEachWorkspace(),
   ],
+  // Include migrations as extraResources so they're accessible outside asar if needed
+  extraResources: [
+    {
+      from: 'packages/main/dist/migrations',
+      to: 'migrations',
+      filter: ['**/*.sql'],
+    },
+  ],
 });
 
 /**

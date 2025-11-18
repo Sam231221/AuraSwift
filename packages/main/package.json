@@ -3,6 +3,7 @@
   "type": "module",
   "files": [
     "dist/**",
+    "dist/migrations/**",
     "package.json"
   ],
   "scripts": {
