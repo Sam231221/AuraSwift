@@ -1,16 +1,16 @@
-import type { ExpirySettings } from "../schema.js";
+import type { ExpirySetting } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq } from "drizzle-orm";
 import * as schema from "../schema.js";
 
-export interface ExpirySettingsResponse {
+export interface ExpirySettingResponse {
   success: boolean;
   message: string;
-  settings?: ExpirySettings;
+  settings?: ExpirySetting;
   errors?: string[];
 }
 
-export class ExpirySettingsManager {
+export class ExpirySettingManager {
   private db: DrizzleDB;
   private uuid: any;
 
@@ -22,7 +22,7 @@ export class ExpirySettingsManager {
   /**
    * Get default expiry settings
    */
-  getDefaultSettings(): Omit<ExpirySettings, "id" | "businessId" | "createdAt" | "updatedAt"> {
+  getDefaultSettings(): Omit<ExpirySetting, "id" | "businessId" | "createdAt" | "updatedAt"> {
     return {
       criticalAlertDays: 3,
       warningAlertDays: 7,
@@ -40,20 +40,20 @@ export class ExpirySettingsManager {
   /**
    * Get expiry settings by business ID
    */
-  async getSettingsByBusiness(businessId: string): Promise<ExpirySettings | null> {
+  async getSettingsByBusiness(businessId: string): Promise<ExpirySetting | null> {
     const [settings] = await this.db
       .select()
       .from(schema.expirySettings)
       .where(eq(schema.expirySettings.businessId, businessId))
       .limit(1);
 
-    return (settings as ExpirySettings) || null;
+    return (settings as ExpirySetting) || null;
   }
 
   /**
    * Get or create expiry settings for business
    */
-  async getOrCreateSettings(businessId: string): Promise<ExpirySettings> {
+  async getOrCreateSettings(businessId: string): Promise<ExpirySetting> {
     let settings = await this.getSettingsByBusiness(businessId);
 
     if (!settings) {
@@ -69,9 +69,9 @@ export class ExpirySettingsManager {
   async createOrUpdateSettings(
     businessId: string,
     settingsData: Partial<
-      Omit<ExpirySettings, "id" | "businessId" | "createdAt" | "updatedAt">
+      Omit<ExpirySetting, "id" | "businessId" | "createdAt" | "updatedAt">
     >
-  ): Promise<ExpirySettings> {
+  ): Promise<ExpirySetting> {
     const existing = await this.getSettingsByBusiness(businessId);
     const defaults = this.getDefaultSettings();
     const now = new Date();

@@ -20,9 +20,10 @@ import { SettingsManager } from "./managers/settingsManager.js";
 import { AgeVerificationManager } from "./managers/ageVerificationManager.js";
 import { BatchManager } from "./managers/batchManager.js";
 import { SupplierManager } from "./managers/supplierManager.js";
-import { ExpirySettingsManager } from "./managers/expirySettingsManager.js";
+import { ExpirySettingManager } from "./managers/expirySettingsManager.js";
 import { ExpiryNotificationManager } from "./managers/expiryNotificationManager.js";
 import { StockMovementManager } from "./managers/stockMovementManager.js";
+import { CartManager } from "./managers/cartManager.js";
 import { initializeDrizzle } from "./drizzle.js";
 import { getDatabaseInfo } from "./utils/dbInfo.js";
 import bcrypt from "bcryptjs";
@@ -56,9 +57,10 @@ export interface DatabaseManagers {
   ageVerification: AgeVerificationManager;
   batches: BatchManager;
   suppliers: SupplierManager;
-  expirySettings: ExpirySettingsManager;
+  expirySettings: ExpirySettingManager;
   expiryNotifications: ExpiryNotificationManager;
   stockMovements: StockMovementManager;
+  cart: CartManager;
 
   getDatabaseInfo: () => {
     path: string;
@@ -150,9 +152,10 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const ageVerification = new AgeVerificationManager(drizzle, uuid);
     const batches = new BatchManager(drizzle, uuid);
     const suppliers = new SupplierManager(drizzle, uuid);
-    const expirySettings = new ExpirySettingsManager(drizzle, uuid);
+    const expirySettings = new ExpirySettingManager(drizzle, uuid);
     const expiryNotifications = new ExpiryNotificationManager(drizzle, uuid);
     const stockMovements = new StockMovementManager(drizzle, uuid, batches);
+    const cart = new CartManager(drizzle, uuid);
 
     managersInstance = {
       users,
@@ -179,6 +182,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
       expirySettings,
       expiryNotifications,
       stockMovements,
+      cart,
 
       // Database info methods
       getDatabaseInfo: () => {

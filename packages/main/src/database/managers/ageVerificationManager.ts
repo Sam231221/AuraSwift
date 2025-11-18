@@ -168,7 +168,7 @@ export class AgeVerificationManager {
       conditions.push(
         gte(
           schema.ageVerificationRecords.verifiedAt,
-          options.startDate.getTime()
+          options.startDate
         )
       );
     }
@@ -177,7 +177,7 @@ export class AgeVerificationManager {
       conditions.push(
         lte(
           schema.ageVerificationRecords.verifiedAt,
-          options.endDate.getTime()
+          options.endDate
         )
       );
     }
@@ -241,7 +241,7 @@ export class AgeVerificationManager {
       conditions.push(
         gte(
           schema.ageVerificationRecords.verifiedAt,
-          options.startDate.getTime()
+          options.startDate
         )
       );
     }
@@ -250,7 +250,7 @@ export class AgeVerificationManager {
       conditions.push(
         lte(
           schema.ageVerificationRecords.verifiedAt,
-          options.endDate.getTime()
+          options.endDate
         )
       );
     }

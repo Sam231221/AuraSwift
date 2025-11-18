@@ -1,5 +1,5 @@
 import type { DatabaseManagers } from "../database/index.js";
-import type { ProductBatch, ExpirySettings } from "../database/schema.js";
+import type { ProductBatch, ExpirySetting } from "../database/schema.js";
 
 export interface ExpiryCheckResult {
   batch: ProductBatch;
@@ -20,7 +20,7 @@ export class ExpiryNotificationService {
    */
   checkBatchExpiry(
     batch: ProductBatch,
-    settings: ExpirySettings
+    settings: ExpirySetting
   ): ExpiryCheckResult | null {
     const now = new Date();
     const expiryDate = new Date(batch.expiryDate);

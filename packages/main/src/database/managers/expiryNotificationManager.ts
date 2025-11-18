@@ -57,7 +57,7 @@ export class ExpiryNotificationManager {
       daysUntilExpiry: notificationData.daysUntilExpiry,
       message: notificationData.message,
       status: "PENDING",
-      channels: JSON.stringify(notificationData.channels),
+      channels: notificationData.channels,
       businessId: notificationData.businessId,
       scheduledFor: notificationData.scheduledFor,
       createdAt: now,
@@ -81,12 +81,7 @@ export class ExpiryNotificationManager {
       throw new Error("Expiry notification not found");
     }
 
-    return {
-      ...notification,
-      channels: notification.channels
-        ? JSON.parse(notification.channels as string)
-        : [],
-    } as ExpiryNotification;
+    return notification as ExpiryNotification;
   }
 
   /**
@@ -99,10 +94,7 @@ export class ExpiryNotificationManager {
       .where(eq(schema.expiryNotifications.productBatchId, batchId))
       .orderBy(desc(schema.expiryNotifications.scheduledFor));
 
-    return notifications.map((n) => ({
-      ...n,
-      channels: n.channels ? JSON.parse(n.channels as string) : [],
-    })) as ExpiryNotification[];
+    return notifications as ExpiryNotification[];
   }
 
   /**
@@ -133,14 +125,14 @@ export class ExpiryNotificationManager {
       conditions.push(
         gte(
           schema.expiryNotifications.scheduledFor,
-          filters.startDate.getTime()
+          filters.startDate
         )
       );
     }
 
     if (filters?.endDate) {
       conditions.push(
-        lte(schema.expiryNotifications.scheduledFor, filters.endDate.getTime())
+        lte(schema.expiryNotifications.scheduledFor, filters.endDate)
       );
     }
 
@@ -150,10 +142,7 @@ export class ExpiryNotificationManager {
       .where(and(...conditions))
       .orderBy(desc(schema.expiryNotifications.scheduledFor));
 
-    return notifications.map((n) => ({
-      ...n,
-      channels: n.channels ? JSON.parse(n.channels as string) : [],
-    })) as ExpiryNotification[];
+    return notifications as ExpiryNotification[];
   }
 
   /**
@@ -172,10 +161,7 @@ export class ExpiryNotificationManager {
       .where(and(...conditions))
       .orderBy(asc(schema.expiryNotifications.scheduledFor));
 
-    return notifications.map((n) => ({
-      ...n,
-      channels: n.channels ? JSON.parse(n.channels as string) : [],
-    })) as ExpiryNotification[];
+    return notifications as ExpiryNotification[];
   }
 
   /**
@@ -231,7 +217,7 @@ export class ExpiryNotificationManager {
     const now = new Date();
     const conditions = [
       eq(schema.expiryNotifications.status, "PENDING"),
-      lte(schema.expiryNotifications.scheduledFor, now.getTime()),
+      lte(schema.expiryNotifications.scheduledFor, now),
     ];
 
     if (businessId) {
@@ -244,10 +230,7 @@ export class ExpiryNotificationManager {
       .where(and(...conditions))
       .orderBy(asc(schema.expiryNotifications.scheduledFor));
 
-    return notifications.map((n) => ({
-      ...n,
-      channels: n.channels ? JSON.parse(n.channels as string) : [],
-    })) as ExpiryNotification[];
+    return notifications as ExpiryNotification[];
   }
 }
 

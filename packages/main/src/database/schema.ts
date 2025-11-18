@@ -2203,3 +2203,17 @@ export type Break = InferSelectModel<typeof breaks>;
 export type NewBreak = InferInsertModel<typeof breaks>;
 export type TimeCorrection = InferSelectModel<typeof timeCorrections>;
 export type NewTimeCorrection = InferInsertModel<typeof timeCorrections>;
+
+// Product Expiry Tracking Types
+export type ProductBatch = InferSelectModel<typeof productBatches>;
+export type NewProductBatch = InferInsertModel<typeof productBatches>;
+export type Supplier = InferSelectModel<typeof suppliers>;
+export type NewSupplier = InferInsertModel<typeof suppliers>;
+export type ExpirySetting = InferSelectModel<typeof expirySettings>;
+export type NewExpirySetting = InferInsertModel<typeof expirySettings>;
+export type ExpiryNotification = InferSelectModel<typeof expiryNotifications>;
+export type NewExpiryNotification = InferInsertModel<
+  typeof expiryNotifications
+>;
+export type StockMovement = InferSelectModel<typeof stockMovements>;
+export type NewStockMovement = InferInsertModel<typeof stockMovements>;

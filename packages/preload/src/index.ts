@@ -27,6 +27,7 @@ import { suppliersAPI } from "./api/suppliers.js";
 import { expirySettingsAPI } from "./api/expirySettings.js";
 import { expiryNotificationsAPI } from "./api/expiryNotifications.js";
 import { stockMovementsAPI } from "./api/stockMovements.js";
+import { cartAPI } from "./api/cart.js";
 
 // Expose APIs to renderer process
 contextBridge.exposeInMainWorld("authStore", authStore);
@@ -53,6 +54,7 @@ contextBridge.exposeInMainWorld("suppliersAPI", suppliersAPI);
 contextBridge.exposeInMainWorld("expirySettingsAPI", expirySettingsAPI);
 contextBridge.exposeInMainWorld("expiryNotificationsAPI", expiryNotificationsAPI);
 contextBridge.exposeInMainWorld("stockMovementsAPI", stockMovementsAPI);
+contextBridge.exposeInMainWorld("cartAPI", cartAPI);
 
 // Generic IPC send function for testing and general IPC communication
 export const send = (channel: string, ...args: any[]) =>

@@ -226,7 +226,7 @@ export class BatchManager {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + options.expiringWithinDays);
       conditions.push(
-        lte(schema.productBatches.expiryDate, futureDate.getTime())
+        lte(schema.productBatches.expiryDate, futureDate)
       );
     }
 
@@ -257,8 +257,8 @@ export class BatchManager {
         and(
           eq(schema.productBatches.businessId, businessId),
           eq(schema.productBatches.status, "ACTIVE"),
-          gte(schema.productBatches.expiryDate, now.getTime()),
-          lte(schema.productBatches.expiryDate, futureDate.getTime())
+          gte(schema.productBatches.expiryDate, now),
+          lte(schema.productBatches.expiryDate, futureDate)
         )
       )
       .orderBy(asc(schema.productBatches.expiryDate));

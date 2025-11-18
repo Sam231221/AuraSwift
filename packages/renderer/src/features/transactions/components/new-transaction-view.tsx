@@ -69,6 +69,8 @@ import type {
   CartItemWithProduct,
 } from "@/features/transactions/types/cart.types";
 import { ScaleDisplay } from "@/components/scale/ScaleDisplay";
+import { AgeVerificationModal } from "./age-verification-modal";
+import { GenericItemPriceModal } from "./generic-item-price-modal";
 
 interface PaymentMethod {
   type: "cash" | "card" | "mobile" | "voucher" | "split";
@@ -340,6 +342,28 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [showStartShiftDialog, setShowStartShiftDialog] = useState(false);
   const [startingCash, setStartingCash] = useState("");
 
+  // Age Verification Modal State
+  const [showAgeVerificationModal, setShowAgeVerificationModal] =
+    useState(false);
+  const [
+    pendingProductForAgeVerification,
+    setPendingProductForAgeVerification,
+  ] = useState<Product | null>(null);
+  const [pendingWeightForAgeVerification, setPendingWeightForAgeVerification] =
+    useState<number | undefined>(undefined);
+
+  // Generic Item Price Modal State
+  const [showGenericPriceModal, setShowGenericPriceModal] = useState(false);
+  const [pendingGenericProduct, setPendingGenericProduct] =
+    useState<Product | null>(null);
+
+  // Double-click detection for generic items
+  const [lastClickTime, setLastClickTime] = useState<{
+    productId: string;
+    timestamp: number;
+  } | null>(null);
+  const DOUBLE_CLICK_DELAY = 300; // milliseconds
+
   // State management
   const [barcodeInput, setBarcodeInput] = useState("");
   const [searchQuery] = useState("");
@@ -429,9 +453,165 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const tax = cartItems.reduce((sum, item) => sum + item.taxAmount, 0);
   const total = subtotal + tax;
 
+  // Check for active shift and scheduled shift (must be defined before initializeCartSession)
+  const checkActiveShift = useCallback(async () => {
+    if (!user?.id) return false;
+
+    try {
+      setIsCheckingShift(true);
+
+      // Check for active POS shift
+      const shiftResponse = await window.shiftAPI.getActive(user.id);
+      const hasActive = shiftResponse.success && !!shiftResponse.data;
+      setHasActiveShift(hasActive);
+
+      // If no active shift, check for scheduled shift today
+      if (!hasActive) {
+        const scheduleResponse = await window.shiftAPI.getTodaySchedule(
+          user.id
+        );
+        const hasScheduled =
+          scheduleResponse.success && !!scheduleResponse.data;
+        setHasScheduledShift(hasScheduled);
+        if (hasScheduled && scheduleResponse.data) {
+          setTodaySchedule(
+            scheduleResponse.data as {
+              id: string;
+              staffId: string;
+              businessId: string;
+              startTime: string;
+              endTime: string;
+              status: string;
+            }
+          );
+        } else {
+          setTodaySchedule(null);
+        }
+      } else {
+        setHasScheduledShift(null); // Don't need to check if already has active shift
+        setTodaySchedule(null);
+      }
+
+      return hasActive;
+    } catch (error) {
+      console.error("Error checking active shift:", error);
+      setHasActiveShift(false);
+      setHasScheduledShift(null);
+      return false;
+    } finally {
+      setIsCheckingShift(false);
+    }
+  }, [user?.id]);
+
+  // Initialize or recover cart session (must be defined before addToCart)
+  const initializeCartSession =
+    useCallback(async (): Promise<CartSession | null> => {
+      if (!user?.businessId || !user?.id) {
+        console.warn("Cannot initialize cart: missing user data");
+        return null;
+      }
+
+      // For cashiers/managers, check if shift exists first
+      if (user.role === "cashier" || user.role === "manager") {
+        const shiftExists = await checkActiveShift();
+        if (!shiftExists) {
+          setLoadingCart(false);
+          return null; // Don't proceed if no shift
+        }
+      }
+
+      try {
+        setLoadingCart(true);
+
+        // Try to get active session first
+        const activeSessionResponse = await window.cartAPI.getActiveSession(
+          user.id
+        );
+
+        if (activeSessionResponse.success && activeSessionResponse.data) {
+          // Recover existing session
+          const session = activeSessionResponse.data as CartSession;
+          setCartSession(session);
+
+          // Load items for this session
+          const itemsResponse = await window.cartAPI.getItems(session.id);
+          if (itemsResponse.success && itemsResponse.data) {
+            const items = itemsResponse.data as CartItemWithProduct[];
+            setCartItems(items);
+            if (items.length > 0) {
+              toast.info(`Recovered cart with ${items.length} item(s)`);
+            }
+          }
+          return session;
+        } else {
+          // Create new session
+          if (user.role === "cashier" || user.role === "manager") {
+            const shiftResponse = await window.shiftAPI.getActive(user.id);
+            if (!shiftResponse.success || !shiftResponse.data) {
+              // Don't show error if user just needs to start shift
+              setHasActiveShift(false);
+              setLoadingCart(false);
+              return null;
+            }
+
+            const activeShift = shiftResponse.data as { id: string };
+
+            const newSessionResponse = await window.cartAPI.createSession({
+              cashierId: user.id,
+              shiftId: activeShift.id,
+              businessId: user.businessId,
+            });
+
+            if (newSessionResponse.success && newSessionResponse.data) {
+              const session = newSessionResponse.data as CartSession;
+              setCartSession(session);
+              setCartItems([]);
+              return session;
+            } else {
+              console.error(
+                "Failed to create cart session:",
+                newSessionResponse
+              );
+              return null;
+            }
+          } else {
+            // Admin users can create sessions without shift
+            const newSessionResponse = await window.cartAPI.createSession({
+              cashierId: user.id,
+              shiftId: "", // Admin doesn't need shift
+              businessId: user.businessId,
+            });
+
+            if (newSessionResponse.success && newSessionResponse.data) {
+              const session = newSessionResponse.data as CartSession;
+              setCartSession(session);
+              setCartItems([]);
+              return session;
+            } else {
+              console.error(
+                "Failed to create cart session:",
+                newSessionResponse
+              );
+              return null;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing cart session:", error);
+        return null;
+      } finally {
+        setLoadingCart(false);
+      }
+    }, [user?.businessId, user?.id, user?.role, checkActiveShift]);
+
   // Functions for cart operations using cart API (must be defined before handleHardwareScan)
   const addToCart = useCallback(
-    async (product: Product, weight?: number) => {
+    async (
+      product: Product,
+      weight?: number,
+      customPrice?: number,
+      ageVerified: boolean = false
+    ) => {
       // Check if operations are disabled (no active shift but has scheduled shift)
       const operationsDisabled =
         (user?.role === "cashier" || user?.role === "manager") &&
@@ -443,15 +623,29 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         return;
       }
 
-      if (!cartSession) {
-        toast.error("Cart session not initialized");
-        return;
+      // Ensure cart session is initialized before adding items
+      let currentSession = cartSession;
+      if (!currentSession) {
+        console.log("🛒 Cart session not found, initializing...");
+        try {
+          const newSession = await initializeCartSession();
+          if (!newSession) {
+            toast.error("Failed to initialize cart session. Please try again.");
+            return;
+          }
+          currentSession = newSession;
+        } catch (error) {
+          console.error("Error initializing cart session:", error);
+          toast.error("Failed to initialize cart session. Please try again.");
+          return;
+        }
       }
 
       console.log(
         "🛒 Adding to cart:",
         product.name,
-        weight ? `(${weight} ${product.unit})` : ""
+        weight ? `(${weight} ${product.unit})` : "",
+        customPrice ? `@ £${customPrice}` : ""
       );
 
       try {
@@ -459,15 +653,15 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         const itemType = product.requiresWeight ? "WEIGHT" : "UNIT";
 
         // Calculate pricing
-        let unitPrice = product.price;
-        let totalPrice = product.price;
+        let unitPrice = customPrice || product.price;
+        let totalPrice = customPrice || product.price;
         let taxAmount = 0;
 
         if (product.requiresWeight && weight && product.pricePerUnit) {
           unitPrice = product.pricePerUnit;
           totalPrice = product.pricePerUnit * weight;
         } else if (!product.requiresWeight) {
-          totalPrice = product.price * 1; // Default quantity 1
+          totalPrice = unitPrice * 1; // Default quantity 1
         }
 
         // Calculate tax (simplified - should use product's tax rate)
@@ -509,7 +703,9 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
           if (updateResponse.success) {
             // Reload cart items
-            const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+            const itemsResponse = await window.cartAPI.getItems(
+              currentSession.id
+            );
             if (itemsResponse.success && itemsResponse.data) {
               setCartItems(itemsResponse.data as CartItemWithProduct[]);
             }
@@ -527,7 +723,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         } else {
           // Add new item
           const addResponse = await window.cartAPI.addItem({
-            cartSessionId: cartSession.id,
+            cartSessionId: currentSession.id,
             productId: product.id,
             itemType,
             quantity: itemType === "UNIT" ? 1 : undefined,
@@ -537,12 +733,14 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             totalPrice,
             taxAmount,
             ageRestrictionLevel: product.ageRestrictionLevel || "NONE",
-            ageVerified: false,
+            ageVerified,
           });
 
           if (addResponse.success) {
             // Reload cart items
-            const itemsResponse = await window.cartAPI.getItems(cartSession.id);
+            const itemsResponse = await window.cartAPI.getItems(
+              currentSession.id
+            );
             if (itemsResponse.success && itemsResponse.data) {
               setCartItems(itemsResponse.data as CartItemWithProduct[]);
             }
@@ -563,7 +761,214 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         toast.error("Failed to add item to cart");
       }
     },
-    [cartSession, cartItems, user?.role, hasActiveShift, hasScheduledShift]
+    [
+      cartSession,
+      cartItems,
+      user?.role,
+      hasActiveShift,
+      hasScheduledShift,
+      initializeCartSession,
+    ]
+  );
+
+  // Handle product click with age verification and scale flow
+  const handleProductClick = useCallback(
+    async (product: Product) => {
+      // Check if operations are disabled
+      const operationsDisabled =
+        (user?.role === "cashier" || user?.role === "manager") &&
+        !hasActiveShift &&
+        hasScheduledShift;
+
+      if (operationsDisabled) {
+        toast.error("Please start your shift before adding items to cart");
+        return;
+      }
+
+      // Ensure cart session is initialized
+      let currentSession = cartSession;
+      if (!currentSession) {
+        console.log("🛒 Initializing cart session before product click...");
+        const newSession = await initializeCartSession();
+        if (!newSession) {
+          toast.error("Failed to initialize cart. Please try again.");
+          return;
+        }
+        currentSession = newSession;
+      }
+
+      // Check if product requires age verification
+      if (
+        product.ageRestrictionLevel &&
+        product.ageRestrictionLevel !== "NONE"
+      ) {
+        // Store product for age verification
+        setPendingProductForAgeVerification(product);
+        setShowAgeVerificationModal(true);
+        return;
+      }
+
+      // Check if product requires weight
+      if (product.requiresWeight) {
+        // Set as selected weight product to trigger scale display
+        setSelectedWeightProduct(product);
+        toast.info(
+          `⚖️ Enter weight for ${product.name} (${product.unit || "kg"})`
+        );
+        return;
+      }
+
+      // Regular product - add directly to cart
+      await addToCart(product);
+    },
+    [
+      user?.role,
+      hasActiveShift,
+      hasScheduledShift,
+      addToCart,
+      cartSession,
+      initializeCartSession,
+    ]
+  );
+
+  // Handle generic item click (single or double)
+  const handleGenericItemClick = useCallback(
+    async (product: Product, isDoubleClick: boolean = false) => {
+      // Check if operations are disabled
+      const operationsDisabled =
+        (user?.role === "cashier" || user?.role === "manager") &&
+        !hasActiveShift &&
+        hasScheduledShift;
+
+      if (operationsDisabled) {
+        toast.error("Please start your shift before adding items to cart");
+        return;
+      }
+
+      // Ensure cart session is initialized
+      let currentSession = cartSession;
+      if (!currentSession) {
+        console.log(
+          "🛒 Initializing cart session before generic item click..."
+        );
+        const newSession = await initializeCartSession();
+        if (!newSession) {
+          toast.error("Failed to initialize cart. Please try again.");
+          return;
+        }
+        currentSession = newSession;
+      }
+
+      if (isDoubleClick) {
+        // Double click - use default price and add directly
+        const price = product.genericDefaultPrice || product.price || 0;
+        if (price > 0) {
+          await addToCart(product, undefined, price);
+        } else {
+          toast.error("No default price set for this item");
+        }
+      } else {
+        // Single click - show price entry modal
+        setPendingGenericProduct(product);
+        setShowGenericPriceModal(true);
+      }
+    },
+    [
+      user?.role,
+      hasActiveShift,
+      hasScheduledShift,
+      addToCart,
+      cartSession,
+      initializeCartSession,
+    ]
+  );
+
+  // Handle age verification completion
+  const handleAgeVerificationComplete = useCallback(
+    async (verified: boolean) => {
+      if (!verified || !pendingProductForAgeVerification) {
+        setShowAgeVerificationModal(false);
+        setPendingProductForAgeVerification(null);
+        setPendingWeightForAgeVerification(undefined);
+        return;
+      }
+
+      const product = pendingProductForAgeVerification;
+      const weight = pendingWeightForAgeVerification;
+
+      // Close modal
+      setShowAgeVerificationModal(false);
+
+      // Ensure cart session is initialized before proceeding
+      let currentSession = cartSession;
+      if (!currentSession) {
+        console.log("🛒 Initializing cart session after age verification...");
+        try {
+          const newSession = await initializeCartSession();
+          if (!newSession) {
+            toast.error("Failed to initialize cart session. Please try again.");
+            setPendingProductForAgeVerification(null);
+            setPendingWeightForAgeVerification(undefined);
+            return;
+          }
+          currentSession = newSession;
+        } catch (error) {
+          console.error("Error initializing cart session:", error);
+          toast.error("Failed to initialize cart session. Please try again.");
+          setPendingProductForAgeVerification(null);
+          setPendingWeightForAgeVerification(undefined);
+          return;
+        }
+      }
+
+      // If product requires weight and we don't have it yet, trigger scale flow
+      if (product.requiresWeight && weight === undefined) {
+        setSelectedWeightProduct(product);
+        toast.info(
+          `⚖️ Enter weight for ${product.name} (${product.unit || "kg"})`
+        );
+      } else {
+        // Add to cart with age verification (and weight if available)
+        await addToCart(product, weight, undefined, true);
+      }
+
+      // Reset pending state
+      setPendingProductForAgeVerification(null);
+      setPendingWeightForAgeVerification(undefined);
+    },
+    [
+      pendingProductForAgeVerification,
+      pendingWeightForAgeVerification,
+      addToCart,
+      cartSession,
+      initializeCartSession,
+    ]
+  );
+
+  // Handle generic price entry completion
+  const handleGenericPriceComplete = useCallback(
+    async (price: number) => {
+      if (!pendingGenericProduct) return;
+
+      // Ensure cart session is initialized
+      let currentSession = cartSession;
+      if (!currentSession) {
+        console.log(
+          "🛒 Initializing cart session before adding generic item..."
+        );
+        const newSession = await initializeCartSession();
+        if (!newSession) {
+          toast.error("Failed to initialize cart. Please try again.");
+          return;
+        }
+        currentSession = newSession;
+      }
+
+      await addToCart(pendingGenericProduct, undefined, price);
+      setShowGenericPriceModal(false);
+      setPendingGenericProduct(null);
+    },
+    [pendingGenericProduct, addToCart, cartSession, initializeCartSession]
   );
 
   // Hardware barcode scanner integration
@@ -688,120 +1093,6 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       toast.error("Failed to load categories");
     }
   }, [user?.businessId]);
-
-  // Check for active shift and scheduled shift
-  const checkActiveShift = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      setIsCheckingShift(true);
-
-      // Check for active POS shift
-      const shiftResponse = await window.shiftAPI.getActive(user.id);
-      const hasActive = shiftResponse.success && !!shiftResponse.data;
-      setHasActiveShift(hasActive);
-
-      // If no active shift, check for scheduled shift today
-      if (!hasActive) {
-        const scheduleResponse = await window.shiftAPI.getTodaySchedule(
-          user.id
-        );
-        const hasScheduled =
-          scheduleResponse.success && !!scheduleResponse.data;
-        setHasScheduledShift(hasScheduled);
-        if (hasScheduled && scheduleResponse.data) {
-          setTodaySchedule(
-            scheduleResponse.data as {
-              id: string;
-              staffId: string;
-              businessId: string;
-              startTime: string;
-              endTime: string;
-              status: string;
-            }
-          );
-        } else {
-          setTodaySchedule(null);
-        }
-      } else {
-        setHasScheduledShift(null); // Don't need to check if already has active shift
-        setTodaySchedule(null);
-      }
-
-      return hasActive;
-    } catch (error) {
-      console.error("Error checking active shift:", error);
-      setHasActiveShift(false);
-      setHasScheduledShift(null);
-      return false;
-    } finally {
-      setIsCheckingShift(false);
-    }
-  }, [user?.id]);
-
-  // Initialize or recover cart session
-  const initializeCartSession = useCallback(async () => {
-    if (!user?.businessId || !user?.id) return;
-
-    // First check if shift exists
-    const shiftExists = await checkActiveShift();
-    if (!shiftExists) {
-      setLoadingCart(false);
-      return; // Don't proceed if no shift
-    }
-
-    try {
-      setLoadingCart(true);
-
-      // Try to get active session first
-      const activeSessionResponse = await window.cartAPI.getActiveSession(
-        user.id
-      );
-
-      if (activeSessionResponse.success && activeSessionResponse.data) {
-        // Recover existing session
-        const session = activeSessionResponse.data as CartSession;
-        setCartSession(session);
-
-        // Load items for this session
-        const itemsResponse = await window.cartAPI.getItems(session.id);
-        if (itemsResponse.success && itemsResponse.data) {
-          const items = itemsResponse.data as CartItemWithProduct[];
-          setCartItems(items);
-          toast.info(`Recovered cart with ${items.length} item(s)`);
-        }
-      } else {
-        // Create new session
-        const shiftResponse = await window.shiftAPI.getActive(user.id);
-        if (!shiftResponse.success || !shiftResponse.data) {
-          toast.error("No active shift found. Please start your shift first.");
-          setHasActiveShift(false);
-          return;
-        }
-
-        const activeShift = shiftResponse.data as { id: string };
-
-        const newSessionResponse = await window.cartAPI.createSession({
-          cashierId: user.id,
-          shiftId: activeShift.id,
-          businessId: user.businessId,
-        });
-
-        if (newSessionResponse.success && newSessionResponse.data) {
-          const session = newSessionResponse.data as CartSession;
-          setCartSession(session);
-          setCartItems([]);
-        } else {
-          toast.error("Failed to create cart session");
-        }
-      }
-    } catch (error) {
-      console.error("Error initializing cart session:", error);
-      toast.error("Failed to initialize cart");
-    } finally {
-      setLoadingCart(false);
-    }
-  }, [user?.businessId, user?.id, checkActiveShift]);
 
   // Check for active shift on mount and periodically
   useEffect(() => {
@@ -1737,10 +2028,93 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             (p) => p.category === category.id
                           ).length;
 
+                          // Check if this category has generic button products
+                          const hasGenericProducts = products.some(
+                            (p) =>
+                              p.category === category.id && p.isGenericButton
+                          );
+
                           return (
                             <motion.button
                               key={category.id}
-                              onClick={() => handleCategoryClick(category)}
+                              onClick={() => {
+                                // Check for double-click on generic category
+                                if (hasGenericProducts) {
+                                  const now = Date.now();
+                                  if (
+                                    lastClickTime &&
+                                    lastClickTime.productId === category.id &&
+                                    now - lastClickTime.timestamp <
+                                      DOUBLE_CLICK_DELAY
+                                  ) {
+                                    // Double click detected - find first generic product and add with default price
+                                    const genericProduct = products.find(
+                                      (p) =>
+                                        p.category === category.id &&
+                                        p.isGenericButton
+                                    );
+                                    if (genericProduct) {
+                                      handleGenericItemClick(
+                                        genericProduct,
+                                        true
+                                      );
+                                    }
+                                    setLastClickTime(null);
+                                  } else {
+                                    // Single click - navigate to category
+                                    handleCategoryClick(category);
+                                    setLastClickTime({
+                                      productId: category.id,
+                                      timestamp: now,
+                                    });
+                                    // Clear after delay
+                                    setTimeout(() => {
+                                      setLastClickTime(null);
+                                    }, DOUBLE_CLICK_DELAY);
+                                  }
+                                } else {
+                                  // Regular category - just navigate
+                                  handleCategoryClick(category);
+                                }
+                              }}
+                              onTouchEnd={() => {
+                                // Touch support for double-click
+                                if (hasGenericProducts) {
+                                  const now = Date.now();
+                                  if (
+                                    lastClickTime &&
+                                    lastClickTime.productId === category.id &&
+                                    now - lastClickTime.timestamp <
+                                      DOUBLE_CLICK_DELAY
+                                  ) {
+                                    // Double tap detected
+                                    const genericProduct = products.find(
+                                      (p) =>
+                                        p.category === category.id &&
+                                        p.isGenericButton
+                                    );
+                                    if (genericProduct) {
+                                      handleGenericItemClick(
+                                        genericProduct,
+                                        true
+                                      );
+                                    }
+                                    setLastClickTime(null);
+                                  } else {
+                                    // Single tap - navigate
+                                    handleCategoryClick(category);
+                                    setLastClickTime({
+                                      productId: category.id,
+                                      timestamp: now,
+                                    });
+                                    setTimeout(() => {
+                                      setLastClickTime(null);
+                                    }, DOUBLE_CLICK_DELAY);
+                                  }
+                                } else {
+                                  handleCategoryClick(category);
+                                }
+                              }}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
                               className="relative bg-linear-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg p-6 shadow-md transition-all h-28 flex flex-col items-center justify-center"
@@ -1814,27 +2188,28 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     : "bg-white border-slate-200 hover:bg-slate-50"
                                 }`}
                                 onClick={async () => {
-                                  if (product.requiresWeight) {
-                                    if (
-                                      selectedWeightProduct?.id ===
-                                        product.id &&
-                                      weightInput &&
-                                      parseFloat(weightInput) > 0
-                                    ) {
-                                      await addToCart(
-                                        product,
-                                        parseFloat(weightInput)
-                                      );
-                                      setWeightInput("");
-                                      setSelectedWeightProduct(null);
-                                    } else {
-                                      setSelectedWeightProduct(product);
-                                      toast.warning(
-                                        `⚖️ Enter weight for ${product.name} (${product.unit})`
-                                      );
-                                    }
+                                  // Handle generic button products
+                                  if (product.isGenericButton) {
+                                    await handleGenericItemClick(
+                                      product,
+                                      false
+                                    );
+                                    return;
+                                  }
+
+                                  // Handle regular products
+                                  await handleProductClick(product);
+                                }}
+                                onTouchEnd={async (e) => {
+                                  // Touch support for products (single click only)
+                                  e.preventDefault();
+                                  if (product.isGenericButton) {
+                                    await handleGenericItemClick(
+                                      product,
+                                      false
+                                    );
                                   } else {
-                                    await addToCart(product);
+                                    await handleProductClick(product);
                                   }
                                 }}
                               >
@@ -1875,6 +2250,23 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                                     Weighed
                                   </Badge>
                                 )}
+                                {product.isGenericButton && (
+                                  <Badge
+                                    variant="outline"
+                                    className="mt-1 text-xs bg-purple-50 text-purple-700 border-purple-200"
+                                  >
+                                    Generic
+                                  </Badge>
+                                )}
+                                {product.ageRestrictionLevel &&
+                                  product.ageRestrictionLevel !== "NONE" && (
+                                    <Badge
+                                      variant="outline"
+                                      className="mt-1 text-xs bg-orange-50 text-orange-700 border-orange-200"
+                                    >
+                                      {product.ageRestrictionLevel}
+                                    </Badge>
+                                  )}
                               </Button>
                             </motion.div>
                           ))}
@@ -2220,9 +2612,25 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                       unitOfMeasure: selectedWeightProduct.unit || "kg",
                     }}
                     onWeightConfirmed={async (weight) => {
-                      await addToCart(selectedWeightProduct, weight);
-                      setSelectedWeightProduct(null);
-                      setWeightInput("");
+                      // Check if this product needed age verification
+                      if (
+                        selectedWeightProduct.ageRestrictionLevel &&
+                        selectedWeightProduct.ageRestrictionLevel !== "NONE"
+                      ) {
+                        // Store weight and trigger age verification
+                        setPendingWeightForAgeVerification(weight);
+                        setPendingProductForAgeVerification(
+                          selectedWeightProduct
+                        );
+                        setShowAgeVerificationModal(true);
+                        setSelectedWeightProduct(null);
+                        setWeightInput("");
+                      } else {
+                        // Add directly to cart
+                        await addToCart(selectedWeightProduct, weight);
+                        setSelectedWeightProduct(null);
+                        setWeightInput("");
+                      }
                     }}
                     onCancel={() => {
                       setSelectedWeightProduct(null);
@@ -2816,6 +3224,35 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Age Verification Modal */}
+      {pendingProductForAgeVerification && (
+        <AgeVerificationModal
+          isOpen={showAgeVerificationModal}
+          product={pendingProductForAgeVerification}
+          onVerify={handleAgeVerificationComplete}
+          onCancel={() => {
+            setShowAgeVerificationModal(false);
+            setPendingProductForAgeVerification(null);
+            setPendingWeightForAgeVerification(undefined);
+            setSelectedWeightProduct(null);
+          }}
+          currentUser={user}
+        />
+      )}
+
+      {/* Generic Item Price Modal */}
+      {pendingGenericProduct && (
+        <GenericItemPriceModal
+          isOpen={showGenericPriceModal}
+          product={pendingGenericProduct}
+          onConfirm={handleGenericPriceComplete}
+          onCancel={() => {
+            setShowGenericPriceModal(false);
+            setPendingGenericProduct(null);
+          }}
+        />
+      )}
     </>
   );
 };

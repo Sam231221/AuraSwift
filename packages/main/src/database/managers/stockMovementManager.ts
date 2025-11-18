@@ -218,13 +218,13 @@ export class StockMovementManager {
 
     if (filters?.startDate) {
       conditions.push(
-        gte(schema.stockMovements.timestamp, filters.startDate.getTime())
+        gte(schema.stockMovements.timestamp, filters.startDate)
       );
     }
 
     if (filters?.endDate) {
       conditions.push(
-        lte(schema.stockMovements.timestamp, filters.endDate.getTime())
+        lte(schema.stockMovements.timestamp, filters.endDate)
       );
     }
 

@@ -41,6 +41,9 @@ export interface Product {
   ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
   requireIdScan?: boolean;
   restrictionReason?: string;
+  // Generic button fields
+  isGenericButton?: boolean;
+  genericDefaultPrice?: number;
   createdAt: string;
   updatedAt: string;
 }
