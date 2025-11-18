@@ -1943,16 +1943,16 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               </div>
 
               {/* Scale Display for Weighted Products */}
-              {selectedWeightProduct && (selectedWeightProduct.requiresWeight || selectedWeightProduct.productType === "WEIGHTED") ? (
+              {selectedWeightProduct && selectedWeightProduct.requiresWeight ? (
                 <div className="mt-2">
                   <ScaleDisplay
                     selectedProduct={{
                       id: selectedWeightProduct.id,
                       name: selectedWeightProduct.name,
-                      productType: selectedWeightProduct.productType,
+                      productType: "WEIGHTED",
                       basePrice: selectedWeightProduct.price,
                       pricePerUnit: selectedWeightProduct.pricePerUnit,
-                      unitOfMeasure: selectedWeightProduct.unitOfMeasure || "kg",
+                      unitOfMeasure: selectedWeightProduct.unit || "kg",
                     }}
                     onWeightConfirmed={async (weight) => {
                       await addToCart(selectedWeightProduct, weight);

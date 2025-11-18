@@ -487,6 +487,76 @@ declare global {
     appAPI: {
       restart: () => Promise<{ success: boolean; message?: string }>;
     };
+
+    scaleAPI: {
+      discover: () => Promise<{
+        success: boolean;
+        devices: Array<{
+          id: string;
+          type: "HID" | "SERIAL" | "TCP_IP";
+          path?: string;
+          vendorId?: number;
+          productId?: number;
+          manufacturer?: string;
+          product?: string;
+          serialNumber?: string;
+          baudRate?: number;
+          address?: string;
+          port?: number;
+        }>;
+        error?: string;
+      }>;
+      connect: (config: {
+        device: {
+          id: string;
+          type: "HID" | "SERIAL" | "TCP_IP";
+          path?: string;
+          vendorId?: number;
+          productId?: number;
+          manufacturer?: string;
+          product?: string;
+          serialNumber?: string;
+          baudRate?: number;
+          address?: string;
+          port?: number;
+        };
+        tareWeight?: number;
+        minWeight?: number;
+        maxWeight?: number;
+        stabilityThreshold?: number;
+        stabilityReadings?: number;
+        unit?: "g" | "kg" | "lb" | "oz";
+        simulated?: boolean;
+      }) => Promise<{ success: boolean; error?: string }>;
+      disconnect: () => Promise<{ success: boolean; error?: string }>;
+      getStatus: () => Promise<{
+        connected: boolean;
+        deviceType: string;
+        connectionType: "HID" | "SERIAL" | "TCP_IP" | "none";
+        deviceId?: string;
+        lastReading?: {
+          weight: number;
+          stable: boolean;
+          unit: "g" | "kg" | "lb" | "oz";
+          timestamp: string;
+          rawReadings?: number[];
+        };
+        error?: string;
+        isReading: boolean;
+      }>;
+      tare: () => Promise<{ success: boolean; error?: string }>;
+      startReading: () => void;
+      stopReading: () => void;
+      onReading: (
+        callback: (reading: {
+          weight: number;
+          stable: boolean;
+          unit: "g" | "kg" | "lb" | "oz";
+          timestamp: string;
+          rawReadings?: number[];
+        }) => void
+      ) => () => void;
+    };
   }
 }
 

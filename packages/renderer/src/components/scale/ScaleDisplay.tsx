@@ -23,9 +23,8 @@ import {
   X,
   RotateCcw,
   RefreshCw,
-  Loader2,
 } from "lucide-react";
-import { useScaleManager, type ScaleReading } from "@/shared/hooks/use-scale-manager";
+import { useScaleManager } from "@/shared/hooks/use-scale-manager";
 import { Progress } from "@/components/ui/progress";
 
 // =============================================================================
@@ -61,7 +60,6 @@ export const ScaleDisplay: React.FC<ScaleDisplayProps> = ({
   maxWeight,
 }) => {
   const {
-    scaleStatus,
     currentReading,
     isConnected,
     isStable,

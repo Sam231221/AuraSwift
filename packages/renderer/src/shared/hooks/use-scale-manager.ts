@@ -70,22 +70,6 @@ export function useScaleManager(config?: ScaleConfig) {
   const [isConnecting, setIsConnecting] = useState(false);
   const readingListenerRef = useRef<(() => void) | null>(null);
 
-  // Declare window type for scaleAPI
-  declare global {
-    interface Window {
-      scaleAPI: {
-        discover: () => Promise<{ success: boolean; devices: ScaleDevice[]; error?: string }>;
-        connect: (config: { device: ScaleDevice } & ScaleConfig) => Promise<{ success: boolean; error?: string }>;
-        disconnect: () => Promise<{ success: boolean; error?: string }>;
-        getStatus: () => Promise<ScaleStatus>;
-        tare: () => Promise<{ success: boolean; error?: string }>;
-        startReading: () => void;
-        stopReading: () => void;
-        onReading: (callback: (reading: ScaleReading) => void) => () => void;
-      };
-    }
-  }
-
   /**
    * Discover available scale devices
    */
