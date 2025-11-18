@@ -610,7 +610,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       product: Product,
       weight?: number,
       customPrice?: number,
-      ageVerified: boolean = false
+      ageVerified: boolean = false,
+      sessionOverride?: CartSession | null
     ) => {
       // Check if operations are disabled (no active shift but has scheduled shift)
       const operationsDisabled =
@@ -624,7 +625,9 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }
 
       // Ensure cart session is initialized before adding items
-      let currentSession = cartSession;
+      // Use sessionOverride if provided, otherwise use cartSession from state
+      let currentSession =
+        sessionOverride !== undefined ? sessionOverride : cartSession;
       if (!currentSession) {
         console.log("🛒 Cart session not found, initializing...");
         try {
@@ -641,35 +644,103 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
       }
 
+      // Determine product type and if it's weighted
+      // Support both old field names (requiresWeight) and new schema fields (productType, usesScale)
+      type ExtendedProduct = Product & {
+        productType?: "STANDARD" | "WEIGHTED" | "GENERIC";
+        usesScale?: boolean;
+        basePrice?: number;
+        pricePerKg?: number;
+        salesUnit?: string;
+      };
+      const extendedProduct = product as ExtendedProduct;
+
+      const isWeighted =
+        extendedProduct.productType === "WEIGHTED" ||
+        extendedProduct.usesScale === true ||
+        product.requiresWeight === true;
+
+      // Get product fields with fallback for old/new field names
+      const basePrice = extendedProduct.basePrice ?? product.price ?? 0;
+      const pricePerKg =
+        extendedProduct.pricePerKg ?? product.pricePerUnit ?? null;
+      const salesUnit = extendedProduct.salesUnit ?? product.unit ?? "each";
+      const taxRate = product.taxRate ?? 0.08; // Default to 8% if not available
+
+      // Validate weight for weighted items
+      if (isWeighted && (!weight || weight <= 0)) {
+        toast.error(
+          `Please enter a weight for ${product.name}. Weighted items require a weight value.`
+        );
+        return;
+      }
+
+      // Determine item type
+      const itemType: "UNIT" | "WEIGHT" = isWeighted ? "WEIGHT" : "UNIT";
+
       console.log(
         "🛒 Adding to cart:",
         product.name,
-        weight ? `(${weight} ${product.unit})` : "",
+        isWeighted && weight ? `(${weight.toFixed(2)} ${salesUnit})` : "",
         customPrice ? `@ £${customPrice}` : ""
       );
 
       try {
-        // Determine item type
-        const itemType = product.requiresWeight ? "WEIGHT" : "UNIT";
+        // Fetch latest cart items to ensure we have up-to-date data
+        // This prevents stale state issues when called from age verification flow
+        const itemsResponse = await window.cartAPI.getItems(currentSession.id);
+        const latestCartItems =
+          itemsResponse.success && itemsResponse.data
+            ? (itemsResponse.data as CartItemWithProduct[])
+            : cartItems;
 
-        // Calculate pricing
-        let unitPrice = customPrice || product.price;
-        let totalPrice = customPrice || product.price;
-        let taxAmount = 0;
-
-        if (product.requiresWeight && weight && product.pricePerUnit) {
-          unitPrice = product.pricePerUnit;
-          totalPrice = product.pricePerUnit * weight;
-        } else if (!product.requiresWeight) {
-          totalPrice = unitPrice * 1; // Default quantity 1
+        // Update state with latest cart items to keep it in sync
+        if (itemsResponse.success && itemsResponse.data) {
+          setCartItems(itemsResponse.data as CartItemWithProduct[]);
         }
 
-        // Calculate tax (simplified - should use product's tax rate)
-        taxAmount = totalPrice * 0.08; // Example 8% tax
-        totalPrice = totalPrice + taxAmount;
+        // Calculate pricing
+        let unitPrice: number;
+        let subtotal: number;
 
-        // Check for existing item to update quantity/weight
-        const existingItem = cartItems.find(
+        if (isWeighted) {
+          // For weighted items, use pricePerKg if available, otherwise basePrice
+          unitPrice = pricePerKg ?? basePrice;
+          if (!weight || weight <= 0) {
+            toast.error("Weight is required for weighted items");
+            return;
+          }
+          subtotal = unitPrice * weight;
+        } else {
+          // For unit items, use customPrice if provided, otherwise basePrice
+          unitPrice = customPrice ?? basePrice;
+          subtotal = unitPrice * 1; // Default quantity 1
+        }
+
+        // Calculate tax (use product's tax rate if available)
+        const taxAmount = subtotal * taxRate;
+        const totalPrice = subtotal + taxAmount;
+
+        // Ensure all required fields are set (prevent null constraint errors)
+        if (!unitPrice || unitPrice <= 0) {
+          toast.error(
+            "Invalid price for product. Please check product pricing."
+          );
+          return;
+        }
+
+        if (!totalPrice || totalPrice <= 0) {
+          toast.error("Invalid total price calculation. Please try again.");
+          return;
+        }
+
+        if (taxAmount < 0) {
+          toast.error("Invalid tax calculation. Please try again.");
+          return;
+        }
+
+        // Check for existing item to update quantity/weight using latest cart items
+        const existingItem = latestCartItems.find(
           (item) => item.productId === product.id && item.itemType === itemType
         );
 
@@ -684,18 +755,19 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               ? (existingItem.weight || 0) + (weight || 0)
               : existingItem.weight;
 
-          const newTotalPrice =
+          // Recalculate totals for updated item
+          const newSubtotal =
             existingItem.itemType === "UNIT"
               ? unitPrice * (newQuantity || 1)
               : unitPrice * (newWeight || 0);
-          const newTaxAmount = newTotalPrice * 0.08;
-          const finalTotalPrice = newTotalPrice + newTaxAmount;
+          const newTaxAmount = newSubtotal * taxRate;
+          const finalTotalPrice = newSubtotal + newTaxAmount;
 
           const updateResponse = await window.cartAPI.updateItem(
             existingItem.id,
             {
-              quantity: newQuantity,
-              weight: newWeight,
+              quantity: newQuantity ?? undefined,
+              weight: newWeight ?? undefined,
               totalPrice: finalTotalPrice,
               taxAmount: newTaxAmount,
             }
@@ -711,24 +783,29 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             }
 
             toast.success(
-              `Added ${product.name} (${newQuantity}x)${
-                product.requiresWeight && newWeight
-                  ? ` - ${newWeight.toFixed(2)} ${product.unit}`
-                  : ""
+              `Added ${product.name}${
+                existingItem.itemType === "UNIT"
+                  ? ` (${newQuantity}x)`
+                  : ` - ${(newWeight || 0).toFixed(2)} ${salesUnit}`
               }`
             );
           } else {
-            toast.error("Failed to update cart item");
+            const errorMessage =
+              updateResponse.message || "Failed to update cart item";
+            console.error("Failed to update cart item:", errorMessage);
+            toast.error(errorMessage);
           }
         } else {
-          // Add new item
+          // Add new item - ensure all required fields are properly set
+          // For product items, always set productId (not categoryId)
           const addResponse = await window.cartAPI.addItem({
             cartSessionId: currentSession.id,
-            productId: product.id,
+            productId: product.id, // Always set for product items
+            itemName: product.name, // Store product name for reference
             itemType,
             quantity: itemType === "UNIT" ? 1 : undefined,
-            weight: itemType === "WEIGHT" ? weight : undefined,
-            unitOfMeasure: product.unit || "each",
+            weight: itemType === "WEIGHT" ? weight ?? undefined : undefined,
+            unitOfMeasure: salesUnit,
             unitPrice,
             totalPrice,
             taxAmount,
@@ -747,18 +824,23 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
             toast.success(
               `Added ${product.name}${
-                product.requiresWeight && weight
-                  ? ` - ${weight.toFixed(2)} ${product.unit}`
+                isWeighted && weight
+                  ? ` - ${weight.toFixed(2)} ${salesUnit}`
                   : ""
               }`
             );
           } else {
-            toast.error("Failed to add item to cart");
+            const errorMessage =
+              addResponse.message || "Failed to add item to cart";
+            console.error("Failed to add item to cart:", errorMessage);
+            toast.error(errorMessage);
           }
         }
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to add item to cart";
         console.error("Error adding to cart:", error);
-        toast.error("Failed to add item to cart");
+        toast.error(errorMessage);
       }
     },
     [
@@ -809,12 +891,24 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }
 
       // Check if product requires weight
-      if (product.requiresWeight) {
+      // Support both old field names (requiresWeight) and new schema fields (productType, usesScale)
+      type ExtendedProduct = Product & {
+        productType?: "STANDARD" | "WEIGHTED" | "GENERIC";
+        usesScale?: boolean;
+        salesUnit?: string;
+      };
+      const extendedProduct = product as ExtendedProduct;
+
+      const isWeighted =
+        extendedProduct.productType === "WEIGHTED" ||
+        extendedProduct.usesScale === true ||
+        product.requiresWeight === true;
+
+      if (isWeighted) {
         // Set as selected weight product to trigger scale display
         setSelectedWeightProduct(product);
-        toast.info(
-          `⚖️ Enter weight for ${product.name} (${product.unit || "kg"})`
-        );
+        const unit = extendedProduct.salesUnit ?? product.unit ?? "kg";
+        toast.info(`⚖️ Enter weight for ${product.name} (${unit})`);
         return;
       }
 
@@ -921,15 +1015,29 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
       }
 
+      // Check if product requires weight
+      // Support both old field names (requiresWeight) and new schema fields (productType, usesScale)
+      type ExtendedProduct = Product & {
+        productType?: "STANDARD" | "WEIGHTED" | "GENERIC";
+        usesScale?: boolean;
+        salesUnit?: string;
+      };
+      const extendedProduct = product as ExtendedProduct;
+
+      const isWeighted =
+        extendedProduct.productType === "WEIGHTED" ||
+        extendedProduct.usesScale === true ||
+        product.requiresWeight === true;
+
       // If product requires weight and we don't have it yet, trigger scale flow
-      if (product.requiresWeight && weight === undefined) {
+      if (isWeighted && weight === undefined) {
         setSelectedWeightProduct(product);
-        toast.info(
-          `⚖️ Enter weight for ${product.name} (${product.unit || "kg"})`
-        );
+        const unit = extendedProduct.salesUnit ?? product.unit ?? "kg";
+        toast.info(`⚖️ Enter weight for ${product.name} (${unit})`);
       } else {
         // Add to cart with age verification (and weight if available)
-        await addToCart(product, weight, undefined, true);
+        // Pass the currentSession to avoid stale closure issues
+        await addToCart(product, weight, undefined, true, currentSession);
       }
 
       // Reset pending state
@@ -964,7 +1072,14 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         currentSession = newSession;
       }
 
-      await addToCart(pendingGenericProduct, undefined, price);
+      // Pass the currentSession to avoid stale closure issues
+      await addToCart(
+        pendingGenericProduct,
+        undefined,
+        price,
+        false,
+        currentSession
+      );
       setShowGenericPriceModal(false);
       setPendingGenericProduct(null);
     },
@@ -1490,8 +1605,8 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         businessId: user.businessId,
         businessName: user.businessName,
         items: cartItems.map((item) => ({
-          id: item.productId,
-          name: item.product?.name || "Unknown Product",
+          id: item.productId || item.categoryId || item.id || "",
+          name: item.itemName || item.product?.name || "Unknown Item",
           quantity: item.itemType === "UNIT" ? item.quantity || 1 : 1,
           price: item.unitPrice,
           total: item.totalPrice,

@@ -119,17 +119,35 @@ export class CartManager {
 
   /**
    * Add item to cart
+   * Supports both product items (productId) and category items (categoryId)
+   * At least one of productId or categoryId must be provided
    */
   async addItem(
     itemData: Omit<CartItem, "id" | "addedAt" | "updatedAt">
   ): Promise<CartItem> {
+    // Validate that at least one of productId or categoryId is set
+    if (!itemData.productId && !itemData.categoryId) {
+      throw new Error(
+        "Either productId or categoryId must be provided for cart item"
+      );
+    }
+
+    // Validate that both are not set (mutually exclusive)
+    if (itemData.productId && itemData.categoryId) {
+      throw new Error(
+        "Cart item cannot have both productId and categoryId. Only one should be set."
+      );
+    }
+
     const itemId = this.uuid.v4();
     const now = new Date();
 
     await this.db.insert(schema.cartItems).values({
       id: itemId,
       cartSessionId: itemData.cartSessionId,
-      productId: itemData.productId,
+      productId: itemData.productId || null,
+      categoryId: itemData.categoryId || null,
+      itemName: itemData.itemName || null,
       itemType: itemData.itemType,
       quantity: itemData.quantity || null,
       weight: itemData.weight || null,

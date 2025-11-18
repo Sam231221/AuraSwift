@@ -780,9 +780,18 @@ export const cartItems = createTable(
     cartSessionId: text("cart_session_id")
       .notNull()
       .references(() => cartSessions.id, { onDelete: "cascade" }),
-    productId: text("product_id")
-      .notNull()
-      .references(() => products.id),
+
+    // Item source: either a product OR a category (for generic/category items)
+    // At least one must be set - enforced at application level
+    productId: text("product_id").references(() => products.id, {
+      onDelete: "cascade",
+    }),
+    categoryId: text("category_id").references(() => categories.id, {
+      onDelete: "cascade",
+    }),
+
+    // Item name (for category items or when product is deleted)
+    itemName: text("item_name"), // Store name for category items or deleted products
 
     // Item type and quantity
     itemType: text("item_type", {
@@ -797,7 +806,7 @@ export const cartItems = createTable(
     totalPrice: real("total_price").notNull(), // Calculated total
     taxAmount: real("tax_amount").notNull(),
 
-    // Batch tracking (for expiry)
+    // Batch tracking (for expiry) - only for product items
     batchId: text("batch_id").references(() => productBatches.id, {
       onDelete: "set null",
     }),
@@ -827,6 +836,7 @@ export const cartItems = createTable(
   (table) => [
     index("cart_items_session_idx").on(table.cartSessionId),
     index("cart_items_product_idx").on(table.productId),
+    index("cart_items_category_idx").on(table.categoryId),
     index("cart_items_batch_idx").on(table.batchId),
     index("cart_items_type_idx").on(table.itemType),
   ]

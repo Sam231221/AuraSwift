@@ -17,7 +17,7 @@ export function DashboardLayout({
 
   subtitle,
 }: DashboardLayoutProps) {
-  const { user, logout, isLoading, getActiveShift } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const [showClockOutDialog, setShowClockOutDialog] = useState(false);
   const [activeShift, setActiveShift] = useState<any>(null);
   const [clockInTime, setClockInTime] = useState<string | undefined>();

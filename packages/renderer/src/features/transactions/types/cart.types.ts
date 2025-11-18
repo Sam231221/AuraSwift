@@ -49,12 +49,17 @@ export interface CartSession {
 
 /**
  * Cart Item - Individual item in a cart session
+ * Supports both product items (productId) and category items (categoryId)
  */
 export interface CartItem {
   id: string;
   cartSessionId: string;
-  productId: string;
-  product?: Product; // Populated when fetching with relations
+  
+  // Item source: either a product OR a category (mutually exclusive)
+  productId?: string;
+  categoryId?: string;
+  itemName?: string; // For category items or when product is deleted
+  product?: Product; // Populated when fetching with relations (only for product items)
   
   // Item type and quantity
   itemType: CartItemType;
@@ -67,7 +72,7 @@ export interface CartItem {
   totalPrice: number; // Calculated total
   taxAmount: number;
   
-  // Batch tracking (for expiry)
+  // Batch tracking (for expiry) - only for product items
   batchId?: string;
   batchNumber?: string;
   expiryDate?: Date | string;
@@ -104,10 +109,14 @@ export interface CreateCartSessionRequest {
 
 /**
  * Create Cart Item Request
+ * Either productId OR categoryId must be provided (mutually exclusive)
  */
 export interface CreateCartItemRequest {
   cartSessionId: string;
-  productId: string;
+  // Either productId OR categoryId must be provided
+  productId?: string;
+  categoryId?: string;
+  itemName?: string; // For category items or when product is deleted
   itemType: CartItemType;
   quantity?: number;
   weight?: number;

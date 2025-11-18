@@ -38,7 +38,10 @@ export const cartAPI = {
   // Cart Item Operations
   addItem: (itemData: {
     cartSessionId: string;
-    productId: string;
+    // Either productId OR categoryId must be provided (mutually exclusive)
+    productId?: string;
+    categoryId?: string;
+    itemName?: string; // For category items or when product is deleted
     itemType: "UNIT" | "WEIGHT";
     quantity?: number;
     weight?: number;
