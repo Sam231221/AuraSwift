@@ -41,14 +41,24 @@ function getMigrationsFolder(): string {
 
   // In production, migrations are bundled in the app
   // Try multiple locations in order of preference
+  // IMPORTANT: Check extraResources FIRST (electron-builder puts them there)
 
-  // Option 1: Check relative to current file (inside asar: node_modules/@app/main/dist/migrations)
+  // Option 1: Check using extraResources (outside asar) - THIS IS WHERE ELECTRON-BUILDER PUTS THEM
+  const resourcesPath = process.resourcesPath;
+  if (resourcesPath) {
+    const resourcesMigrationsPath = join(resourcesPath, "migrations");
+    if (existsSync(resourcesMigrationsPath)) {
+      return resourcesMigrationsPath;
+    }
+  }
+
+  // Option 2: Check relative to current file (inside asar: node_modules/@app/main/dist/migrations)
   const distMigrationsPath = join(__dirname, "migrations");
   if (existsSync(distMigrationsPath)) {
     return distMigrationsPath;
   }
 
-  // Option 2: Check in app path (if migrations are at app root)
+  // Option 3: Check in app path (if migrations are at app root)
   const appPath = app.getAppPath();
   const appMigrationsPath = join(
     appPath,
@@ -60,15 +70,6 @@ function getMigrationsFolder(): string {
   );
   if (existsSync(appMigrationsPath)) {
     return appMigrationsPath;
-  }
-
-  // Option 3: Check using extraResources (outside asar)
-  const resourcesPath = process.resourcesPath;
-  if (resourcesPath) {
-    const resourcesMigrationsPath = join(resourcesPath, "migrations");
-    if (existsSync(resourcesMigrationsPath)) {
-      return resourcesMigrationsPath;
-    }
   }
 
   // Option 4: Try app path with database subfolder (legacy)

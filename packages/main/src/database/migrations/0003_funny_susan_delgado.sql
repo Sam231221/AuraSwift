@@ -81,7 +81,39 @@ CREATE TABLE `__new_transaction_items` (
 	FOREIGN KEY (`cart_item_id`) REFERENCES `cart_items`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-INSERT INTO `__new_transaction_items`("id", "transactionId", "productId", "productName", "item_type", "quantity", "weight", "unit_of_measure", "unitPrice", "totalPrice", "tax_amount", "refundedQuantity", "discountAmount", "appliedDiscounts", "batch_id", "batch_number", "expiry_date", "age_restriction_level", "age_verified", "cart_item_id", "created_at") SELECT "id", "transactionId", "productId", "productName", "item_type", "quantity", "weight", "unit_of_measure", "unitPrice", "totalPrice", "tax_amount", "refundedQuantity", "discountAmount", "appliedDiscounts", "batch_id", "batch_number", "expiry_date", "age_restriction_level", "age_verified", "cart_item_id", "created_at" FROM `transaction_items`;--> statement-breakpoint
+-- Copy data from old table, handling missing columns gracefully
+-- Old table (0002) has: id, transactionId, productId, productName, quantity, unitPrice, totalPrice, refundedQuantity, weight, discountAmount, appliedDiscounts, created_at
+-- Old table does NOT have: item_type, tax_amount, cart_item_id, unit_of_measure, batch_id, batch_number, expiry_date, age_restriction_level, age_verified
+INSERT INTO `__new_transaction_items`(
+  "id", "transactionId", "productId", "productName", "item_type", 
+  "quantity", "weight", "unit_of_measure", "unitPrice", "totalPrice", 
+  "tax_amount", "refundedQuantity", "discountAmount", "appliedDiscounts", 
+  "batch_id", "batch_number", "expiry_date", "age_restriction_level", 
+  "age_verified", "cart_item_id", "created_at"
+) 
+SELECT 
+  "id", 
+  "transactionId", 
+  "productId", 
+  "productName", 
+  'UNIT' as "item_type",  -- New required column, default to UNIT for existing items
+  "quantity", 
+  "weight",  -- Old table has this column
+  NULL as "unit_of_measure",  -- New column, not in old table
+  "unitPrice", 
+  "totalPrice", 
+  0 as "tax_amount",  -- New required column, default to 0
+  COALESCE("refundedQuantity", 0) as "refundedQuantity",
+  COALESCE("discountAmount", 0) as "discountAmount",
+  "appliedDiscounts", 
+  NULL as "batch_id",  -- New column, not in old table
+  NULL as "batch_number",  -- New column, not in old table
+  NULL as "expiry_date",  -- New column, not in old table
+  'NONE' as "age_restriction_level",  -- New column, default to NONE
+  0 as "age_verified",  -- New column, default to false
+  NULL as "cart_item_id",  -- New column, not in old table
+  "created_at"
+FROM `transaction_items`;--> statement-breakpoint
 DROP TABLE `transaction_items`;--> statement-breakpoint
 ALTER TABLE `__new_transaction_items` RENAME TO `transaction_items`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;
