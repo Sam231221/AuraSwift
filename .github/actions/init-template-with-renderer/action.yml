@@ -12,8 +12,8 @@ runs:
   steps:
     - uses: actions/setup-node@v4
       with:
-        node-version: "18.x"
-        # Disable setup-node cache to avoid stale node_modules from Node 22
+        node-version: "20.x"
+        # Disable setup-node cache to avoid stale node_modules from different Node versions
         cache: ""
 
     - name: Check if renderer directory exists
@@ -36,9 +36,9 @@ runs:
       uses: actions/cache@v4
       with:
         path: node_modules
-        key: npm-${{ runner.os }}-node18-${{ inputs.renderer-template }}-${{ hashFiles('**/package.json') }}
+        key: npm-${{ runner.os }}-node20-${{ inputs.renderer-template }}-${{ hashFiles('**/package.json') }}
         restore-keys: |
-          npm-${{ runner.os }}-node18-${{ inputs.renderer-template }}-
+          npm-${{ runner.os }}-node20-${{ inputs.renderer-template }}-
 
     - name: Clean workspace (remove incompatible node_modules)
       run: |
