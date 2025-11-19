@@ -12,7 +12,7 @@ runs:
   steps:
     - uses: actions/setup-node@v4
       with:
-        node-version: "22"
+        node-version: "22.x"
         cache: "npm"
 
     - name: Check if renderer directory exists
@@ -31,16 +31,6 @@ runs:
       shell: bash
       if: inputs.renderer-template != '' && steps.check-renderer.outputs.RENDERER_EXIST == 'false'
 
-    - name: Clear npm cache (integrity issue workaround)
-      run: npm cache clean --force
-      shell: bash
-
-    - name: Clean node_modules and package-lock.json (for fresh install)
-      run: |
-        rm -rf node_modules package-lock.json || true
-        rm -rf packages/*/node_modules packages/*/package-lock.json || true
-      shell: bash
-
     - name: Cache Dependencies
       uses: actions/cache@v4
       with:
@@ -49,14 +39,21 @@ runs:
         restore-keys: |
           npm-${{ runner.os }}-${{ inputs.renderer-template }}-
 
-    - name: Install Dependencies (skip native builds)
+    - name: Clear npm cache (integrity issue workaround)
+      run: npm cache clean --force
+      shell: bash
+
+    - name: Install Dependencies
       run: |
         set -e
-        echo "Installing dependencies with fresh node_modules..."
-        echo "Skipping native module builds (will be built later with Node 18)"
-        npm install --prefer-offline --no-audit --progress=false --ignore-scripts
+        if [ "${{ steps.check-renderer.outputs.RENDERER_EXIST }}" == "true" ] && [ -f "package-lock.json" ]; then
+          echo "Using npm ci for existing project..."
+          npm ci --prefer-offline --no-audit --progress=false
+        else
+          echo "Using npm install for new project..."
+          npm install --prefer-offline --no-audit --progress=false
+        fi
       shell: bash
       env:
         PYTHON: python
         msvs_version: 2022
-        ELECTRON_SKIP_BINARY_DOWNLOAD: 1
