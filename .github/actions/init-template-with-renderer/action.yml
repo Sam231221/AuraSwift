@@ -12,8 +12,9 @@ runs:
   steps:
     - uses: actions/setup-node@v4
       with:
-        node-version: "22.x"
-        cache: "npm"
+        node-version: "18.x"
+        # Disable setup-node cache to avoid stale node_modules from Node 22
+        cache: ""
 
     - name: Check if renderer directory exists
       id: check-renderer
@@ -35,12 +36,17 @@ runs:
       uses: actions/cache@v4
       with:
         path: node_modules
-        key: npm-${{ runner.os }}-${{ inputs.renderer-template }}-${{ hashFiles('**/package.json') }}
+        key: npm-${{ runner.os }}-node18-${{ inputs.renderer-template }}-${{ hashFiles('**/package.json') }}
         restore-keys: |
-          npm-${{ runner.os }}-${{ inputs.renderer-template }}-
+          npm-${{ runner.os }}-node18-${{ inputs.renderer-template }}-
 
-    - name: Clear npm cache (integrity issue workaround)
-      run: npm cache clean --force
+    - name: Clean workspace (remove incompatible node_modules)
+      run: |
+        echo "Cleaning npm cache..."
+        npm cache clean --force
+        echo "Removing node_modules directories..."
+        rm -rf node_modules packages/*/node_modules 2>/dev/null || true
+        echo "Cleanup complete"
       shell: bash
 
     - name: Install Dependencies
