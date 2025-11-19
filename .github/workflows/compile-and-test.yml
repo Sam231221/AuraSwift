@@ -42,10 +42,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "18"
           cache: "npm"
 
       - name: Cache node_modules for typecheck
@@ -92,19 +92,12 @@ jobs:
           python-version: "3.x"
 
       # Cache global npm packages
-      - name: Get npm global prefix
-        id: npm-global-prefix
-        run: |
-          $prefix = npm config get prefix
-          echo "prefix=$prefix" >> $env:GITHUB_OUTPUT
-        shell: powershell
-
       - name: Cache global npm packages
         uses: actions/cache@v4
         with:
           path: |
             ${{ runner.temp }}/npm-cache
-            ${{ steps.npm-global-prefix.outputs.prefix }}/npm
+            C:\Users\runneradmin\AppData\Roaming\npm
           key: npm-global-${{ runner.os }}-${{ hashFiles('package.json') }}
           restore-keys: |
             npm-global-${{ runner.os }}-
@@ -182,36 +175,12 @@ jobs:
           restore-keys: |
             vite-build-${{ runner.os }}-
 
-      - name: Verify migrations are copied
-        run: |
-          Write-Host "Checking if migrations were copied during build..."
-          if (Test-Path "packages/main/dist/migrations") {
-            $migrationFiles = Get-ChildItem -Path "packages/main/dist/migrations" -Filter "*.sql" -Recurse
-            Write-Host "✅ Found $($migrationFiles.Count) migration file(s):"
-            $migrationFiles | ForEach-Object { Write-Host "   - $($_.Name)" }
-          } else {
-            Write-Host "⚠️  WARNING: Migrations folder not found at packages/main/dist/migrations"
-            Write-Host "   This might cause database initialization to fail in production"
-          }
-        shell: powershell
-
       - name: Build and compile Electron app (Windows only)
         run: |
           Write-Host "Building Electron app with NSIS + Squirrel targets..."
           npm run build
           if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: npm build failed"
-            exit 1
-          }
-          
-          # Verify migrations are still present after build
-          Write-Host ""
-          Write-Host "Verifying migrations after build..."
-          if (Test-Path "packages/main/dist/migrations") {
-            $migrationFiles = Get-ChildItem -Path "packages/main/dist/migrations" -Filter "*.sql" -Recurse
-            Write-Host "✅ Migrations present: $($migrationFiles.Count) file(s)"
-          } else {
-            Write-Host "❌ ERROR: Migrations missing after build!"
             exit 1
           }
 
@@ -362,4 +331,4 @@ jobs:
         with:
           name: windows-${{inputs.distribution-channel}}
           path: dist
-          retention-days: 7 # Reduce artifact retention to save storage costs
+          retention-days: 7

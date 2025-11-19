@@ -1,8 +1,5 @@
 # This workflow is the entry point for all CI processes.
 # It handles building, testing, and semantic versioning releases.
-#
-# COST OPTIMIZATION: Only runs on push to main and manual triggers
-# PRs do NOT trigger this workflow to save costs
 
 name: Entry CI
 on:
