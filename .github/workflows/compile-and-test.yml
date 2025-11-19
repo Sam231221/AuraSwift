@@ -43,10 +43,10 @@ jobs:
       - uses: actions/checkout@v5
 
       # Setup Node.js FIRST - must run before any cache or npm operations
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
+          node-version: "22.x"
           # Disable setup-node cache to avoid stale node_modules from different Node versions
           cache: ""
 
@@ -66,9 +66,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
-          key: typecheck-deps-${{ runner.os }}-node20-${{ hashFiles('**/package-lock.json') }}
+          key: typecheck-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            typecheck-deps-${{ runner.os }}-node20-
+            typecheck-deps-${{ runner.os }}-node22-
 
       - name: Install dependencies (lightweight, no native builds needed)
         run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
@@ -90,10 +90,10 @@ jobs:
       - uses: actions/checkout@v5
 
       # Setup Node.js FIRST - must run before any cache or npm operations
-      - name: Setup Node.js 20 for native module compatibility
+      - name: Setup Node.js 22 for native module compatibility
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
+          node-version: "22.x"
           # Disable setup-node cache to avoid stale node_modules from different Node versions
           cache: ""
 
@@ -123,9 +123,9 @@ jobs:
           path: |
             ${{ runner.temp }}/npm-cache
             C:\Users\runneradmin\AppData\Roaming\npm
-          key: npm-global-${{ runner.os }}-node20-${{ hashFiles('package.json') }}
+          key: npm-global-${{ runner.os }}-node22-${{ hashFiles('package.json') }}
           restore-keys: |
-            npm-global-${{ runner.os }}-node20-
+            npm-global-${{ runner.os }}-node22-
 
       - name: Install and configure node-gyp/electron-rebuild globally
         run: npm install --location=global node-gyp@latest electron-rebuild@latest
@@ -137,13 +137,56 @@ jobs:
           renderer-template: ${{inputs.renderer-template}}
 
       # Clean workspace before install to avoid Node version mismatches
-      - name: Clean workspace (remove incompatible node_modules)
+      # This must run AFTER init-template action but BEFORE install
+      - name: Clean workspace (remove incompatible node_modules with retry)
         run: |
           Write-Host "Cleaning npm cache..."
           npm cache clean --force
-          Write-Host "Removing node_modules directories..."
-          Remove-Item -LiteralPath .\node_modules -Recurse -Force -ErrorAction SilentlyContinue
-          Remove-Item -LiteralPath .\packages\*\node_modules -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Host "Removing node_modules directories with retry logic..."
+          # Retry removal to handle locked files on Windows
+          $maxRetries = 3
+          $retryCount = 0
+          $success = $false
+
+          while ($retryCount -lt $maxRetries -and -not $success) {
+            $retryCount++
+            Write-Host "Attempt $retryCount of $maxRetries..."
+            
+            # Kill any processes that might be locking files
+            Get-Process | Where-Object { $_.Path -like "*node*" -or $_.Path -like "*npm*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+            
+            # Remove directories
+            $errors = @()
+            if (Test-Path ".\node_modules") {
+              Remove-Item -LiteralPath .\node_modules -Recurse -Force -ErrorAction SilentlyContinue
+              if (Test-Path ".\node_modules") { $errors += "node_modules" }
+            }
+            
+            Get-ChildItem -Path .\packages -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+              $pkgPath = Join-Path $_.FullName "node_modules"
+              if (Test-Path $pkgPath) {
+                Remove-Item -LiteralPath $pkgPath -Recurse -Force -ErrorAction SilentlyContinue
+                if (Test-Path $pkgPath) { $errors += $pkgPath }
+              }
+            }
+            
+            if ($errors.Count -eq 0) {
+              $success = $true
+              Write-Host "Cleanup successful"
+            } else {
+              Write-Host "Some directories still locked: $($errors -join ', ')"
+              if ($retryCount -lt $maxRetries) {
+                Start-Sleep -Seconds 3
+              }
+            }
+          }
+
+          if (-not $success) {
+            Write-Host "WARNING: Some directories could not be removed, but continuing..."
+          }
+
           Write-Host "Cleanup complete"
         shell: powershell
 
@@ -160,17 +203,19 @@ jobs:
             **/node_modules/serialport/build
             **/node_modules/usb/build
             node_modules/electron/dist
-          key: node-deps-${{ runner.os }}-node20-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
+          key: node-deps-${{ runner.os }}-node22-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
           restore-keys: |
-            node-deps-${{ runner.os }}-node20-electron-
-            node-deps-${{ runner.os }}-node20-
+            node-deps-${{ runner.os }}-node22-electron-
+            node-deps-${{ runner.os }}-node22-
 
-      - name: Install project dependencies
+      - name: Install project dependencies (skip scripts to avoid native build conflicts)
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           Write-Host "Installing dependencies with Node.js version:"
           node -v
-          npm ci --prefer-offline --no-audit --no-fund
+          Write-Host "Installing with --ignore-scripts to avoid native module build conflicts..."
+          npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+          Write-Host "Dependencies installed successfully"
         shell: powershell
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
@@ -187,10 +232,20 @@ jobs:
           node -v
         shell: powershell
 
-      - name: Rebuild native modules (only if not cached)
+      - name: Rebuild native modules (explicit rebuild after install)
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npx electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --verbose
+        run: |
+          Write-Host "Rebuilding native modules for Electron..."
+          Write-Host "Node version:"
+          node -v
+          Write-Host "Electron version:"
+          npx electron --version
+          Write-Host "Starting electron-rebuild..."
+          npx electron-rebuild --force --only=better-sqlite3,node-hid,serialport,usb --verbose
+          Write-Host "Native modules rebuilt successfully"
         shell: powershell
+        env:
+          npm_config_build_from_source: true
 
       - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 

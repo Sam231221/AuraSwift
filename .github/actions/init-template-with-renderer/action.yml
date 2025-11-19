@@ -12,7 +12,7 @@ runs:
   steps:
     - uses: actions/setup-node@v4
       with:
-        node-version: "20.x"
+        node-version: "22.x"
         # Disable setup-node cache to avoid stale node_modules from different Node versions
         cache: ""
 
@@ -36,29 +36,39 @@ runs:
       uses: actions/cache@v4
       with:
         path: node_modules
-        key: npm-${{ runner.os }}-node20-${{ inputs.renderer-template }}-${{ hashFiles('**/package.json') }}
+        key: npm-${{ runner.os }}-node22-${{ inputs.renderer-template }}-${{ hashFiles('**/package.json') }}
         restore-keys: |
-          npm-${{ runner.os }}-node20-${{ inputs.renderer-template }}-
+          npm-${{ runner.os }}-node22-${{ inputs.renderer-template }}-
 
     - name: Clean workspace (remove incompatible node_modules)
       run: |
         echo "Cleaning npm cache..."
-        npm cache clean --force
-        echo "Removing node_modules directories..."
-        rm -rf node_modules packages/*/node_modules 2>/dev/null || true
+        npm cache clean --force || true
+        echo "Removing node_modules directories with retry logic..."
+        # Retry removal with delays to handle locked files on Windows
+        for i in 1 2 3; do
+          rm -rf node_modules packages/*/node_modules 2>/dev/null || true
+          sleep 1
+        done
+        # Force remove any remaining locked directories (Windows-specific)
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          echo "Windows detected - using PowerShell for force removal"
+          powershell -Command "Get-ChildItem -Path node_modules,packages -Recurse -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue" || true
+        fi
         echo "Cleanup complete"
       shell: bash
 
-    - name: Install Dependencies
+    - name: Install Dependencies (skip scripts to avoid conflicts)
       run: |
         set -e
         if [ "${{ steps.check-renderer.outputs.RENDERER_EXIST }}" == "true" ] && [ -f "package-lock.json" ]; then
-          echo "Using npm ci for existing project..."
-          npm ci --prefer-offline --no-audit --progress=false
+          echo "Using npm ci for existing project (skipping scripts)..."
+          npm ci --prefer-offline --no-audit --progress=false --ignore-scripts
         else
-          echo "Using npm install for new project..."
-          npm install --prefer-offline --no-audit --progress=false
+          echo "Using npm install for new project (skipping scripts)..."
+          npm install --prefer-offline --no-audit --progress=false --ignore-scripts
         fi
+        echo "Dependencies installed. Native modules will be rebuilt separately."
       shell: bash
       env:
         PYTHON: python

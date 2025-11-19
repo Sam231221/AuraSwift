@@ -9,7 +9,137 @@ Run actions/cache@v4
 Cache not found for input keys: npm-Windows-node18--51ef0c6ec40fc67f76f517eb344a4b2939862d52f7175875d33564689d16cdc2, npm-Windows-node18--
 Run echo "Cleaning npm cache..."
 Cleaning npm cache...
+npm warn using --force RecomPrepare all required actions
+Getting action download info
+Run ./.github/actions/init-template-with-renderer
+Run actions/setup-node@v4
+Found in cache @ C:\hostedtoolcache\windows\node\20.19.5\x64
+Environment details
+Run if [ -d "packages/renderer" ]; then
+Run actions/cache@v4
+Cache not found for input keys: npm-Windows-node20--dc506606e3b7e4d2dc6de583d5862de63d33ee6dc4fea9ba724d8fd031a465cc, npm-Windows-node20--
+Run echo "Cleaning npm cache..."
+Cleaning npm cache...
 npm warn using --force Recommended protections disabled.
+Removing node_modules directories...
+Cleanup complete
+Run set -e
+Using npm ci for existing project...
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE package: '@electron/rebuild@4.0.1',
+npm warn EBADENGINE required: { node: '>=22.12.0' },
+npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE package: '@semantic-release/github@12.0.2',
+npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
+npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE package: '@semantic-release/npm@13.1.2',
+npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
+npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE package: 'node-abi@4.24.0',
+npm warn EBADENGINE required: { node: '>=22.12.0' },
+npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
+npm warn EBADENGINE }
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE package: 'semantic-release@25.0.2',
+npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
+npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
+npm warn EBADENGINE }
+npm warn skipping integrity check for git dependency ssh://git@github.com/electron/node-gyp.git
+npm warn deprecated semver-diff@5.0.0: Deprecated as the semver package now supports this built-in.
+npm warn deprecated rimraf@2.6.3: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated @npmcli/move-file@2.0.1: This functionality has been moved to @npmcli/fs
+npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
+npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@8.1.0: Glob versions prior to v9 are no longer supported
+npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn cleanup Failed to remove some directories [
+npm warn cleanup [
+npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3',
+npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\better-sqlite3'] {
+npm warn cleanup errno: -4082,
+npm warn cleanup code: 'EBUSY',
+npm warn cleanup syscall: 'rmdir',
+npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3'
+npm warn cleanup }
+npm warn cleanup ],
+npm warn cleanup [
+npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\usb',
+npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\usb'] {
+npm warn cleanup errno: -4082,
+npm warn cleanup code: 'EBUSY',
+npm warn cleanup syscall: 'rmdir',
+npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\usb'
+npm warn cleanup }
+npm warn cleanup ],
+npm warn cleanup [
+npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules',
+npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\better-sqlite3'] {
+npm warn cleanup errno: -4082,
+npm warn cleanup code: 'EBUSY',
+npm warn cleanup syscall: 'rmdir',
+npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3'
+npm warn cleanup }
+npm warn cleanup ],
+npm warn cleanup [
+npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\temp-file',
+npm warn cleanup [Error: EPERM: operation not permitted, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\temp-file\node_modules'] {
+npm warn cleanup errno: -4048,
+npm warn cleanup code: 'EPERM',
+npm warn cleanup syscall: 'rmdir',
+npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\temp-file\\node_modules'
+npm warn cleanup }
+npm warn cleanup ],
+npm warn cleanup [
+npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\npm',
+npm warn cleanup [Error: EPERM: operation not permitted, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\npm\node_modules'] {
+npm warn cleanup errno: -4048,
+npm warn cleanup code: 'EPERM',
+npm warn cleanup syscall: 'rmdir',
+npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\npm\\node_modules'
+npm warn cleanup }
+npm warn cleanup ]
+npm warn cleanup ]
+npm error code 1
+npm error path D:\a\AuraSwift\AuraSwift\packages\main\node_modules\@serialport\bindings-cpp
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c node-gyp-build
+npm error node:internal/child_process:420
+npm error throw new ErrnoException(err, 'spawn');
+npm error ^
+npm error
+npm error Error: spawn EINVAL
+npm error at ChildProcess.spawn (node:internal/child_process:420:11)
+npm error at Object.spawn (node:child_process:762:9)
+npm error at build (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:29:8)
+npm error at preinstall (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:38:32)
+npm error at Object.<anonymous> (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:15:3)
+npm error at Module.\_compile (node:internal/modules/cjs/loader:1521:14)
+npm error at Module.\_extensions..js (node:internal/modules/cjs/loader:1623:10)
+npm error at Module.load (node:internal/modules/cjs/loader:1266:32)
+npm error at Module.\_load (node:internal/modules/cjs/loader:1091:12)
+npm error at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
+npm error errno: -4071,
+npm error code: 'EINVAL',
+npm error syscall: 'spawn'
+npm error }
+npm error
+npm error Node.js v20.19.5
+npm error A complete log of this run can be found in: C:\npm\cache_logs\2025-11-19T22_40_12_060Z-debug-0.log
+Error: Process completed with exit code 1.mended protections disabled.
 Removing node_modules directories...
 Cleanup complete
 Run set -e
