@@ -22,7 +22,7 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "build": "npm run build --workspace @app/renderer && npm run build --workspace @app/main && npm run build --workspace @app/preload",
+    "build": "npm --workspace=packages/renderer run build && npm --workspace=packages/main run build && npm --workspace=packages/preload run build",
     "compile": "npm run build && electron-builder build --config electron-builder.mjs",
     "postinstall": "electron-rebuild",
     "test": "npx playwright test ./tests/e2e.spec.ts",
