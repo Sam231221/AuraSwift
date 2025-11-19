@@ -12,7 +12,7 @@ runs:
   steps:
     - uses: actions/setup-node@v4
       with:
-        node-version: "22.x"
+        node-version: "20"
         cache: "npm"
 
     - name: Check if renderer directory exists
@@ -31,6 +31,16 @@ runs:
       shell: bash
       if: inputs.renderer-template != '' && steps.check-renderer.outputs.RENDERER_EXIST == 'false'
 
+    - name: Clear npm cache (integrity issue workaround)
+      run: npm cache clean --force
+      shell: bash
+
+    - name: Clean node_modules and package-lock.json (for fresh install)
+      run: |
+        rm -rf node_modules package-lock.json || true
+        rm -rf packages/*/node_modules packages/*/package-lock.json || true
+      shell: bash
+
     - name: Cache Dependencies
       uses: actions/cache@v4
       with:
@@ -39,20 +49,11 @@ runs:
         restore-keys: |
           npm-${{ runner.os }}-${{ inputs.renderer-template }}-
 
-    - name: Clear npm cache (integrity issue workaround)
-      run: npm cache clean --force
-      shell: bash
-
     - name: Install Dependencies
       run: |
         set -e
-        if [ "${{ steps.check-renderer.outputs.RENDERER_EXIST }}" == "true" ] && [ -f "package-lock.json" ]; then
-          echo "Using npm ci for existing project..."
-          npm ci --prefer-offline --no-audit --progress=false
-        else
-          echo "Using npm install for new project..."
-          npm install --prefer-offline --no-audit --progress=false
-        fi
+        echo "Installing dependencies with fresh node_modules..."
+        npm install --prefer-offline --no-audit --progress=false
       shell: bash
       env:
         PYTHON: python
