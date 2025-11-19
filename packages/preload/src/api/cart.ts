@@ -1,5 +1,5 @@
 import { ipcRenderer } from "electron";
-import type { CartSession, CartItem } from "../../main/src/database/schema";
+import type { CartSession, CartItem } from "@app/main/src/database/schema.js";
 
 export const cartAPI = {
   // Cart Session Operations
