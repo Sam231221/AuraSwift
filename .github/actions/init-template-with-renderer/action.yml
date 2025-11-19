@@ -40,22 +40,34 @@ runs:
         restore-keys: |
           npm-${{ runner.os }}-node22-${{ inputs.renderer-template }}-
 
-    - name: Clean workspace (remove incompatible node_modules)
+    - name: Clean workspace (remove incompatible node_modules only)
       run: |
         echo "Cleaning npm cache..."
         npm cache clean --force || true
         echo "Removing node_modules directories with retry logic..."
+        echo "NOTE: Only removing node_modules, NOT package directories"
         # Retry removal with delays to handle locked files on Windows
         for i in 1 2 3; do
-          rm -rf node_modules packages/*/node_modules 2>/dev/null || true
+          # Only remove node_modules directories, not the packages themselves
+          rm -rf node_modules 2>/dev/null || true
+          rm -rf packages/*/node_modules 2>/dev/null || true
           sleep 1
         done
-        # Force remove any remaining locked directories (Windows-specific)
+        # Force remove any remaining locked node_modules (Windows-specific)
         if [ "$RUNNER_OS" = "Windows" ]; then
-          echo "Windows detected - using PowerShell for force removal"
-          powershell -Command "Get-ChildItem -Path node_modules,packages -Recurse -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue" || true
+          echo "Windows detected - using PowerShell for force removal of node_modules only"
+          # Only remove node_modules directories, preserve package.json files
+          powershell -Command "
+            if (Test-Path 'node_modules') { Remove-Item -Path 'node_modules' -Recurse -Force -ErrorAction SilentlyContinue }
+            Get-ChildItem -Path 'packages' -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+              \$nodeModulesPath = Join-Path \$_.FullName 'node_modules'
+              if (Test-Path \$nodeModulesPath) {
+                Remove-Item -Path \$nodeModulesPath -Recurse -Force -ErrorAction SilentlyContinue
+              }
+            }
+          " || true
         fi
-        echo "Cleanup complete"
+        echo "Cleanup complete - package.json files preserved"
       shell: bash
 
     - name: Install Dependencies (skip scripts to avoid conflicts)

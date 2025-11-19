@@ -136,6 +136,57 @@ jobs:
         with:
           renderer-template: ${{inputs.renderer-template}}
 
+      # Verify workspace packages exist after init-template action
+      - name: Verify workspace packages exist
+        run: |
+          Write-Host "Verifying workspace packages exist after init-template..."
+          Write-Host "Current working directory:"
+          pwd
+          Write-Host ""
+          Write-Host "Listing packages directory:"
+          if (Test-Path "packages") {
+            Get-ChildItem -Path packages -Directory | ForEach-Object { 
+              Write-Host "  - $($_.Name)"
+              if (Test-Path (Join-Path $_.FullName "package.json")) {
+                Write-Host "    ✓ package.json exists"
+              } else {
+                Write-Host "    ✗ package.json MISSING"
+              }
+            }
+          } else {
+            Write-Host "  ERROR: packages directory does not exist!"
+            exit 1
+          }
+          Write-Host ""
+          $missing = @()
+          if (!(Test-Path "packages/renderer/package.json")) { 
+            Write-Host "✗ packages/renderer/package.json MISSING"
+            $missing += "renderer"
+          } else {
+            Write-Host "✓ packages/renderer/package.json exists"
+          }
+          if (!(Test-Path "packages/main/package.json")) { 
+            Write-Host "✗ packages/main/package.json MISSING"
+            $missing += "main"
+          } else {
+            Write-Host "✓ packages/main/package.json exists"
+          }
+          if (!(Test-Path "packages/preload/package.json")) { 
+            Write-Host "✗ packages/preload/package.json MISSING"
+            $missing += "preload"
+          } else {
+            Write-Host "✓ packages/preload/package.json exists"
+          }
+          if ($missing.Count -gt 0) {
+            Write-Host ""
+            Write-Host "ERROR: Missing workspace packages: $($missing -join ', ')"
+            Write-Host "These packages must exist in the repository or be created by the init-template action."
+            exit 1
+          }
+          Write-Host ""
+          Write-Host "All workspace packages verified ✓"
+        shell: powershell
+
       # Clean workspace before install to avoid Node version mismatches
       # This must run AFTER init-template action but BEFORE install
       - name: Clean workspace (remove incompatible node_modules with retry)
@@ -213,10 +264,6 @@ jobs:
         run: |
           Write-Host "Installing dependencies with Node.js version:"
           node -v
-          Write-Host "Verifying workspace packages exist..."
-          if (!(Test-Path "packages/renderer/package.json")) { Write-Host "ERROR: packages/renderer/package.json missing"; exit 1 }
-          if (!(Test-Path "packages/main/package.json")) { Write-Host "ERROR: packages/main/package.json missing"; exit 1 }
-          if (!(Test-Path "packages/preload/package.json")) { Write-Host "ERROR: packages/preload/package.json missing"; exit 1 }
           Write-Host "Installing with --ignore-scripts to avoid native module build conflicts..."
           npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
           Write-Host "Verifying workspaces are set up..."
