@@ -153,15 +153,16 @@ jobs:
                 COMMITS=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD)
               fi
               
-              # Count releasable commit types (with or without scope)
-              FIX_COUNT=$(echo "$COMMITS" | grep -cE "^fix(\([^)]*\))?:" || echo "0")
-              FEAT_COUNT=$(echo "$COMMITS" | grep -cE "^feat(\([^)]*\))?:" || echo "0")
-              PERF_COUNT=$(echo "$COMMITS" | grep -cE "^perf(\([^)]*\))?:" || echo "0")
-              REFACTOR_COUNT=$(echo "$COMMITS" | grep -cE "^refactor(\([^)]*\))?:" || echo "0")
-              BUILD_COUNT=$(echo "$COMMITS" | grep -cE "^build(\([^)]*\))?:" || echo "0")
+              # Count releasable commit types (with or without scope) using robust awk-based counting
+              # awk ensures numeric output (defaults to 0) even if grep returns empty or unexpected values
+              FIX_COUNT=$(echo "$COMMITS" | awk '/^fix(\([^)]*\))?:/ {count++} END {print count+0}')
+              FEAT_COUNT=$(echo "$COMMITS" | awk '/^feat(\([^)]*\))?:/ {count++} END {print count+0}')
+              PERF_COUNT=$(echo "$COMMITS" | awk '/^perf(\([^)]*\))?:/ {count++} END {print count+0}')
+              REFACTOR_COUNT=$(echo "$COMMITS" | awk '/^refactor(\([^)]*\))?:/ {count++} END {print count+0}')
+              BUILD_COUNT=$(echo "$COMMITS" | awk '/^build(\([^)]*\))?:/ {count++} END {print count+0}')
               
-              # Check if we have any releasable commits
-              TOTAL_RELEASABLE=$((FIX_COUNT + FEAT_COUNT + PERF_COUNT + REFACTOR_COUNT + BUILD_COUNT))
+              # Check if we have any releasable commits (awk ensures all values are numeric)
+              TOTAL_RELEASABLE=$(awk "BEGIN {print $FIX_COUNT + $FEAT_COUNT + $PERF_COUNT + $REFACTOR_COUNT + $BUILD_COUNT}")
               
               if [ "$TOTAL_RELEASABLE" -gt 0 ]; then
                 # Calculate next version
