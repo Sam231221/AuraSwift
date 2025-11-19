@@ -73,8 +73,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: "18.x"
+          # Disable setup-node cache to avoid stale node_modules from different Node versions
+          cache: ""
 
       - name: Install semantic-release dependencies
         run: |
@@ -232,8 +233,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: "18.x"
+          # Disable setup-node cache to avoid stale node_modules from different Node versions
+          cache: ""
 
       - name: Install semantic-release dependencies only
         run: |

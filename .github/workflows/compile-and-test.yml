@@ -42,21 +42,33 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Setup Node.js FIRST - must run before any cache or npm operations
       - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
-          cache: "npm"
+          node-version: "18.x"
+          # Disable setup-node cache to avoid stale node_modules from Node 22
+          cache: ""
 
-      - name: Cache node_modules for typecheck
+      # Verify Node version is correct
+      - name: Verify Node.js version
+        run: |
+          echo "Node.js version:"
+          node -v
+          echo "npm version:"
+          npm -v
+          echo "Node.js path:"
+          which node
+
+      - name: Cache node_modules for typecheck (with Node version in key)
         uses: actions/cache@v4
         with:
           path: |
             node_modules
             packages/*/node_modules
-          key: typecheck-deps-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          key: typecheck-deps-${{ runner.os }}-node18-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            typecheck-deps-${{ runner.os }}-
+            typecheck-deps-${{ runner.os }}-node18-
 
       - name: Install dependencies (lightweight, no native builds needed)
         run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
@@ -77,11 +89,24 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Setup Node.js FIRST - must run before any cache or npm operations
       - name: Setup Node.js 18 for native module compatibility
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
-          cache: "npm"
+          node-version: "18.x"
+          # Disable setup-node cache to avoid stale node_modules from Node 22
+          cache: ""
+
+      # Verify Node version is correct
+      - name: Verify Node.js version
+        run: |
+          Write-Host "Node.js version:"
+          node -v
+          Write-Host "npm version:"
+          npm -v
+          Write-Host "Node.js path:"
+          Get-Command node | Select-Object -ExpandProperty Source
+        shell: powershell
 
       - name: Setup MSBuild (Windows)
         uses: microsoft/setup-msbuild@v2
@@ -91,16 +116,16 @@ jobs:
         with:
           python-version: "3.x"
 
-      # Cache global npm packages
+      # Cache global npm packages (include node version in key)
       - name: Cache global npm packages
         uses: actions/cache@v4
         with:
           path: |
             ${{ runner.temp }}/npm-cache
             C:\Users\runneradmin\AppData\Roaming\npm
-          key: npm-global-${{ runner.os }}-${{ hashFiles('package.json') }}
+          key: npm-global-${{ runner.os }}-node18-${{ hashFiles('package.json') }}
           restore-keys: |
-            npm-global-${{ runner.os }}-
+            npm-global-${{ runner.os }}-node18-
 
       - name: Install and configure node-gyp/electron-rebuild globally
         run: npm install --location=global node-gyp@latest electron-rebuild@latest
@@ -111,7 +136,18 @@ jobs:
         with:
           renderer-template: ${{inputs.renderer-template}}
 
-      # Enhanced caching for node_modules including native modules
+      # Clean workspace before install to avoid Node version mismatches
+      - name: Clean workspace (remove incompatible node_modules)
+        run: |
+          Write-Host "Cleaning npm cache..."
+          npm cache clean --force
+          Write-Host "Removing node_modules directories..."
+          Remove-Item -LiteralPath .\node_modules -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath .\packages\*\node_modules -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Cleanup complete"
+        shell: powershell
+
+      # Enhanced caching for node_modules including native modules (with Node version in key)
       - name: Cache node_modules and native builds
         id: cache-deps
         uses: actions/cache@v4
@@ -131,17 +167,24 @@ jobs:
 
       - name: Install project dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci --prefer-offline --no-audit --no-fund
+        run: |
+          Write-Host "Installing dependencies with Node.js version:"
+          node -v
+          npm ci --prefer-offline --no-audit --no-fund
         shell: powershell
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
-      - name: Install dependencies (cache hit - verify only)
+      - name: Verify dependencies after cache restore
         if: steps.cache-deps.outputs.cache-hit == 'true'
         run: |
+          Write-Host "Verifying cached dependencies..."
           if (!(Test-Path "node_modules/electron/dist/electron.exe")) {
+            Write-Host "Electron not found, installing..."
             npm install electron --no-save
           }
+          Write-Host "Verifying Node.js version matches:"
+          node -v
         shell: powershell
 
       - name: Rebuild native modules (only if not cached)
