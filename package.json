@@ -47,12 +47,12 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
-    "@npmcli/map-workspaces": "5.0.0",
-    "@playwright/test": "1.55.0",
+    "@npmcli/map-workspaces": "5.0.2",
+    "@playwright/test": "1.56.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^12.0.0",
-    "@types/node": "24.5.2",
+    "@semantic-release/github": "^12.0.2",
+    "@types/node": "24.10.1",
     "@types/pdfkit": "^0.17.3",
     "conventional-changelog-cli": "^5.0.0",
     "create-vite": "7.1.2",
@@ -61,7 +61,7 @@
     "glob": "^11.0.3",
     "playwright": "^1.55.0",
     "png2icons": "^2.0.1",
-    "semantic-release": "^25.0.1",
+    "semantic-release": "^25.0.2",
     "tsx": "^4.20.6"
   },
   "dependencies": {
