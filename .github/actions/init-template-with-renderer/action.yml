@@ -12,7 +12,7 @@ runs:
   steps:
     - uses: actions/setup-node@v4
       with:
-        node-version: "20"
+        node-version: "22"
         cache: "npm"
 
     - name: Check if renderer directory exists
@@ -49,12 +49,14 @@ runs:
         restore-keys: |
           npm-${{ runner.os }}-${{ inputs.renderer-template }}-
 
-    - name: Install Dependencies
+    - name: Install Dependencies (skip native builds)
       run: |
         set -e
         echo "Installing dependencies with fresh node_modules..."
-        npm install --prefer-offline --no-audit --progress=false
+        echo "Skipping native module builds (will be built later with Node 18)"
+        npm install --prefer-offline --no-audit --progress=false --ignore-scripts
       shell: bash
       env:
         PYTHON: python
         msvs_version: 2022
+        ELECTRON_SKIP_BINARY_DOWNLOAD: 1
