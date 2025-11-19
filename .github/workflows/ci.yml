@@ -1,5 +1,8 @@
 # This workflow is the entry point for all CI processes.
 # It handles building, testing, and semantic versioning releases.
+#
+# COST OPTIMIZATION: Only runs on push to main and manual triggers
+# PRs do NOT trigger this workflow to save costs
 
 name: Entry CI
 on:
@@ -67,11 +70,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || github.token }}
 
-      - name: Use Node.js 20.x
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
-          cache: "npm"
+          node-version: 22
+          cache: npm
 
       - name: Install semantic-release dependencies
         run: |
@@ -225,11 +228,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN }}
 
-      - name: Use Node.js 20.x
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
-          cache: "npm"
+          node-version: 22
+          cache: npm
 
       - name: Install semantic-release dependencies only
         run: |

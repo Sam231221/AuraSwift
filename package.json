@@ -17,6 +17,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "build": "npm run build --workspace @app/renderer && npm run build --workspace @app/main && npm run build --workspace @app/preload",
     "compile": "npm run build && electron-builder build --config electron-builder.mjs",

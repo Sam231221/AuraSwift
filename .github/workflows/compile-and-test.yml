@@ -42,10 +42,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "18"
           cache: "npm"
 
       - name: Cache node_modules for typecheck
@@ -77,10 +77,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Node.js 22 for renderer compatibility
+      - name: Setup Node.js 18 for native module compatibility
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "18"
           cache: "npm"
 
       - name: Setup MSBuild (Windows)
@@ -124,10 +124,10 @@ jobs:
             **/node_modules/serialport/build
             **/node_modules/usb/build
             node_modules/electron/dist
-          key: node-deps-${{ runner.os }}-node22-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
+          key: node-deps-${{ runner.os }}-node18-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
           restore-keys: |
-            node-deps-${{ runner.os }}-node22-electron-
-            node-deps-${{ runner.os }}-node22-
+            node-deps-${{ runner.os }}-node18-electron-
+            node-deps-${{ runner.os }}-node18-
 
       - name: Install project dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
@@ -331,4 +331,4 @@ jobs:
         with:
           name: windows-${{inputs.distribution-channel}}
           path: dist
-          retention-days: 7
+          retention-days: 7 # Reduce artifact retention to save storage costs
