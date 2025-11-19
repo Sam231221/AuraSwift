@@ -71,7 +71,7 @@ jobs:
           token: ${{ secrets.GH_TOKEN || github.token }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22.x"
           # Disable setup-node cache to avoid stale node_modules from different Node versions
@@ -231,7 +231,7 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22.x"
           # Disable setup-node cache to avoid stale node_modules from different Node versions
@@ -252,7 +252,7 @@ jobs:
           PUPPETEER_SKIP_DOWNLOAD: 1
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: windows-${{ inputs.distribution-channel || 'main' }}
           path: dist
