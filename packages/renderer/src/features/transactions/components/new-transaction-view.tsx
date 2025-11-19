@@ -40,6 +40,7 @@ import {
   RefreshCw,
   Clock,
   AlertTriangle,
+  DollarSign,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/shared/hooks/use-auth";
@@ -181,6 +182,11 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [pendingGenericProduct, setPendingGenericProduct] =
     useState<Product | null>(null);
 
+  // Category Price Input State (similar to weight input)
+  const [pendingCategory, setPendingCategory] = useState<Category | null>(null);
+  const [categoryPriceInput, setCategoryPriceInput] = useState("");
+  const [categoryDisplayPrice, setCategoryDisplayPrice] = useState("0.00");
+
   // Double-click detection for generic items
   const [lastClickTime, setLastClickTime] = useState<{
     productId: string;
@@ -198,6 +204,7 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [cashAmount, setCashAmount] = useState(0);
   const [transactionComplete, setTransactionComplete] = useState(false);
   const [weightInput, setWeightInput] = useState("");
+  const [weightDisplayPrice, setWeightDisplayPrice] = useState("0.00");
   const [selectedWeightProduct, setSelectedWeightProduct] =
     useState<Product | null>(null);
 
@@ -760,6 +767,162 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     ]
   );
 
+  // Add category to cart with custom price
+  const addCategoryToCart = useCallback(
+    async (
+      category: Category,
+      price: number,
+      sessionOverride?: CartSession | null
+    ) => {
+      // Check if operations are disabled (no active shift but has scheduled shift)
+      const operationsDisabled =
+        (user?.role === "cashier" || user?.role === "manager") &&
+        !activeShift &&
+        todaySchedule;
+
+      if (operationsDisabled) {
+        toast.error("Please start your shift before adding items to cart");
+        return;
+      }
+
+      // Ensure cart session is initialized before adding items
+      let currentSession =
+        sessionOverride !== undefined ? sessionOverride : cartSession;
+      if (!currentSession) {
+        console.log("🛒 Cart session not found, initializing...");
+        try {
+          const newSession = await initializeCartSession();
+          if (!newSession) {
+            toast.error("Failed to initialize cart session. Please try again.");
+            return;
+          }
+          currentSession = newSession;
+        } catch (error) {
+          console.error("Error initializing cart session:", error);
+          toast.error("Failed to initialize cart session. Please try again.");
+          return;
+        }
+      }
+
+      // Default tax rate for categories (can be made configurable)
+      const taxRate = 0.08; // Default to 8%
+      const unitPrice = price;
+      const subtotal = unitPrice * 1; // Quantity is always 1 for categories
+      const taxAmount = subtotal * taxRate;
+      const totalPrice = subtotal + taxAmount;
+
+      // Validate price
+      if (!unitPrice || unitPrice <= 0) {
+        toast.error("Invalid price. Please enter a valid amount.");
+        return;
+      }
+
+      if (!totalPrice || totalPrice <= 0) {
+        toast.error("Invalid total price calculation. Please try again.");
+        return;
+      }
+
+      console.log("🛒 Adding category to cart:", category.name, `@ £${price}`);
+
+      try {
+        // Check for existing category item to update quantity
+        const itemsResponse = await window.cartAPI.getItems(currentSession.id);
+        const latestCartItems =
+          itemsResponse.success && itemsResponse.data
+            ? (itemsResponse.data as CartItemWithProduct[])
+            : cartItems;
+
+        // Update state with latest cart items to keep it in sync
+        if (itemsResponse.success && itemsResponse.data) {
+          setCartItems(itemsResponse.data as CartItemWithProduct[]);
+        }
+
+        const existingItem = latestCartItems.find(
+          (item) => item.categoryId === category.id && item.itemType === "UNIT"
+        );
+
+        if (existingItem) {
+          // Update existing item
+          const newQuantity = (existingItem.quantity || 0) + 1;
+          const newSubtotal = unitPrice * newQuantity;
+          const newTaxAmount = newSubtotal * taxRate;
+          const finalTotalPrice = newSubtotal + newTaxAmount;
+
+          const updateResponse = await window.cartAPI.updateItem(
+            existingItem.id,
+            {
+              quantity: newQuantity,
+              totalPrice: finalTotalPrice,
+              taxAmount: newTaxAmount,
+            }
+          );
+
+          if (updateResponse.success) {
+            // Reload cart items
+            const itemsResponse = await window.cartAPI.getItems(
+              currentSession.id
+            );
+            if (itemsResponse.success && itemsResponse.data) {
+              setCartItems(itemsResponse.data as CartItemWithProduct[]);
+            }
+
+            toast.success(`Added ${category.name} (${newQuantity}x)`);
+          } else {
+            const errorMessage =
+              updateResponse.message || "Failed to update cart item";
+            console.error("Failed to update cart item:", errorMessage);
+            toast.error(errorMessage);
+          }
+        } else {
+          // Add new category item - use categoryId (not productId)
+          const addResponse = await window.cartAPI.addItem({
+            cartSessionId: currentSession.id,
+            categoryId: category.id, // Set categoryId for category items
+            itemName: category.name, // Store category name for reference
+            itemType: "UNIT",
+            quantity: 1, // Always 1 unit for categories
+            unitOfMeasure: "each",
+            unitPrice,
+            totalPrice,
+            taxAmount,
+            ageRestrictionLevel: "NONE",
+            ageVerified: false,
+          });
+
+          if (addResponse.success) {
+            // Reload cart items
+            const itemsResponse = await window.cartAPI.getItems(
+              currentSession.id
+            );
+            if (itemsResponse.success && itemsResponse.data) {
+              setCartItems(itemsResponse.data as CartItemWithProduct[]);
+            }
+
+            toast.success(`Added ${category.name}`);
+          } else {
+            const errorMessage =
+              addResponse.message || "Failed to add item to cart";
+            console.error("Failed to add item to cart:", errorMessage);
+            toast.error(errorMessage);
+          }
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to add item to cart";
+        console.error("Error adding category to cart:", error);
+        toast.error(errorMessage);
+      }
+    },
+    [
+      cartSession,
+      cartItems,
+      user?.role,
+      activeShift,
+      todaySchedule,
+      initializeCartSession,
+    ]
+  );
+
   // Handle product click with age verification and scale flow
   const handleProductClick = useCallback(
     async (product: Product) => {
@@ -812,7 +975,13 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         product.requiresWeight === true;
 
       if (isWeighted) {
+        // Clear any existing category selection when switching to weighted product
+        setPendingCategory(null);
+        setCategoryPriceInput("");
+        setCategoryDisplayPrice("0.00");
         // Set as selected weight product to trigger scale display
+        setWeightInput("");
+        setWeightDisplayPrice("0.00");
         setSelectedWeightProduct(product);
         const unit = extendedProduct.salesUnit ?? product.unit ?? "kg";
         toast.info(`⚖️ Enter weight for ${product.name} (${unit})`);
@@ -938,6 +1107,12 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
       // If product requires weight and we don't have it yet, trigger scale flow
       if (isWeighted && weight === undefined) {
+        // Clear any existing category selection when switching to weighted product
+        setPendingCategory(null);
+        setCategoryPriceInput("");
+        setCategoryDisplayPrice("0.00");
+        setWeightInput("");
+        setWeightDisplayPrice("0.00");
         setSelectedWeightProduct(product);
         const unit = extendedProduct.salesUnit ?? product.unit ?? "kg";
         toast.info(`⚖️ Enter weight for ${product.name} (${unit})`);
@@ -1013,15 +1188,28 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           if (
             selectedWeightProduct?.id === product.id &&
             weightInput &&
-            parseFloat(weightInput) > 0
+            weightInput.length > 0
           ) {
             // If we already have the weight input for this product
-            await addToCart(product, parseFloat(weightInput));
-            setWeightInput("");
-            setSelectedWeightProduct(null);
-            return true;
+            // Parse raw digits and divide by 100 (auto-decimal format)
+            const rawDigits = weightInput.replace(/[^0-9]/g, "");
+            const weightValue = rawDigits ? parseFloat(rawDigits) / 100 : 0;
+            if (weightValue > 0) {
+              await addToCart(product, weightValue);
+              setWeightInput("");
+              setWeightDisplayPrice("0.00");
+              setSelectedWeightProduct(null);
+              return true;
+            }
+            return false; // Weight value is 0 or invalid
           } else {
             // Set as selected weight product and prompt for weight
+            // Clear any existing category selection when switching to weighted product
+            setPendingCategory(null);
+            setCategoryPriceInput("");
+            setCategoryDisplayPrice("0.00");
+            setWeightInput("");
+            setWeightDisplayPrice("0.00");
             setSelectedWeightProduct(product);
             toast.warning(
               `⚖️ Weight required for ${product.name}. Enter weight in ${
@@ -1207,9 +1395,34 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   }, [loadProducts, loadCategories, initializeCartSession]);
 
   // Category navigation functions
-  const handleCategoryClick = (category: Category) => {
-    setCurrentCategoryId(category.id);
-    setBreadcrumb([...breadcrumb, { id: category.id, name: category.name }]);
+  const handleCategoryClick = (
+    category: Category,
+    addToCart: boolean = false
+  ) => {
+    // Check if operations are disabled
+    const operationsDisabled =
+      (user?.role === "cashier" || user?.role === "manager") &&
+      !activeShift &&
+      todaySchedule;
+
+    if (addToCart) {
+      // Add to cart flow - set pending category for price input in right column
+      if (operationsDisabled) {
+        toast.error("Please start your shift before adding items to cart");
+        return;
+      }
+      // Clear any existing weight product selection when switching to category
+      setSelectedWeightProduct(null);
+      setWeightInput("");
+      setWeightDisplayPrice("0.00");
+      setPendingCategory(category);
+      setCategoryPriceInput("");
+      setCategoryDisplayPrice("0.00");
+    } else {
+      // Navigation flow - expand category
+      setCurrentCategoryId(category.id);
+      setBreadcrumb([...breadcrumb, { id: category.id, name: category.name }]);
+    }
   };
 
   const handleBreadcrumbClick = (index: number) => {
@@ -1367,11 +1580,23 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     if (product) {
       if (product.requiresWeight) {
-        if (weightInput && parseFloat(weightInput) > 0) {
-          await addToCart(product, parseFloat(weightInput));
-          setWeightInput("");
-          setSelectedWeightProduct(null);
+        if (weightInput && weightInput.length > 0) {
+          // Parse raw digits and divide by 100 (auto-decimal format)
+          const rawDigits = weightInput.replace(/[^0-9]/g, "");
+          const weightValue = rawDigits ? parseFloat(rawDigits) / 100 : 0;
+          if (weightValue > 0) {
+            await addToCart(product, weightValue);
+            setWeightInput("");
+            setWeightDisplayPrice("0.00");
+            setSelectedWeightProduct(null);
+          }
         } else {
+          // Clear any existing category selection when switching to weighted product
+          setPendingCategory(null);
+          setCategoryPriceInput("");
+          setCategoryDisplayPrice("0.00");
+          setWeightInput("");
+          setWeightDisplayPrice("0.00");
           setSelectedWeightProduct(product);
           toast.error(
             `Please enter weight in ${product.unit || "units"} for ${
@@ -2230,91 +2455,57 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             (p) => p.category === category.id
                           ).length;
 
-                          // Check if this category has generic button products
-                          const hasGenericProducts = products.some(
-                            (p) =>
-                              p.category === category.id && p.isGenericButton
-                          );
-
                           return (
                             <motion.button
                               key={category.id}
                               onClick={() => {
-                                // Check for double-click on generic category
-                                if (hasGenericProducts) {
-                                  const now = Date.now();
-                                  if (
-                                    lastClickTime &&
-                                    lastClickTime.productId === category.id &&
-                                    now - lastClickTime.timestamp <
-                                      DOUBLE_CLICK_DELAY
-                                  ) {
-                                    // Double click detected - find first generic product and add with default price
-                                    const genericProduct = products.find(
-                                      (p) =>
-                                        p.category === category.id &&
-                                        p.isGenericButton
-                                    );
-                                    if (genericProduct) {
-                                      handleGenericItemClick(
-                                        genericProduct,
-                                        true
-                                      );
-                                    }
-                                    setLastClickTime(null);
-                                  } else {
-                                    // Single click - navigate to category
-                                    handleCategoryClick(category);
-                                    setLastClickTime({
-                                      productId: category.id,
-                                      timestamp: now,
-                                    });
-                                    // Clear after delay
-                                    setTimeout(() => {
-                                      setLastClickTime(null);
-                                    }, DOUBLE_CLICK_DELAY);
-                                  }
+                                // Detect double-click for navigation
+                                const now = Date.now();
+                                if (
+                                  lastClickTime &&
+                                  lastClickTime.productId === category.id &&
+                                  now - lastClickTime.timestamp <
+                                    DOUBLE_CLICK_DELAY
+                                ) {
+                                  // Double click detected - navigate to category (show nested categories/products)
+                                  handleCategoryClick(category, false);
+                                  setLastClickTime(null);
                                 } else {
-                                  // Regular category - just navigate
-                                  handleCategoryClick(category);
+                                  // Single click - add category to cart (show price input)
+                                  handleCategoryClick(category, true);
+                                  setLastClickTime({
+                                    productId: category.id,
+                                    timestamp: now,
+                                  });
+                                  // Clear after delay
+                                  setTimeout(() => {
+                                    setLastClickTime(null);
+                                  }, DOUBLE_CLICK_DELAY);
                                 }
                               }}
-                              onTouchEnd={() => {
-                                // Touch support for double-click
-                                if (hasGenericProducts) {
-                                  const now = Date.now();
-                                  if (
-                                    lastClickTime &&
-                                    lastClickTime.productId === category.id &&
-                                    now - lastClickTime.timestamp <
-                                      DOUBLE_CLICK_DELAY
-                                  ) {
-                                    // Double tap detected
-                                    const genericProduct = products.find(
-                                      (p) =>
-                                        p.category === category.id &&
-                                        p.isGenericButton
-                                    );
-                                    if (genericProduct) {
-                                      handleGenericItemClick(
-                                        genericProduct,
-                                        true
-                                      );
-                                    }
-                                    setLastClickTime(null);
-                                  } else {
-                                    // Single tap - navigate
-                                    handleCategoryClick(category);
-                                    setLastClickTime({
-                                      productId: category.id,
-                                      timestamp: now,
-                                    });
-                                    setTimeout(() => {
-                                      setLastClickTime(null);
-                                    }, DOUBLE_CLICK_DELAY);
-                                  }
+                              onTouchEnd={(e) => {
+                                // Touch support for double-tap navigation
+                                e.preventDefault();
+                                const now = Date.now();
+                                if (
+                                  lastClickTime &&
+                                  lastClickTime.productId === category.id &&
+                                  now - lastClickTime.timestamp <
+                                    DOUBLE_CLICK_DELAY
+                                ) {
+                                  // Double tap detected - navigate to category (show nested categories/products)
+                                  handleCategoryClick(category, false);
+                                  setLastClickTime(null);
                                 } else {
-                                  handleCategoryClick(category);
+                                  // Single tap - add category to cart (show price input)
+                                  handleCategoryClick(category, true);
+                                  setLastClickTime({
+                                    productId: category.id,
+                                    timestamp: now,
+                                  });
+                                  setTimeout(() => {
+                                    setLastClickTime(null);
+                                  }, DOUBLE_CLICK_DELAY);
                                 }
                               }}
                               whileHover={{ scale: 1.02 }}
@@ -2810,16 +3001,19 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         setShowAgeVerificationModal(true);
                         setSelectedWeightProduct(null);
                         setWeightInput("");
+                        setWeightDisplayPrice("0.00");
                       } else {
                         // Add directly to cart
                         await addToCart(selectedWeightProduct, weight);
                         setSelectedWeightProduct(null);
                         setWeightInput("");
+                        setWeightDisplayPrice("0.00");
                       }
                     }}
                     onCancel={() => {
                       setSelectedWeightProduct(null);
                       setWeightInput("");
+                      setWeightDisplayPrice("0.00");
                     }}
                     autoAddOnStable={true}
                     minWeight={0.001} // Minimum 1g
@@ -2827,87 +3021,44 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   />
                 </div>
               ) : (
-                <div
-                  className={`mt-1 flex items-center gap-2 p-2 rounded ${
-                    selectedWeightProduct
-                      ? "bg-blue-50 border border-blue-200"
-                      : ""
-                  }`}
-                >
-                  <Scale
-                    className={`h-4 w-4 ${
-                      selectedWeightProduct ? "text-blue-600" : "text-slate-500"
-                    }`}
-                  />
-                  <span
-                    className={`text-sm ${
-                      selectedWeightProduct
-                        ? "text-blue-700 font-medium"
-                        : "text-slate-600"
-                    }`}
-                  >
-                    {selectedWeightProduct
-                      ? `Weight for ${selectedWeightProduct.name}:`
-                      : "Weight (for produce):"}
-                  </span>
-                  <Input
-                    type="number"
-                    placeholder={
-                      selectedWeightProduct
-                        ? `Enter weight in ${
-                            selectedWeightProduct.unit || "units"
-                          }`
-                        : "Enter weight"
-                    }
-                    value={weightInput}
-                    onChange={(e) => setWeightInput(e.target.value)}
-                    className={`w-24 ${
-                      selectedWeightProduct
-                        ? "border-blue-300"
-                        : "border-slate-300"
-                    } bg-white`}
-                  />
-                  <span
-                    className={`text-sm ${
-                      selectedWeightProduct
-                        ? "text-blue-600 font-medium"
-                        : "text-slate-600"
-                    }`}
-                  >
-                    {selectedWeightProduct?.unit || "units"}
-                  </span>
-                  {selectedWeightProduct && (
-                    <>
-                      {weightInput && parseFloat(weightInput) > 0 && (
-                        <Button
-                          size="sm"
-                          onClick={async () => {
-                            await addToCart(
-                              selectedWeightProduct,
-                              parseFloat(weightInput)
-                            );
-                            setWeightInput("");
-                            setSelectedWeightProduct(null);
-                          }}
-                          className="h-8 px-3 bg-sky-600 hover:bg-sky-700 text-white"
-                        >
-                          Add to Cart
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedWeightProduct(null);
-                          setWeightInput("");
-                        }}
-                        className="h-8 px-2 text-slate-600 hover:text-slate-800"
-                      >
-                        Clear
-                      </Button>
-                    </>
+                <>
+                  {/* Weight Input for Products */}
+                  {selectedWeightProduct && !pendingCategory && (
+                    <div className="mt-1 flex flex-col gap-2 p-2 rounded bg-blue-50 border border-blue-200">
+                      <div className="flex items-center gap-2">
+                        <Scale className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm text-blue-700 font-medium">
+                          Weight for {selectedWeightProduct.name}:
+                        </span>
+                      </div>
+                      {/* Weight Display */}
+                      <div className="bg-white p-4 rounded-lg text-center border border-blue-200">
+                        <div className="text-3xl font-bold text-slate-900">
+                          {weightDisplayPrice}{" "}
+                          {selectedWeightProduct.unit || "units"}
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </div>
+
+                  {/* Amount Input for Categories */}
+                  {pendingCategory && !selectedWeightProduct && (
+                    <div className="mt-1 flex flex-col gap-2 p-2 rounded bg-blue-50 border border-blue-200">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm text-blue-700 font-medium">
+                          Amount for {pendingCategory.name}:
+                        </span>
+                      </div>
+                      {/* Price Display */}
+                      <div className="bg-white p-4 rounded-lg text-center border border-blue-200">
+                        <div className="text-3xl font-bold text-slate-900">
+                          £{categoryDisplayPrice}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </div>
@@ -3071,7 +3222,119 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <div className="shrink-0">
             <NumericKeypad
               onInput={(value) => {
-                // Handle numeric keypad input here
+                // Handle weight input when selectedWeightProduct is set
+                if (selectedWeightProduct && !pendingCategory) {
+                  if (value === "Clear") {
+                    setWeightInput("");
+                    setWeightDisplayPrice("0.00");
+                    return;
+                  }
+
+                  if (value === "Enter") {
+                    // Parse weight: raw digits divided by 100 (auto-decimal format)
+                    const rawDigits = weightInput.replace(/[^0-9]/g, ""); // Remove any non-digits
+                    const weightValue = rawDigits
+                      ? parseFloat(rawDigits) / 100
+                      : 0;
+                    if (!isNaN(weightValue) && weightValue > 0) {
+                      addToCart(selectedWeightProduct, weightValue).then(() => {
+                        setWeightInput("");
+                        setWeightDisplayPrice("0.00");
+                        setSelectedWeightProduct(null);
+                      });
+                    }
+                    return;
+                  }
+
+                  // Handle numeric input for weight (store raw digits only)
+                  let newWeight = weightInput.replace(/[^0-9]/g, ""); // Remove any non-digits
+                  if (value === "00") {
+                    newWeight = newWeight + "00";
+                  } else if (value === ".") {
+                    // Decimal point - user can still enter manually, but we auto-format
+                    // For now, treat as regular digit handling (auto-format on display)
+                    // Could be ignored or used for manual override if needed
+                    return;
+                  } else if (/^[0-9]$/.test(value)) {
+                    newWeight = newWeight + value;
+                  }
+
+                  setWeightInput(newWeight);
+
+                  // Auto-format display: insert decimal 2 positions from right
+                  const numDigits = newWeight.length;
+                  if (numDigits === 0) {
+                    setWeightDisplayPrice("0.00");
+                  } else if (numDigits === 1) {
+                    setWeightDisplayPrice(`0.0${newWeight}`);
+                  } else if (numDigits === 2) {
+                    setWeightDisplayPrice(`0.${newWeight}`);
+                  } else {
+                    const wholePart = newWeight.slice(0, -2);
+                    const decimalPart = newWeight.slice(-2);
+                    setWeightDisplayPrice(`${wholePart}.${decimalPart}`);
+                  }
+                  return;
+                }
+
+                // Handle category price input when pendingCategory is set
+                if (pendingCategory) {
+                  if (value === "Clear") {
+                    setCategoryPriceInput("");
+                    setCategoryDisplayPrice("0.00");
+                    return;
+                  }
+
+                  if (value === "Enter") {
+                    // Parse price: raw digits divided by 100 (auto-decimal format)
+                    const rawDigits = categoryPriceInput.replace(/[^0-9]/g, ""); // Remove any non-digits
+                    const priceValue = rawDigits
+                      ? parseFloat(rawDigits) / 100
+                      : 0;
+                    if (!isNaN(priceValue) && priceValue > 0) {
+                      addCategoryToCart(pendingCategory, priceValue).then(
+                        () => {
+                          setCategoryPriceInput("");
+                          setCategoryDisplayPrice("0.00");
+                          setPendingCategory(null);
+                        }
+                      );
+                    }
+                    return;
+                  }
+
+                  // Handle numeric input for category price (store raw digits only)
+                  let newPrice = categoryPriceInput.replace(/[^0-9]/g, ""); // Remove any non-digits
+                  if (value === "00") {
+                    newPrice = newPrice + "00";
+                  } else if (value === ".") {
+                    // Decimal point - user can still enter manually, but we auto-format
+                    // For now, treat as regular digit handling (auto-format on display)
+                    // Could be ignored or used for manual override if needed
+                    return;
+                  } else if (/^[0-9]$/.test(value)) {
+                    newPrice = newPrice + value;
+                  }
+
+                  setCategoryPriceInput(newPrice);
+
+                  // Auto-format display: insert decimal 2 positions from right
+                  const numDigits = newPrice.length;
+                  if (numDigits === 0) {
+                    setCategoryDisplayPrice("0.00");
+                  } else if (numDigits === 1) {
+                    setCategoryDisplayPrice(`0.0${newPrice}`);
+                  } else if (numDigits === 2) {
+                    setCategoryDisplayPrice(`0.${newPrice}`);
+                  } else {
+                    const wholePart = newPrice.slice(0, -2);
+                    const decimalPart = newPrice.slice(-2);
+                    setCategoryDisplayPrice(`${wholePart}.${decimalPart}`);
+                  }
+                  return;
+                }
+
+                // Handle other numeric keypad input here
                 console.log("Numeric keypad input:", value);
               }}
               keysOverride={[
@@ -3081,7 +3344,11 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                   "1",
                   "2",
                   "3",
-                  !paymentStep ? (
+                  selectedWeightProduct && !pendingCategory ? (
+                    "." // Show decimal point for weight entry
+                  ) : pendingCategory ? (
+                    "." // Show decimal point for category price entry
+                  ) : !paymentStep ? (
                     <Button
                       className="w-full h-full py-4 font-semibold text-lg rounded transition-colors bg-sky-600 hover:bg-sky-700 text-white"
                       style={{ minHeight: 0, minWidth: 0 }}
