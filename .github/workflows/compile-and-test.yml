@@ -148,9 +148,9 @@ jobs:
             Get-ChildItem -Path packages -Directory | ForEach-Object { 
               Write-Host "  - $($_.Name)"
               if (Test-Path (Join-Path $_.FullName "package.json")) {
-                Write-Host "    ✓ package.json exists"
+                Write-Host "    [OK] package.json exists"
               } else {
-                Write-Host "    ✗ package.json MISSING"
+                Write-Host "    [MISSING] package.json MISSING"
               }
             }
           } else {
@@ -160,22 +160,22 @@ jobs:
           Write-Host ""
           $missing = @()
           if (!(Test-Path "packages/renderer/package.json")) { 
-            Write-Host "✗ packages/renderer/package.json MISSING"
+            Write-Host "[ERROR] packages/renderer/package.json MISSING"
             $missing += "renderer"
           } else {
-            Write-Host "✓ packages/renderer/package.json exists"
+            Write-Host "[OK] packages/renderer/package.json exists"
           }
           if (!(Test-Path "packages/main/package.json")) { 
-            Write-Host "✗ packages/main/package.json MISSING"
+            Write-Host "[ERROR] packages/main/package.json MISSING"
             $missing += "main"
           } else {
-            Write-Host "✓ packages/main/package.json exists"
+            Write-Host "[OK] packages/main/package.json exists"
           }
           if (!(Test-Path "packages/preload/package.json")) { 
-            Write-Host "✗ packages/preload/package.json MISSING"
+            Write-Host "[ERROR] packages/preload/package.json MISSING"
             $missing += "preload"
           } else {
-            Write-Host "✓ packages/preload/package.json exists"
+            Write-Host "[OK] packages/preload/package.json exists"
           }
           if ($missing.Count -gt 0) {
             Write-Host ""
@@ -184,7 +184,7 @@ jobs:
             exit 1
           }
           Write-Host ""
-          Write-Host "All workspace packages verified ✓"
+          Write-Host "All workspace packages verified successfully"
         shell: powershell
 
       # Clean workspace before install to avoid Node version mismatches
