@@ -42,10 +42,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Node.js 18
+      - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20.x"
           cache: "npm"
 
       - name: Cache node_modules for typecheck
@@ -77,11 +77,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Node.js 18 for native module compatibility
+      - name: Setup Node.js 20.x for native module compatibility
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20.x"
           cache: "npm"
+
+      - name: Clean npm cache
+        run: npm cache clean --force
+
+      - name: Remove node_modules if present (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path -Path "${{ github.workspace }}\\node_modules") { Remove-Item -Recurse -Force "${{ github.workspace }}\\node_modules" }
+          if (Test-Path -Path "${{ github.workspace }}\\packages\\main\\node_modules") { Remove-Item -Recurse -Force "${{ github.workspace }}\\packages\\main\\node_modules" }
 
       - name: Setup MSBuild (Windows)
         uses: microsoft/setup-msbuild@v2
@@ -124,14 +134,14 @@ jobs:
             **/node_modules/serialport/build
             **/node_modules/usb/build
             node_modules/electron/dist
-          key: node-deps-${{ runner.os }}-node18-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
+          key: node-deps-${{ runner.os }}-node20-electron-${{ hashFiles('**/package-lock.json', '**/package.json') }}
           restore-keys: |
-            node-deps-${{ runner.os }}-node18-electron-
-            node-deps-${{ runner.os }}-node18-
+            node-deps-${{ runner.os }}-node20-electron-
+            node-deps-${{ runner.os }}-node20-
 
       - name: Install project dependencies
         if: steps.cache-deps.outputs.cache-hit != 'true'
-        run: npm ci --prefer-offline --no-audit --no-fund
+        run: npm ci --prefer-offline --no-audit --progress=false
         shell: powershell
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1

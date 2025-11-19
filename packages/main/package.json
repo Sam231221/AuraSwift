@@ -1,6 +1,9 @@
 {
   "name": "@app/main",
   "type": "module",
+  "engines": {
+    "node": ">=18 <21"
+  },
   "files": [
     "dist/**",
     "dist/migrations/**",
