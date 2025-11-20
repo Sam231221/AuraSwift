@@ -1,8 +1,3 @@
-/**
- * Payment Terminal Components for BBPOS WisePad 3 Card Reader
- * Provides UI components for card payment processing with real-time feedback
- */
-
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {

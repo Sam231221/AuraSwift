@@ -57,16 +57,16 @@ import { ReceiptPrinterStatus } from "./components/receipt-printer-components";
 import type { TransactionData, PrinterConfig } from "@/types/printer";
 import { useCardPayment } from "./hooks/use-stripe-terminal";
 import { PaymentStatusModal } from "./components/payment-components";
-import RefundTransactionView from "./components/refund-transaction-view";
-import VoidTransactionModal from "./components/void-transaction-view";
-import CashDrawerCountModal from "./components/cash-drawer-count-modal";
-import { QuickActionButtons } from "./components/quick-actions-buttons";
+import RefundTransactionView from "./components/modals/refund-transaction-modal";
+import VoidTransactionModal from "./components/modals/void-transaction-modal";
+import CashDrawerCountModal from "./components/modals/cash-drawer-count-modal";
+import { QuickActionButtons } from "./components/cart-operation-buttons";
 import { NumericKeypad } from "./components/numeric-keypad";
 import type { CartSession, CartItemWithProduct } from "./types/cart.types";
 import { ScaleDisplay } from "@/components/scale/ScaleDisplay";
-import { AgeVerificationModal } from "./components/age-verification-modal";
-import { GenericItemPriceModal } from "./components/generic-item-price-modal";
-import { QuickActionsCarousel } from "./components/quick-actions-transaction-carousel";
+import { AgeVerificationModal } from "./components/modals/age-verification-modal";
+import { GenericItemPriceModal } from "./components/modals/generic-item-price-modal";
+import { QuickActionsCarousel } from "./components/cashier-actions-carousel";
 
 interface PaymentMethod {
   type: "cash" | "card" | "mobile" | "voucher" | "split";
@@ -89,28 +89,6 @@ interface BreadcrumbItem {
   id: string | null;
   name: string;
 }
-
-/**
- * SHIFT vs SCHEDULE DISTINCTION (as per shifttimeCase.md):
- *
- * Scenario Implemented:
- * 1. Manager creates schedule: 2 PM - 9 PM (Sept 26)
- * 2. Cashier logs in late at 3:33 PM
- * 3. Manager later extends end time to 10 PM and sets start time to 1 PM
- * 4. Dashboard shows:
- *    - Scheduled Shift: 1:00 PM – 10:00 PM
- *    - Clocked In: 3:33 PM (33m late)
- *    - Ends: 10:00 PM
- *    - Time Remaining: 6h 27m (calculated from scheduled end time)
- *
- * Key Implementation:
- * - Schedule = What manager planned (can be updated live)
- * - Shift = What actually happened (actual clock-in/out times - never overwritten)
- * - Time remaining calculated from SCHEDULED end time
- * - Progress calculated from ACTUAL start time to SCHEDULED end time
- * - Manager changes update live every 30 seconds while preserving actual work times
- * - Reports will show variance between scheduled vs actual hours
- */
 
 interface Shift {
   id: string;

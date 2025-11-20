@@ -7,7 +7,7 @@ type CarouselCardProps = {
 };
 
 const CarouselCard = ({ icon: Icon, title }: CarouselCardProps) => (
-  <div className="flex-shrink-0 w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 bg-gray-100 rounded-lg flex flex-col items-center justify-center gap-3 sm:gap-4 md:gap-6">
+  <div className="shrink-0 w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 bg-gray-100 rounded-lg flex flex-col items-center justify-center gap-3 sm:gap-4 md:gap-6">
     <Icon className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 stroke-1" />
     <span className="text-xl sm:text-2xl md:text-3xl font-normal">{title}</span>
   </div>

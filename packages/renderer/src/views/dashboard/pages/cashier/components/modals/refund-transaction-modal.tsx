@@ -54,7 +54,7 @@ interface RefundModalProps {
   onRefundProcessed: () => void;
 }
 
-const RefundTransactionView: React.FC<RefundModalProps> = ({
+const RefundTransactionModal: React.FC<RefundModalProps> = ({
   isOpen,
   onClose,
   onRefundProcessed,
@@ -1037,4 +1037,4 @@ const RefundView: React.FC<{
   );
 };
 
-export default RefundTransactionView;
+export default RefundTransactionModal;
