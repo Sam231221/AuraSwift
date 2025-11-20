@@ -44,7 +44,7 @@ jobs:
 
       # Setup Node.js FIRST - must run before any cache or npm operations
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22.x"
           # Disable setup-node cache to avoid stale node_modules from different Node versions
@@ -93,7 +93,7 @@ jobs:
 
       # Setup Node.js FIRST - must run before any cache or npm operations
       - name: Setup Node.js 22 for native module compatibility
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22.x"
           # Disable setup-node cache to avoid stale node_modules from different Node versions
@@ -114,7 +114,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Setup Python for node-gyp
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
 
@@ -521,7 +521,7 @@ jobs:
           subject-path: "dist/auraswift-*, dist/latest*.yml"
 
       - name: Upload compiled app
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: windows-${{inputs.distribution-channel}}
           path: dist
