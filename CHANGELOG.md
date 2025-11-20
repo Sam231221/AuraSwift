@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/Sam231221/AuraSwift/compare/v1.7.0...v1.7.1) (2025-11-20)
+
+
+### Bug Fixes
+
+* **electron-builder:** modify requestExecutionLevel configuration for Windows compatibility ([1006373](https://github.com/Sam231221/AuraSwift/commit/1006373e260fb41168080fdc9b832c3a5e02256f))
+* **ci:** update electron-builder configuration for Windows 10 Enterprise compatibility and adjust CI workflow to use windows-2022 ([ca2cc0f](https://github.com/Sam231221/AuraSwift/commit/ca2cc0fb687875c44862d1161aded86442e4dfb6))
+
 # [1.7.0](https://github.com/Sam231221/AuraSwift/compare/v1.6.0...v1.7.0) (2025-11-20)
 
 
