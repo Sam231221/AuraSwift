@@ -903,9 +903,14 @@ export const transactionItems = createTable("transaction_items", {
   transactionId: text("transactionId")
     .notNull()
     .references(() => transactions.id),
-  productId: text("productId")
-    .notNull()
-    .references(() => products.id),
+  // Item source: either a product OR a category (for generic/category items)
+  // At least one must be set - enforced at application level
+  productId: text("productId").references(() => products.id, {
+    onDelete: "set null",
+  }),
+  categoryId: text("category_id").references(() => categories.id, {
+    onDelete: "set null",
+  }),
   productName: text("productName").notNull(),
 
   // Item type and quantity (from cart_items)

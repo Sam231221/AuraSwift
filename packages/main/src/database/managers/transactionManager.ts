@@ -185,33 +185,35 @@ export class TransactionManager {
   ): Promise<TransactionWithItems> {
     const id = this.uuid.v4();
 
-    const result = await this.db.transaction(async (tx: any) => {
+    const result = this.db.transaction((tx: any) => {
       // 1. Insert main transaction
-      await tx.insert(schema.transactions).values({
-        id,
-        shiftId: transaction.shiftId,
-        businessId: transaction.businessId,
-        type: transaction.type,
-        subtotal: transaction.subtotal,
-        tax: transaction.tax,
-        total: transaction.total,
-        paymentMethod: transaction.paymentMethod,
-        cashAmount: transaction.cashAmount ?? null,
-        cardAmount: transaction.cardAmount ?? null,
-        status: transaction.status,
-        voidReason: transaction.voidReason ?? null,
-        customerId: transaction.customerId ?? null,
-        receiptNumber: transaction.receiptNumber,
-        appliedDiscounts: transaction.appliedDiscounts
-          ? JSON.stringify(transaction.appliedDiscounts)
-          : null,
-        timestamp: transaction.timestamp,
-        originalTransactionId: null,
-        refundReason: null,
-        refundMethod: null,
-        managerApprovalId: null,
-        isPartialRefund: false,
-      });
+      tx.insert(schema.transactions)
+        .values({
+          id,
+          shiftId: transaction.shiftId,
+          businessId: transaction.businessId,
+          type: transaction.type,
+          subtotal: transaction.subtotal,
+          tax: transaction.tax,
+          total: transaction.total,
+          paymentMethod: transaction.paymentMethod,
+          cashAmount: transaction.cashAmount ?? null,
+          cardAmount: transaction.cardAmount ?? null,
+          status: transaction.status,
+          voidReason: transaction.voidReason ?? null,
+          customerId: transaction.customerId ?? null,
+          receiptNumber: transaction.receiptNumber,
+          appliedDiscounts: transaction.appliedDiscounts
+            ? JSON.stringify(transaction.appliedDiscounts)
+            : null,
+          timestamp: transaction.timestamp,
+          originalTransactionId: null,
+          refundReason: null,
+          refundMethod: null,
+          managerApprovalId: null,
+          isPartialRefund: false,
+        })
+        .run();
 
       // 2. Insert transaction items
       if (transaction.items && transaction.items.length > 0) {
@@ -221,32 +223,35 @@ export class TransactionManager {
           // Determine itemType from quantity vs weight
           const itemType = item.weight != null ? "WEIGHT" : "UNIT";
 
-          await tx.insert(schema.transactionItems).values({
-            id: itemId,
-            transactionId: id,
-            productId: item.productId,
-            productName: item.productName,
-            itemType,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.totalPrice,
-            taxAmount: item.taxAmount ?? 0,
-            refundedQuantity: item.refundedQuantity ?? null,
-            weight: item.weight ?? null,
-            unitOfMeasure: item.unitOfMeasure ?? null,
-            discountAmount: item.discountAmount ?? null,
-            appliedDiscounts: item.appliedDiscounts
-              ? JSON.stringify(item.appliedDiscounts)
-              : null,
-            // Batch tracking
-            batchId: item.batchId ?? null,
-            batchNumber: item.batchNumber ?? null,
-            expiryDate: item.expiryDate ?? null,
-            // Age restriction tracking
-            ageRestrictionLevel: item.ageRestrictionLevel ?? "NONE",
-            ageVerified: item.ageVerified ?? false,
-            cartItemId: item.cartItemId ?? null,
-          });
+          tx.insert(schema.transactionItems)
+            .values({
+              id: itemId,
+              transactionId: id,
+              productId: item.productId ?? null,
+              categoryId: item.categoryId ?? null,
+              productName: item.productName,
+              itemType,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              taxAmount: item.taxAmount ?? 0,
+              refundedQuantity: item.refundedQuantity ?? null,
+              weight: item.weight ?? null,
+              unitOfMeasure: item.unitOfMeasure ?? null,
+              discountAmount: item.discountAmount ?? null,
+              appliedDiscounts: item.appliedDiscounts
+                ? JSON.stringify(item.appliedDiscounts)
+                : null,
+              // Batch tracking
+              batchId: item.batchId ?? null,
+              batchNumber: item.batchNumber ?? null,
+              expiryDate: item.expiryDate ?? null,
+              // Age restriction tracking
+              ageRestrictionLevel: item.ageRestrictionLevel ?? "NONE",
+              ageVerified: item.ageVerified ?? false,
+              cartItemId: item.cartItemId ?? null,
+            })
+            .run();
           // Note: appliedModifiers table doesn't exist in schema
         }
       }
@@ -365,31 +370,33 @@ export class TransactionManager {
       });
 
     // Use Drizzle transaction for atomicity
-    await this.db.transaction(async (tx: any) => {
+    this.db.transaction((tx: any) => {
       // 1. Create refund transaction record
-      await tx.insert(schema.transactions).values({
-        id: refundId,
-        shiftId: refundData.shiftId,
-        businessId: refundData.businessId,
-        type: "refund",
-        subtotal: -refundSubtotal, // Negative for refund
-        tax: -refundTax,
-        total: -refundTotal,
-        paymentMethod,
-        cashAmount: paymentMethod === "cash" ? -refundTotal : null,
-        cardAmount: paymentMethod === "card" ? -refundTotal : null,
-        status: "completed",
-        receiptNumber,
-        timestamp: new Date().toISOString(),
-        originalTransactionId: refundData.originalTransactionId,
-        refundReason: refundData.refundReason,
-        refundMethod: refundData.refundMethod,
-        managerApprovalId: refundData.managerApprovalId ?? null,
-        isPartialRefund: isPartialRefund,
-        voidReason: null,
-        customerId: null,
-        appliedDiscounts: null,
-      });
+      tx.insert(schema.transactions)
+        .values({
+          id: refundId,
+          shiftId: refundData.shiftId,
+          businessId: refundData.businessId,
+          type: "refund",
+          subtotal: -refundSubtotal, // Negative for refund
+          tax: -refundTax,
+          total: -refundTotal,
+          paymentMethod,
+          cashAmount: paymentMethod === "cash" ? -refundTotal : null,
+          cardAmount: paymentMethod === "card" ? -refundTotal : null,
+          status: "completed",
+          receiptNumber,
+          timestamp: new Date().toISOString(),
+          originalTransactionId: refundData.originalTransactionId,
+          refundReason: refundData.refundReason,
+          refundMethod: refundData.refundMethod,
+          managerApprovalId: refundData.managerApprovalId ?? null,
+          isPartialRefund: isPartialRefund,
+          voidReason: null,
+          customerId: null,
+          appliedDiscounts: null,
+        })
+        .run();
 
       // 2. Create refund transaction items
       for (const refundItem of refundData.refundItems) {
@@ -404,54 +411,58 @@ export class TransactionManager {
             ? -refundTax * (refundItem.refundAmount / refundSubtotal)
             : 0;
 
-        await tx.insert(schema.transactionItems).values({
-          id: itemId,
-          transactionId: refundId,
-          productId: refundItem.productId,
-          productName: refundItem.productName,
-          itemType,
-          quantity: -refundItem.refundQuantity, // Negative for refund
-          unitPrice: refundItem.unitPrice,
-          totalPrice: -refundItem.refundAmount,
-          taxAmount: itemTaxAmount,
-          refundedQuantity: null,
-          weight: null,
-          discountAmount: null,
-          appliedDiscounts: null,
-        });
+        tx.insert(schema.transactionItems)
+          .values({
+            id: itemId,
+            transactionId: refundId,
+            productId: refundItem.productId,
+            productName: refundItem.productName,
+            itemType,
+            quantity: -refundItem.refundQuantity, // Negative for refund
+            unitPrice: refundItem.unitPrice,
+            totalPrice: -refundItem.refundAmount,
+            taxAmount: itemTaxAmount,
+            refundedQuantity: null,
+            weight: null,
+            discountAmount: null,
+            appliedDiscounts: null,
+          })
+          .run();
 
         // 3. Update original item's refunded quantity
-        const [currentItem] = await tx
+        const [currentItem] = tx
           .select({
             refundedQuantity: schema.transactionItems.refundedQuantity,
           })
           .from(schema.transactionItems)
           .where(eq(schema.transactionItems.id, refundItem.originalItemId))
-          .limit(1);
+          .limit(1)
+          .all();
 
-        await tx
-          .update(schema.transactionItems)
+        tx.update(schema.transactionItems)
           .set({
             refundedQuantity:
               (currentItem?.refundedQuantity ?? 0) + refundItem.refundQuantity,
           })
-          .where(eq(schema.transactionItems.id, refundItem.originalItemId));
+          .where(eq(schema.transactionItems.id, refundItem.originalItemId))
+          .run();
 
         // 4. Update inventory if item is restockable
         if (refundItem.restockable) {
-          const [currentProduct] = await tx
+          const [currentProduct] = tx
             .select({ stockLevel: schema.products.stockLevel })
             .from(schema.products)
             .where(eq(schema.products.id, refundItem.productId))
-            .limit(1);
+            .limit(1)
+            .all();
 
-          await tx
-            .update(schema.products)
+          tx.update(schema.products)
             .set({
               stockLevel:
                 (currentProduct?.stockLevel ?? 0) + refundItem.refundQuantity,
             })
-            .where(eq(schema.products.id, refundItem.productId));
+            .where(eq(schema.products.id, refundItem.productId))
+            .run();
         }
       }
     });
@@ -504,47 +515,56 @@ export class TransactionManager {
       }
 
       // Use Drizzle transaction for atomicity
-      await this.db.transaction(async (tx: any) => {
+      this.db.transaction((tx: any) => {
         // 1. Update transaction status to voided
-        await tx
-          .update(schema.transactions)
+        tx.update(schema.transactions)
           .set({
             status: "voided",
             voidReason: voidData.reason,
           })
-          .where(eq(schema.transactions.id, voidData.transactionId));
+          .where(eq(schema.transactions.id, voidData.transactionId))
+          .run();
 
         // 2. Restore inventory for all items in the transaction
+        // Only restore inventory for items with productId (skip category-only items)
         for (const item of originalTransaction.items) {
-          const [currentProduct] = await tx
+          if (!item.productId) {
+            // Skip category items - they don't have inventory to restore
+            continue;
+          }
+
+          const [currentProduct] = tx
             .select({ stockLevel: schema.products.stockLevel })
             .from(schema.products)
             .where(eq(schema.products.id, item.productId))
-            .limit(1);
+            .limit(1)
+            .all();
 
-          await tx
-            .update(schema.products)
+          tx.update(schema.products)
             .set({
               stockLevel: (currentProduct?.stockLevel ?? 0) + item.quantity,
             })
-            .where(eq(schema.products.id, item.productId));
+            .where(eq(schema.products.id, item.productId))
+            .run();
         }
 
         // 3. Create audit log entry
         const auditId = this.uuid.v4();
-        await tx.insert(schema.auditLogs).values({
-          id: auditId,
-          userId: voidData.cashierId,
-          action: "void",
-          resource: "transactions",
-          resourceId: voidData.transactionId,
-          details: JSON.stringify({
-            reason: voidData.reason,
-            managerApproval: voidData.managerApprovalId,
-            originalAmount: originalTransaction.total,
-          }),
-          timestamp: new Date().toISOString(),
-        });
+        tx.insert(schema.auditLogs)
+          .values({
+            id: auditId,
+            userId: voidData.cashierId,
+            action: "void",
+            resource: "transactions",
+            resourceId: voidData.transactionId,
+            details: JSON.stringify({
+              reason: voidData.reason,
+              managerApproval: voidData.managerApprovalId,
+              originalAmount: originalTransaction.total,
+            }),
+            timestamp: new Date().toISOString(),
+          })
+          .run();
       });
 
       return {
