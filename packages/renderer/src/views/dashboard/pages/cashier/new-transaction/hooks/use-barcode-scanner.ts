@@ -1,0 +1,205 @@
+/**
+ * Hook for managing barcode scanning
+ * Handles both hardware scanner and manual barcode input
+ */
+
+import { useState, useCallback, useEffect } from "react";
+import { toast } from "sonner";
+import { useProductionScanner } from "@/shared/hooks/use-production-scanner";
+import { ScannerAudio } from "@/shared/services/scanner-audio";
+import type { Product } from "@/features/products/types/product.types";
+import { isWeightedProduct, getProductSalesUnit } from "../utils/product-helpers";
+
+interface UseBarcodeScannerProps {
+  products: Product[];
+  onProductFound: (product: Product, weight?: number) => Promise<void>;
+  selectedWeightProduct: Product | null;
+  weightInput: string;
+  weightDisplayPrice: string; // Used in hook but not directly in this interface
+  onSetSelectedWeightProduct: (product: Product | null) => void;
+  onSetWeightInput: (value: string) => void;
+  onSetWeightDisplayPrice: (value: string) => void;
+  onClearCategorySelection?: () => void;
+  audioEnabled?: boolean;
+}
+
+/**
+ * Hook for managing barcode scanning
+ * @param props - Barcode scanner configuration
+ * @returns Barcode input state and handlers
+ */
+export function useBarcodeScanner({
+  products,
+  onProductFound,
+  selectedWeightProduct,
+  weightInput,
+  weightDisplayPrice: _weightDisplayPrice, // Prefixed with _ to indicate intentionally unused
+  onSetSelectedWeightProduct,
+  onSetWeightInput,
+  onSetWeightDisplayPrice,
+  onClearCategorySelection,
+  audioEnabled = true,
+}: UseBarcodeScannerProps) {
+  const [barcodeInput, setBarcodeInput] = useState("");
+
+  /**
+   * Handle hardware scanner input
+   */
+  const handleHardwareScan = useCallback(
+    async (barcode: string): Promise<boolean> => {
+      console.log("🔍 Hardware scanner detected barcode:", barcode);
+
+      // Search by barcode, PLU, or SKU
+      const product = products.find(
+        (p) =>
+          p.id === barcode ||
+          p.sku === barcode ||
+          p.plu === barcode ||
+          p.sku.toLowerCase() === barcode.toLowerCase()
+      );
+
+      if (product) {
+        const isWeighted = isWeightedProduct(product);
+
+        if (isWeighted) {
+          // For weight-based products, we need to handle this specially
+          if (
+            selectedWeightProduct?.id === product.id &&
+            weightInput &&
+            weightInput.length > 0
+          ) {
+            // If we already have the weight input for this product
+            // Parse raw digits and divide by 100 (auto-decimal format)
+            const rawDigits = weightInput.replace(/[^0-9]/g, "");
+            const weightValue = rawDigits ? parseFloat(rawDigits) / 100 : 0;
+            if (weightValue > 0) {
+              await onProductFound(product, weightValue);
+              onSetWeightInput("");
+              onSetWeightDisplayPrice("0.00");
+              onSetSelectedWeightProduct(null);
+              return true;
+            }
+            return false; // Weight value is 0 or invalid
+          } else {
+            // Set as selected weight product and prompt for weight
+            // Clear any existing category selection when switching to weighted product
+            if (onClearCategorySelection) {
+              onClearCategorySelection();
+            }
+            onSetWeightInput("");
+            onSetWeightDisplayPrice("0.00");
+            onSetSelectedWeightProduct(product);
+            const unit = getProductSalesUnit(product);
+            toast.warning(
+              `⚖️ Weight required for ${product.name}. Enter weight in ${unit} and scan again.`
+            );
+            return false; // Return false to play error sound and indicate incomplete scan
+          }
+        } else {
+          // Normal product, add directly to cart
+          await onProductFound(product);
+          console.log("✅ Product added to cart:", product.name);
+          return true; // Success!
+        }
+      } else {
+        console.warn("❌ Product not found for barcode:", barcode);
+        toast.error(`Product not found: ${barcode}`);
+        return false; // Product not found
+      }
+    },
+    [
+      products,
+      selectedWeightProduct,
+      weightInput,
+      onProductFound,
+      onSetSelectedWeightProduct,
+      onSetWeightInput,
+      onSetWeightDisplayPrice,
+      onClearCategorySelection,
+    ]
+  );
+
+  /**
+   * Handle manual barcode scan (from input field)
+   */
+  const handleBarcodeScan = useCallback(async () => {
+    if (barcodeInput.trim() === "") return;
+
+    // Search by ID, SKU, or PLU
+    const product = products.find(
+      (p) =>
+        p.id === barcodeInput ||
+        p.sku === barcodeInput ||
+        p.plu === barcodeInput
+    );
+
+    if (product) {
+      const isWeighted = isWeightedProduct(product);
+
+      if (isWeighted) {
+        if (weightInput && weightInput.length > 0) {
+          // Parse raw digits and divide by 100 (auto-decimal format)
+          const rawDigits = weightInput.replace(/[^0-9]/g, "");
+          const weightValue = rawDigits ? parseFloat(rawDigits) / 100 : 0;
+          if (weightValue > 0) {
+            await onProductFound(product, weightValue);
+            onSetWeightInput("");
+            onSetWeightDisplayPrice("0.00");
+            onSetSelectedWeightProduct(null);
+          }
+        } else {
+          // Clear any existing category selection when switching to weighted product
+          if (onClearCategorySelection) {
+            onClearCategorySelection();
+          }
+          onSetWeightInput("");
+          onSetWeightDisplayPrice("0.00");
+          onSetSelectedWeightProduct(product);
+          const unit = getProductSalesUnit(product);
+          toast.error(
+            `Please enter weight in ${unit} for ${product.name}`
+          );
+        }
+      } else {
+        await onProductFound(product);
+      }
+      setBarcodeInput("");
+    } else {
+      toast.error("Product not found");
+    }
+  }, [
+    barcodeInput,
+    products,
+    weightInput,
+    onProductFound,
+    onSetSelectedWeightProduct,
+    onSetWeightInput,
+    onSetWeightDisplayPrice,
+    onClearCategorySelection,
+  ]);
+
+  // Initialize scanner hook
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { scanLog: _scanLog, clearScanLog: _clearScanLog } =
+    useProductionScanner({
+      onScan: handleHardwareScan,
+      enableAudio: audioEnabled,
+      minBarcodeLength: 4, // Allow shorter codes for PLU
+      maxBarcodeLength: 20, // Allow longer codes for various barcode formats
+      scanTimeout: 250, // Slightly longer timeout for reliability
+    });
+
+  // Initialize audio on component mount
+  useEffect(() => {
+    if (audioEnabled) {
+      ScannerAudio.init().catch(console.warn);
+    }
+  }, [audioEnabled]);
+
+  return {
+    barcodeInput,
+    setBarcodeInput,
+    handleBarcodeScan,
+  };
+}
+

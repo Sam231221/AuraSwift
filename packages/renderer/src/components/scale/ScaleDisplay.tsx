@@ -42,6 +42,7 @@ interface ScaleDisplayProps {
   } | null;
   onWeightConfirmed?: (weight: number) => void;
   onCancel?: () => void;
+  onManualEntryRequest?: () => void; // Callback to switch to inline manual entry form
   autoAddOnStable?: boolean;
   minWeight?: number;
   maxWeight?: number;
@@ -55,6 +56,7 @@ export const ScaleDisplay: React.FC<ScaleDisplayProps> = ({
   selectedProduct,
   onWeightConfirmed,
   onCancel,
+  onManualEntryRequest,
   autoAddOnStable = false,
   minWeight,
   maxWeight,
@@ -255,10 +257,10 @@ export const ScaleDisplay: React.FC<ScaleDisplayProps> = ({
                 {!isConnected
                   ? "Not Connected"
                   : !hasWeight
-                    ? "Waiting for item..."
-                    : isStable
-                      ? "Weight Stable"
-                      : "Stabilizing..."}
+                  ? "Waiting for item..."
+                  : isStable
+                  ? "Weight Stable"
+                  : "Stabilizing..."}
               </span>
             </div>
 
@@ -276,7 +278,8 @@ export const ScaleDisplay: React.FC<ScaleDisplayProps> = ({
             {hasWeight && selectedProduct.pricePerUnit && (
               <div className="pt-2 border-t">
                 <div className="text-sm text-gray-600">
-                  Price: <span className="font-semibold">${price.toFixed(2)}</span>
+                  Price:{" "}
+                  <span className="font-semibold">${price.toFixed(2)}</span>
                 </div>
                 <div className="text-xs text-gray-500">
                   {currentReading?.weight.toFixed(3)}kg × $
@@ -301,17 +304,19 @@ export const ScaleDisplay: React.FC<ScaleDisplayProps> = ({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowManualEntry(true)}
+              onClick={() => {
+                if (onManualEntryRequest) {
+                  onManualEntryRequest();
+                } else {
+                  setShowManualEntry(true);
+                }
+              }}
               className="flex-1"
             >
               📝 Enter Weight Manually
             </Button>
             {isConnected && (
-              <Button
-                variant="outline"
-                onClick={tareScale}
-                className="flex-1"
-              >
+              <Button variant="outline" onClick={tareScale} className="flex-1">
                 <RotateCcw className="h-4 w-4 mr-1" />
                 Tare
               </Button>
@@ -378,9 +383,7 @@ export const ScaleDisplay: React.FC<ScaleDisplayProps> = ({
                 />
                 <select
                   value={manualUnit}
-                  onChange={(e) =>
-                    setManualUnit(e.target.value as "g" | "kg")
-                  }
+                  onChange={(e) => setManualUnit(e.target.value as "g" | "kg")}
                   className="px-3 py-2 border rounded-md"
                 >
                   <option value="kg">kg</option>
@@ -413,4 +416,3 @@ export const ScaleDisplay: React.FC<ScaleDisplayProps> = ({
     </>
   );
 };
-

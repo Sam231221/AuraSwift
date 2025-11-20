@@ -3,7 +3,7 @@ import { type ReactNode } from "react";
 import AdminDashboardPage from "./pages/admin/admin-dashboard-page";
 import CashierDashboardPage from "./pages/cashier/cashier-dashboard-page";
 import ManagerDashboardPage from "./pages/manager/manager-dashboard-page";
-import NewTransactionView from "./pages/cashier/new-transaction-page";
+import NewTransactionView from "./pages/cashier/new-transaction";
 import UserManagementView from "@/features/users/components/user-management-view";
 import StaffSchedulesView from "@/features/users/components/staff-schedules-view";
 import CashierManagementView from "@/features/users/components/manage-cashier-view";

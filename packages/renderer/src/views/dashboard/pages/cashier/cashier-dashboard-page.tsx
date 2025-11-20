@@ -28,9 +28,11 @@ import {
 
 import { useAuth } from "@/shared/hooks";
 import { useNavigate } from "react-router-dom";
-import RefundTransactionView from "./components/modals/refund-transaction-modal";
-import VoidTransactionModal from "./components/modals/void-transaction-modal";
-import CashDrawerCountModal from "./components/modals/cash-drawer-count-modal";
+import {
+  RefundTransactionView,
+  VoidTransactionModal,
+  CashDrawerCountModal,
+} from "./new-transaction/components/modals";
 
 // TypeScript interfaces
 interface Transaction {

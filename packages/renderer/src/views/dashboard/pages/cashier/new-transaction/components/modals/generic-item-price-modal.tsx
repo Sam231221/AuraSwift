@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Calculator } from "lucide-react";
-import { NumericKeypad } from "../numeric-keypad";
+import { NumericKeypad } from "../shared/numeric-keypad";
 import type { Product } from "@/features/products/types/product.types";
 
 interface GenericItemPriceModalProps {
