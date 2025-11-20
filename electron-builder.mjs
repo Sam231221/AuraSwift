@@ -34,15 +34,20 @@ export default /** @type import('electron-builder').Configuration */
     target: [
       {
         target: 'nsis',
-        arch: ['x64', 'ia32']
+        arch: ['x64']  // Focus on x64 only - Windows 10 Enterprise typically uses x64
       },
       {
         target: 'squirrel',
-        arch: ['x64', 'ia32']
+        arch: ['x64']  // Focus on x64 only
       }
     ],
     icon: 'buildResources/icon.ico',
-    verifyUpdateCodeSignature: false  // Set to true when you have code signing certificate
+    verifyUpdateCodeSignature: false,  // Set to true when you have code signing certificate
+    requestedExecutionLevel: 'asInvoker',  // Don't require admin by default - let NSIS handle elevation
+    // Ensure compatibility with Windows 10 Enterprise
+    // Note: electron-builder automatically includes Visual C++ Redistributables for native modules
+    // (better-sqlite3, node-hid, serialport, usb) when needed
+    // The app is built on windows-2022 runner for better Windows 10 Enterprise compatibility
   },
   squirrelWindows: {
     // iconUrl is required for Squirrel - must be a public URL
@@ -52,8 +57,8 @@ export default /** @type import('electron-builder').Configuration */
   },
   nsis: {
     oneClick: false,                    // Show installation wizard (not one-click)
-    perMachine: true,                   // Install for all users (requires admin)
-    allowElevation: true,               // Request admin rights
+    perMachine: false,                  // Install for current user (better for Enterprise environments)
+    allowElevation: true,               // Allow elevation if user wants to install for all users
     allowToChangeInstallationDirectory: true,  // Let user choose install location
     createDesktopShortcut: true,        // Create desktop shortcut
     createStartMenuShortcut: true,      // Create Start Menu shortcut
@@ -66,6 +71,12 @@ export default /** @type import('electron-builder').Configuration */
     // installerHeader requires .bmp format (150x57 pixels), not .ico
     // Removing it to use default NSIS header
     license: undefined,                 // Path to license.txt (optional)
+    // Request execution level - asInvoker is more compatible with Enterprise policies
+    requestExecutionLevel: 'asInvoker',  // Don't require admin by default
+    // Include Visual C++ Redistributables check/install
+    // Note: electron-builder will automatically include VC++ Redist if needed
+    // but we ensure compatibility with Windows 10 Enterprise
+    include: undefined,                 // Use default includes
   },
   linux: {
     target: ['deb'],

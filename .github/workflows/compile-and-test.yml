@@ -80,8 +80,10 @@ jobs:
         run: npm run typecheck -ws --if-present
 
   # Build and test job - Windows for native modules and building
+  # Using windows-2022 instead of windows-latest for better Windows 10 Enterprise compatibility
+  # windows-latest now uses Windows Server 2025 which may have compatibility issues
   build-and-test:
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
       PYTHON: python
       MSVS-VERSION: 2022
