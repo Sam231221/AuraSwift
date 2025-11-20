@@ -71,8 +71,7 @@ export default /** @type import('electron-builder').Configuration */
     // installerHeader requires .bmp format (150x57 pixels), not .ico
     // Removing it to use default NSIS header
     license: undefined,                 // Path to license.txt (optional)
-    // Request execution level - asInvoker is more compatible with Enterprise policies
-    requestExecutionLevel: 'asInvoker',  // Don't require admin by default
+    // Request execution level is set in win.requestedExecutionLevel (not in nsis config)
     // Include Visual C++ Redistributables check/install
     // Note: electron-builder will automatically include VC++ Redist if needed
     // but we ensure compatibility with Windows 10 Enterprise
