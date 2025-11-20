@@ -26,6 +26,16 @@ export const transactionAPI = {
 
   getByShift: (shiftId: string) =>
     ipcRenderer.invoke("transactions:getByShift", shiftId),
+
+  createFromCart: (data: {
+    cartSessionId: string;
+    shiftId: string;
+    businessId: string;
+    paymentMethod: "cash" | "card" | "mixed";
+    cashAmount?: number;
+    cardAmount?: number;
+    receiptNumber: string;
+  }) => ipcRenderer.invoke("transactions:createFromCart", data),
 };
 
 export const refundAPI = {

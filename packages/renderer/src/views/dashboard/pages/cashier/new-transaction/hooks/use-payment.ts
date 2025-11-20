@@ -8,7 +8,11 @@ import { toast } from "sonner";
 import type { PaymentMethod } from "../types/transaction.types";
 import type { TransactionData } from "@/types/printer";
 import type { CartSession, CartItemWithProduct } from "../../types/cart.types";
-import { validateCashPayment, validateCart, validateBusinessId } from "../utils/validation";
+import {
+  validateCashPayment,
+  validateCart,
+  validateBusinessId,
+} from "../utils/validation";
 
 interface UsePaymentProps {
   cartSession: CartSession | null;
@@ -23,13 +27,17 @@ interface UsePaymentProps {
   userBusinessName: string | undefined;
   cardReaderReady: boolean;
   cardProcessing: boolean;
-  processQuickPayment: (amountInCents: number, currency: string) => Promise<{
+  processQuickPayment: (
+    amountInCents: number,
+    currency: string
+  ) => Promise<{
     success: boolean;
     error?: string;
   }>;
   cancelPayment: () => Promise<void>;
   startPrintingFlow: (data: TransactionData) => Promise<boolean>;
   isShowingStatus: boolean;
+  onResetPrintStatus?: () => void;
   onCartSessionInit?: () => Promise<void>;
 }
 
@@ -55,6 +63,7 @@ export function usePayment({
   cancelPayment,
   startPrintingFlow,
   isShowingStatus,
+  onResetPrintStatus,
   onCartSessionInit,
 }: UsePaymentProps) {
   const [paymentStep, setPaymentStep] = useState(false);
@@ -147,8 +156,28 @@ export function usePayment({
    */
   const completeTransaction = useCallback(
     async (skipPaymentValidation = false) => {
-      // Check printer status before completing transaction
-      if (window.printerAPI) {
+      // Validate payment method (skip for card payments already processed)
+      if (!skipPaymentValidation) {
+        if (!paymentMethod) {
+          toast.error("Please select a payment method");
+          return;
+        }
+
+        // Validate cash payment
+        if (paymentMethod.type === "cash") {
+          const validation = validateCashPayment(cashAmount, total);
+          if (!validation.valid) {
+            toast.error(validation.error || "Invalid cash payment");
+            return;
+          }
+        }
+      }
+
+      // Check printer status only for non-cash payments (cash payments show receipt options modal)
+      // Skip printer check for cash payments since they'll get receipt options modal
+      const isCashPayment =
+        !skipPaymentValidation && paymentMethod?.type === "cash";
+      if (!isCashPayment && window.printerAPI) {
         try {
           const printerStatus = await window.printerAPI.getStatus();
 
@@ -166,30 +195,16 @@ export function usePayment({
               return;
             }
 
-            toast.warning("Transaction will complete without printed receipt.", {
-              duration: 5000,
-            });
+            toast.warning(
+              "Transaction will complete without printed receipt.",
+              {
+                duration: 5000,
+              }
+            );
           }
         } catch (error) {
           console.error("Failed to check printer status:", error);
           // Continue anyway - don't block transaction on printer status check failure
-        }
-      }
-
-      // Validate payment method (skip for card payments already processed)
-      if (!skipPaymentValidation) {
-        if (!paymentMethod) {
-          toast.error("Please select a payment method");
-          return;
-        }
-
-        // Validate cash payment
-        if (paymentMethod.type === "cash") {
-          const validation = validateCashPayment(cashAmount, total);
-          if (!validation.valid) {
-            toast.error(validation.error || "Invalid cash payment");
-            return;
-          }
         }
       }
 
@@ -261,7 +276,10 @@ export function usePayment({
         });
 
         if (!transactionResponse.success) {
-          toast.error("Failed to record transaction");
+          const errorMessage =
+            transactionResponse.message || "Failed to record transaction";
+          console.error("Transaction creation error:", errorMessage);
+          toast.error(errorMessage);
           return;
         }
 
@@ -323,14 +341,24 @@ export function usePayment({
 
         // For cash payments, show receipt options modal instead of auto-printing
         if (!skipPaymentValidation && paymentMethod?.type === "cash") {
+          // Reset any printer status FIRST to ensure printer modal doesn't show
+          // This must happen before setting showReceiptOptions to prevent modal conflict
+          if (onResetPrintStatus) {
+            onResetPrintStatus();
+          }
+
+          // Ensure printer status is cleared before showing receipt options
+          // Set receipt options AFTER resetting printer status
+          setShowReceiptOptions(true);
           setCompletedTransactionData(receiptData);
           setTransactionComplete(true);
-          setShowReceiptOptions(true);
 
           // Show success message with payment details
           const change = cashAmount - total;
           if (change > 0) {
-            toast.success(`Transaction complete! Change: £${change.toFixed(2)}`);
+            toast.success(
+              `Transaction complete! Change: £${change.toFixed(2)}`
+            );
           } else {
             toast.success("Transaction complete! Exact change received.");
           }
@@ -360,15 +388,19 @@ export function usePayment({
         }
 
         // Show success message with payment details
-        if (skipPaymentValidation) {
-          toast.success("Transaction complete! Paid by card");
-        } else if (paymentMethod?.type === "cash") {
+        // Check actual payment method first, not skipPaymentValidation flag
+        if (paymentMethod?.type === "cash") {
           const change = cashAmount - total;
           if (change > 0) {
-            toast.success(`Transaction complete! Change: £${change.toFixed(2)}`);
+            toast.success(
+              `Transaction complete! Change: £${change.toFixed(2)}`
+            );
           } else {
             toast.success("Transaction complete! Exact change received.");
           }
+        } else if (skipPaymentValidation) {
+          // Card payment already processed
+          toast.success("Transaction complete! Paid by card");
         } else {
           toast.success(`Transaction complete! Paid by ${paymentMethod?.type}`);
         }
@@ -377,7 +409,11 @@ export function usePayment({
         // TODO: Open cash drawer for cash payments
       } catch (error) {
         console.error("Transaction error:", error);
-        toast.error("Failed to complete transaction");
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to complete transaction";
+        toast.error(errorMessage);
         return;
       }
 
@@ -411,6 +447,7 @@ export function usePayment({
       userBusinessName,
       startPrintingFlow,
       isShowingStatus,
+      onResetPrintStatus,
       onCartSessionInit,
     ]
   );
@@ -669,8 +706,10 @@ export function usePayment({
     completedTransactionData,
     setPaymentStep,
     setCashAmount,
-    setPaymentMethod: (method: PaymentMethod | null) => setPaymentMethod(method),
-    setTransactionComplete: (complete: boolean) => setTransactionComplete(complete),
+    setPaymentMethod: (method: PaymentMethod | null) =>
+      setPaymentMethod(method),
+    setTransactionComplete: (complete: boolean) =>
+      setTransactionComplete(complete),
     setShowCardPayment: (show: boolean) => setShowCardPayment(show),
     handlePayment,
     handleCardPayment,
@@ -685,4 +724,3 @@ export function usePayment({
     handleRetryCardPayment,
   };
 }
-

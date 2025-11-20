@@ -1155,6 +1155,157 @@ ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
   }
 });
 
+ipcMain.handle("transactions:createFromCart", async (event, data) => {
+  try {
+    console.log("Creating transaction from cart:", {
+      cartSessionId: data.cartSessionId,
+      shiftId: data.shiftId,
+      businessId: data.businessId,
+      paymentMethod: data.paymentMethod,
+    });
+
+    const db = await getDatabase();
+
+    // Get cart session
+    const cartSession = await db.cart.getSessionById(data.cartSessionId);
+    if (!cartSession) {
+      console.error("Cart session not found:", data.cartSessionId);
+      return {
+        success: false,
+        message: "Cart session not found",
+      };
+    }
+
+    // Get all cart items
+    const cartItems = await db.cart.getItemsBySession(data.cartSessionId);
+    if (!cartItems || cartItems.length === 0) {
+      console.error("Cart is empty:", data.cartSessionId);
+      return {
+        success: false,
+        message: "Cart is empty",
+      };
+    }
+
+    console.log(`Processing ${cartItems.length} cart items`);
+
+    // Validate that all items have either productId or categoryId
+    const invalidItems = cartItems.filter(
+      (item) => !item.productId && !item.categoryId
+    );
+    if (invalidItems.length > 0) {
+      console.error(
+        `Found ${invalidItems.length} cart items without productId or categoryId`
+      );
+      return {
+        success: false,
+        message:
+          "Some cart items are invalid. Each item must have either a product ID or category ID.",
+      };
+    }
+
+    // Calculate totals from all cart items
+    const subtotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    const tax = cartItems.reduce((sum, item) => sum + item.taxAmount, 0);
+    const total = subtotal + tax;
+
+    console.log("Calculated totals:", { subtotal, tax, total });
+
+    // Create transaction items from cart items
+    const transactionItems = cartItems.map((item) => {
+      // Convert expiryDate to timestamp in milliseconds if it exists
+      let expiryDateTimestamp: number | null = null;
+      if (item.expiryDate) {
+        try {
+          if (item.expiryDate instanceof Date) {
+            expiryDateTimestamp = item.expiryDate.getTime();
+          } else if (typeof item.expiryDate === "string") {
+            expiryDateTimestamp = new Date(item.expiryDate).getTime();
+            if (isNaN(expiryDateTimestamp)) {
+              console.warn(`Invalid expiryDate string: ${item.expiryDate}`);
+              expiryDateTimestamp = null;
+            }
+          } else if (typeof item.expiryDate === "number") {
+            // Already a timestamp
+            expiryDateTimestamp = item.expiryDate;
+          }
+        } catch (e) {
+          console.warn(`Error parsing expiryDate for item ${item.id}:`, e);
+        }
+      }
+
+      return {
+        productId: item.productId || null,
+        categoryId: item.categoryId || null,
+        productName: item.itemName || "Unknown Item",
+        quantity: item.itemType === "UNIT" ? item.quantity || 1 : 1,
+        weight: item.itemType === "WEIGHT" ? item.weight || null : null,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        taxAmount: item.taxAmount,
+        unitOfMeasure: item.unitOfMeasure || null,
+        batchId: item.batchId || null,
+        batchNumber: item.batchNumber || null,
+        expiryDate: expiryDateTimestamp,
+        ageRestrictionLevel: item.ageRestrictionLevel || "NONE",
+        ageVerified: item.ageVerified || false,
+      } as any; // Type assertion needed because createTransactionWithItems expects partial TransactionItem
+    });
+
+    console.log(`Creating transaction with ${transactionItems.length} items`);
+
+    // Create transaction using createTransactionWithItems
+    const transaction = await db.transactions.createTransactionWithItems({
+      shiftId: data.shiftId,
+      businessId: data.businessId,
+      type: "sale",
+      subtotal,
+      tax,
+      total,
+      paymentMethod: data.paymentMethod,
+      cashAmount: data.cashAmount || null,
+      cardAmount: data.cardAmount || null,
+      status: "completed",
+      receiptNumber: data.receiptNumber,
+      timestamp: new Date().toISOString(),
+      voidReason: null,
+      customerId: null,
+      originalTransactionId: null,
+      refundReason: null,
+      refundMethod: null,
+      managerApprovalId: null,
+      isPartialRefund: false,
+      discountAmount: 0,
+      appliedDiscounts: null,
+      items: transactionItems,
+    } as any);
+
+    console.log("Transaction created successfully:", transaction.id);
+
+    // Convert to plain object to ensure serialization works
+    const serializedTransaction = JSON.parse(JSON.stringify(transaction));
+
+    return {
+      success: true,
+      data: serializedTransaction,
+    };
+  } catch (error) {
+    console.error("Create transaction from cart IPC error:", error);
+    if (error instanceof Error) {
+      console.error("Error stack:", error.stack);
+    }
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+        ? error
+        : "Failed to create transaction from cart";
+    return {
+      success: false,
+      message: errorMessage,
+    };
+  }
+});
+
 // Shift reconciliation endpoints for auto-ended shifts
 ipcMain.handle(
   "shift:reconcile",

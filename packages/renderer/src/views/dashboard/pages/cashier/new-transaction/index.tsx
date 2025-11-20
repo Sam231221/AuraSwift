@@ -198,6 +198,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     },
     startPrintingFlow,
     isShowingStatus,
+    onResetPrintStatus: handleSkipReceipt,
     onCartSessionInit: async () => {
       await cart.initializeCartSession();
       return;
@@ -773,7 +774,8 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
       )}
 
       {/* Receipt Printer Status Modal */}
-      {isShowingStatus && !payment.showCardPayment && (
+      {/* Only show printer modal if not showing receipt options (cash payments) or card payment */}
+      {isShowingStatus && !payment.showCardPayment && !payment.showReceiptOptions && (
         <ReceiptPrinterStatus
           printStatus={printStatus}
           printerInfo={printerInfo || undefined}
