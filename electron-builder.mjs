@@ -82,11 +82,12 @@ export default /** @type import('electron-builder').Configuration */
     ...await getListOfFilesFromEachWorkspace(),
   ],
   // Include migrations as extraResources so they're accessible outside asar if needed
+  // IMPORTANT: Include ALL files including meta/_journal.json and snapshot files
   extraResources: [
     {
       from: 'packages/main/dist/migrations',
       to: 'migrations',
-      filter: ['**/*.sql'],
+      filter: ['**/*'],  // Include all files: .sql, meta/_journal.json, meta/*.json
     },
   ],
 });

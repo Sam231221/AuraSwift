@@ -1,817 +1,476 @@
-Prepare all required actions
-Getting action download info
-Run ./.github/actions/init-template-with-renderer
-Run actions/setup-node@v4
-Found in cache @ C:\hostedtoolcache\windows\node\18.20.8\x64
-Environment details
-Run if [ -d "packages/renderer" ]; then
-Run actions/cache@v4
-Cache not found for input keys: npm-Windows-node18--51ef0c6ec40fc67f76f517eb344a4b2939862d52f7175875d33564689d16cdc2, npm-Windows-node18--
-Run echo "Cleaning npm cache..."
-Cleaning npm cache...
-npm warn using --force RecomPrepare all required actions
-Getting action download info
-Run ./.github/actions/init-template-with-renderer
-Run actions/setup-node@v4
-Found in cache @ C:\hostedtoolcache\windows\node\20.19.5\x64
-Environment details
-Run if [ -d "packages/renderer" ]; then
-Run actions/cache@v4
-Cache not found for input keys: npm-Windows-node20--dc506606e3b7e4d2dc6de583d5862de63d33ee6dc4fea9ba724d8fd031a465cc, npm-Windows-node20--
-Run echo "Cleaning npm cache..."
-Cleaning npm cache...
-npm warn using --force Recommended protections disabled.
-Removing node_modules directories...
-Cleanup complete
-Run set -e
-Using npm ci for existing project...
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@electron/rebuild@4.0.1',
-npm warn EBADENGINE required: { node: '>=22.12.0' },
-npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@semantic-release/github@12.0.2',
-npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
-npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@semantic-release/npm@13.1.2',
-npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
-npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'node-abi@4.24.0',
-npm warn EBADENGINE required: { node: '>=22.12.0' },
-npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'semantic-release@25.0.2',
-npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
-npm warn EBADENGINE current: { node: 'v20.19.5', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn skipping integrity check for git dependency ssh://git@github.com/electron/node-gyp.git
-npm warn deprecated semver-diff@5.0.0: Deprecated as the semver package now supports this built-in.
-npm warn deprecated rimraf@2.6.3: Rimraf versions prior to v4 are no longer supported
-npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
-npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
-npm warn deprecated @npmcli/move-file@2.0.1: This functionality has been moved to @npmcli/fs
-npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
-npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
-npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
-npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
-npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
-npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
-npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
-npm warn deprecated glob@8.1.0: Glob versions prior to v9 are no longer supported
-npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
-npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
-npm warn cleanup Failed to remove some directories [
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3',
-npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\better-sqlite3'] {
-npm warn cleanup errno: -4082,
-npm warn cleanup code: 'EBUSY',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3'
-npm warn cleanup }
-npm warn cleanup ],
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\usb',
-npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\usb'] {
-npm warn cleanup errno: -4082,
-npm warn cleanup code: 'EBUSY',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\usb'
-npm warn cleanup }
-npm warn cleanup ],
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules',
-npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\better-sqlite3'] {
-npm warn cleanup errno: -4082,
-npm warn cleanup code: 'EBUSY',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3'
-npm warn cleanup }
-npm warn cleanup ],
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\temp-file',
-npm warn cleanup [Error: EPERM: operation not permitted, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\temp-file\node_modules'] {
-npm warn cleanup errno: -4048,
-npm warn cleanup code: 'EPERM',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\temp-file\\node_modules'
-npm warn cleanup }
-npm warn cleanup ],
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\npm',
-npm warn cleanup [Error: EPERM: operation not permitted, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\npm\node_modules'] {
-npm warn cleanup errno: -4048,
-npm warn cleanup code: 'EPERM',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\npm\\node_modules'
-npm warn cleanup }
-npm warn cleanup ]
-npm warn cleanup ]
-npm error code 1
-npm error path D:\a\AuraSwift\AuraSwift\packages\main\node_modules\@serialport\bindings-cpp
-npm error command failed
-npm error command C:\Windows\system32\cmd.exe /d /s /c node-gyp-build
-npm error node:internal/child_process:420
-npm error throw new ErrnoException(err, 'spawn');
-npm error ^
-npm error
-npm error Error: spawn EINVAL
-npm error at ChildProcess.spawn (node:internal/child_process:420:11)
-npm error at Object.spawn (node:child_process:762:9)
-npm error at build (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:29:8)
-npm error at preinstall (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:38:32)
-npm error at Object.<anonymous> (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:15:3)
-npm error at Module.\_compile (node:internal/modules/cjs/loader:1521:14)
-npm error at Module.\_extensions..js (node:internal/modules/cjs/loader:1623:10)
-npm error at Module.load (node:internal/modules/cjs/loader:1266:32)
-npm error at Module.\_load (node:internal/modules/cjs/loader:1091:12)
-npm error at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12) {
-npm error errno: -4071,
-npm error code: 'EINVAL',
-npm error syscall: 'spawn'
-npm error }
-npm error
-npm error Node.js v20.19.5
-npm error A complete log of this run can be found in: C:\npm\cache_logs\2025-11-19T22_40_12_060Z-debug-0.log
-Error: Process completed with exit code 1.mended protections disabled.
-Removing node_modules directories...
-Cleanup complete
-Run set -e
-Using npm ci for existing project...
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@electron/rebuild@4.0.1',
-npm warn EBADENGINE required: { node: '>=22.12.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@isaacs/balanced-match@4.0.1',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@isaacs/brace-expansion@5.0.0',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/git@7.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/map-workspaces@5.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/package-json@7.0.3',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'glob@12.0.0',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/promise-spawn@9.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/auth-token@6.0.0',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/core@7.0.6',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/endpoint@11.0.2',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/graphql@9.0.3',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/plugin-paginate-rest@14.0.0',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/plugin-retry@8.0.3',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/plugin-throttling@11.0.3',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/request@10.0.7',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@octokit/request-error@7.1.0',
-npm warn EBADENGINE required: { node: '>= 20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@semantic-release/commit-analyzer@13.0.1',
-npm warn EBADENGINE required: { node: '>=20.8.1' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@semantic-release/github@12.0.2',
-npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@semantic-release/npm@13.1.2',
-npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'normalize-package-data@8.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'read-pkg@10.0.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'type-fest@5.2.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@semantic-release/release-notes-generator@14.1.0',
-npm warn EBADENGINE required: { node: '>=20.8.1' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-byte-length@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-cctalk@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-inter-byte-timeout@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-ready@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-regex@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-slip-encoder@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-spacepacket@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/stream@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@vitejs/plugin-react@5.1.1',
-npm warn EBADENGINE required: { node: '^20.19.0 || >=22.12.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'better-sqlite3@12.4.1',
-npm warn EBADENGINE required: { node: '20.x || 22.x || 23.x || 24.x' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'conf@14.0.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'create-vite@7.1.2',
-npm warn EBADENGINE required: { node: '^20.19.0 || >=22.12.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'electron-store@10.1.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'glob@11.1.0',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'hook-std@4.0.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'hosted-git-info@9.0.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'ini@6.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'jackspeak@4.1.1',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'json-parse-even-better-errors@5.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'lru-cache@11.2.2',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'minimatch@10.1.1',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'node-abi@4.24.0',
-npm warn EBADENGINE required: { node: '>=22.12.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm@11.6.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-install-checks@8.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-normalize-package-bin@5.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-package-arg@13.0.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-pick-manifest@11.0.3',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@isaacs/balanced-match@4.0.1',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@isaacs/brace-expansion@5.0.0',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/agent@4.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/arborist@9.1.6',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/config@10.4.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/git@7.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/map-workspaces@5.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/metavuln-calculator@9.0.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/package-json@7.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@npmcli/run-script@10.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@sigstore/bundle@4.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@sigstore/core@3.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@sigstore/sign@4.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@sigstore/tuf@4.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@sigstore/verify@3.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@tufjs/models@4.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'cacache@20.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'cidr-regex@5.0.1',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'glob@11.0.3',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'hosted-git-info@9.0.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'ignore-walk@8.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'init-package-json@8.2.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'is-cidr@6.0.1',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'jackspeak@4.1.1',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmaccess@10.0.3',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmdiff@8.0.9',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmexec@10.1.8',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmfund@7.0.9',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmorg@8.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmpack@9.0.9',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmpublish@11.1.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmsearch@9.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmteam@8.0.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'libnpmversion@8.0.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'lru-cache@11.2.2',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'make-fetch-happen@15.0.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'minimatch@10.0.3',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-package-arg@13.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-packlist@10.0.2',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-pick-manifest@11.0.1',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-profile@12.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'npm-registry-fetch@19.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'pacote@21.0.3',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'path-scurry@2.0.0',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'sigstore@4.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'tuf-js@4.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'walk-up-path@4.0.0',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'path-scurry@2.0.1',
-npm warn EBADENGINE required: { node: '20 || >=22' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'proc-log@6.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'react-router@7.9.6',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'react-router-dom@7.9.6',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'semantic-release@25.0.2',
-npm warn EBADENGINE required: { node: '^22.14.0 || >= 24.10.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'cliui@9.0.1',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'normalize-package-data@8.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'read-package-up@12.0.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'read-pkg@10.0.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'type-fest@5.2.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'yargs@18.0.0',
-npm warn EBADENGINE required: { node: '^20.19.0 || ^22.12.0 || >=23' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'yargs-parser@22.0.0',
-npm warn EBADENGINE required: { node: '^20.19.0 || ^22.12.0 || >=23' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'serialport@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-delimiter@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: '@serialport/parser-readline@13.0.0',
-npm warn EBADENGINE required: { node: '>=20.0.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'tagged-tag@1.0.0',
-npm warn EBADENGINE required: { node: '>=20' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'undici@7.16.0',
-npm warn EBADENGINE required: { node: '>=20.18.1' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'validate-npm-package-name@7.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'vite@7.1.6',
-npm warn EBADENGINE required: { node: '^20.19.0 || >=22.12.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn EBADENGINE Unsupported engine {
-npm warn EBADENGINE package: 'which@6.0.0',
-npm warn EBADENGINE required: { node: '^20.17.0 || >=22.9.0' },
-npm warn EBADENGINE current: { node: 'v18.20.8', npm: '10.8.2' }
-npm warn EBADENGINE }
-npm warn skipping integrity check for git dependency ssh://git@github.com/electron/node-gyp.git
-npm warn deprecated semver-diff@5.0.0: Deprecated as the semver package now supports this built-in.
-npm warn deprecated rimraf@2.6.3: Rimraf versions prior to v4 are no longer supported
-npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
-npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
-npm warn deprecated @npmcli/move-file@2.0.1: This functionality has been moved to @npmcli/fs
-npm warn deprecated @esbuild-kit/esm-loader@2.6.5: Merged into tsx: https://tsx.is
-npm warn deprecated @esbuild-kit/core-utils@3.3.2: Merged into tsx: https://tsx.is
-npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
-npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
-npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
-npm warn deprecated glob@8.1.0: Glob versions prior to v9 are no longer supported
-npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
-npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
-npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
-npm warn deprecated boolean@3.2.0: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
-npm warn cleanup Failed to remove some directories [
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3',
-npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\better-sqlite3'] {
-npm warn cleanup errno: -4082,
-npm warn cleanup code: 'EBUSY',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3'
-npm warn cleanup }
-npm warn cleanup ],
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\usb',
-npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\usb'] {
-npm warn cleanup errno: -4082,
-npm warn cleanup code: 'EBUSY',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\usb'
-npm warn cleanup }
-npm warn cleanup ],
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules',
-npm warn cleanup [Error: EBUSY: resource busy or locked, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\better-sqlite3'] {
-npm warn cleanup errno: -4082,
-npm warn cleanup code: 'EBUSY',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\better-sqlite3'
-npm warn cleanup }
-npm warn cleanup ],
-npm warn cleanup [
-npm warn cleanup 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\@playwright',
-npm warn cleanup [Error: EPERM: operation not permitted, rmdir 'D:\a\AuraSwift\AuraSwift\node_modules\@playwright\test\node_modules\playwright-core\lib\vite\traceViewer'] {
-npm warn cleanup errno: -4048,
-npm warn cleanup code: 'EPERM',
-npm warn cleanup syscall: 'rmdir',
-npm warn cleanup path: 'D:\\a\\AuraSwift\\AuraSwift\\node_modules\\@playwright\\test\\node_modules\\playwright-core\\lib\\vite\\traceViewer'
-npm warn cleanup }
-npm warn cleanup ]
-npm warn cleanup ]
-npm error code 1
-npm error path D:\a\AuraSwift\AuraSwift\packages\main\node_modules\@serialport\bindings-cpp
-npm error command failed
-npm error command C:\Windows\system32\cmd.exe /d /s /c node-gyp-build
-npm error node:internal/child_process:414
-npm error throw errnoException(err, 'spawn');
-npm error ^
-npm error
-npm error Error: spawn EINVAL
-npm error at ChildProcess.spawn (node:internal/child_process:414:11)
-npm error at Object.spawn (node:child_process:761:9)
-npm error at build (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:29:8)
-npm error at preinstall (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:38:32)
-npm error at Object.<anonymous> (D:\a\AuraSwift\AuraSwift\packages\main\node_modules\node-gyp-build\bin.js:15:3)
-npm error at Module.\_compile (node:internal/modules/cjs/loader:1364:14)
-npm error at Module.\_extensions..js (node:internal/modules/cjs/loader:1422:10)
-npm error at Module.load (node:internal/modules/cjs/loader:1203:32)
-npm error at Module.\_load (node:internal/modules/cjs/loader:1019:12)
-npm error at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12) {
-npm error errno: -4071,
-npm error code: 'EINVAL',
-npm error syscall: 'spawn'
-npm error }
-npm error
-npm error Node.js v18.20.8
-npm error A complete log of this run can be found in: C:\npm\cache_logs\2025-11-19T22_24_59_608Z-debug-0.log
-Error: Process completed with exit code 1.
+Run npm run test:all --if-present
+
+> auraswift@1.7.0 test:all
+> npx playwright test ./tests/
+> npm warn Unknown env config "build-from-source". This will stop working in the next major version of npm.
+> npm warn config cache-max This option has been deprecated in favor of `--prefer-online`
+> npm warn config cache-min This option has been deprecated in favor of `--prefer-offline`.
+> npm warn Unknown env config "msvs-version". This will stop working in the next major version of npm.
+> npm warn Unknown env config "python". This will stop working in the next major version of npm.
+> npm warn Unknown env config "target-arch". This will stop working in the next major version of npm.
+> npm warn Unknown env config "target-platform". This will stop working in the next major version of npm.
+> npm warn Unknown project config "build-from-source". This will stop working in the next major version of npm.
+> npm warn Unknown project config "target_platform". This will stop working in the next major version of npm.
+> npm warn Unknown project config "target_arch". This will stop working in the next major version of npm.
+> npm warn Unknown project config "cache_max". This will stop working in the next major version of npm.
+> npm warn Unknown project config "cache_min". This will stop working in the next major version of npm.
+> npm warn Unknown project config "msvs-version". This will stop working in the next major version of npm.
+> npm warn Unknown project config "python". This will stop working in the next major version of npm.
+> Running 20 tests using 2 workers
+> [Test Setup] Failed to launch Electron: electron.launch: Process failed to launch!
+> Call log:
+
+- <launching> "dist\win-unpacked\auraswift.exe" "--inspect=0" "--remote-debugging-port=0" "--no-sandbox" "--disable-gpu" "--disable-dev-shm-usage" "--disable-extensions"
+- <launched> pid=5972
+- [pid=5972][out]
+- [pid=5972][err] Debugger listening on ws://127.0.0.1:53042/b9885f63-531d-4ca6-958c-ad9496c85083
+- [pid=5972][err] For help, see: https://nodejs.org/en/docs/inspector
+- <ws connecting> ws://127.0.0.1:53042/b9885f63-531d-4ca6-958c-ad9496c85083
+- <ws connected> ws://127.0.0.1:53042/b9885f63-531d-4ca6-958c-ad9496c85083
+- [pid=5972][err] Debugger attached.
+- [pid=5972][out] Production mode: Using user data directory for database
+- [pid=5972][out] Database at: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][out] Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][out]
+- [pid=5972][out] 🚀 Running Drizzle ORM Migrations...
+- [pid=5972][out] 🔒 Production mode: Enhanced safety checks enabled
+- [pid=5972][out] 📁 Migrations folder: D:\a\AuraSwift\AuraSwift\dist\win-unpacked\resources\migrations
+- [pid=5972][out] 🔍 Checking database integrity...
+- [pid=5972][out] ✅ Quick integrity check passed
+- [pid=5972][out] ✅ Database integrity check passed
+- [pid=5972][out] ✅ Foreign key check passed
+- [pid=5972][out] 📦 Backup created: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\backups\auraswift-backup-2025-11-20T00-04-11-953Z.db
+- [pid=5972][out] ⚙️ Applying pending migrations...
+- [pid=5972][err] ❌ Migration failed:
+- [pid=5972][err] 📍 Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][err] 📝 Error message: Can't find meta/\_journal.json file
+- [pid=5972][err] 📋 Stack trace:
+- [pid=5972][err] Error: Can't find meta/\_journal.json file
+- [pid=5972][err] at readMigrationFiles (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/drizzle-orm/migrator.js:8:11)
+- [pid=5972][err] at migrate (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/drizzle-orm/better-sqlite3/migrator.js:3:22)
+- [pid=5972][err] at runDrizzleMigrations (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:1142:11)
+- [pid=5972][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2936:40
+- [pid=5972][err] at DBManager.initialize (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2969:7)
+- [pid=5972][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:29
+- [pid=5972][err] at getDatabase (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8888:5)
+- [pid=5972][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:9047:1
+- [pid=5972][err] at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+- [pid=5972][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=5972][out] 🔄 Attempting to rollback migration...
+- [pid=5972][err] 🔄 Attempting automatic rollback...
+- [pid=5972][out] ✅ Database restored from backup
+- [pid=5972][out] 📦 Restored from: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\backups\auraswift-backup-2025-11-20T00-04-11-953Z.db
+- [pid=5972][err] ✅ Migration rolled back successfully
+- [pid=5972][err] 💡 Database restored to pre-migration state
+- [pid=5972][err] ❌ Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][out] Production mode: Using user data directory for database
+- [pid=5972][err] ❌ Database initialization error:
+- [pid=5972][err] Path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][out] Database at: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][err] Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][err] Stack: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=5972][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=5972][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=5972][err] Error: Database initialization failed at C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2964:15
+- [pid=5972][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=5972][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5 {
+- [pid=5972][err] [cause]: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=5972][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=5972][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=5972][err] } Promise {
+- [pid=5972][err] <rejected> Error: Database initialization failed at C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2964:15
+- [pid=5972][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=5972][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5 {
+- [pid=5972][err] [cause]: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=5972][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=5972][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=5972][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=5972][err] }
+- [pid=5972][err] }
+- <ws disconnected> ws://127.0.0.1:53042/b9885f63-531d-4ca6-958c-ad9496c85083 code=1006 reason=
+- [pid=5972] <kill>
+- [pid=5972] <will force kill>
+- [pid=5972] taskkill stderr: ERROR: The process "5972" not found.
+- [pid=5972] <process did exit: exitCode=1, signal=null>
+- [pid=5972] starting temporary directories cleanup
+- [pid=5972] finished temporary directories cleanup
+  [Test Setup] Executable path: dist\win-unpacked\auraswift.exe
+  [Test Setup] Launch args: --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-extensions
+  [Test Setup] Failed to launch Electron: electron.launch: Process failed to launch!
+  Call log:
+- <launching> "dist\win-unpacked\auraswift.exe" "--inspect=0" "--remote-debugging-port=0" "--no-sandbox" "--disable-gpu" "--disable-dev-shm-usage" "--disable-extensions"
+- <launched> pid=8700
+- [pid=8700][out]
+- [pid=8700][err] Debugger listening on ws://127.0.0.1:53048/ccb49baf-0b38-4494-9058-d4033e0044bf
+- [pid=8700][err] For help, see: https://nodejs.org/en/docs/inspector
+- <ws connecting> ws://127.0.0.1:53048/ccb49baf-0b38-4494-9058-d4033e0044bf
+- <ws connected> ws://127.0.0.1:53048/ccb49baf-0b38-4494-9058-d4033e0044bf
+- [pid=8700][err] Debugger attached.
+- [pid=8700][out] Production mode: Using user data directory for database
+- [pid=8700][out] Database at: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][out] Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][out]
+- [pid=8700][out] 🚀 Running Drizzle ORM Migrations...
+- [pid=8700][out] 🔒 Production mode: Enhanced safety checks enabled
+- [pid=8700][out] 📁 Migrations folder: D:\a\AuraSwift\AuraSwift\dist\win-unpacked\resources\migrations
+- [pid=8700][out] 🔍 Checking database integrity...
+- [pid=8700][out] ✅ Quick integrity check passed
+- [pid=8700][out] ✅ Database integrity check passed
+- [pid=8700][out] ✅ Foreign key check passed
+- [pid=8700][out] 📦 Backup created: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\backups\auraswift-backup-2025-11-20T00-04-15-584Z.db
+- [pid=8700][out] ⚙️ Applying pending migrations...
+- [pid=8700][err] ❌ Migration failed:
+- [pid=8700][err] 📍 Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] 📝 Error message: Can't find meta/\_journal.json file
+- [pid=8700][err] 📋 Stack trace:
+- [pid=8700][err] Error: Can't find meta/\_journal.json file
+- [pid=8700][err] at readMigrationFiles (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/drizzle-orm/migrator.js:8:11)
+- [pid=8700][err] at migrate (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/drizzle-orm/better-sqlite3/migrator.js:3:22)
+- [pid=8700][err] at runDrizzleMigrations (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:1142:11)
+- [pid=8700][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2936:40
+- [pid=8700][err] at DBManager.initialize (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2969:7)
+- [pid=8700][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:29
+- [pid=8700][err] at getDatabase (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8888:5)
+- [pid=8700][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:9047:1
+- [pid=8700][err] at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+- [pid=8700][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=8700][out] 🔄 Attempting to rollback migration...
+- [pid=8700][err] 🔄 Attempting automatic rollback...
+- [pid=8700][out] ✅ Database restored from backup
+- [pid=8700][out] 📦 Restored from: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\backups\auraswift-backup-2025-11-20T00-04-15-584Z.db
+- [pid=8700][err] ✅ Migration rolled back successfully
+- [pid=8700][err] 💡 Database restored to pre-migration state
+- [pid=8700][err] ❌ Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][out] Production mode: Using user data directory for database
+- [pid=8700][out] Database at: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] ❌ Database initialization error:
+- [pid=8700][err] Path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] Stack: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=8700][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=8700][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=8700][err] Error: Database initialization failed at C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2964:15
+- [pid=8700][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=8700][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5 {
+- [pid=8700][err] [cause]: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=8700][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=8700][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=8700][err] } Promise {
+- [pid=8700][err] <rejected> Error: Database initialization failed at C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2964:15
+- [pid=8700][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=8700][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5 {
+- [pid=8700][err] [cause]: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=8700][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=8700][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=8700][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=8700][err] }
+- [pid=8700][err] }
+- <ws disconnected> ws://127.0.0.1:53048/ccb49baf-0b38-4494-9058-d4033e0044bf code=1006 reason=
+- [pid=8700] <kill>
+- [pid=8700] <will force kill>
+- [pid=8700] taskkill stderr: ERROR: The process "8700" not found.
+- [pid=8700] <process did exit: exitCode=1, signal=null>
+- [pid=8700] starting temporary directories cleanup
+- [pid=8700] finished temporary directories cleanup
+  [Test Setup] Executable path: dist\win-unpacked\auraswift.exe
+  [Test Setup] Launch args: --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-extensions
+  [Test Setup] Failed to launch Electron: electron.launch: Process failed to launch!
+  Call log:
+- <launching> "dist\win-unpacked\auraswift.exe" "--inspect=0" "--remote-debugging-port=0" "--no-sandbox" "--disable-gpu" "--disable-dev-shm-usage" "--disable-extensions"
+- <launched> pid=6120
+- [pid=6120][out]
+- [pid=6120][err] Debugger listening on ws://127.0.0.1:53058/f652e311-54ad-4fa4-a051-ac55ccc8970b
+- [pid=6120][err] For help, see: https://nodejs.org/en/docs/inspector
+- <ws connecting> ws://127.0.0.1:53058/f652e311-54ad-4fa4-a051-ac55ccc8970b
+- <ws connected> ws://127.0.0.1:53058/f652e311-54ad-4fa4-a051-ac55ccc8970b
+- [pid=6120][err] Debugger attached.
+- [pid=6120][out] Production mode: Using user data directory for database
+- [pid=6120][out] Database at: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][out] Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][out]
+- [pid=6120][out] 🚀 Running Drizzle ORM Migrations...
+- [pid=6120][out] 🔒 Production mode: Enhanced safety checks enabled
+- [pid=6120][out] 📁 Migrations folder: D:\a\AuraSwift\AuraSwift\dist\win-unpacked\resources\migrations
+- [pid=6120][out] 🔍 Checking database integrity...
+- [pid=6120][out] ✅ Quick integrity check passed
+- [pid=6120][out] ✅ Database integrity check passed
+- [pid=6120][out] ✅ Foreign key check passed
+- [pid=6120][out] 📦 Backup created: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\backups\auraswift-backup-2025-11-20T00-04-19-187Z.db
+- [pid=6120][out] ⚙️ Applying pending migrations...
+- [pid=6120][err] ❌ Migration failed:
+- [pid=6120][err] 📍 Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] 📝 Error message: Can't find meta/\_journal.json file
+- [pid=6120][err] 📋 Stack trace:
+- [pid=6120][err] Error: Can't find meta/\_journal.json file
+- [pid=6120][err] at readMigrationFiles (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/drizzle-orm/migrator.js:8:11)
+- [pid=6120][err] at migrate (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/drizzle-orm/better-sqlite3/migrator.js:3:22)
+- [pid=6120][err] at runDrizzleMigrations (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:1142:11)
+- [pid=6120][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2936:40
+- [pid=6120][err] at DBManager.initialize (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2969:7)
+- [pid=6120][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:29
+- [pid=6120][err] at getDatabase (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8888:5)
+- [pid=6120][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:9047:1
+- [pid=6120][err] at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+- [pid=6120][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=6120][out] 🔄 Attempting to rollback migration...
+- [pid=6120][err] 🔄 Attempting automatic rollback...
+- [pid=6120][out] ✅ Database restored from backup
+- [pid=6120][out] 📦 Restored from: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\backups\auraswift-backup-2025-11-20T00-04-19-187Z.db
+- [pid=6120][err] ✅ Migration rolled back successfully
+- [pid=6120][err] 💡 Database restored to pre-migration state
+- [pid=6120][err] ❌ Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][out] Production mode: Using user data directory for database
+- [pid=6120][out] Database at: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] ❌ Database initialization error:
+- [pid=6120][err] Path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] Stack: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=6120][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=6120][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=6120][err] Error: Database initialization failed at C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2964:15
+- [pid=6120][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=6120][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5 {
+- [pid=6120][err] [cause]: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=6120][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=6120][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=6120][err] } Promise {
+- [pid=6120][err] <rejected> Error: Database initialization failed at C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2964:15
+- [pid=6120][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=6120][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5 {
+- [pid=6120][err] [cause]: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=6120][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=6120][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=6120][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=6120][err] }
+- [pid=6120][err] }
+- <ws disconnected> ws://127.0.0.1:53058/f652e311-54ad-4fa4-a051-ac55ccc8970b code=1006 reason=
+- [pid=6120] <kill>
+- [pid=6120] <will force kill>
+- [pid=6120] taskkill stderr: ERROR: The process "6120" not found.
+- [pid=6120] <process did exit: exitCode=1, signal=null>
+- [pid=6120] starting temporary directories cleanup
+- [pid=6120] finished temporary directories cleanup
+  [Test Setup] Executable path: dist\win-unpacked\auraswift.exe
+  [Test Setup] Launch args: --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-extensions
+  [Test Setup] Failed to launch Electron: electron.launch: Process failed to launch!
+  Call log:
+- <launching> "dist\win-unpacked\auraswift.exe" "--inspect=0" "--remote-debugging-port=0" "--no-sandbox" "--disable-gpu" "--disable-dev-shm-usage" "--disable-extensions"
+- <launched> pid=1068
+- [pid=1068][out]
+- [pid=1068][err] Debugger listening on ws://127.0.0.1:53062/a7cf0fae-d85e-474b-b6c8-073c6342ff3f
+- [pid=1068][err] For help, see: https://nodejs.org/en/docs/inspector
+- <ws connecting> ws://127.0.0.1:53062/a7cf0fae-d85e-474b-b6c8-073c6342ff3f
+- <ws connected> ws://127.0.0.1:53062/a7cf0fae-d85e-474b-b6c8-073c6342ff3f
+- [pid=1068][err] Debugger attached.
+- [pid=1068][out] Production mode: Using user data directory for database
+- [pid=1068][out] Database at: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][out] Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][out]
+- [pid=1068][out] 🚀 Running Drizzle ORM Migrations...
+- [pid=1068][out] 🔒 Production mode: Enhanced safety checks enabled
+- [pid=1068][out] 📁 Migrations folder: D:\a\AuraSwift\AuraSwift\dist\win-unpacked\resources\migrations
+- [pid=1068][out] 🔍 Checking database integrity...
+- [pid=1068][out] ✅ Quick integrity check passed
+- [pid=1068][out] ✅ Database integrity check passed
+- [pid=1068][out] ✅ Foreign key check passed
+- [pid=1068][out] 📦 Backup created: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\backups\auraswift-backup-2025-11-20T00-04-22-676Z.db
+- [pid=1068][out] ⚙️ Applying pending migrations...
+- [pid=1068][err] ❌ Migration failed:
+- [pid=1068][err] 📍 Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] 📝 Error message: Can't find meta/\_journal.json file
+- [pid=1068][err] 📋 Stack trace:
+- [pid=1068][err] Error: Can't find meta/\_journal.json file
+- [pid=1068][err] at readMigrationFiles (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/drizzle-orm/migrator.js:8:11)
+- [pid=1068][err] at migrate (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/drizzle-orm/better-sqlite3/migrator.js:3:22)
+- [pid=1068][err] at runDrizzleMigrations (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:1142:11)
+- [pid=1068][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2936:40
+- [pid=1068][err] at DBManager.initialize (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2969:7)
+- [pid=1068][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:29
+- [pid=1068][err] at getDatabase (file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8888:5)
+- [pid=1068][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:9047:1
+- [pid=1068][err] at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+- [pid=1068][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=1068][err] 🔄 Attempting automatic rollback...
+- [pid=1068][out] 🔄 Attempting to rollback migration...
+- [pid=1068][out] ✅ Database restored from backup
+- [pid=1068][out] 📦 Restored from: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\backups\auraswift-backup-2025-11-20T00-04-22-676Z.db
+- [pid=1068][err] ✅ Migration rolled back successfully
+- [pid=1068][err] 💡 Database restored to pre-migration state
+- [pid=1068][err] ❌ Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][out] Production mode: Using user data directory for database
+- [pid=1068][out] Database at: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] ❌ Database initialization error:
+- [pid=1068][err] Path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] Stack: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=1068][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=1068][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=1068][err] Error: Database initialization failed at C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2964:15
+- [pid=1068][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=1068][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5 {
+- [pid=1068][err] [cause]: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=1068][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=1068][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=1068][err] } Promise {
+- [pid=1068][err] <rejected> Error: Database initialization failed at C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2964:15
+- [pid=1068][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=1068][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5 {
+- [pid=1068][err] [cause]: Error: Database migration failed. Check the migration logs above for details. Database path: C:\Users\runneradmin\AppData\Roaming\auraswift\AuraSwift\pos_system.db
+- [pid=1068][err] at file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:2944:17
+- [pid=1068][err] at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+- [pid=1068][err] at async file:///D:/a/AuraSwift/AuraSwift/dist/win-unpacked/resources/app.asar/node_modules/@app/main/dist/index.js:8725:5
+- [pid=1068][err] }
+- [pid=1068][err] }
+- <ws disconnected> ws://127.0.0.1:53062/a7cf0fae-d85e-474b-b6c8-073c6342ff3f code=1006 reason=
+- [pid=1068] <kill>
+- [pid=1068] <will force kill>
+- [pid=1068] taskkill stderr: ERROR: The process "1068" not found.
+- [pid=1068] <process did exit: exitCode=1, signal=null>
+- [pid=1068] starting temporary directories cleanup
+- [pid=1068] finished temporary directories cleanup
+  [Test Setup] Executable path: dist\win-unpacked\auraswift.exe
+  [Test Setup] Launch args: --no-sandbox --disable-gpu --disable-dev-shm-usage --disable-extensions
+  F·F··F··············
+
+1.  tests\e2e.spec.ts:196:3 › Build Environment Debug › Check build output structure ──────────────
+    Error: electron.launch: Process failed to launch!
+    Call log:
+    - <launching> "D:\a\AuraSwift\AuraSwift\node_modules\electron\dist\electron.exe" "--inspect=0" "--remote-debugging-port=0" "packages/entry-point.mjs" "--no-sandbox" "--disable-gpu" "--disable-dev-shm-usage" "--disable-extensions"
+    - <launched> pid=6044
+    - [pid=6044][out]
+    - [pid=6044][err] Debugger listening on ws://127.0.0.1:53046/b26e8b68-0940-4d08-8a95-1255980c270a
+    - [pid=6044][err] For help, see: https://nodejs.org/en/docs/inspector
+    - <ws connecting> ws://127.0.0.1:53046/b26e8b68-0940-4d08-8a95-1255980c270a
+    - <ws connected> ws://127.0.0.1:53046/b26e8b68-0940-4d08-8a95-1255980c270a
+    - [pid=6044][err] Debugger attached.
+    - [pid=6044][out] Development mode: Using project directory for database
+    - [pid=6044][out] Database at: D:\a\AuraSwift\AuraSwift\packages\data\pos_system.db
+    - [pid=6044][out] Database path: D:\a\AuraSwift\AuraSwift\packages\data\pos_system.db
+    - [pid=6044][out]
+    - [pid=6044][out] 🚀 Running Drizzle ORM Migrations...
+    - [pid=6044][out] 🛠️ Development mode: Relaxed migration checks
+    - [pid=6044][out] 📁 Migrations folder: D:\a\AuraSwift\AuraSwift\packages\main\dist\migrations
+    - [pid=6044][out] 🔍 Checking database integrity...
+    - [pid=6044][out] ✅ Database integrity check passed
+    - [pid=6044][out] ✅ Foreign key check passed
+    - [pid=6044][out] 📦 Backup created: D:\a\AuraSwift\AuraSwift\packages\data\backups\auraswift-backup-2025-11-20T00-04-13-043Z.db
+    - [pid=6044][out] ⚙️ Applying pending migrations...
+    - [pid=6044][out] ⏱️ Migrations completed in 0.00s
+    - [pid=6044][out] 🔍 Verifying database integrity after migration...
+    - [pid=6044][out] ✅ Database integrity check passed
+    - [pid=6044][out] ✅ Foreign key check passed
+    - [pid=6044][out] ✅ All migrations completed successfully!
+    - [pid=6044][out]
+    - [pid=6044][out] ✅ Database initialized successfully
+    - [pid=6044][out]
+    - [pid=6044][out] ✅ Drizzle ORM initialized
+    - [pid=6044][out]
+    - [pid=6044][out] 🌱 Checking if seed data is needed...
+    - [pid=6044][out] ⏭️ Database already seeded, skipping...
+    - [pid=6044][out] info: Office printer IPC handlers registered {"service":"office-printer-service","timestamp":"2025-11-20 00:04:13"}
+    - [pid=6044][out] info: PDF-to-Printer library loaded successfully {"service":"office-printer-service","timestamp":"2025-11-20 00:04:13"}
+    - [pid=6044][out] info: Printer health monitoring started {"service":"office-printer-service","timestamp":"2025-11-20 00:04:13"}
+    - [pid=6044][out] info: Office Printer Service initialized {"service":"office-printer-service","timestamp":"2025-11-20 00:04:13"}
+    - [pid=6044][out] ✅ PDF Receipt Service initialized
+    - <ws disconnected> ws://127.0.0.1:53046/b26e8b68-0940-4d08-8a95-1255980c270a code=1006 reason=
+    - [pid=6044] <kill>
+    - [pid=6044] <will force kill>
+    - [pid=6044] taskkill stderr: ERROR: The process "6044" not found.
+    - [pid=6044] <process did exit: exitCode=0, signal=null>
+    - [pid=6044] starting temporary directories cleanup
+    - [pid=6044] finished temporary directories cleanup
+      143 |
+      144 | if (existsSync(devMainEntry)) {
+      > 145 | electronApp = await electron.launch({
+            |                           ^
+      146 | executablePath: electronBinary,
+      147 | args: [devMainEntry, ...launchArgs],
+      148 | timeout: 60000,
+      at Object.base.extend.electronApp.scope (D:\a\AuraSwift\AuraSwift\tests\e2e.spec.ts:145:27)
+2.  tests\e2e.spec.ts:262:3 › Vite Build & TypeScript Integration › Vite development assets load correctly
+    Error: electron.launch: Process failed to launch!
+    Call log:
+    - <launching> "D:\a\AuraSwift\AuraSwift\node_modules\electron\dist\electron.exe" "--inspect=0" "--remote-debugging-port=0" "packages/entry-point.mjs" "--no-sandbox" "--disable-gpu" "--disable-dev-shm-usage" "--disable-extensions"
+    - <launched> pid=6640
+    - [pid=6640][out]
+    - [pid=6640][err] Debugger listening on ws://127.0.0.1:53055/ac34f704-cfc9-4ad7-be96-dc6f0a20ae94
+    - [pid=6640][err] For help, see: https://nodejs.org/en/docs/inspector
+    - <ws connecting> ws://127.0.0.1:53055/ac34f704-cfc9-4ad7-be96-dc6f0a20ae94
+    - <ws connected> ws://127.0.0.1:53055/ac34f704-cfc9-4ad7-be96-dc6f0a20ae94
+    - [pid=6640][err] Debugger attached.
+    - [pid=6640][out] Development mode: Using project directory for database
+    - [pid=6640][out] Database at: D:\a\AuraSwift\AuraSwift\packages\data\pos_system.db
+    - [pid=6640][out] Database path: D:\a\AuraSwift\AuraSwift\packages\data\pos_system.db
+    - [pid=6640][out]
+    - [pid=6640][out] 🚀 Running Drizzle ORM Migrations...
+    - [pid=6640][out] 🛠️ Development mode: Relaxed migration checks
+    - [pid=6640][out] 📁 Migrations folder: D:\a\AuraSwift\AuraSwift\packages\main\dist\migrations
+    - [pid=6640][out] 🔍 Checking database integrity...
+    - [pid=6640][out] ✅ Database integrity check passed
+    - [pid=6640][out] ✅ Foreign key check passed
+    - [pid=6640][out] 📦 Backup created: D:\a\AuraSwift\AuraSwift\packages\data\backups\auraswift-backup-2025-11-20T00-04-16-488Z.db
+    - [pid=6640][out] ⚙️ Applying pending migrations...
+    - [pid=6640][out] ⏱️ Migrations completed in 0.00s
+    - [pid=6640][out] 🔍 Verifying database integrity after migration...
+    - [pid=6640][out] ✅ Database integrity check passed
+    - [pid=6640][out] ✅ Foreign key check passed
+    - [pid=6640][out] ✅ All migrations completed successfully!
+    - [pid=6640][out]
+    - [pid=6640][out] ✅ Database initialized successfully
+    - [pid=6640][out]
+    - [pid=6640][out] ✅ Drizzle ORM initialized
+    - [pid=6640][out]
+    - [pid=6640][out] 🌱 Checking if seed data is needed...
+    - [pid=6640][out] ⏭️ Database already seeded, skipping...
+    - [pid=6640][out] info: Office printer IPC handlers registered {"service":"office-printer-service","timestamp":"2025-11-20 00:04:16"}
+    - [pid=6640][out] info: PDF-to-Printer library loaded successfully {"service":"office-printer-service","timestamp":"2025-11-20 00:04:16"}
+    - [pid=6640][out] info: Printer health monitoring started {"service":"office-printer-service","timestamp":"2025-11-20 00:04:16"}
+    - [pid=6640][out] info: Office Printer Service initialized {"service":"office-printer-service","timestamp":"2025-11-20 00:04:16"}
+    - [pid=6640][out] ✅ PDF Receipt Service initialized
+    - <ws disconnected> ws://127.0.0.1:53055/ac34f704-cfc9-4ad7-be96-dc6f0a20ae94 code=1006 reason=
+    - [pid=6640] <kill>
+    - [pid=6640] <will force kill>
+    - [pid=6640] taskkill stderr: ERROR: The process "6640" not found.
+    - [pid=6640] <process did exit: exitCode=0, signal=null>
+    - [pid=6640] starting temporary directories cleanup
+    - [pid=6640] finished temporary directories cleanup
+      143 |
+      144 | if (existsSync(devMainEntry)) {
+      > 145 | electronApp = await electron.launch({
+            |                           ^
+      146 | executablePath: electronBinary,
+      147 | args: [devMainEntry, ...launchArgs],
+      148 | timeout: 60000,
+      at Object.base.extend.electronApp.scope (D:\a\AuraSwift\AuraSwift\tests\e2e.spec.ts:145:27)
+3.  tests\e2e.spec.ts:285:3 › Vite Build & TypeScript Integration › TypeScript compilation produces working code
+    Error: electron.launch: Process failed to launch!
+    Call log: - <launching> "D:\a\AuraSwift\AuraSwift\node_modules\electron\dist\electron.exe" "--inspect=0" "--remote-debugging-port=0" "packages/entry-point.mjs" "--no-sandbox" "--disable-gpu" "--disable-dev-shm-usage" "--disable-extensions" - <launched> pid=5412 - [pid=5412][out] - [pid=5412][err] Debugger listening on ws://127.0.0.1:53060/7fddfe13-a864-44de-9f33-762862792e96 - [pid=5412][err] For help, see: https://nodejs.org/en/docs/inspector - <ws connecting> ws://127.0.0.1:53060/7fddfe13-a864-44de-9f33-762862792e96 - <ws connected> ws://127.0.0.1:53060/7fddfe13-a864-44de-9f33-762862792e96 - [pid=5412][err] Debugger attached. - [pid=5412][out] Development mode: Using project directory for database - [pid=5412][out] Database at: D:\a\AuraSwift\AuraSwift\packages\data\pos_system.db - [pid=5412][out] Database path: D:\a\AuraSwift\AuraSwift\packages\data\pos_system.db - [pid=5412][out] - [pid=5412][out] 🚀 Running Drizzle ORM Migrations... - [pid=5412][out] 🛠️ Development mode: Relaxed migration checks - [pid=5412][out] 📁 Migrations folder: D:\a\AuraSwift\AuraSwift\packages\main\dist\migrations - [pid=5412][out] 🔍 Checking database integrity... - [pid=5412][out] ✅ Database integrity check passed - [pid=5412][out] ✅ Foreign key check passed - [pid=5412][out] 📦 Backup created: D:\a\AuraSwift\AuraSwift\packages\data\backups\auraswift-backup-2025-11-20T00-04-20-048Z.db - [pid=5412][out] ⚙️ Applying pending migrations... - [pid=5412][out] ⏱️ Migrations completed in 0.00s - [pid=5412][out] 🔍 Verifying database integrity after migration... - [pid=5412][out] ✅ Database integrity check passed - [pid=5412][out] ✅ Foreign key check passed - [pid=5412][out] ✅ All migrations completed successfully! - [pid=5412][out] - [pid=5412][out] ✅ Database initialized successfully - [pid=5412][out] - [pid=5412][out] ✅ Drizzle ORM initialized - [pid=5412][out] - [pid=5412][out] 🌱 Checking if seed data is needed... - [pid=5412][out] ⏭️ Database already seeded, skipping... - [pid=5412][out] info: Office printer IPC handlers registered {"service":"office-printer-service","timestamp":"2025-11-20 00:04:20"} - [pid=5412][out] info: PDF-to-Printer library loaded successfully {"service":"office-printer-service","timestamp":"2025-11-20 00:04:20"} - [pid=5412][out] info: Printer health monitoring started {"service":"office-printer-service","timestamp":"2025-11-20 00:04:20"} - [pid=5412][out] info: Office Printer Service initialized {"service":"office-printer-service","timestamp":"2025-11-20 00:04:20"} - [pid=5412][out] ✅ PDF Receipt Service initialized - <ws disconnected> ws://127.0.0.1:53060/7fddfe13-a864-44de-9f33-762862792e96 code=1006 reason= - [pid=5412] <kill> - [pid=5412] <will force kill> - [pid=5412] taskkill stderr: ERROR: The process "5412" not found. - [pid=5412] <process did exit: exitCode=0, signal=null> - [pid=5412] starting temporary directories cleanup - [pid=5412] finished temporary directories cleanup
+    143 |
+    144 | if (existsSync(devMainEntry)) { > 145 | electronApp = await electron.launch({
+    | ^
+    146 | executablePath: electronBinary,
+    147 | args: [devMainEntry, ...launchArgs],
+    148 | timeout: 60000,
+    at Object.base.extend.electronApp.scope (D:\a\AuraSwift\AuraSwift\tests\e2e.spec.ts:145:27)
+    3 failed
+    tests\e2e.spec.ts:196:3 › Build Environment Debug › Check build output structure ───────────────
+    tests\e2e.spec.ts:262:3 › Vite Build & TypeScript Integration › Vite development assets load correctly
+    tests\e2e.spec.ts:285:3 › Vite Build & TypeScript Integration › TypeScript compilation produces working code
+    17 passed (46.7s)
+    Error: Process completed with exit code 1.
