@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 import { Store, LogOut, User, Bell, Settings, Clock } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
-import { ClockOutWarningDialog } from "@/features/auth/components/clock-out-warning-dialog";
+import { ClockOutWarningDialog } from "@/views/auth/components/clock-out-warning-dialog";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -132,14 +132,15 @@ export function DashboardLayout({
                 <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
                   <User className="w-4 h-4" />
                 </div>
-                {activeShift && (user.role === "cashier" || user.role === "manager") && (
-                  <div className="flex items-center gap-1 px-2 py-1 bg-green-100 rounded-full">
-                    <Clock className="w-3 h-3 text-green-700" />
-                    <span className="text-xs font-medium text-green-700">
-                      Clocked In
-                    </span>
-                  </div>
-                )}
+                {activeShift &&
+                  (user.role === "cashier" || user.role === "manager") && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-green-100 rounded-full">
+                      <Clock className="w-3 h-3 text-green-700" />
+                      <span className="text-xs font-medium text-green-700">
+                        Clocked In
+                      </span>
+                    </div>
+                  )}
               </div>
               <Button
                 onClick={handleLogout}

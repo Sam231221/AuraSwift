@@ -28,9 +28,9 @@ import {
 
 import { useAuth } from "@/shared/hooks";
 import { useNavigate } from "react-router-dom";
-import RefundTransactionView from "@/features/transactions/components/refund-transaction-view.tsx";
-import VoidTransactionModal from "@/features/transactions/components/void-transaction-view.tsx";
-import CashDrawerCountModal from "@/features/transactions/components/cash-drawer-count-modal";
+import RefundTransactionView from "./components/refund-transaction-view";
+import VoidTransactionModal from "./components/void-transaction-view";
+import CashDrawerCountModal from "./components/cash-drawer-count-modal";
 
 // TypeScript interfaces
 interface Transaction {
@@ -53,28 +53,6 @@ interface TransactionItem {
   totalPrice: number;
   refundedQuantity?: number;
 }
-
-/**
- * SHIFT vs SCHEDULE DISTINCTION (as per shifttimeCase.md):
- *
- * Scenario Implemented:
- * 1. Manager creates schedule: 2 PM - 9 PM (Sept 26)
- * 2. Cashier logs in late at 3:33 PM
- * 3. Manager later extends end time to 10 PM and sets start time to 1 PM
- * 4. Dashboard shows:
- *    - Scheduled Shift: 1:00 PM – 10:00 PM
- *    - Clocked In: 3:33 PM (33m late)
- *    - Ends: 10:00 PM
- *    - Time Remaining: 6h 27m (calculated from scheduled end time)
- *
- * Key Implementation:
- * - Schedule = What manager planned (can be updated live)
- * - Shift = What actually happened (actual clock-in/out times - never overwritten)
- * - Time remaining calculated from SCHEDULED end time
- * - Progress calculated from ACTUAL start time to SCHEDULED end time
- * - Manager changes update live every 30 seconds while preserving actual work times
- * - Reports will show variance between scheduled vs actual hours
- */
 
 interface Shift {
   id: string;
@@ -116,12 +94,12 @@ interface ShiftStats {
   totalRefunds: number;
   totalVoids: number;
 }
-interface CashierDashboardViewProps {
+interface CashierDashboardPageProps {
   onNewTransaction: () => void;
 }
-const CashierDashboardView = ({
+const CashierDashboardPage = ({
   onNewTransaction,
-}: CashierDashboardViewProps) => {
+}: CashierDashboardPageProps) => {
   // State management
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
@@ -1674,4 +1652,4 @@ const CashierDashboardView = ({
   );
 };
 
-export default memo(CashierDashboardView);
+export default memo(CashierDashboardPage);

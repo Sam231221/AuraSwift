@@ -52,24 +52,21 @@ import { ScannerAudio } from "@/shared/services/scanner-audio";
 import {
   useReceiptPrintingFlow,
   useThermalPrinter,
-} from "@/features/transactions/hooks/use-thermal-printer";
-import { ReceiptPrinterStatus } from "./receipt-printer-components";
+} from "./hooks/use-thermal-printer";
+import { ReceiptPrinterStatus } from "./components/receipt-printer-components";
 import type { TransactionData, PrinterConfig } from "@/types/printer";
-import { useCardPayment } from "@/features/transactions/hooks/use-stripe-terminal";
-import { PaymentStatusModal } from "./payment-components";
-import RefundTransactionView from "./refund-transaction-view";
-import VoidTransactionModal from "./void-transaction-view";
-import CashDrawerCountModal from "./cash-drawer-count-modal";
-import { QuickActionButtons } from "./quick-actions-buttons";
-import { NumericKeypad } from "./numeric-keypad";
-import type {
-  CartSession,
-  CartItemWithProduct,
-} from "@/features/transactions/types/cart.types";
+import { useCardPayment } from "./hooks/use-stripe-terminal";
+import { PaymentStatusModal } from "./components/payment-components";
+import RefundTransactionView from "./components/refund-transaction-view";
+import VoidTransactionModal from "./components/void-transaction-view";
+import CashDrawerCountModal from "./components/cash-drawer-count-modal";
+import { QuickActionButtons } from "./components/quick-actions-buttons";
+import { NumericKeypad } from "./components/numeric-keypad";
+import type { CartSession, CartItemWithProduct } from "./types/cart.types";
 import { ScaleDisplay } from "@/components/scale/ScaleDisplay";
-import { AgeVerificationModal } from "./age-verification-modal";
-import { GenericItemPriceModal } from "./generic-item-price-modal";
-import { QuickActionsCarousel } from "./quick-actions-transaction-carousel";
+import { AgeVerificationModal } from "./components/age-verification-modal";
+import { GenericItemPriceModal } from "./components/generic-item-price-modal";
+import { QuickActionsCarousel } from "./components/quick-actions-transaction-carousel";
 
 interface PaymentMethod {
   type: "cash" | "card" | "mobile" | "voucher" | "split";
@@ -2293,13 +2290,9 @@ const NewTransactionView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-center">
-              <Button
-                onClick={() => loadShiftData(true)}
-                variant="outline"
-                size="lg"
-              >
+              <Button onClick={() => logout()} variant="outline" size="lg">
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
+                Logout
               </Button>
             </div>
           </CardContent>

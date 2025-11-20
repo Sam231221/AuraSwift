@@ -33,7 +33,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-export const AdminDashboardView = ({ onFront }: { onFront: () => void }) => {
+const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
   const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
   const [isEmptyDialogOpen, setIsEmptyDialogOpen] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -454,3 +454,4 @@ export const AdminDashboardView = ({ onFront }: { onFront: () => void }) => {
     </>
   );
 };
+export default AdminDashboardPage;

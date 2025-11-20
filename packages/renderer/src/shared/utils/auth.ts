@@ -1,4 +1,4 @@
-import type { User } from "@/features/auth/types/auth.types";
+import type { User } from "@/views/auth/types/auth.types";
 
 /**
  * Check if a user has a specific permission

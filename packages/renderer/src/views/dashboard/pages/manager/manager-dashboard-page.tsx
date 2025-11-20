@@ -15,7 +15,7 @@ import {
   Package,
 } from "lucide-react";
 
-export const ManagerDashboardView = ({
+const ManagerDashboardPage = ({
   onStaffSchedules,
   onManageProducts,
   onManageCashiers,
@@ -167,3 +167,4 @@ export const ManagerDashboardView = ({
     </div>
   );
 };
+export default ManagerDashboardPage;

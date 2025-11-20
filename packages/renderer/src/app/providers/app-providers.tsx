@@ -1,4 +1,4 @@
-import { AuthProvider } from "@/features/auth/context/auth-context";
+import { AuthProvider } from "@/views/auth/context/auth-context";
 
 interface AppProvidersProps {
   children: React.ReactNode;

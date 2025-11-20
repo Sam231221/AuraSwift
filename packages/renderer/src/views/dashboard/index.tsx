@@ -1,7 +1,7 @@
-import { AdminDashboard } from "./admin-view";
-import ManagerDashboard from "./manager-view";
-import CashierDashboard from "./cashier-view";
 import { useAuth } from "@/shared/hooks";
+import { AdminDashboard } from "./admin-view";
+import { CashierDashboard } from "./cashier-view";
+import { ManagerDashboard } from "./manager-view";
 
 type Role = "admin" | "manager" | "cashier";
 

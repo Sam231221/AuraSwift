@@ -1,53 +1,38 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import NewTransactionView from "@/features/transactions/components/new-transaction-view";
-import CashierDashboardView from "@/features/sales/components/cashier-dashboard-view";
-import { useAuth } from "@/shared/hooks/use-auth";
 
-export default function CashierDashboard() {
-  const [currentView, setCurrentView] = useState<
-    "dashboard" | "newTransaction"
-  >("newTransaction");
+import { ViewTransitionContainer } from "@/shared/components";
+import { useViewNavigation, useViewMap } from "@/shared/hooks";
 
+import { useAuth } from "@/shared/hooks";
+
+import {
+  CASHIER_VIEWS,
+  type CashierView,
+  createCashierViewDefinitions,
+} from "./view-definitions";
+
+export const CashierDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentView, navigateTo } = useViewNavigation<CashierView>(
+    "newTransaction",
+    CASHIER_VIEWS
+  );
 
   useEffect(() => {
     if (!user) {
       navigate("/");
     }
   }, [user, navigate]);
+
+  const views = useViewMap(createCashierViewDefinitions, navigateTo);
+
   if (!user) return null;
 
   return (
     <>
-      <div className="grid gap-6">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentView}
-            initial={{
-              x: currentView === "dashboard" ? 300 : -300,
-              opacity: 0,
-            }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{
-              x: currentView === "dashboard" ? -300 : 300,
-              opacity: 0,
-            }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="w-full"
-          >
-            {currentView === "dashboard" ? (
-              <CashierDashboardView
-                onNewTransaction={() => setCurrentView("newTransaction")}
-              />
-            ) : currentView === "newTransaction" ? (
-              <NewTransactionView onBack={() => setCurrentView("dashboard")} />
-            ) : null}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      <ViewTransitionContainer currentView={currentView} views={views} />
     </>
   );
-}
+};

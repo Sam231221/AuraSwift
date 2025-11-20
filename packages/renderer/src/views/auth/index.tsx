@@ -1,9 +1,10 @@
 import {
-  AuthHeroSection,
-  AuthHeader,
   AuthFooter,
+  AuthHeader,
+  AuthHeroSection,
   AuthUserSelection,
-} from "@/features/auth/components";
+} from "@/views/auth/components";
+
 export default function AuthPage() {
   return (
     <div className="flex flex-col min-h-screen">
