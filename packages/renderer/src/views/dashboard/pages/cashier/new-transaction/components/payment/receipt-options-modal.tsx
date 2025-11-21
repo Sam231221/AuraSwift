@@ -1,9 +1,8 @@
 /**
  * Receipt options modal component
- * Shown after cash payment completion
+ * Shown after successful transaction completion for all payment types
  */
 
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
   CheckCircle,
@@ -24,6 +23,10 @@ interface ReceiptOptionsModalProps {
   onEmail: () => void;
   onClose: () => void;
   onCancel: () => void;
+  printerStatus?: {
+    connected: boolean;
+    error: string | null;
+  };
 }
 
 export function ReceiptOptionsModal({
@@ -34,14 +37,34 @@ export function ReceiptOptionsModal({
   onEmail,
   onClose,
   onCancel,
+  printerStatus = { connected: true, error: null },
 }: ReceiptOptionsModalProps) {
   if (!isOpen || !transactionData) return null;
 
+  // Determine payment method and if it's a cash payment
+  const paymentMethod = transactionData.paymentMethods[0]?.type || "cash";
+  const isCashPayment = paymentMethod === "cash";
+
+  // Format payment method name for display
+  const getPaymentMethodName = (method: string) => {
+    switch (method) {
+      case "card":
+        return "Card Payment";
+      case "mobile":
+        return "Mobile Payment";
+      case "digital":
+        return "Digital Payment";
+      case "voucher":
+        return "Voucher";
+      case "split":
+        return "Split Payment";
+      default:
+        return "Cash Payment";
+    }
+  };
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+    <div
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -51,13 +74,7 @@ export function ReceiptOptionsModal({
         }
       }}
     >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: 10 }}
-        transition={{ type: "spring", duration: 0.5 }}
-        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden"
-      >
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
         {/* Header */}
         <div className="bg-linear-to-r from-green-500 to-emerald-600 p-6 relative">
           <button
@@ -92,17 +109,28 @@ export function ReceiptOptionsModal({
               </span>
             </div>
             <div className="pt-3 border-t border-slate-200 space-y-2">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-600">Cash Received:</span>
-                <span className="font-semibold text-slate-700">
-                  £{transactionData.amountPaid.toFixed(2)}
-                </span>
-              </div>
-              {transactionData.change > 0 && (
+              {isCashPayment ? (
+                <>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-600">Cash Received:</span>
+                    <span className="font-semibold text-slate-700">
+                      £{transactionData.amountPaid.toFixed(2)}
+                    </span>
+                  </div>
+                  {transactionData.change > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-slate-600">Change Given:</span>
+                      <span className="font-bold text-green-600 text-lg">
+                        £{transactionData.change.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </>
+              ) : (
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-600">Change Given:</span>
-                  <span className="font-bold text-green-600 text-lg">
-                    £{transactionData.change.toFixed(2)}
+                  <span className="text-slate-600">Payment Method:</span>
+                  <span className="font-semibold text-slate-700">
+                    {getPaymentMethodName(paymentMethod)}
                   </span>
                 </div>
               )}
@@ -116,18 +144,27 @@ export function ReceiptOptionsModal({
             </p>
 
             {/* Print Receipt Button */}
-            <Button
-              onClick={onPrint}
-              className="w-full h-16 bg-linear-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white flex items-center justify-between px-6 text-base font-semibold shadow-md hover:shadow-lg transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
-                  <Printer className="h-5 w-5" />
+            <div className="space-y-2">
+              <Button
+                onClick={onPrint}
+                disabled={!printerStatus.connected}
+                className="w-full h-16 bg-linear-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 disabled:from-slate-400 disabled:to-slate-500 disabled:cursor-not-allowed text-white flex items-center justify-between px-6 text-base font-semibold shadow-md hover:shadow-lg transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Printer className="h-5 w-5" />
+                  </div>
+                  <span>Print Receipt</span>
                 </div>
-                <span>Print Receipt</span>
-              </div>
-              <ChevronRight className="h-5 w-5" />
-            </Button>
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+              {!printerStatus.connected && (
+                <p className="text-xs text-amber-600 text-center px-2">
+                  ⚠️ Printer is not connected. You can download the receipt or
+                  print later from transaction history.
+                </p>
+              )}
+            </div>
 
             {/* Download Receipt Button */}
             <Button
@@ -187,7 +224,7 @@ export function ReceiptOptionsModal({
             </p>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }

@@ -274,7 +274,7 @@ declare global {
         subtotal: number;
         tax: number;
         total: number;
-        paymentMethod: "cash" | "card" | "mixed";
+        paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
         cashAmount?: number;
         cardAmount?: number;
         items: Array<{
@@ -305,7 +305,7 @@ declare global {
         cartSessionId: string;
         shiftId: string;
         businessId: string;
-        paymentMethod: "cash" | "card" | "mixed";
+        paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
         cashAmount?: number;
         cardAmount?: number;
         receiptNumber: string;

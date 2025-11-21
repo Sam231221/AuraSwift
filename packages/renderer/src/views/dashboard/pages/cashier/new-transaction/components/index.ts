@@ -30,8 +30,6 @@ export * from "./payment/payment-actions";
 export * from "./payment/payment-panel";
 export * from "./payment/receipt-options-modal";
 
-// Input
-export * from "./input/barcode-scanner-input";
 export * from "./input/weight-input-display";
 export * from "./input/category-price-input-display";
 

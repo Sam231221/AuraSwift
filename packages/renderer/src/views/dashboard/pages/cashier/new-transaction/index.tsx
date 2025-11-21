@@ -24,7 +24,6 @@ import {
   useCategories,
   useWeightInput,
   useCategoryPriceInput,
-  useBarcodeScanner,
   useShift,
   usePayment,
 } from "./hooks";
@@ -38,7 +37,6 @@ import {
   ProductSelectionPanel,
   CartPanel,
   PaymentPanel,
-  BarcodeScannerInput,
   WeightInputDisplay,
   CategoryPriceInputDisplay,
 } from "./components";
@@ -50,7 +48,6 @@ import {
   QuickActionButtons,
   NumericKeypad,
   PaymentStatusModal,
-  ReceiptPrinterStatus,
 } from "./components/shared";
 import {
   AgeVerificationModal,
@@ -104,16 +101,8 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   const [showScaleDisplay, setShowScaleDisplay] = useState(false);
 
   // Receipt printing flow
-  const {
-    isShowingStatus,
-    printStatus,
-    printerInfo,
-    startPrintingFlow,
-    handleRetryPrint,
-    handleSkipReceipt,
-    handleEmailReceipt,
-    handleNewSale,
-  } = useReceiptPrintingFlow();
+  const { isShowingStatus, startPrintingFlow, handleSkipReceipt } =
+    useReceiptPrintingFlow();
 
   // Thermal printer
   const { connectPrinter: connectPrinterInternal } = useThermalPrinter();
@@ -203,34 +192,6 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
       await cart.initializeCartSession();
       return;
     },
-  });
-
-  // Barcode scanner hook
-  const barcodeScanner = useBarcodeScanner({
-    products: products.products,
-    onProductFound: async (product, weight) => {
-      await handleProductClick(product, weight);
-    },
-    selectedWeightProduct: weightInput.selectedWeightProduct,
-    weightInput: weightInput.weightInput,
-    weightDisplayPrice: weightInput.weightDisplayPrice,
-    onSetSelectedWeightProduct: weightInput.setSelectedWeightProduct,
-    onSetWeightInput: async (value) => {
-      const weightValue = weightInput.handleWeightInput(value);
-      if (weightValue !== undefined && weightValue > 0) {
-        // Weight was entered via Enter key
-        if (weightInput.selectedWeightProduct) {
-          await handleProductClick(
-            weightInput.selectedWeightProduct,
-            weightValue
-          );
-        }
-      }
-    },
-    onSetWeightDisplayPrice: () => {
-      // This is handled by handleWeightInput
-    },
-    onClearCategorySelection: () => categoryPriceInput.resetPriceInput(),
   });
 
   // Check if operations should be disabled
@@ -372,6 +333,14 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     initPrinter();
   }, [connectPrinter]);
 
+  // Ensure printer status modal doesn't show when receipt options modal should be shown
+  // This prevents flicker when completing cash payments
+  useEffect(() => {
+    if (payment.showReceiptOptions && isShowingStatus) {
+      handleSkipReceipt();
+    }
+  }, [payment.showReceiptOptions, isShowingStatus, handleSkipReceipt]);
+
   // Early returns
   if (!user) {
     navigate("/");
@@ -477,12 +446,6 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
 
           <div className="bg-white border-t-black-200 shadow-lg shrink-0">
             <CardContent className="p-2">
-              <BarcodeScannerInput
-                barcodeInput={barcodeScanner.barcodeInput}
-                onBarcodeInputChange={barcodeScanner.setBarcodeInput}
-                onBarcodeScan={barcodeScanner.handleBarcodeScan}
-              />
-
               {/* Scale Display for Weighted Products (shown by default) */}
               {weightInput.selectedWeightProduct &&
                 isWeightedProduct(weightInput.selectedWeightProduct) &&
@@ -773,23 +736,6 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
         />
       )}
 
-      {/* Receipt Printer Status Modal */}
-      {/* Only show printer modal if not showing receipt options (cash payments) or card payment */}
-      {isShowingStatus && !payment.showCardPayment && !payment.showReceiptOptions && (
-        <ReceiptPrinterStatus
-          printStatus={printStatus}
-          printerInfo={printerInfo || undefined}
-          onRetryPrint={handleRetryPrint}
-          onSkipReceipt={handleSkipReceipt}
-          onEmailReceipt={handleEmailReceipt}
-          onNewSale={async () => {
-            handleNewSale();
-            await cart.initializeCartSession();
-            payment.setPaymentStep(false);
-          }}
-        />
-      )}
-
       {/* Card Payment Status Modal */}
       {payment.showCardPayment && (
         <PaymentStatusModal
@@ -821,6 +767,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
           onEmail={payment.handleEmailReceiptOption}
           onClose={payment.handleCloseReceiptOptions}
           onCancel={payment.handleCancelPayment}
+          printerStatus={payment.printerStatus}
         />
       )}
     </>

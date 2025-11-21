@@ -1281,6 +1281,86 @@ ipcMain.handle("transactions:createFromCart", async (event, data) => {
 
     console.log("Transaction created successfully:", transaction.id);
 
+    // Update inventory levels for sold products
+    try {
+      const cashierId = cartSession.cashierId;
+
+      for (const item of transaction.items) {
+        // Only update inventory for products (not category items)
+        if (!item.productId) {
+          continue;
+        }
+
+        // Get product to check if inventory tracking is enabled
+        try {
+          const product = await db.products.getProductById(item.productId);
+
+          if (!product.trackInventory) {
+            console.log(
+              `Skipping inventory update for product ${item.productId} - tracking disabled`
+            );
+            continue;
+          }
+
+          // Calculate quantity to decrement
+          let quantityToDecrement: number;
+          if (item.itemType === "WEIGHT" && item.weight) {
+            // For weight-based items, decrement by weight
+            quantityToDecrement = item.weight;
+          } else {
+            // For unit-based items, decrement by quantity
+            quantityToDecrement = item.quantity || 1;
+          }
+
+          // Check if sufficient stock available
+          const currentStock = product.stockLevel ?? 0;
+          if (currentStock < quantityToDecrement) {
+            console.warn(
+              `⚠️ Insufficient stock for product ${item.productId}. Current: ${currentStock}, Required: ${quantityToDecrement}`
+            );
+            // Still decrement (allow negative stock) but log warning
+            // In production, you might want to prevent the transaction or handle differently
+          }
+
+          // Create stock adjustment to record the sale
+          try {
+            db.inventory.createStockAdjustment({
+              productId: item.productId,
+              type: "sale",
+              quantity: quantityToDecrement,
+              reason: `Sale - Transaction ${transaction.id}`,
+              note: null,
+              userId: cashierId,
+              businessId: data.businessId,
+            });
+            console.log(
+              `✅ Updated inventory for product ${item.productId}: -${quantityToDecrement}`
+            );
+          } catch (inventoryError) {
+            console.error(
+              `Failed to update inventory for product ${item.productId}:`,
+              inventoryError
+            );
+            // Don't fail the transaction if inventory update fails
+            // Log error but continue
+          }
+        } catch (productError) {
+          console.error(
+            `Failed to get product ${item.productId} for inventory update:`,
+            productError
+          );
+          // Continue with next item
+        }
+      }
+    } catch (inventoryError) {
+      console.error(
+        "Error updating inventory after transaction:",
+        inventoryError
+      );
+      // Don't fail the transaction if inventory update fails
+      // Transaction is already saved, inventory can be corrected manually
+    }
+
     // Convert to plain object to ensure serialization works
     const serializedTransaction = JSON.parse(JSON.stringify(transaction));
 

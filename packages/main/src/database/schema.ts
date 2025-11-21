@@ -863,7 +863,7 @@ export const transactions = createTable("transactions", {
   tax: real("tax").notNull(),
   total: real("total").notNull(),
   paymentMethod: text("paymentMethod", {
-    enum: ["cash", "card", "mixed"],
+    enum: ["cash", "card", "mobile", "voucher", "split"],
   }).notNull(),
   cashAmount: real("cashAmount"),
   cardAmount: real("cardAmount"),
