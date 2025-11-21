@@ -1,0 +1,63 @@
+/**
+ * Example Component Test for ProductCard
+ * 
+ * This is an example file showing how to structure component tests.
+ * Copy this file and remove .example extension to create actual tests.
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { ProductCard } from '@/views/dashboard/pages/cashier/new-transaction/components/product-selection/product-card';
+
+describe('ProductCard', () => {
+  const mockProduct = {
+    id: '1',
+    name: 'Test Product',
+    price: 10.99,
+    stock: 100,
+    businessId: 'business-1',
+    categoryId: 'category-1',
+  };
+
+  const mockOnSelect = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should render product information correctly', () => {
+    render(<ProductCard product={mockProduct} onSelect={mockOnSelect} />);
+
+    expect(screen.getByText('Test Product')).toBeInTheDocument();
+    expect(screen.getByText(/\$10\.99/)).toBeInTheDocument();
+    expect(screen.getByText(/100/)).toBeInTheDocument(); // Stock
+  });
+
+  it('should call onSelect when product is clicked', async () => {
+    const user = userEvent.setup();
+    render(<ProductCard product={mockProduct} onSelect={mockOnSelect} />);
+
+    const card = screen.getByRole('button', { name: /test product/i });
+    await user.click(card);
+
+    expect(mockOnSelect).toHaveBeenCalledTimes(1);
+    expect(mockOnSelect).toHaveBeenCalledWith(mockProduct.id);
+  });
+
+  it('should display out of stock message when stock is 0', () => {
+    const outOfStockProduct = { ...mockProduct, stock: 0 };
+    render(<ProductCard product={outOfStockProduct} onSelect={mockOnSelect} />);
+
+    expect(screen.getByText(/out of stock/i)).toBeInTheDocument();
+  });
+
+  it('should be disabled when stock is 0', () => {
+    const outOfStockProduct = { ...mockProduct, stock: 0 };
+    render(<ProductCard product={outOfStockProduct} onSelect={mockOnSelect} />);
+
+    const card = screen.getByRole('button');
+    expect(card).toBeDisabled();
+  });
+});
+
