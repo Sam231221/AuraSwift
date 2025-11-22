@@ -190,8 +190,7 @@ export function usePayment({
   processQuickPayment,
   cancelPayment,
   startPrintingFlow,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  isShowingStatus, // Unused - kept for interface compatibility, will be used in future
+  isShowingStatus: _isShowingStatus, // Unused - kept for interface compatibility, will be used in future
   onResetPrintStatus,
   onCartSessionInit,
 }: UsePaymentProps) {

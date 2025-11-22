@@ -30,7 +30,7 @@ export interface CreateTransactionData {
   subtotal: number;
   tax: number;
   total: number;
-  paymentMethod: "cash" | "card" | "mixed";
+  paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
   cashAmount?: number;
   cardAmount?: number;
   items: TransactionItem[];
