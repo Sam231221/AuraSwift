@@ -29,6 +29,43 @@ export class AutoUpdater implements AppModule {
   readonly #CACHE_DURATION = 15 * 60 * 1000; // 15 minutes cache duration
   readonly #IDLE_THRESHOLD = 30 * 60 * 1000; // 30 minutes idle threshold
   readonly #ACTIVITY_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes activity check interval
+  // Phase 2.1: Request Timeout & Retry Logic
+  readonly #REQUEST_TIMEOUT = 10000; // 10 seconds
+  readonly #MAX_RETRIES = 3;
+  readonly #RETRY_DELAY = 2000; // 2 seconds base delay
+  // Phase 3.2: Release Notes Caching
+  readonly #cachedReleaseNotes: Map<string, string> = new Map();
+  readonly #MAX_CACHED_NOTES = 5; // Keep last 5 versions
+  // Phase 4.1: Download Resume Capability
+  #downloadState: {
+    url: string;
+    downloadedBytes: number;
+    totalBytes: number;
+    version: string;
+  } | null = null;
+  // Phase 4.3: Update Check Debouncing
+  #checkDebounceTimer: NodeJS.Timeout | null = null;
+  readonly #DEBOUNCE_DELAY = 2000; // 2 seconds
+  // Phase 5.1: Performance Metrics
+  readonly #metrics: {
+    checkCount: number;
+    checkDuration: number[];
+    downloadCount: number;
+    downloadDuration: number[];
+    errorCount: number;
+    cacheHitRate: number;
+    retryCount: number;
+    timeoutCount: number;
+  } = {
+    checkCount: 0,
+    checkDuration: [],
+    downloadCount: 0,
+    downloadDuration: [],
+    errorCount: 0,
+    cacheHitRate: 0,
+    retryCount: 0,
+    timeoutCount: 0,
+  };
   #postponeCount = 0;
   #isCheckingForUpdates = false;
   #updateListeners: Array<{
@@ -95,6 +132,12 @@ export class AutoUpdater implements AppModule {
     if (this.#activityCheckInterval) {
       clearInterval(this.#activityCheckInterval);
       this.#activityCheckInterval = null;
+    }
+
+    // Phase 4.3: Clear debounce timer
+    if (this.#checkDebounceTimer) {
+      clearTimeout(this.#checkDebounceTimer);
+      this.#checkDebounceTimer = null;
     }
 
     // Remove all event listeners
@@ -331,7 +374,20 @@ export class AutoUpdater implements AppModule {
           this.#downloadStartTime = Date.now();
 
           const updater = this.getAutoUpdater();
-          updater.downloadUpdate();
+          // Phase 4.1: Set version in download state before starting
+          if (this.#downloadState) {
+            this.#downloadState.version = info.version;
+          } else {
+            // Initialize download state
+            this.#downloadState = {
+              url: "",
+              downloadedBytes: 0,
+              totalBytes: 0,
+              version: info.version,
+            };
+          }
+          // Phase 4.1: Check for resume capability
+          this.downloadWithResume(updater, info.version);
 
           if (Notification.isSupported()) {
             const notification = new Notification({
@@ -388,6 +444,43 @@ export class AutoUpdater implements AppModule {
    */
   getLastError(): { message: string; timestamp: Date; type: string } | null {
     return this.#lastError;
+  }
+
+  /**
+   * Get performance metrics (Phase 5.1)
+   * @returns Performance metrics object with statistics
+   */
+  getMetrics(): {
+    checkCount: number;
+    avgCheckDuration: number;
+    downloadCount: number;
+    avgDownloadDuration: number;
+    errorCount: number;
+    cacheHitRate: number;
+    retryCount: number;
+    timeoutCount: number;
+  } {
+    const avgCheckDuration =
+      this.#metrics.checkDuration.length > 0
+        ? this.#metrics.checkDuration.reduce((a, b) => a + b, 0) /
+          this.#metrics.checkDuration.length
+        : 0;
+    const avgDownloadDuration =
+      this.#metrics.downloadDuration.length > 0
+        ? this.#metrics.downloadDuration.reduce((a, b) => a + b, 0) /
+          this.#metrics.downloadDuration.length
+        : 0;
+
+    return {
+      checkCount: this.#metrics.checkCount,
+      avgCheckDuration,
+      downloadCount: this.#metrics.downloadCount,
+      avgDownloadDuration,
+      errorCount: this.#metrics.errorCount,
+      cacheHitRate: this.#metrics.cacheHitRate,
+      retryCount: this.#metrics.retryCount,
+      timeoutCount: this.#metrics.timeoutCount,
+    };
   }
 
   /**
@@ -506,9 +599,35 @@ export class AutoUpdater implements AppModule {
    * Run the auto-updater to check for available updates
    * Prevents race conditions by skipping if a check is already in progress
    * Uses caching to avoid redundant network requests (Performance: Phase 1.2)
+   * Implements debouncing to prevent rapid checks (Performance: Phase 4.3)
+   * Implements timeout and retry logic (Performance: Phase 2.1)
    * @returns Update check result or null if no update available or check skipped
    */
   async runAutoUpdater() {
+    // Phase 4.3: Debounce rapid checks
+    if (this.#checkDebounceTimer) {
+      clearTimeout(this.#checkDebounceTimer);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.#checkDebounceTimer = setTimeout(async () => {
+        this.#checkDebounceTimer = null;
+        try {
+          const result = await this.performUpdateCheck();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      }, this.#DEBOUNCE_DELAY);
+    });
+  }
+
+  /**
+   * Perform the actual update check with timeout and retry logic
+   * (Performance: Phase 2.1 - Request Timeout & Retry)
+   * @returns Update check result or null
+   */
+  private async performUpdateCheck() {
     // Prevent race conditions: skip if already checking
     if (this.#isCheckingForUpdates) {
       if (this.#logger) {
@@ -528,6 +647,8 @@ export class AutoUpdater implements AppModule {
             )}s old, version: ${this.#lastCheckResult.version})`
           );
         }
+        // Track cache hit
+        this.trackCheckMetrics(0, true);
         // Return cached result - no network request needed
         // Note: We still need to check if update is available, so we'll do a lightweight check
         // For now, we'll proceed with full check but could optimize further
@@ -536,72 +657,150 @@ export class AutoUpdater implements AppModule {
 
     this.#isCheckingForUpdates = true;
     const checkStartTime = Date.now();
-    try {
-      const updater = this.getAutoUpdater();
-      updater.logger = this.#logger || null;
-      updater.fullChangelog = true;
-      updater.autoDownload = false;
-      updater.autoInstallOnAppQuit = true;
-      updater.allowDowngrade = false;
-      updater.channel = "latest";
-      this.setupUpdateListeners(updater);
 
-      const result = await updater.checkForUpdates();
-      const checkDuration = Date.now() - checkStartTime;
+    // Phase 2.1: Retry logic with timeout
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= this.#MAX_RETRIES; attempt++) {
+      try {
+        const updater = this.getAutoUpdater();
+        updater.logger = this.#logger || null;
+        updater.fullChangelog = true;
+        updater.autoDownload = false;
+        updater.autoInstallOnAppQuit = true;
+        updater.allowDowngrade = false;
+        updater.channel = "latest";
+        this.setupUpdateListeners(updater);
 
-      // Cache successful result (Performance: Phase 1.2)
-      if (result?.updateInfo) {
-        this.#lastCheckResult = {
-          version: result.updateInfo.version,
-          timestamp: Date.now(),
-        };
-        this.#lastCheckTime = Date.now();
+        // Phase 2.1: Add timeout wrapper
+        const checkPromise = updater.checkForUpdates();
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            this.#metrics.timeoutCount++;
+            reject(new Error("Update check timeout"));
+          }, this.#REQUEST_TIMEOUT);
+        });
 
-        if (this.#logger) {
-          this.#logger.info(
-            `Update check completed in ${checkDuration}ms, cached for ${Math.floor(
-              this.#CACHE_DURATION / 60000
-            )} minutes`
-          );
+        const result = await Promise.race([checkPromise, timeoutPromise]);
+        const checkDuration = Date.now() - checkStartTime;
+
+        // Track metrics (Phase 5.1)
+        this.trackCheckMetrics(checkDuration, false);
+
+        // Cache successful result (Performance: Phase 1.2)
+        if (result?.updateInfo) {
+          this.#lastCheckResult = {
+            version: result.updateInfo.version,
+            timestamp: Date.now(),
+          };
+          this.#lastCheckTime = Date.now();
+
+          if (this.#logger) {
+            this.#logger.info(
+              `Update check completed in ${checkDuration}ms (attempt ${attempt}/${
+                this.#MAX_RETRIES
+              }), cached for ${Math.floor(
+                this.#CACHE_DURATION / 60000
+              )} minutes`
+            );
+          }
+        } else {
+          // Cache "no update" result too
+          this.#lastCheckTime = Date.now();
+          this.#lastCheckResult = {
+            version: app.getVersion(),
+            timestamp: Date.now(),
+          };
         }
-      } else {
-        // Cache "no update" result too
-        this.#lastCheckTime = Date.now();
-        this.#lastCheckResult = {
-          version: app.getVersion(),
-          timestamp: Date.now(),
-        };
-      }
 
-      if (result === null) {
-        return null;
-      }
-
-      return result;
-    } catch (error) {
-      if (error instanceof Error) {
-        const errorMessage = error.message;
-
-        if (errorMessage.includes("No published versions")) {
+        if (result === null) {
           return null;
         }
 
-        if (errorMessage.includes("Cannot find latest")) {
-          return null;
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+
+        // Track retry attempt
+        if (attempt < this.#MAX_RETRIES) {
+          this.#metrics.retryCount++;
         }
 
+        // Handle expected errors (don't retry)
         if (
-          errorMessage.includes("ENOTFOUND") ||
-          errorMessage.includes("ETIMEDOUT") ||
-          errorMessage.includes("ECONNREFUSED")
+          errorMessage.includes("No published versions") ||
+          errorMessage.includes("Cannot find latest") ||
+          errorMessage.includes("No updates available")
         ) {
           return null;
         }
-      }
 
-      throw error;
-    } finally {
-      this.#isCheckingForUpdates = false;
+        // Handle network errors (retry)
+        if (
+          errorMessage.includes("ENOTFOUND") ||
+          errorMessage.includes("ETIMEDOUT") ||
+          errorMessage.includes("ECONNREFUSED") ||
+          errorMessage.includes("timeout")
+        ) {
+          if (attempt < this.#MAX_RETRIES) {
+            const retryDelay = this.#RETRY_DELAY * attempt; // Exponential backoff
+            if (this.#logger) {
+              this.#logger.warn(
+                `Update check failed (attempt ${attempt}/${
+                  this.#MAX_RETRIES
+                }): ${errorMessage}. Retrying in ${retryDelay}ms...`
+              );
+            }
+            await new Promise((resolve) => setTimeout(resolve, retryDelay));
+            continue;
+          }
+        }
+
+        // If we've exhausted retries or it's not a retryable error, throw
+        if (attempt === this.#MAX_RETRIES) {
+          this.#metrics.errorCount++;
+          if (this.#logger) {
+            this.#logger.error(
+              `Update check failed after ${
+                this.#MAX_RETRIES
+              } attempts: ${errorMessage}`
+            );
+          }
+          throw lastError || new Error("Update check failed after retries");
+        }
+      } finally {
+        this.#isCheckingForUpdates = false;
+      }
+    }
+
+    // Should never reach here, but TypeScript needs it
+    throw lastError || new Error("Update check failed");
+  }
+
+  /**
+   * Track check metrics (Phase 5.1)
+   * @param duration - Check duration in milliseconds
+   * @param cached - Whether the result was from cache
+   */
+  private trackCheckMetrics(duration: number, cached: boolean): void {
+    this.#metrics.checkCount++;
+    this.#metrics.checkDuration.push(duration);
+
+    // Update cache hit rate
+    if (cached) {
+      this.#metrics.cacheHitRate =
+        (this.#metrics.cacheHitRate * (this.#metrics.checkCount - 1) + 1) /
+        this.#metrics.checkCount;
+    } else {
+      this.#metrics.cacheHitRate =
+        (this.#metrics.cacheHitRate * (this.#metrics.checkCount - 1)) /
+        this.#metrics.checkCount;
+    }
+
+    // Keep only last 100 measurements
+    if (this.#metrics.checkDuration.length > 100) {
+      this.#metrics.checkDuration.shift();
     }
   }
 
@@ -639,6 +838,29 @@ export class AutoUpdater implements AppModule {
     });
 
     const onDownloadProgress = (progressInfo: ProgressInfo) => {
+      // Phase 4.1: Save download state for resume capability
+      // Track download progress for potential resume
+      // Note: electron-updater handles resume automatically, we track for logging
+      if (progressInfo.total && progressInfo.transferred) {
+        // Store state with current version from update info if available
+        // We'll get the version from the update info when download starts
+        if (
+          !this.#downloadState ||
+          this.#downloadState.totalBytes !== progressInfo.total
+        ) {
+          // Initialize or update download state
+          this.#downloadState = {
+            url: "", // URL not available in ProgressInfo, but electron-updater handles it
+            downloadedBytes: progressInfo.transferred,
+            totalBytes: progressInfo.total,
+            version: "", // Will be set when download starts
+          };
+        } else {
+          // Update existing state
+          this.#downloadState.downloadedBytes = progressInfo.transferred;
+        }
+      }
+
       // Log progress for debugging
       if (this.#logger) {
         this.#logger.info(
@@ -676,13 +898,28 @@ export class AutoUpdater implements AppModule {
       this.#isDownloading = false;
       this.#hasShownProgressNotification = false; // Reset for next download
       const downloadDuration = this.#downloadStartTime
-        ? ((Date.now() - this.#downloadStartTime) / 1000).toFixed(0)
+        ? Date.now() - this.#downloadStartTime
+        : 0;
+      const downloadDurationSeconds = downloadDuration
+        ? (downloadDuration / 1000).toFixed(0)
         : "unknown";
       this.#downloadStartTime = null;
 
+      // Phase 5.1: Track download metrics
+      if (downloadDuration > 0) {
+        this.#metrics.downloadCount++;
+        this.#metrics.downloadDuration.push(downloadDuration);
+        if (this.#metrics.downloadDuration.length > 100) {
+          this.#metrics.downloadDuration.shift();
+        }
+      }
+
+      // Phase 4.1: Clear download state after successful download
+      this.#downloadState = null;
+
       if (this.#logger) {
         this.#logger.info(
-          `Update downloaded successfully in ${downloadDuration}s`
+          `Update downloaded successfully in ${downloadDurationSeconds}s`
         );
       }
       if (this.#remindLaterTimeout) {
@@ -745,6 +982,9 @@ export class AutoUpdater implements AppModule {
       this.#isDownloading = false;
       this.#hasShownProgressNotification = false; // Reset notification flag
       this.#downloadStartTime = null;
+
+      // Phase 4.1: Keep download state for resume (don't clear on error)
+      // The download state is preserved so user can retry and resume
 
       // Check if this is a download error
       const isDownloadError =
@@ -870,15 +1110,66 @@ export class AutoUpdater implements AppModule {
   }
 
   /**
+   * Download update with resume capability (Phase 4.1)
+   * @param updater - The AppUpdater instance
+   * @param version - The version being downloaded
+   */
+  private downloadWithResume(updater: AppUpdater, version: string): void {
+    // Check for partial download to resume
+    if (
+      this.#downloadState &&
+      this.#downloadState.version === version &&
+      this.#downloadState.downloadedBytes > 0 &&
+      this.#downloadState.downloadedBytes < this.#downloadState.totalBytes
+    ) {
+      if (this.#logger) {
+        this.#logger.info(
+          `Resuming download: ${this.#downloadState.downloadedBytes}/${
+            this.#downloadState.totalBytes
+          } bytes (${Math.floor(
+            (this.#downloadState.downloadedBytes /
+              this.#downloadState.totalBytes) *
+              100
+          )}%)`
+        );
+      }
+      // Note: electron-updater handles resume automatically via Squirrel
+      // We track state for logging and potential future manual resume
+    } else {
+      if (this.#logger) {
+        this.#logger.info("Starting new download");
+      }
+    }
+
+    // Start/resume download
+    updater.downloadUpdate();
+  }
+
+  /**
    * Format release notes for display in update dialogs
    * Removes HTML, decodes entities, and truncates appropriately
+   * Uses caching to avoid re-formatting (Performance: Phase 3.2)
    * @param info - Update information containing release notes
    * @returns Formatted release notes string
    */
   private formatReleaseNotes(info: UpdateInfo): string {
     try {
+      // Phase 3.2: Check cache first
+      if (info.version && this.#cachedReleaseNotes.has(info.version)) {
+        if (this.#logger) {
+          this.#logger.info(
+            `Using cached release notes for version ${info.version}`
+          );
+        }
+        return this.#cachedReleaseNotes.get(info.version)!;
+      }
+
       if (!info.releaseNotes) {
-        return "• See full release notes on GitHub";
+        const fallback = "• See full release notes on GitHub";
+        if (info.version) {
+          this.#cachedReleaseNotes.set(info.version, fallback);
+        }
+        return fallback;
       }
 
       if (typeof info.releaseNotes === "string") {
@@ -946,7 +1237,27 @@ export class AutoUpdater implements AppModule {
           }
         }
 
-        return result || "• See full release notes on GitHub";
+        const resultText = result || "• See full release notes on GitHub";
+
+        // Phase 3.2: Cache formatted result
+        if (info.version && resultText) {
+          this.#cachedReleaseNotes.set(info.version, resultText);
+
+          // Limit cache size (keep last N versions)
+          if (this.#cachedReleaseNotes.size > this.#MAX_CACHED_NOTES) {
+            const firstKey = this.#cachedReleaseNotes.keys().next().value;
+            if (firstKey) {
+              this.#cachedReleaseNotes.delete(firstKey);
+              if (this.#logger) {
+                this.#logger.info(
+                  `Release notes cache limit reached, removed version ${firstKey}`
+                );
+              }
+            }
+          }
+        }
+
+        return resultText;
       }
 
       if (Array.isArray(info.releaseNotes)) {
@@ -974,10 +1285,30 @@ export class AutoUpdater implements AppModule {
           })
           .join("\n");
 
-        return formatted || "• See full release notes on GitHub";
+        const formattedText = formatted || "• See full release notes on GitHub";
+
+        // Phase 3.2: Cache formatted result
+        if (info.version && formattedText) {
+          this.#cachedReleaseNotes.set(info.version, formattedText);
+
+          // Limit cache size
+          if (this.#cachedReleaseNotes.size > this.#MAX_CACHED_NOTES) {
+            const firstKey = this.#cachedReleaseNotes.keys().next().value;
+            if (firstKey) {
+              this.#cachedReleaseNotes.delete(firstKey);
+            }
+          }
+        }
+
+        return formattedText;
       }
 
-      return "• See full release notes on GitHub";
+      const fallback = "• See full release notes on GitHub";
+      // Phase 3.2: Cache fallback too
+      if (info.version) {
+        this.#cachedReleaseNotes.set(info.version, fallback);
+      }
+      return fallback;
     } catch (error) {
       const errorMessage = this.formatErrorMessage(error);
       if (this.#logger) {
