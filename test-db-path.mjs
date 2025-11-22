@@ -33,19 +33,22 @@ function simulateDatabasePath(isPackaged, nodeEnv, electronIsDev, customPath) {
     return devDbPath;
   } else {
     // Simulate getUserDataPath for different platforms
+    // NOTE: In actual production, app.getPath("userData") already includes "AuraSwift"
+    // This simulation adds it manually, which may not match exact production behavior
     const userHome = process.env.HOME || process.env.USERPROFILE || "/tmp";
     let userDataPath;
 
     if (process.platform === "win32") {
-      userDataPath = path.join(userHome, "AppData", "Roaming");
+      userDataPath = path.join(userHome, "AppData", "Roaming", "AuraSwift");
     } else if (process.platform === "darwin") {
-      userDataPath = path.join(userHome, "Library", "Application Support");
+      userDataPath = path.join(userHome, "Library", "Application Support", "AuraSwift");
     } else {
-      userDataPath = path.join(userHome, ".config");
+      userDataPath = path.join(userHome, ".config", "AuraSwift");
     }
 
-    const prodDbPath = path.join(userDataPath, "AuraSwift", "pos_system.db");
-    console.log(`🚀 Result: Production path - ${prodDbPath}`);
+    const prodDbPath = path.join(userDataPath, "pos_system.db");
+    console.log(`🚀 Result: Production path (simulated) - ${prodDbPath}`);
+    console.log(`   ⚠️  Note: Actual production path uses app.getPath("userData") which may differ`);
     return prodDbPath;
   }
 }

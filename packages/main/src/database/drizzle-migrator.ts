@@ -9,6 +9,18 @@
  * - Automatic backups before migrations
  * - Integrity checks before/after
  * - Rollback on failure
+ *
+ * Migration Folder Detection:
+ * - Development: Uses migrations folder relative to dist directory
+ * - Production: Checks multiple locations in order:
+ *   1. process.resourcesPath/migrations (electron-builder extraResources)
+ *   2. __dirname/migrations (inside asar bundle)
+ *   3. app.getAppPath()/node_modules/@app/main/dist/migrations
+ *   4. app.getAppPath()/database/migrations (legacy)
+ *
+ * Expected Bundle Structure (Production):
+ * - migrations/ folder should be in extraResources (electron-builder config)
+ * - Or bundled in the asar archive at: node_modules/@app/main/dist/migrations/
  */
 
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
@@ -33,28 +45,59 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Get migrations folder path - handles both development and production
  * In production, migrations should be bundled with the app
  */
+/**
+ * Get the path to the migrations folder.
+ *
+ * In development, migrations are in the source directory.
+ * In production, checks multiple locations in order:
+ * 1. process.resourcesPath/migrations (extraResources - recommended)
+ * 2. __dirname/migrations (inside asar bundle)
+ * 3. app.getAppPath()/node_modules/@app/main/dist/migrations
+ * 4. app.getAppPath()/database/migrations (legacy)
+ *
+ * @returns Path to migrations folder
+ * @throws Error if folder not found (in production)
+ */
 function getMigrationsFolder(): string {
   // In development, use source folder
   if (!app.isPackaged) {
-    return join(__dirname, "migrations");
+    const devPath = join(__dirname, "migrations");
+    if (!existsSync(devPath)) {
+      throw new Error(
+        `Development migrations folder not found: ${devPath}\n` +
+          "Make sure migrations folder exists in packages/main/src/database/"
+      );
+    }
+    return devPath;
   }
 
   // In production, migrations are bundled in the app
   // Try multiple locations in order of preference
   // IMPORTANT: Check extraResources FIRST (electron-builder puts them there)
 
+  const checkedPaths: string[] = [];
+
   // Option 1: Check using extraResources (outside asar) - THIS IS WHERE ELECTRON-BUILDER PUTS THEM
+  // This is the recommended location for electron-builder
   const resourcesPath = process.resourcesPath;
   if (resourcesPath) {
     const resourcesMigrationsPath = join(resourcesPath, "migrations");
+    checkedPaths.push(
+      `1. ${resourcesMigrationsPath} (extraResources - recommended)`
+    );
     if (existsSync(resourcesMigrationsPath)) {
+      console.log(
+        `   📁 Found migrations in extraResources: ${resourcesMigrationsPath}`
+      );
       return resourcesMigrationsPath;
     }
   }
 
   // Option 2: Check relative to current file (inside asar: node_modules/@app/main/dist/migrations)
   const distMigrationsPath = join(__dirname, "migrations");
+  checkedPaths.push(`2. ${distMigrationsPath} (inside asar)`);
   if (existsSync(distMigrationsPath)) {
+    console.log(`   📁 Found migrations in asar: ${distMigrationsPath}`);
     return distMigrationsPath;
   }
 
@@ -68,18 +111,39 @@ function getMigrationsFolder(): string {
     "dist",
     "migrations"
   );
+  checkedPaths.push(`3. ${appMigrationsPath} (app path)`);
   if (existsSync(appMigrationsPath)) {
+    console.log(`   📁 Found migrations in app path: ${appMigrationsPath}`);
     return appMigrationsPath;
   }
 
   // Option 4: Try app path with database subfolder (legacy)
   const asarMigrationsPath = join(appPath, "database", "migrations");
+  checkedPaths.push(`4. ${asarMigrationsPath} (legacy)`);
   if (existsSync(asarMigrationsPath)) {
+    console.log(
+      `   📁 Found migrations in legacy location: ${asarMigrationsPath}`
+    );
     return asarMigrationsPath;
   }
 
-  // Last resort: Return expected path (will be checked later)
-  return distMigrationsPath;
+  // No migrations folder found - provide detailed error message
+  const errorMessage =
+    `Migrations folder not found in any expected location.\n\n` +
+    `Checked paths (in order):\n${checkedPaths.join("\n")}\n\n` +
+    `Expected Bundle Structure:\n` +
+    `- Migrations should be in extraResources (recommended for electron-builder)\n` +
+    `- Configure in electron-builder.mjs:\n` +
+    `  extraResources: [\n` +
+    `    { from: "packages/main/src/database/migrations", to: "migrations" }\n` +
+    `  ]\n` +
+    `- Or bundled in asar at: node_modules/@app/main/dist/migrations/\n\n` +
+    `Troubleshooting:\n` +
+    `- Check that migrations folder exists in source code\n` +
+    `- Verify electron-builder configuration includes migrations\n` +
+    `- Check that migrations are included in the build output`;
+
+  throw new Error(errorMessage);
 }
 
 /**
@@ -97,10 +161,10 @@ function checkDatabaseIntegrity(
         quick_check: string;
       };
       if (quickCheck.quick_check !== "ok") {
-        console.warn("   ⚠️  Quick check found issues, running full check...");
+        console.warn("Quick check found issues, running full check...");
         // Fall through to full integrity check
       } else {
-        console.log("   ✅ Quick integrity check passed");
+        console.log("Quick integrity check passed");
       }
     }
 
@@ -109,10 +173,7 @@ function checkDatabaseIntegrity(
       integrity_check: string;
     };
     if (result.integrity_check !== "ok") {
-      console.error(
-        "   ❌ Database integrity check failed:",
-        result.integrity_check
-      );
+      console.error("Database integrity check failed:", result.integrity_check);
       return false;
     }
     console.log("   ✅ Database integrity check passed");
@@ -268,7 +329,8 @@ export async function runDrizzleMigrations(
     }
     console.log(`   📁 Migrations folder: ${migrationsFolder}`);
 
-    // Check if migrations folder exists
+    // Check if migrations folder exists (getMigrationsFolder now throws if not found)
+    // But we still check here for additional diagnostics
     if (!existsSync(migrationsFolder)) {
       console.error(`   ❌ Migrations folder not found: ${migrationsFolder}`);
       console.error(
@@ -289,6 +351,11 @@ export async function runDrizzleMigrations(
           console.error(
             `   📂 Contents of dist directory: ${distContents.join(", ")}`
           );
+          if (!distContents.includes("migrations")) {
+            console.error(
+              "   ⚠️  'migrations' folder not found in dist directory"
+            );
+          }
         } catch (e) {
           const errorMessage = e instanceof Error ? e.message : String(e);
           console.error(
@@ -296,6 +363,29 @@ export async function runDrizzleMigrations(
           );
         }
       }
+
+      // Additional diagnostics: check resources path contents
+      if (process.resourcesPath && existsSync(process.resourcesPath)) {
+        try {
+          const resourcesContents = readdirSync(process.resourcesPath);
+          console.error(
+            `   📂 Contents of resources directory: ${resourcesContents.join(
+              ", "
+            )}`
+          );
+          if (!resourcesContents.includes("migrations")) {
+            console.error(
+              "   ⚠️  'migrations' folder not found in resources directory"
+            );
+            console.error(
+              "   💡 Add migrations to extraResources in electron-builder.mjs"
+            );
+          }
+        } catch (e) {
+          // Ignore - can't read resources directory
+        }
+      }
+
       return false;
     }
 
@@ -331,8 +421,39 @@ export async function runDrizzleMigrations(
         "   ℹ️  Database file doesn't exist yet - creating new database"
       );
     } else {
+      // Checkpoint WAL to ensure all data is in the main database file
+      // This is important because SQLite uses WAL mode by default, which creates
+      // .db-wal and .db-shm files that aren't included in simple file copies
+      try {
+        rawDb.prepare("PRAGMA wal_checkpoint(TRUNCATE)").run();
+        console.log("   ✅ WAL checkpoint completed - all data in main file");
+      } catch (walError) {
+        console.warn("   ⚠️  WAL checkpoint failed (non-fatal):", walError);
+        // Continue with backup even if checkpoint fails
+      }
+
+      // Create backup
       copyFileSync(dbPath, backupPath);
       console.log(`   📦 Backup created: ${backupPath}`);
+
+      // Verify backup was created successfully and is valid
+      if (!existsSync(backupPath)) {
+        throw new Error("Backup creation failed - backup file not found");
+      }
+
+      // Verify backup size matches source (if source exists)
+      const sourceStats = statSync(dbPath);
+      const backupStats = statSync(backupPath);
+
+      if (sourceStats.size !== backupStats.size) {
+        throw new Error(
+          `Backup size mismatch: source ${sourceStats.size} bytes vs backup ${backupStats.size} bytes`
+        );
+      }
+
+      console.log(
+        `   ✅ Backup verified: ${(backupStats.size / 1024).toFixed(2)} KB`
+      );
     }
 
     // Production-specific safety checks

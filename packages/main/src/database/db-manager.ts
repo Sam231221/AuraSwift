@@ -7,6 +7,37 @@ import { runDrizzleMigrations } from "./drizzle-migrator.js";
 import Database from "better-sqlite3";
 import semver from "semver";
 import * as schema from "./schema.js";
+import { isDevelopmentMode } from "./utils/environment.js";
+// Layer 1: Pre-connection validation
+import {
+  validateDatabaseFile,
+  validateDatabaseDirectory,
+  isDatabaseLocked,
+} from "./utils/db-validator.js";
+// Layer 2: Compatibility checks
+import {
+  checkDatabaseCompatibility,
+  checkMigrationPathExists,
+} from "./utils/db-compatibility.js";
+// Layer 3: Repair mechanisms
+import { repairDatabase, createFreshDatabase } from "./utils/db-repair.js";
+// Layer 4: User dialogs
+import {
+  showRecoveryDialog,
+  showDatabaseTooOldDialog,
+  showCorruptedDatabaseDialog,
+  showMigrationFailureDialog,
+  showIncompatibleSchemaDialog,
+  showDatabaseErrorDialog,
+  type RecoveryAction,
+} from "./utils/db-recovery-dialog.js";
+// Path migration utility
+import {
+  hasOldDatabasePath,
+  shouldMigrateDatabasePath,
+  migrateDatabaseFromOldPath,
+  getOldDatabasePath,
+} from "./utils/db-path-migration.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +51,12 @@ const __dirname = path.dirname(__filename);
  * 1. Connect to SQLite database
  * 2. Create baseline schema via initializeTables() (if needed)
  * 3. Run Drizzle ORM migrations automatically
+ *
+ * Connection Lifecycle:
+ * - Database connection is opened once during initialization
+ * - Connection remains open for the lifetime of the application
+ * - This is appropriate for SQLite's single-writer model
+ * - Connection is properly closed on app exit via close() method
  *
  * Migration System:
  * - Uses Drizzle Kit's built-in migrator
@@ -55,21 +92,192 @@ export class DBManager {
     // Start initialization and store the promise to prevent concurrent initializations
     this.initializationPromise = (async (): Promise<void> => {
       try {
+        // ========================================
+        // PATH MIGRATION: Check for old database path
+        // ========================================
+
+        // Check if database exists at old incorrect path (double-nested)
+        if (shouldMigrateDatabasePath()) {
+          const oldPath = getOldDatabasePath();
+          console.log("📦 Detected old database at incorrect path:", oldPath);
+          console.log("🔧 Attempting to migrate to correct location...");
+
+          const migrationResult = migrateDatabaseFromOldPath(false); // Don't remove old yet
+
+          if (migrationResult.migrated) {
+            console.log("✅ Database migrated successfully!");
+            console.log(`   Old location: ${migrationResult.oldPath}`);
+            console.log(`   New location: ${migrationResult.newPath}`);
+            if (migrationResult.backupPath) {
+              console.log(`   Backup created: ${migrationResult.backupPath}`);
+            }
+          } else {
+            console.warn(
+              "⚠️  Database migration failed:",
+              migrationResult.reason
+            );
+            console.warn(
+              "   Old database preserved at:",
+              migrationResult.oldPath
+            );
+            console.warn("   App will continue with new database location");
+          }
+        }
+
         const dbPath = this.getDatabasePath();
         console.log("Database path:", dbPath);
 
-        // Ensure the directory exists
+        // ========================================
+        // LAYER 1: Pre-Connection Health Assessment
+        // ========================================
+
+        // Validate directory first
+        const dirValidation = validateDatabaseDirectory(dbPath);
+        if (!dirValidation.valid) {
+          const errorMessage =
+            dirValidation.reason || "Invalid database directory";
+          console.error(`❌ ${errorMessage}`);
+          await showDatabaseErrorDialog(
+            "Database Directory Error",
+            errorMessage,
+            `Database directory: ${dirValidation.directory || "unknown"}`
+          );
+          throw new Error(errorMessage);
+        }
+
+        // Ensure directory exists
         const dbDir = path.dirname(dbPath);
         if (!fs.existsSync(dbDir)) {
           fs.mkdirSync(dbDir, { recursive: true });
         }
 
-        this.db = new Database(dbPath);
+        // Validate database file (if it exists)
+        const fileValidation = validateDatabaseFile(dbPath);
+
+        // If database file doesn't exist, it's fine - will be created
+        if (fileValidation.isEmpty === false && !fileValidation.valid) {
+          console.warn(
+            "⚠️  Database file validation issues:",
+            fileValidation.reason
+          );
+
+          // Check if database is locked
+          if (isDatabaseLocked(dbPath)) {
+            await showDatabaseErrorDialog(
+              "Database Locked",
+              "Database is locked by another process.",
+              "Please close any other instances of AuraSwift or other applications that might be using the database."
+            );
+            throw new Error("Database is locked by another process");
+          }
+
+          // If corrupted but might be recoverable, attempt repair later
+          // For now, continue and we'll handle it after opening
+        }
+
+        // Check if database file exists (not just validation)
+        const dbExists = fs.existsSync(dbPath);
+
+        // Open database connection
+        // Note: Connection stays open for the lifetime of the application
+        // This is appropriate for SQLite which uses a single-writer model
+        try {
+          this.db = new Database(dbPath);
+        } catch (openError) {
+          // Database might be corrupted - try to handle it
+          const errorMessage =
+            openError instanceof Error ? openError.message : String(openError);
+
+          console.error(`❌ Failed to open database: ${errorMessage}`);
+
+          // If database exists but couldn't open, offer recovery options
+          if (dbExists) {
+            const action = await showCorruptedDatabaseDialog();
+
+            if (action === "backup-and-fresh") {
+              // Create fresh database
+              await this.handleCreateFreshDatabase(dbPath);
+              // Retry opening
+              this.db = new Database(dbPath);
+            } else if (action === "cancel") {
+              app.quit();
+              return;
+            } else {
+              throw new Error(
+                `Database could not be opened: ${errorMessage}. User cancelled recovery.`
+              );
+            }
+          } else {
+            throw new Error(`Database could not be opened: ${errorMessage}`);
+          }
+        }
 
         // Initialize Drizzle ORM wrapper with schema
         const drizzleDb = drizzle(this.db, { schema });
 
+        // ========================================
+        // LAYER 2: Database Compatibility Check
+        // ========================================
+
+        // Check database compatibility if database exists
+        if (dbExists) {
+          const compatibility = checkDatabaseCompatibility(this.db, dbPath);
+
+          if (!compatibility.compatible) {
+            console.error(
+              "❌ Database compatibility check failed:",
+              compatibility.reason
+            );
+
+            // Close database before showing dialog
+            this.db.close();
+            this.db = null;
+
+            if (compatibility.requiresFreshDatabase) {
+              const action = await showDatabaseTooOldDialog();
+              await this.handleRecoveryAction(action, dbPath);
+              // Reset state and retry initialization
+              this.initialized = false;
+              this.initializationPromise = null;
+              return this.initialize();
+            } else {
+              await showDatabaseErrorDialog(
+                "Database Compatibility Error",
+                compatibility.reason ||
+                  "Database is not compatible with this version",
+                "Please contact support if you need to recover data from this database."
+              );
+              throw new Error(
+                compatibility.reason || "Database compatibility check failed"
+              );
+            }
+          }
+
+          // Check if migration path exists
+          const migrationsFolder = this.getMigrationsFolder();
+          const migrationPathExists = checkMigrationPathExists(
+            this.db,
+            migrationsFolder
+          );
+
+          if (!migrationPathExists) {
+            console.error("❌ Migration path does not exist");
+            this.db.close();
+            this.db = null;
+
+            const action = await showIncompatibleSchemaDialog();
+            await this.handleRecoveryAction(action, dbPath);
+            // Reset state and retry initialization
+            this.initialized = false;
+            this.initializationPromise = null;
+            return this.initialize();
+          }
+        }
+
         // Check for downgrade scenario (newer database, older app)
+        // Note: We open the connection first to read version info from the database
+        // This is acceptable as the downgrade check is quick and the connection
+        // will be closed immediately if a downgrade is detected
         const isDowngradeAttempt = this.checkForDowngrade(this.db, dbPath);
         if (isDowngradeAttempt) {
           console.error(
@@ -89,6 +297,43 @@ export class DBManager {
           return;
         }
 
+        // ========================================
+        // LAYER 3: Database Repair (if needed)
+        // ========================================
+
+        // If file validation indicated potential issues, attempt repair
+        if (
+          dbExists &&
+          fileValidation.valid === false &&
+          fileValidation.canRecover
+        ) {
+          console.log("🔧 Attempting database repair...");
+          const repairResult = await repairDatabase(this.db, dbPath);
+
+          if (!repairResult.success) {
+            console.warn("⚠️  Database repair failed:", repairResult.reason);
+
+            // Close database before showing dialog
+            this.db.close();
+            this.db = null;
+
+            const action = await showCorruptedDatabaseDialog(
+              repairResult.backupCreated
+            );
+            await this.handleRecoveryAction(action, dbPath);
+            // Reset state and retry initialization
+            this.initialized = false;
+            this.initializationPromise = null;
+            return this.initialize();
+          } else if (repairResult.repaired) {
+            console.log("✅ Database repair successful");
+          }
+        }
+
+        // ========================================
+        // LAYER 5: Migration Safety (enhanced in drizzle-migrator.ts)
+        // ========================================
+
         // Run Drizzle migrations automatically
         // Pass both Drizzle wrapper (for migrate()) and raw DB (for transactions/integrity checks)
         const migrationSuccess = await runDrizzleMigrations(
@@ -100,7 +345,36 @@ export class DBManager {
         if (!migrationSuccess) {
           const errorMessage = `Database migration failed. Check the migration logs above for details. Database path: ${dbPath}`;
           console.error(`❌ ${errorMessage}`);
-          throw new Error(errorMessage);
+
+          // Find latest backup
+          const backupDir = path.join(path.dirname(dbPath), "backups");
+          let latestBackup: string | undefined;
+          if (fs.existsSync(backupDir)) {
+            const backups = fs
+              .readdirSync(backupDir)
+              .filter(
+                (f) => f.startsWith("auraswift-backup-") && f.endsWith(".db")
+              )
+              .map((f) => path.join(backupDir, f))
+              .sort((a, b) => {
+                const statA = fs.statSync(a);
+                const statB = fs.statSync(b);
+                return statB.mtimeMs - statA.mtimeMs;
+              });
+            latestBackup = backups[0];
+          }
+
+          // Close database before showing dialog
+          this.db.close();
+          this.db = null;
+
+          // Show recovery dialog
+          const action = await showMigrationFailureDialog(latestBackup);
+          await this.handleRecoveryAction(action, dbPath, latestBackup);
+          // Reset state and retry initialization
+          this.initialized = false;
+          this.initializationPromise = null;
+          return this.initialize();
         }
 
         this.initialized = true;
@@ -273,35 +547,43 @@ export class DBManager {
   }
 
   public getDatabasePath(): string {
-    // Multiple ways to detect development mode
-    const isDev =
-      process.env.NODE_ENV === "development" ||
-      process.env.ELECTRON_IS_DEV === "true" ||
-      !app.isPackaged;
+    // Use centralized environment detection
+    const isDev = isDevelopmentMode();
 
     // Allow override via environment variable for testing
     const customDbPath = process.env.POS_DB_PATH;
     if (customDbPath) {
       console.log("Using custom database path:", customDbPath);
+      // Validate custom path doesn't contain invalid characters
+      if (customDbPath.includes("\0") || customDbPath.includes("\x00")) {
+        throw new Error(`Invalid database path: ${customDbPath}`);
+      }
       return customDbPath;
     }
+
+    let finalPath: string;
 
     if (isDev) {
       // Development: Store in project directory
       // app.getAppPath() returns the project root in development
       const projectRoot = app.getAppPath();
-      const devDbPath = path.join(projectRoot, "data", "pos_system.db");
+      finalPath = path.join(projectRoot, "data", "pos_system.db");
       console.log("Development mode: Using project directory for database");
-      console.log("Database at:", devDbPath);
-      return devDbPath;
     } else {
       // Production: Use proper user data directory based on platform
+      // Note: app.getPath("userData") already includes the app name (e.g., "AuraSwift")
       const userDataPath = app.getPath("userData");
-      const prodDbPath = path.join(userDataPath, "AuraSwift", "pos_system.db");
+      finalPath = path.join(userDataPath, "pos_system.db");
       console.log("Production mode: Using user data directory for database");
-      console.log("Database at:", prodDbPath);
-      return prodDbPath;
     }
+
+    // Validate path doesn't contain invalid characters
+    if (finalPath.includes("\0") || finalPath.includes("\x00")) {
+      throw new Error(`Invalid database path: ${finalPath}`);
+    }
+
+    console.log("Database at:", finalPath);
+    return finalPath;
   }
 
   getDb(): Database.Database {
@@ -309,6 +591,146 @@ export class DBManager {
       throw new Error("Database not initialized. Call initialize() first.");
     }
     return this.db;
+  }
+
+  /**
+   * Get migrations folder path (used by compatibility checker)
+   * Uses same logic as drizzle-migrator to ensure consistency
+   */
+  private getMigrationsFolder(): string {
+    // In development, use source folder
+    if (!app.isPackaged) {
+      return path.join(__dirname, "migrations");
+    }
+
+    // In production, migrations are bundled in the app
+    // Try multiple locations in order of preference
+
+    // Option 1: Check using extraResources (outside asar)
+    const resourcesPath = process.resourcesPath;
+    if (resourcesPath) {
+      const resourcesMigrationsPath = path.join(resourcesPath, "migrations");
+      if (fs.existsSync(resourcesMigrationsPath)) {
+        return resourcesMigrationsPath;
+      }
+    }
+
+    // Option 2: Check relative to current file (inside asar)
+    const distMigrationsPath = path.join(__dirname, "migrations");
+    if (fs.existsSync(distMigrationsPath)) {
+      return distMigrationsPath;
+    }
+
+    // Option 3: Check in app path
+    const appPath = app.getAppPath();
+    const appMigrationsPath = path.join(
+      appPath,
+      "node_modules",
+      "@app",
+      "main",
+      "dist",
+      "migrations"
+    );
+    if (fs.existsSync(appMigrationsPath)) {
+      return appMigrationsPath;
+    }
+
+    // Option 4: Try app path with database subfolder (legacy)
+    const asarMigrationsPath = path.join(appPath, "database", "migrations");
+    if (fs.existsSync(asarMigrationsPath)) {
+      return asarMigrationsPath;
+    }
+
+    // Last resort: Return expected path
+    return distMigrationsPath;
+  }
+
+  /**
+   * Handle recovery action from user dialog
+   */
+  private async handleRecoveryAction(
+    action: RecoveryAction,
+    dbPath: string,
+    backupPath?: string
+  ): Promise<void> {
+    switch (action) {
+      case "backup-and-fresh":
+        await this.handleCreateFreshDatabase(dbPath);
+        break;
+
+      case "repair":
+        // Repair will be attempted on next initialization
+        // For now, just inform user we'll retry
+        console.log("🔧 User requested repair - will retry initialization");
+        break;
+
+      case "restore-backup":
+        if (backupPath && fs.existsSync(backupPath)) {
+          await this.handleRestoreFromBackup(dbPath, backupPath);
+        } else {
+          await showDatabaseErrorDialog(
+            "Backup Not Found",
+            "The backup file could not be found.",
+            backupPath
+              ? `Expected location: ${backupPath}`
+              : "No backup path provided"
+          );
+          app.quit();
+        }
+        break;
+
+      case "cancel":
+        app.quit();
+        break;
+    }
+  }
+
+  /**
+   * Handle creating a fresh database
+   */
+  private async handleCreateFreshDatabase(dbPath: string): Promise<void> {
+    console.log("🔄 Creating fresh database...");
+    const migrationsFolder = this.getMigrationsFolder();
+    await createFreshDatabase(dbPath, migrationsFolder);
+    console.log("✅ Fresh database prepared");
+  }
+
+  /**
+   * Handle restoring from backup
+   */
+  private async handleRestoreFromBackup(
+    dbPath: string,
+    backupPath: string
+  ): Promise<void> {
+    console.log(`🔄 Restoring database from backup: ${backupPath}`);
+
+    try {
+      // Close database if open
+      if (this.db) {
+        this.db.close();
+        this.db = null;
+      }
+
+      // Remove current database if exists
+      if (fs.existsSync(dbPath)) {
+        const oldBackupPath = `${dbPath}.old.${Date.now()}`;
+        fs.renameSync(dbPath, oldBackupPath);
+        console.log(`📦 Old database backed up to: ${oldBackupPath}`);
+      }
+
+      // Copy backup to database location
+      fs.copyFileSync(backupPath, dbPath);
+      console.log("✅ Database restored from backup");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      await showDatabaseErrorDialog(
+        "Restore Failed",
+        "Failed to restore database from backup.",
+        errorMessage
+      );
+      throw error;
+    }
   }
 
   close(): void {
