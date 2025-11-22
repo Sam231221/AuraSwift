@@ -90,8 +90,6 @@
   },
   "dependencies": {
     "@app/main": "*",
-    "@stripe/stripe-js": "^8.0.0",
-    "@stripe/terminal-js": "^0.24.0",
     "better-sqlite3": "^12.4.1",
     "dotenv": "^16.6.1",
     "node-addon-api": "^8.3.0",
@@ -99,7 +97,6 @@
     "pdf-to-printer": "^5.6.1",
     "pdfkit": "^0.15.2",
     "serialport": "^13.0.0",
-    "stripe": "^19.0.0",
     "usb": "^2.16.0",
     "winston": "^3.18.3",
     "winston-daily-rotate-file": "^5.0.0"
