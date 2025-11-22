@@ -3,6 +3,7 @@ import electronUpdater, {
   type AppUpdater,
   type Logger,
   type UpdateInfo,
+  type ProgressInfo,
 } from "electron-updater";
 import { app, dialog, Notification, shell } from "electron";
 
@@ -22,7 +23,15 @@ export class AutoUpdater implements AppModule {
 
   readonly #REMIND_LATER_INTERVAL = 2 * 60 * 60 * 1000;
   readonly #MAX_POSTPONE_COUNT = 3;
+  readonly #GITHUB_REPO_URL = "https://github.com/Sam231221/AuraSwift";
+  readonly #GITHUB_RELEASES_URL = `${this.#GITHUB_REPO_URL}/releases`;
   #postponeCount = 0;
+  #isCheckingForUpdates = false;
+  #updateListeners: Array<{
+    event: string;
+    listener: (...args: any[]) => void;
+  }> = [];
+  #hasShownProgressNotification = false;
 
   constructor({
     logger = null,
@@ -35,6 +44,10 @@ export class AutoUpdater implements AppModule {
     this.#notification = downloadNotification;
   }
 
+  /**
+   * Enable the auto-updater module
+   * Checks for updates on startup and schedules periodic checks
+   */
   async enable(): Promise<void> {
     if (await this.handleSquirrelEvents()) {
       return;
@@ -44,6 +57,10 @@ export class AutoUpdater implements AppModule {
     this.schedulePeriodicChecks();
   }
 
+  /**
+   * Disable the auto-updater module
+   * Cleans up intervals, timeouts, and event listeners
+   */
   async disable(): Promise<void> {
     if (this.#updateCheckInterval) {
       clearInterval(this.#updateCheckInterval);
@@ -54,6 +71,10 @@ export class AutoUpdater implements AppModule {
       clearTimeout(this.#remindLaterTimeout);
       this.#remindLaterTimeout = null;
     }
+
+    // Remove all event listeners
+    const updater = this.getAutoUpdater();
+    this.removeUpdateListeners(updater);
   }
 
   private async handleSquirrelEvents(): Promise<boolean> {
@@ -111,7 +132,8 @@ export class AutoUpdater implements AppModule {
 
       app.quit();
       return true;
-    } catch {
+    } catch (error) {
+      console.error("Unexpected error in Squirrel event handling:", error);
       app.quit();
       return true;
     }
@@ -121,8 +143,15 @@ export class AutoUpdater implements AppModule {
     const CHECK_INTERVAL = 4 * 60 * 60 * 1000;
 
     this.#updateCheckInterval = setInterval(() => {
-      const updater = this.getAutoUpdater();
-      updater.checkForUpdates().catch(() => {});
+      // Use runAutoUpdater to ensure proper state management and avoid race conditions
+      this.runAutoUpdater().catch((error) => {
+        const errorMessage = this.formatErrorMessage(error);
+        if (this.#logger) {
+          this.#logger.error(`Periodic update check failed: ${errorMessage}`);
+        } else {
+          console.error("Periodic update check failed:", error);
+        }
+      });
     }, CHECK_INTERVAL);
   }
 
@@ -169,10 +198,35 @@ export class AutoUpdater implements AppModule {
     }
   }
 
+  /**
+   * Format error message from unknown error type
+   * @param error - The error to format
+   * @returns Formatted error message string
+   */
+  private formatErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
+  }
+
+  /**
+   * Show dialog when an update is available
+   * @param info - Update information from electron-updater
+   * @param isReminder - Whether this is a reminder notification (default: false)
+   */
   private showUpdateAvailableDialog(
     info: UpdateInfo,
     isReminder: boolean = false
   ): void {
+    // Input validation
+    if (!info || !info.version) {
+      console.error(
+        "Invalid update info provided to showUpdateAvailableDialog"
+      );
+      return;
+    }
+
     const currentVersion = app.getVersion();
     const newVersion = info.version;
     const releaseNotes = this.formatReleaseNotes(info);
@@ -222,9 +276,7 @@ export class AutoUpdater implements AppModule {
             notification.show();
           }
         } else if (result.response === 1) {
-          shell.openExternal(
-            `https://github.com/Sam231221/AuraSwift/releases/tag/v${newVersion}`
-          );
+          shell.openExternal(`${this.#GITHUB_RELEASES_URL}/tag/v${newVersion}`);
 
           setTimeout(() => {
             this.showUpdateAvailableDialog(info, isReminder);
@@ -243,23 +295,38 @@ export class AutoUpdater implements AppModule {
           }
         }
       })
-      .catch(() => {});
+      .catch((error) => {
+        const errorMessage = this.formatErrorMessage(error);
+        if (this.#logger) {
+          this.#logger.error(
+            `Error showing update available dialog: ${errorMessage}`
+          );
+        } else {
+          console.error("Error showing update available dialog:", error);
+        }
+      });
   }
 
+  /**
+   * Get the electron-updater AppUpdater instance
+   * @returns The AppUpdater instance from electron-updater
+   */
   getAutoUpdater(): AppUpdater {
     const { autoUpdater } = electronUpdater;
     return autoUpdater;
   }
 
   /**
-   * Get the last update error if any
+   * Get the last update error if any occurred
+   * @returns The last error object with message, timestamp, and type, or null if no error occurred
    */
   getLastError(): { message: string; timestamp: Date; type: string } | null {
     return this.#lastError;
   }
 
   /**
-   * Show the last error dialog if there is one
+   * Show a dialog displaying the last update error with troubleshooting information
+   * If no error exists, shows a message indicating no recent errors
    */
   showLastErrorDialog(): void {
     if (!this.#lastError) {
@@ -274,8 +341,16 @@ export class AutoUpdater implements AppModule {
         })
         .then((result) => {
           if (result.response === 1) {
-            const updater = this.getAutoUpdater();
-            updater.checkForUpdates().catch(() => {});
+            this.runAutoUpdater().catch((error) => {
+              const errorMessage = this.formatErrorMessage(error);
+              if (this.#logger) {
+                this.#logger.error(
+                  `Error checking for updates from error dialog: ${errorMessage}`
+                );
+              } else {
+                console.error("Error checking for updates:", error);
+              }
+            });
           }
         });
       return;
@@ -313,15 +388,32 @@ export class AutoUpdater implements AppModule {
       })
       .then((result) => {
         if (result.response === 1) {
-          shell.openExternal("https://github.com/Sam231221/AuraSwift/releases");
+          shell.openExternal(this.#GITHUB_RELEASES_URL);
         } else if (result.response === 2) {
           // Clear the error and try again
           this.#lastError = null;
-          const updater = this.getAutoUpdater();
-          updater.checkForUpdates().catch(() => {});
+          this.runAutoUpdater().catch((error) => {
+            const errorMessage = this.formatErrorMessage(error);
+            if (this.#logger) {
+              this.#logger.error(
+                `Error retrying update check: ${errorMessage}`
+              );
+            } else {
+              console.error("Error retrying update check:", error);
+            }
+          });
         }
       })
-      .catch(() => {});
+      .catch((error) => {
+        const errorMessage = this.formatErrorMessage(error);
+        if (this.#logger) {
+          this.#logger.error(
+            `Error showing last error dialog: ${errorMessage}`
+          );
+        } else {
+          console.error("Error showing last error dialog:", error);
+        }
+      });
   }
 
   /**
@@ -344,9 +436,23 @@ export class AutoUpdater implements AppModule {
     return date.toLocaleDateString();
   }
 
+  /**
+   * Run the auto-updater to check for available updates
+   * Prevents race conditions by skipping if a check is already in progress
+   * @returns Update check result or null if no update available or check skipped
+   */
   async runAutoUpdater() {
-    const updater = this.getAutoUpdater();
+    // Prevent race conditions: skip if already checking
+    if (this.#isCheckingForUpdates) {
+      if (this.#logger) {
+        this.#logger.info("Update check already in progress, skipping...");
+      }
+      return null;
+    }
+
+    this.#isCheckingForUpdates = true;
     try {
+      const updater = this.getAutoUpdater();
       updater.logger = this.#logger || null;
       updater.fullChangelog = true;
       updater.autoDownload = false;
@@ -358,7 +464,7 @@ export class AutoUpdater implements AppModule {
       const result = await updater.checkForUpdates();
 
       if (result === null) {
-        return;
+        return null;
       }
 
       return result;
@@ -384,11 +490,23 @@ export class AutoUpdater implements AppModule {
       }
 
       throw error;
+    } finally {
+      this.#isCheckingForUpdates = false;
     }
   }
 
+  private removeUpdateListeners(updater: AppUpdater): void {
+    for (const { event, listener } of this.#updateListeners) {
+      updater.off(event as any, listener);
+    }
+    this.#updateListeners = [];
+  }
+
   private setupUpdateListeners(updater: AppUpdater): void {
-    updater.on("update-available", (info: UpdateInfo) => {
+    // Remove existing listeners first to prevent duplicates
+    this.removeUpdateListeners(updater);
+
+    const onUpdateAvailable = (info: UpdateInfo) => {
       if (
         this.#postponedUpdateInfo &&
         this.#postponedUpdateInfo.version === info.version
@@ -396,11 +514,21 @@ export class AutoUpdater implements AppModule {
         return;
       }
       this.showUpdateAvailableDialog(info, false);
+    };
+    updater.on("update-available", onUpdateAvailable);
+    this.#updateListeners.push({
+      event: "update-available",
+      listener: onUpdateAvailable,
     });
 
-    updater.on("update-not-available", () => {});
+    const onUpdateNotAvailable = () => {};
+    updater.on("update-not-available", onUpdateNotAvailable);
+    this.#updateListeners.push({
+      event: "update-not-available",
+      listener: onUpdateNotAvailable,
+    });
 
-    updater.on("download-progress", (progressInfo) => {
+    const onDownloadProgress = (progressInfo: ProgressInfo) => {
       // Log progress for debugging
       if (this.#logger) {
         this.#logger.info(
@@ -410,12 +538,14 @@ export class AutoUpdater implements AppModule {
         );
       }
 
-      // Show a notification at 50% completion
+      // Show a notification at 50% completion (only once)
       if (
+        !this.#hasShownProgressNotification &&
         progressInfo.percent > 50 &&
         progressInfo.percent < 55 &&
         Notification.isSupported()
       ) {
+        this.#hasShownProgressNotification = true;
         const notification = new Notification({
           title: "Download In Progress",
           body: `Update download is ${progressInfo.percent.toFixed(
@@ -425,10 +555,16 @@ export class AutoUpdater implements AppModule {
         });
         notification.show();
       }
+    };
+    updater.on("download-progress", onDownloadProgress);
+    this.#updateListeners.push({
+      event: "download-progress",
+      listener: onDownloadProgress,
     });
 
-    updater.on("update-downloaded", (info: UpdateInfo) => {
+    const onUpdateDownloaded = (info: UpdateInfo) => {
       this.#isDownloading = false;
+      this.#hasShownProgressNotification = false; // Reset for next download
       const downloadDuration = this.#downloadStartTime
         ? ((Date.now() - this.#downloadStartTime) / 1000).toFixed(0)
         : "unknown";
@@ -474,15 +610,30 @@ export class AutoUpdater implements AppModule {
             }
           }
         })
-        .catch(() => {});
+        .catch((error) => {
+          const errorMessage = this.formatErrorMessage(error);
+          if (this.#logger) {
+            this.#logger.error(
+              `Error showing update ready dialog: ${errorMessage}`
+            );
+          } else {
+            console.error("Error showing update ready dialog:", error);
+          }
+        });
+    };
+    updater.on("update-downloaded", onUpdateDownloaded);
+    this.#updateListeners.push({
+      event: "update-downloaded",
+      listener: onUpdateDownloaded,
     });
 
-    updater.on("error", (error) => {
+    const onError = (error: Error) => {
       const errorMessage = error.message || String(error);
 
       // Reset download state on error
       const wasDownloading = this.#isDownloading;
       this.#isDownloading = false;
+      this.#hasShownProgressNotification = false; // Reset notification flag
       this.#downloadStartTime = null;
 
       // Check if this is a download error
@@ -513,7 +664,7 @@ export class AutoUpdater implements AppModule {
         errorMessage.includes("Cannot find latest") ||
         errorMessage.includes("No updates available") ||
         errorMessage.includes("net::ERR_INTERNET_DISCONNECTED") ||
-        !import.meta.env.PROD;
+        process.env.NODE_ENV !== "production";
 
       if (!shouldSkipDialog) {
         const isNetworkError =
@@ -571,12 +722,17 @@ export class AutoUpdater implements AppModule {
           })
           .then((result) => {
             if (result.response === 1) {
-              shell.openExternal(
-                "https://github.com/Sam231221/AuraSwift/releases"
-              );
+              shell.openExternal(this.#GITHUB_RELEASES_URL);
             }
           })
-          .catch(() => {});
+          .catch((error) => {
+            const errorMessage = this.formatErrorMessage(error);
+            if (this.#logger) {
+              this.#logger.error(`Error showing error dialog: ${errorMessage}`);
+            } else {
+              console.error("Error showing error dialog:", error);
+            }
+          });
 
         // Also show a persistent notification for download errors
         if (isDownloadError && Notification.isSupported()) {
@@ -598,7 +754,9 @@ export class AutoUpdater implements AppModule {
           }, 500);
         }
       }
-    });
+    };
+    updater.on("error", onError);
+    this.#updateListeners.push({ event: "error", listener: onError });
   }
 
   private formatReleaseNotes(info: UpdateInfo): string {
@@ -660,17 +818,22 @@ export class AutoUpdater implements AppModule {
     if (Array.isArray(info.releaseNotes)) {
       const formatted = info.releaseNotes
         .slice(0, 15)
-        .map((note: any) => {
-          let text = note.note || note;
-
-          if (typeof text === "string") {
-            text = text
-              .replace(/&lt;/g, "<")
-              .replace(/&gt;/g, ">")
-              .replace(/&amp;/g, "&")
-              .replace(/<[^>]*>/gs, "")
-              .trim();
+        .map((note: string | { note: string | null }) => {
+          let text: string;
+          if (typeof note === "string") {
+            text = note;
+          } else if (note && typeof note === "object" && "note" in note) {
+            text = note.note || "";
+          } else {
+            text = String(note);
           }
+
+          text = text
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&amp;/g, "&")
+            .replace(/<[^>]*>/gs, "")
+            .trim();
 
           return text.match(/^[•\-*✨🐛⚡🔥]/) ? text : `• ${text}`;
         })

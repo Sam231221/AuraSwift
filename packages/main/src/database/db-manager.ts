@@ -564,11 +564,25 @@ export class DBManager {
     let finalPath: string;
 
     if (isDev) {
-      // Development: Store in project directory
-      // app.getAppPath() returns the project root in development
-      const projectRoot = app.getAppPath();
+      // Development: Store in project directory at root level
+      // FIXED: Use __dirname for reliable path resolution (always resolves to project root)
+      // This file is at: packages/main/src/database/db-manager.ts
+      // __dirname resolves to: <project-root>/packages/main/src/database
+      // Go up 3 levels to get project root
+      const projectRoot = path.resolve(__dirname, "../../../");
       finalPath = path.join(projectRoot, "data", "pos_system.db");
+      
+      // Validate path is at root level (not in packages/)
+      if (finalPath.includes(path.join("packages", "data"))) {
+        throw new Error(
+          `Database path resolved incorrectly to: ${finalPath}. ` +
+          `Expected: ${path.join(projectRoot, "data", "pos_system.db")}`
+        );
+      }
+      
       console.log("Development mode: Using project directory for database");
+      console.log(`Project root: ${projectRoot}`);
+      console.log(`Database path: ${finalPath}`);
     } else {
       // Production: Use proper user data directory based on platform
       // Note: app.getPath("userData") already includes the app name (e.g., "AuraSwift")
