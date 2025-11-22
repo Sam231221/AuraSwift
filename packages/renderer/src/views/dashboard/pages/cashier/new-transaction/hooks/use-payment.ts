@@ -26,16 +26,6 @@ interface UsePaymentProps {
   userFirstName: string | undefined;
   userLastName: string | undefined;
   userBusinessName: string | undefined;
-  cardReaderReady: boolean;
-  cardProcessing: boolean;
-  processQuickPayment: (
-    amountInCents: number,
-    currency: string
-  ) => Promise<{
-    success: boolean;
-    error?: string;
-  }>;
-  cancelPayment: () => Promise<void>;
   startPrintingFlow: (data: TransactionData) => Promise<boolean>;
   isShowingStatus: boolean;
   onResetPrintStatus?: () => void;
@@ -185,10 +175,6 @@ export function usePayment({
   userFirstName,
   userLastName,
   userBusinessName,
-  cardReaderReady,
-  cardProcessing,
-  processQuickPayment,
-  cancelPayment,
   startPrintingFlow,
   isShowingStatus: _isShowingStatus, // Unused - kept for interface compatibility, will be used in future
   onResetPrintStatus,
@@ -200,7 +186,6 @@ export function usePayment({
   );
   const [cashAmount, setCashAmount] = useState(0);
   const [transactionComplete, setTransactionComplete] = useState(false);
-  const [showCardPayment, setShowCardPayment] = useState(false);
   const [showReceiptOptions, setShowReceiptOptions] = useState(false);
   const [completedTransactionData, setCompletedTransactionData] =
     useState<TransactionData | null>(null);
@@ -231,7 +216,6 @@ export function usePayment({
     setPaymentMethod(null);
     setTransactionComplete(false);
     setCashAmount(0);
-    setShowCardPayment(false);
     setCompletedTransactionData(null);
     setPrinterStatus({ connected: true, error: null });
   }, []);
@@ -675,83 +659,11 @@ export function usePayment({
 
       // Handle card/mobile payments
       if (method === "card" || method === "mobile") {
-        try {
-          // FIX #8: Initial card reader check
-          if (!cardReaderReady) {
-            toast.error("Card reader not ready. Please check connection.");
-            return;
-          }
-
-          setShowCardPayment(true);
-
-          const amountInCents = Math.round(total * 100);
-          // FIX #12: Gate console.log for development only
-          if (process.env.NODE_ENV === "development") {
-            console.log("💳 Starting card payment:", {
-              amount: amountInCents,
-              total,
-              currency: "gbp",
-            });
-          }
-
-          // FIX #8: Re-check reader status right before processing payment
-          // This prevents payment attempts if reader disconnects between check and processing
-          if (!cardReaderReady) {
-            toast.error(
-              "Card reader disconnected. Please reconnect and try again."
-            );
-            resetPaymentState();
-            return;
-          }
-
-          const result = await processQuickPayment(amountInCents, "gbp");
-
-          if (result.success) {
-            toast.success("Card payment successful!");
-            // Complete transaction with skipPaymentValidation since card is already processed
-            // FIX #4: Pass the actual payment method (card or mobile) to ensure correct recording
-            // FIX #7: Wrap in try-catch to reset state if transaction completion fails
-            try {
-              await completeTransaction(true, method);
-              // Only reset card payment UI if transaction completes successfully
-              setShowCardPayment(false);
-            } catch (error) {
-              console.error(
-                "Transaction completion failed after card payment:",
-                error
-              );
-              // FIX #11: Consistent error message with details
-              const errorDetails =
-                error instanceof Error ? error.message : "Unknown error";
-              toast.error(
-                `Card payment succeeded but transaction failed: ${errorDetails}. Please contact support.`,
-                { duration: 10000 }
-              );
-              resetPaymentState();
-            }
-          } else {
-            // FIX #11: Consistent error message formatting
-            const errorDetails = result.error || "Unknown error";
-            toast.error(`Card payment failed: ${errorDetails}`);
-            resetPaymentState();
-          }
-        } catch (error) {
-          console.error("Card payment error:", error);
-          // FIX #11: Consistent error message with details
-          const errorDetails =
-            error instanceof Error ? error.message : "Unknown error";
-          toast.error(`Card payment failed: ${errorDetails}`);
-          resetPaymentState();
-        }
+        toast.error("Card payment is not available. Please use cash payment.");
+        return;
       }
     },
-    [
-      total,
-      cardReaderReady,
-      processQuickPayment,
-      resetPaymentState,
-      completeTransaction,
-    ]
+    [total, resetPaymentState, completeTransaction]
   );
 
   /**
@@ -944,30 +856,12 @@ export function usePayment({
     }
   }, [resetAndInitCart]);
 
-  /**
-   * Cancel card payment
-   */
-  const handleCancelCardPayment = useCallback(async () => {
-    if (cardProcessing) {
-      await cancelPayment();
-    }
-    resetPaymentState();
-  }, [cardProcessing, cancelPayment, resetPaymentState]);
-
-  /**
-   * Retry card payment
-   */
-  const handleRetryCardPayment = useCallback(async () => {
-    const method = paymentMethod?.type || "card";
-    await handlePayment(method);
-  }, [handlePayment, paymentMethod]);
 
   return {
     paymentStep,
     paymentMethod,
     cashAmount,
     transactionComplete,
-    showCardPayment,
     showReceiptOptions,
     completedTransactionData,
     printerStatus,
@@ -977,7 +871,6 @@ export function usePayment({
       setPaymentMethod(method),
     setTransactionComplete: (complete: boolean) =>
       setTransactionComplete(complete),
-    setShowCardPayment: (show: boolean) => setShowCardPayment(show),
     handlePayment,
     completeTransaction,
     handleDownloadReceipt,
@@ -985,7 +878,5 @@ export function usePayment({
     handleEmailReceiptOption,
     handleCloseReceiptOptions,
     handleCancelPayment,
-    handleCancelCardPayment,
-    handleRetryCardPayment,
   };
 }

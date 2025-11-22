@@ -1,6 +1,6 @@
 /**
  * TypeScript type definitions for Payment API
- * Defines interfaces for BBPOS WisePad 3 and Stripe integration
+ * Defines interfaces for BBPOS WisePad 3
  */
 
 export interface PaymentAPI {
@@ -30,7 +30,7 @@ export interface PaymentAPI {
   processCardPayment: (paymentIntentId: string) => Promise<PaymentResult>;
   cancelPayment: () => Promise<{ success: boolean; error?: string }>;
 
-  // Connection Token (for Stripe Terminal)
+  // Connection Token
   getConnectionToken: () => Promise<{
     success: boolean;
     secret?: string;

@@ -80,7 +80,7 @@ export const paymentAPI = {
 
   cancelPayment: () => ipcRenderer.invoke("payment:cancel"),
 
-  // Connection Token (for Stripe Terminal)
+  // Connection Token
   getConnectionToken: () => ipcRenderer.invoke("payment:connection-token"),
 };
 

@@ -17,7 +17,6 @@ import {
   useReceiptPrintingFlow,
   useThermalPrinter,
 } from "../hooks/use-thermal-printer";
-import { useCardPayment } from "../hooks/use-stripe-terminal";
 import {
   useCart,
   useProducts,
@@ -107,15 +106,6 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   // Thermal printer
   const { connectPrinter: connectPrinterInternal } = useThermalPrinter();
 
-  // Card payment
-  const {
-    paymentState,
-    isReady: cardReaderReady,
-    processQuickPayment,
-    cancelPayment,
-    isProcessing: cardProcessing,
-  } = useCardPayment();
-
   // Wrapper for connect printer with localStorage save
   const connectPrinter = useCallback(
     async (config: PrinterConfig): Promise<boolean> => {
@@ -179,12 +169,6 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     userFirstName: user?.firstName,
     userLastName: user?.lastName,
     userBusinessName: user?.businessName,
-    cardReaderReady: cardReaderReady ?? false,
-    cardProcessing: cardProcessing ?? false,
-    processQuickPayment,
-    cancelPayment: async () => {
-      await cancelPayment();
-    },
     startPrintingFlow,
     isShowingStatus,
     onResetPrintStatus: handleSkipReceipt,
@@ -534,7 +518,6 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             paymentMethod={payment.paymentMethod}
             total={cart.total}
             cashAmount={payment.cashAmount}
-            cardReaderReady={cardReaderReady ?? false}
             onPaymentMethodSelect={payment.handlePayment}
             onCashAmountChange={payment.setCashAmount}
             onCompleteTransaction={payment.completeTransaction}
@@ -733,27 +716,6 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
           activeShiftId={user.id}
           countType="mid-shift"
           startingCash={0}
-        />
-      )}
-
-      {/* Card Payment Status Modal */}
-      {payment.showCardPayment && (
-        <PaymentStatusModal
-          isOpen={true}
-          paymentState={{
-            step: paymentState.step,
-            message: paymentState.message,
-            canCancel: paymentState.canCancel,
-            progress: paymentState.progress,
-          }}
-          amount={Math.round(cart.total * 100)}
-          onCancel={payment.handleCancelCardPayment}
-          onRetry={payment.handleRetryCardPayment}
-          onClose={() => {
-            payment.setShowCardPayment(false);
-            payment.setPaymentMethod(null);
-            payment.setPaymentStep(false);
-          }}
         />
       )}
 

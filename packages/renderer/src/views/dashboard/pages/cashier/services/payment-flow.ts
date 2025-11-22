@@ -1,5 +1,5 @@
 /**
- * Payment Flow Business Logic for BBPOS WisePad 3 and Stripe Integration
+ * Payment Flow Business Logic for BBPOS WisePad 3
  * Handles state management, retry logic, and error handling for card transactions
  */
 
@@ -226,7 +226,7 @@ export class PaymentFlow {
   }
 
   /**
-   * Step 2: Create Stripe payment intent
+   * Step 2: Create payment intent
    */
   private async stepCreatePaymentIntent(): Promise<void> {
     this.updateState({

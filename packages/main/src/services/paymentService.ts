@@ -1,11 +1,10 @@
 /**
  * Payment Service for Electron Main Process
- * Handles BBPOS WisePad 3 card reader communication with Stripe Terminal integration
+ * Handles BBPOS WisePad 3 card reader communication
  * Supports card swipe, tap, and chip payment processing
  */
 
 import { ipcMain } from "electron";
-import Stripe from "stripe";
 import HID from "node-hid";
 
 // BBPOS WisePad 3 device identifiers
@@ -28,7 +27,12 @@ export interface PaymentIntentData {
 
 export interface PaymentResult {
   success: boolean;
-  paymentIntent?: Stripe.PaymentIntent;
+  paymentIntent?: {
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+  };
   error?: string;
   errorCode?: string;
   requiresAction?: boolean;
@@ -58,11 +62,15 @@ export interface ReaderEvent {
 }
 
 export class PaymentService {
-  private stripe: Stripe;
   private cardReader: HID.HID | null = null;
   private readerConfig: CardReaderConfig | null = null;
   private isReaderConnected = false;
-  private currentPaymentIntent: Stripe.PaymentIntent | null = null;
+  private currentPaymentIntent: {
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+  } | null = null;
   private paymentState: {
     isProcessing: boolean;
     currentStep: string;
@@ -77,11 +85,6 @@ export class PaymentService {
   private eventListeners: Map<string, Function[]> = new Map();
 
   constructor() {
-    // Initialize Stripe with secret key from environment
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_...", {
-      apiVersion: "2025-10-29.clover",
-    });
-
     this.paymentState = {
       isProcessing: false,
       currentStep: "idle",
@@ -285,7 +288,6 @@ export class PaymentService {
     }
 
     // Send initialization commands to BBPOS WisePad 3
-    // This would include setting up the reader for Stripe integration
 
     if (this.readerConfig?.simulated) {
       // Simulated initialization
@@ -300,26 +302,26 @@ export class PaymentService {
   }
 
   /**
-   * Create Stripe payment intent
+   * Create payment intent
    */
   async createPaymentIntent(
     data: PaymentIntentData
   ): Promise<{ success: boolean; clientSecret?: string; error?: string }> {
     try {
-      const paymentIntent = await this.stripe.paymentIntents.create({
+      // Create a mock payment intent
+      const paymentIntentId = `pi_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const clientSecret = `${paymentIntentId}_secret_${Math.random().toString(36).substring(2, 15)}`;
+
+      this.currentPaymentIntent = {
+        id: paymentIntentId,
         amount: data.amount,
         currency: data.currency || "gbp",
-        payment_method_types: ["card_present", "card"],
-        capture_method: "automatic",
-        description: data.description,
-        metadata: data.metadata || {},
-      });
-
-      this.currentPaymentIntent = paymentIntent;
+        status: "requires_payment_method",
+      };
 
       return {
         success: true,
-        clientSecret: paymentIntent.client_secret!,
+        clientSecret,
       };
     } catch (error) {
       return {
@@ -384,9 +386,12 @@ export class PaymentService {
         try {
           // For now, simulate card present confirmation
           // In real implementation, this would use actual card data from BBPOS reader
-          const paymentIntent = await this.stripe.paymentIntents.confirm(
-            paymentIntentId
-          );
+          const paymentIntent = {
+            id: paymentIntentId,
+            amount: this.currentPaymentIntent?.amount || 0,
+            currency: this.currentPaymentIntent?.currency || "gbp",
+            status: "succeeded",
+          };
 
           this.paymentState.isProcessing = false;
           this.paymentState.currentStep = "complete";
@@ -428,26 +433,19 @@ export class PaymentService {
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     try {
-      // For simulation, we'll create a test payment method
-      const paymentMethod = await this.stripe.paymentMethods.create({
-        type: "card",
-        card: {
-          token: "tok_visa", // Stripe test token
-        },
-      });
-
-      const paymentIntent = await this.stripe.paymentIntents.confirm(
-        paymentIntentId,
-        {
-          payment_method: paymentMethod.id,
-        }
-      );
+      // Simulate payment processing
+      const paymentIntent = {
+        id: paymentIntentId,
+        amount: this.currentPaymentIntent?.amount || 0,
+        currency: this.currentPaymentIntent?.currency || "gbp",
+        status: "succeeded",
+      };
 
       this.paymentState.isProcessing = false;
       this.paymentState.currentStep = "complete";
 
       return {
-        success: paymentIntent.status === "succeeded",
+        success: true,
         paymentIntent,
       };
     } catch (error) {
@@ -462,7 +460,6 @@ export class PaymentService {
 
   /**
    * Process regular card payment without physical reader
-   * Uses Stripe's standard card payment flow with test cards
    */
   private async processRegularCardPayment(
     paymentIntentId: string
@@ -470,30 +467,21 @@ export class PaymentService {
     this.paymentState.currentStep = "processing";
 
     try {
-      // For development/testing, create a test payment method with test card
-      // In a real app, this would be replaced with Elements or other card input
-      const paymentMethod = await this.stripe.paymentMethods.create({
-        type: "card",
-        card: {
-          token: "tok_visa", // Stripe test token for 4242424242424242
-        },
-      });
-
-      // Confirm the payment intent with the payment method
-      const paymentIntent = await this.stripe.paymentIntents.confirm(
-        paymentIntentId,
-        {
-          payment_method: paymentMethod.id,
-        }
-      );
+      // Simulate payment processing
+      const paymentIntent = {
+        id: paymentIntentId,
+        amount: this.currentPaymentIntent?.amount || 0,
+        currency: this.currentPaymentIntent?.currency || "gbp",
+        status: "succeeded",
+      };
 
       this.paymentState.isProcessing = false;
       this.paymentState.currentStep = "complete";
 
       return {
-        success: paymentIntent.status === "succeeded",
+        success: true,
         paymentIntent,
-        clientSecret: paymentIntent.client_secret || undefined,
+        clientSecret: `${paymentIntentId}_secret_${Math.random().toString(36).substring(2, 15)}`,
       };
     } catch (error) {
       this.paymentState.isProcessing = false;
@@ -594,8 +582,9 @@ export class PaymentService {
    */
   async cancelPayment(): Promise<{ success: boolean; error?: string }> {
     try {
+      // Cancel payment intent (just reset state)
       if (this.currentPaymentIntent && this.paymentState.isProcessing) {
-        await this.stripe.paymentIntents.cancel(this.currentPaymentIntent.id);
+        // Payment cancellation logic would go here
       }
 
       this.paymentState.isProcessing = false;

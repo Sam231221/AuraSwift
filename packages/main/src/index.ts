@@ -36,7 +36,7 @@ export async function initApp(initConfig: AppInitConfig) {
   // Initialize PDF receipt generation service
   await import("./services/pdfReceiptService.js");
 
-  // Initialize payment service for BBPOS WisePad 3 and Stripe integration
+  // Initialize payment service for BBPOS WisePad 3
   await import("./services/paymentService.js");
 
   // Initialize scale hardware service for weight measurement
