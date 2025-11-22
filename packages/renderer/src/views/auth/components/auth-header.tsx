@@ -18,32 +18,32 @@ export function AuthHeader() {
   });
 
   return (
-    <header className="w-full flex items-center justify-between px-2 sm:px-4 py-2 border-b border-gray-200 bg-white/90 shadow-sm select-none">
+    <header className="w-full flex items-center justify-between px-2 sm:px-4 lg:px-6 py-2 sm:py-3 border-b border-gray-200 bg-white/90 shadow-sm select-none">
       <div className="flex py-2 items-center gap-2 min-w-0">
-        <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center">
-          <Store className="w-6 h-6 text-primary-foreground" />
+        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-xl flex items-center justify-center shrink-0">
+          <Store className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-foreground">AuraSwift</h1>
-          <p className="text-[12px] text-muted-foreground">
+        <div className="min-w-0">
+          <h1 className="text-base sm:text-xl font-bold text-foreground truncate">AuraSwift</h1>
+          <p className="text-[10px] sm:text-[12px] text-muted-foreground truncate">
             Point of Sale System
           </p>
         </div>
       </div>
-      {/* Center: Store/Terminal Name */}
-      <div className="flex-1 flex justify-center items-center min-w-0">
-        <span className="text-base sm:text-lg font-semibold text-gray-700 truncate max-w-xs text-center"></span>
+      {/* Center: Store/Terminal Name - Hidden on small screens */}
+      <div className="hidden sm:flex flex-1 justify-center items-center min-w-0 px-2">
+        <span className="text-xs sm:text-sm lg:text-base font-semibold text-gray-700 truncate max-w-xs text-center"></span>
       </div>
 
       {/* Right: Status Area */}
-      <div className="flex items-center gap-4 min-w-0">
-        <span className="hidden md:inline-flex items-center gap-2 text-gray-400">
-          <Wifi className="w-5 h-5" aria-label="Network Status" />
-          <BatteryFull className="w-5 h-5" aria-label="Battery Status" />
-          <Bell className="w-5 h-5" aria-label="Notifications" />
+      <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 min-w-0">
+        <span className="hidden md:inline-flex items-center gap-1.5 lg:gap-2 text-gray-400">
+          <Wifi className="w-4 h-4 lg:w-5 lg:h-5" aria-label="Network Status" />
+          <BatteryFull className="w-4 h-4 lg:w-5 lg:h-5" aria-label="Battery Status" />
+          <Bell className="w-4 h-4 lg:w-5 lg:h-5" aria-label="Notifications" />
         </span>
         <span
-          className="text-sm font-mono text-gray-700"
+          className="text-xs sm:text-sm font-mono text-gray-700 whitespace-nowrap"
           aria-label="Current Time"
         >
           {timeString}

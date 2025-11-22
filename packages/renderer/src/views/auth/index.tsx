@@ -9,10 +9,12 @@ export default function AuthPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <AuthHeader />
-      <main className="flex-1 bg-linear-to-br from-gray-50 to-gray-100 flex">
+      <main className="flex-1 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-4 sm:px-6 lg:px-8">
         <AuthHeroSection />
 
-        <AuthUserSelection />
+        <div className="w-full flex items-center justify-center lg:w-auto">
+          <AuthUserSelection />
+        </div>
       </main>
       <AuthFooter />
     </div>

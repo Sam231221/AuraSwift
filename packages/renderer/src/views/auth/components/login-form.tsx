@@ -38,29 +38,29 @@ export function LoginForm({ onSubmit, error, isLoading }: LoginFormProps) {
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="username">Username</Label>
+          <Label htmlFor="username" className="text-sm sm:text-base">Username</Label>
           <Input
             id="username"
             name="username"
             type="text"
             placeholder="Enter your username"
-            className="h-11"
+            className="h-10 sm:h-11 text-sm sm:text-base"
             autoComplete="username"
             required
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="pin">PIN</Label>
+          <Label htmlFor="pin" className="text-sm sm:text-base">PIN</Label>
           <div className="relative">
             <Input
               id="pin"
               name="pin"
               type={showPin ? "text" : "password"}
               placeholder="Enter your PIN"
-              className="h-11 pr-10"
+              className="h-10 sm:h-11 pr-10 text-sm sm:text-base"
               maxLength={6}
               autoComplete="off"
               required
@@ -81,7 +81,7 @@ export function LoginForm({ onSubmit, error, isLoading }: LoginFormProps) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-xs sm:text-sm">
           <label className="flex items-center space-x-2 cursor-pointer">
             <input
               type="checkbox"
@@ -91,7 +91,7 @@ export function LoginForm({ onSubmit, error, isLoading }: LoginFormProps) {
             />
             <span className="text-muted-foreground">Remember me</span>
           </label>
-          <Button variant="link" className="p-0 h-auto text-sm">
+          <Button variant="link" className="p-0 h-auto text-xs sm:text-sm">
             Forgot password?
           </Button>
         </div>
@@ -99,7 +99,7 @@ export function LoginForm({ onSubmit, error, isLoading }: LoginFormProps) {
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <Button
             type="submit"
-            className="w-full h-11 text-base font-medium"
+            className="w-full h-10 sm:h-11 text-sm sm:text-base font-medium touch-manipulation"
             disabled={isLoading}
           >
             {isLoading ? (

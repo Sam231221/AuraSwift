@@ -65,42 +65,42 @@ export function RegisterForm({
         </Alert>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+      <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
-            <Label htmlFor="firstName">First Name</Label>
+            <Label htmlFor="firstName" className="text-sm sm:text-base">First Name</Label>
             <Input
               id="firstName"
               name="firstName"
               placeholder="John"
-              className="h-11"
+              className="h-10 sm:h-11 text-sm sm:text-base"
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lastName">Last Name</Label>
+            <Label htmlFor="lastName" className="text-sm sm:text-base">Last Name</Label>
             <Input
               id="lastName"
               name="lastName"
               placeholder="Doe"
-              className="h-11"
+              className="h-10 sm:h-11 text-sm sm:text-base"
               required
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="businessName">Business Name</Label>
+          <Label htmlFor="businessName" className="text-sm sm:text-base">Business Name</Label>
           <Input
             id="businessName"
             name="businessName"
             placeholder="Your Store Name"
-            className="h-11"
+            className="h-10 sm:h-11 text-sm sm:text-base"
             required
           />
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <AvatarUpload
             value={businessAvatar || undefined}
             onChange={setBusinessAvatar}
@@ -112,26 +112,26 @@ export function RegisterForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="registerEmail">Email Address</Label>
+          <Label htmlFor="registerEmail" className="text-sm sm:text-base">Email Address</Label>
           <Input
             id="registerEmail"
             name="registerEmail"
             type="email"
             placeholder="store@example.com"
-            className="h-11"
+            className="h-10 sm:h-11 text-sm sm:text-base"
             required
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="registerPassword">Password</Label>
+          <Label htmlFor="registerPassword" className="text-sm sm:text-base">Password</Label>
           <div className="relative">
             <Input
               id="registerPassword"
               name="registerPassword"
               type={showPassword ? "text" : "password"}
               placeholder="Create a strong password"
-              className="h-11 pr-10"
+              className="h-10 sm:h-11 pr-10 text-sm sm:text-base"
               required
             />
             <Button
@@ -148,7 +148,7 @@ export function RegisterForm({
               )}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[10px] sm:text-xs text-muted-foreground">
             Password must be at least 8 characters with uppercase, lowercase,
             number, and special character.
           </p>
@@ -157,7 +157,7 @@ export function RegisterForm({
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
           <Button
             type="submit"
-            className="w-full h-11 text-base font-medium"
+            className="w-full h-10 sm:h-11 text-sm sm:text-base font-medium touch-manipulation"
             disabled={isLoading}
           >
             {isLoading ? (
