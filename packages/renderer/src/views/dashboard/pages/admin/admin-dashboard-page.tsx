@@ -219,18 +219,18 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
         open={isBackupDialogOpen}
         onOpenChange={setIsBackupDialogOpen}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] mx-4">
           <AlertDialogHeader>
-            <AlertDialogTitle>Backup Database</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-base sm:text-lg">Backup Database</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs sm:text-sm">
               You will be prompted to choose where to save your database backup
               file. The backup will include all your business data, products,
               transactions, and settings.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBackupDatabase}>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <AlertDialogCancel className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBackupDatabase} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
               Choose Location & Backup
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -239,15 +239,15 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
 
       {/* Empty Database Confirmation Dialog */}
       <AlertDialog open={isEmptyDialogOpen} onOpenChange={setIsEmptyDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] mx-4">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600">
+            <AlertDialogTitle className="text-base sm:text-lg text-red-600">
               ⚠️ Empty Database
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
+            <AlertDialogDescription className="space-y-2 text-xs sm:text-sm">
               <p className="font-semibold">This action cannot be undone!</p>
               <p>This will permanently delete ALL data from your database:</p>
-              <ul className="list-disc list-inside space-y-1 text-sm">
+              <ul className="list-disc list-inside space-y-1 text-[11px] sm:text-sm">
                 <li>All user accounts and permissions</li>
                 <li>All products and categories</li>
                 <li>All transactions and sales history</li>
@@ -258,11 +258,11 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <AlertDialogCancel className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmEmptyDatabase}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
             >
               I Understand, Empty Database
             </AlertDialogAction>
@@ -271,81 +271,81 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
       </AlertDialog>
 
       {/* Admin Overview */}
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Revenueß
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Total Revenue
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$45,231.89</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-xl sm:text-2xl font-bold">$45,231.89</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
               +20.1% from last month
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Active Users</CardTitle>
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">3 online now</p>
+            <div className="text-xl sm:text-2xl font-bold">12</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">3 online now</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">System Health</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">System Health</CardTitle>
+            <Shield className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">99.9%</div>
-            <p className="text-xs text-muted-foreground">Uptime this month</p>
+            <div className="text-xl sm:text-2xl font-bold">99.9%</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Uptime this month</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alerts</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Alerts</CardTitle>
+            <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2</div>
-            <p className="text-xs text-muted-foreground">Require attention</p>
+            <div className="text-xl sm:text-2xl font-bold">2</div>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Require attention</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Admin Controls */}
-      <div className="grid md:grid-cols-3 mt-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4 gap-4 sm:gap-6">
         <Card>
           <CardHeader>
             <CardTitle>User Management</CardTitle>
             <CardDescription>Manage staff and permissions</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3">
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
               onClick={onFront}
             >
-              <Users className="w-4 h-4 mr-2" />
+              <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               Manage Users
             </Button>
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
             >
-              <Shield className="w-4 h-4 mr-2" />
+              <Shield className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               Role Permissions
             </Button>
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
             >
-              <Settings className="w-4 h-4 mr-2" />
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               Access Control
             </Button>
           </CardContent>
@@ -356,26 +356,26 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
             <CardTitle>System Settings</CardTitle>
             <CardDescription>Configure system preferences</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3">
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
             >
-              <Settings className="w-4 h-4 mr-2" />
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               General Settings
             </Button>
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
             >
-              <Store className="w-4 h-4 mr-2" />
+              <Store className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               Store Configuration
             </Button>
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
             >
-              <Shield className="w-4 h-4 mr-2" />
+              <Shield className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               Security Settings
             </Button>
           </CardContent>
@@ -386,26 +386,26 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
             <CardTitle>Advanced Reports</CardTitle>
             <CardDescription>Comprehensive analytics</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3">
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
             >
-              <BarChart3 className="w-4 h-4 mr-2" />
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               Financial Reports
             </Button>
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
             >
-              <TrendingUp className="w-4 h-4 mr-2" />
+              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               Business Intelligence
             </Button>
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
             >
-              <Users className="w-4 h-4 mr-2" />
+              <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               User Activity Logs
             </Button>
           </CardContent>
@@ -416,37 +416,37 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
             <CardTitle>DB Management</CardTitle>
             <CardDescription>Database backup and maintenance</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3">
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
               onClick={handleImportDatabase}
               disabled={isImporting}
             >
-              <Upload className="w-4 h-4 mr-2" />
-              {isImporting ? "Importing Database..." : "Import Database"}
+              <Upload className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
+              <span className="truncate">{isImporting ? "Importing Database..." : "Import Database"}</span>
             </Button>
             <Button
-              className="w-full justify-start bg-transparent"
+              className="w-full justify-start bg-transparent text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
               onClick={() => setIsBackupDialogOpen(true)}
               disabled={isBackingUp}
             >
               {isBackingUp ? (
-                <Download className="w-4 h-4 mr-2 animate-spin" />
+                <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin shrink-0" />
               ) : (
-                <Download className="w-4 h-4 mr-2" />
+                <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
               )}
-              {isBackingUp ? "Creating Backup..." : "Backup Database"}
+              <span className="truncate">{isBackingUp ? "Creating Backup..." : "Backup Database"}</span>
             </Button>
             <Button
-              className="w-full justify-start bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="w-full justify-start bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50 text-sm sm:text-base h-9 sm:h-10 touch-manipulation"
               variant="outline"
               onClick={handleEmptyDatabase}
               disabled={isEmptying}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              {isEmptying ? "Emptying Database..." : "Empty Database"}
+              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 shrink-0" />
+              <span className="truncate">{isEmptying ? "Emptying Database..." : "Empty Database"}</span>
             </Button>
           </CardContent>
         </Card>

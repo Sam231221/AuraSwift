@@ -765,9 +765,9 @@ const CashierDashboardPage = ({
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-gray-600">Loading shift data...</div>
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+        <div className="flex items-center justify-center h-48 sm:h-64">
+          <div className="text-gray-600 text-sm sm:text-base">Loading shift data...</div>
         </div>
       </div>
     );
@@ -777,14 +777,14 @@ const CashierDashboardPage = ({
     <>
       {/* Overtime Warning Banner */}
       {showOvertimeWarning && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+            <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 shrink-0 mt-0.5 sm:mt-0" />
             <div>
-              <h3 className="font-semibold text-red-800">
+              <h3 className="font-semibold text-red-800 text-sm sm:text-base">
                 Shift Overtime Warning
               </h3>
-              <p className="text-sm text-red-700">
+              <p className="text-xs sm:text-sm text-red-700">
                 Your shift is {overtimeMinutes} minutes past the scheduled end
                 time. Please end your shift as soon as possible.
                 {overtimeMinutes >= 60 && (
@@ -799,7 +799,7 @@ const CashierDashboardPage = ({
           </div>
           <Button
             onClick={handleEndShiftClick}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
           >
             End Shift Now
           </Button>
@@ -807,15 +807,15 @@ const CashierDashboardPage = ({
       )}
 
       {/* Shift Status Bar */}
-      <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="font-semibold text-lg">
+      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <div className="w-full sm:w-auto">
+            <h2 className="font-semibold text-base sm:text-lg">
               {activeShift ? "Current Shift" : "No Active Shift"}
             </h2>
             <div className="text-slate-600 space-y-1">
               {activeShift && todaySchedule ? (
-                <div className="text-sm">
+                <div className="text-xs sm:text-sm">
                   <span className="font-medium text-emerald-700">
                     Active Shift • Clocked in at{" "}
                     {new Date(activeShift.startTime).toLocaleTimeString([], {
@@ -865,7 +865,7 @@ const CashierDashboardPage = ({
                   </span>
                 </div>
               ) : activeShift ? (
-                <div className="text-sm">
+                <div className="text-xs sm:text-sm">
                   <span className="font-medium text-emerald-700">
                     Active Shift • Started at{" "}
                     {new Date(activeShift.startTime).toLocaleTimeString([], {
@@ -877,7 +877,7 @@ const CashierDashboardPage = ({
                   </span>
                 </div>
               ) : todaySchedule ? (
-                <div className="text-sm">
+                <div className="text-xs sm:text-sm">
                   <span>
                     {(() => {
                       const startDate = new Date(todaySchedule.startTime);
@@ -914,14 +914,14 @@ const CashierDashboardPage = ({
                   </span>
                 </div>
               ) : (
-                <div className="text-sm">No schedule found for today</div>
+                <div className="text-xs sm:text-sm">No schedule found for today</div>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-slate-500" />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-slate-500 shrink-0" />
             <span
-              className={`font-medium ${
+              className={`font-medium text-xs sm:text-sm ${
                 overtimeMinutes > 0 ? "text-red-600" : ""
               }`}
             >
@@ -954,29 +954,29 @@ const CashierDashboardPage = ({
                 : "No active shift"}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             {!activeShift ? (
               <Button
                 variant="outline"
                 onClick={handleStartShiftClick}
-                className={`border-slate-300 ${
+                className={`border-slate-300 w-full sm:w-auto h-10 sm:h-11 text-xs sm:text-sm touch-manipulation ${
                   !shiftTimingInfo.canStart ? "opacity-50" : ""
                 }`}
                 disabled={!todaySchedule || !shiftTimingInfo.canStart}
                 title={shiftTimingInfo.reason}
               >
-                {shiftTimingInfo.buttonText}
+                <span className="truncate">{shiftTimingInfo.buttonText}</span>
               </Button>
             ) : (
               <Button
                 onClick={handleEndShiftClick}
-                className={
+                className={`w-full sm:w-auto h-10 sm:h-11 text-xs sm:text-sm touch-manipulation ${
                   overtimeMinutes > 0
                     ? "bg-red-600 hover:bg-red-700 animate-pulse"
                     : "bg-green-600 hover:bg-green-700"
-                }
+                }`}
               >
-                {overtimeMinutes > 0 ? "End Shift (Overtime)" : "End Shift"}
+                <span className="truncate">{overtimeMinutes > 0 ? "End Shift (Overtime)" : "End Shift"}</span>
               </Button>
             )}
           </div>
@@ -997,8 +997,8 @@ const CashierDashboardPage = ({
 
           {/* Shift Summary - matches shifttimeCase.md scenario example */}
           {activeShift && todaySchedule && (
-            <div className="mt-3 p-3 bg-slate-50 rounded-lg text-sm">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="mt-3 p-2 sm:p-3 bg-slate-50 rounded-lg text-xs sm:text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <span className="text-slate-500 font-medium">
                     Scheduled Shift:
@@ -1097,25 +1097,25 @@ const CashierDashboardPage = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
         {/* Today's Sales Total */}
 
         <Card className="bg-white border-slate-200 shadow-sm h-full">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base font-semibold">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="flex items-center justify-between text-sm sm:text-base font-semibold">
               <span className="text-slate-700">Today's Sales</span>
-              <DollarSign className="h-5 w-5 text-green-600" />
+              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 shrink-0" />
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-700">
+            <div className="text-xl sm:text-2xl font-bold text-green-700">
               £{(shiftStats.totalSales || 0).toFixed(2)}
             </div>
-            <div className="flex items-center mt-2 text-sm text-slate-600">
-              <TrendingUp className="h-4 w-4 mr-1 text-green-500" />
+            <div className="flex items-center mt-2 text-xs sm:text-sm text-slate-600">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-green-500 shrink-0" />
               <span>{shiftStats.totalTransactions || 0} transactions</span>
             </div>
-            <div className="text-xs text-slate-500 mt-1">
+            <div className="text-[10px] sm:text-xs text-slate-500 mt-1">
               Average: £{averageTransaction.toFixed(2)}
             </div>
           </CardContent>
@@ -1124,21 +1124,21 @@ const CashierDashboardPage = ({
         {/* Transaction Count */}
 
         <Card className="bg-white border-slate-200 shadow-sm h-full">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base font-semibold">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="flex items-center justify-between text-sm sm:text-base font-semibold">
               <span className="text-slate-700">Transactions</span>
-              <ShoppingCart className="h-5 w-5 text-blue-600" />
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-700">
+            <div className="text-xl sm:text-2xl font-bold text-blue-700">
               {shiftStats.totalTransactions || 0}
             </div>
-            <div className="flex items-center mt-2 text-sm text-slate-600">
-              <Clock className="h-4 w-4 mr-1 text-blue-500" />
+            <div className="flex items-center mt-2 text-xs sm:text-sm text-slate-600">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-blue-500 shrink-0" />
               <span>This shift</span>
             </div>
-            <div className="text-xs text-slate-500 mt-1">
+            <div className="text-[10px] sm:text-xs text-slate-500 mt-1">
               Last hour: {hourlyStats.lastHour} transactions
             </div>
           </CardContent>
@@ -1147,30 +1147,30 @@ const CashierDashboardPage = ({
         {/* Cash Drawer Balance */}
 
         <Card className="bg-white border-slate-200 shadow-sm h-full">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base font-semibold">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="flex items-center justify-between text-sm sm:text-base font-semibold">
               <span className="text-slate-700">Cash Drawer</span>
-              <DollarSign className="h-5 w-5 text-amber-600" />
+              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0" />
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-700">
+            <div className="text-xl sm:text-2xl font-bold text-amber-700">
               £{cashDrawerBalance.amount.toFixed(2)}
               {cashDrawerBalance.isEstimated && (
-                <span className="text-xs text-amber-600 ml-1">(est.)</span>
+                <span className="text-[10px] sm:text-xs text-amber-600 ml-1">(est.)</span>
               )}
             </div>
             <div
-              className={`flex items-center mt-2 text-sm ${
+              className={`flex items-center mt-2 text-xs sm:text-sm ${
                 (cashDrawerBalance.variance || 0) >= 0
                   ? "text-green-600"
                   : "text-red-600"
               }`}
             >
               {(cashDrawerBalance.variance || 0) >= 0 ? (
-                <CheckCircle className="h-4 w-4 mr-1" />
+                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 shrink-0" />
               ) : (
-                <AlertTriangle className="h-4 w-4 mr-1" />
+                <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 shrink-0" />
               )}
               <span>
                 Variance: £
@@ -1178,7 +1178,7 @@ const CashierDashboardPage = ({
                 {cashDrawerBalance.isEstimated && " (est.)"}
               </span>
             </div>
-            <div className="text-xs text-slate-500 mt-1">
+            <div className="text-[10px] sm:text-xs text-slate-500 mt-1">
               {cashDrawerBalance.lastCountTime ? (
                 <>
                   Last count:{" "}
@@ -1201,26 +1201,26 @@ const CashierDashboardPage = ({
         {/* Refunds & Voided */}
 
         <Card className="bg-white border-slate-200 shadow-sm h-full">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-base font-semibold">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="flex items-center justify-between text-sm sm:text-base font-semibold">
               <span className="text-slate-700">Adjustments</span>
-              <RefreshCw className="h-5 w-5 text-red-600" />
+              <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 shrink-0" />
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-2 text-xs sm:text-sm">
               <span className="text-slate-600">Refunds:</span>
               <span className="font-semibold text-red-700">
                 -£{(shiftStats.totalRefunds || 0).toFixed(2)}
               </span>
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center text-xs sm:text-sm">
               <span className="text-slate-600">Voided Transactions:</span>
               <span className="font-semibold text-red-700">
                 {shiftStats.totalVoids || 0}
               </span>
             </div>
-            <div className="text-xs text-slate-500 mt-2">
+            <div className="text-[10px] sm:text-xs text-slate-500 mt-2">
               Total adjustments:{" "}
               {(shiftStats.totalVoids || 0) +
                 ((shiftStats.totalRefunds || 0) > 0 ? 1 : 0)}
@@ -1229,23 +1229,23 @@ const CashierDashboardPage = ({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
         {/* Recent Transactions */}
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-slate-700">
+            <CardTitle className="text-base sm:text-lg font-semibold text-slate-700">
               Recent Transactions
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {transactions.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-6 sm:py-8 text-slate-500">
                   <div className="mb-2">
-                    <ShoppingCart className="h-8 w-8 mx-auto opacity-50" />
+                    <ShoppingCart className="h-6 w-6 sm:h-8 sm:w-8 mx-auto opacity-50" />
                   </div>
-                  <p className="text-sm">No recent transactions</p>
-                  <p className="text-xs mt-1">
+                  <p className="text-xs sm:text-sm">No recent transactions</p>
+                  <p className="text-[10px] sm:text-xs mt-1">
                     Transactions will appear here once processed
                   </p>
                 </div>
@@ -1274,28 +1274,28 @@ const CashierDashboardPage = ({
                     `}
                       >
                         {transaction.type === "sale" && (
-                          <CheckCircle className="h-4 w-4" />
+                          <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                         )}
                         {transaction.type === "refund" && (
-                          <RefreshCw className="h-4 w-4" />
+                          <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
                         )}
                         {transaction.type === "void" && (
-                          <XCircle className="h-4 w-4" />
+                          <XCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                         )}
                       </div>
-                      <div>
-                        <div className="font-medium">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-xs sm:text-sm truncate">
                           #{transaction.receiptNumber}
                         </div>
-                        <div className="text-sm text-slate-500">
+                        <div className="text-[10px] sm:text-xs text-slate-500 truncate">
                           {new Date(transaction.timestamp).toLocaleString()} •{" "}
                           {transaction.items.length} items
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <div
-                        className={`font-semibold ${
+                        className={`font-semibold text-xs sm:text-sm ${
                           transaction.type === "sale"
                             ? "text-green-700"
                             : "text-red-700"
@@ -1308,7 +1308,7 @@ const CashierDashboardPage = ({
                       <Badge
                         variant="outline"
                         className={`
-                      text-xs
+                      text-[10px] sm:text-xs mt-1
                       ${
                         transaction.paymentMethod === "cash"
                           ? "bg-amber-50 text-amber-700"
@@ -1339,27 +1339,27 @@ const CashierDashboardPage = ({
         {/* Quick Actions & Statistics */}
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-slate-700">
+            <CardTitle className="text-base sm:text-lg font-semibold text-slate-700">
               Quick Actions
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {!activeShift && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 sm:p-3 mb-3 sm:mb-4">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                    <span className="text-sm text-amber-800 font-medium">
+                    <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 shrink-0" />
+                    <span className="text-xs sm:text-sm text-amber-800 font-medium">
                       Start your shift to access quick actions
                     </span>
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <Button
                   onClick={() => activeShift && setShowRefundView(true)}
                   variant="outline"
-                  className={`h-16 flex flex-col border-slate-300 ${
+                  className={`h-14 sm:h-16 flex flex-col border-slate-300 touch-manipulation ${
                     !activeShift ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                   disabled={!activeShift}
@@ -1367,13 +1367,13 @@ const CashierDashboardPage = ({
                     !activeShift ? "Start your shift to process refunds" : ""
                   }
                 >
-                  <RefreshCw className="h-5 w-5 mb-1" />
-                  <span className="text-xs">Process Refund</span>
+                  <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 mb-1 shrink-0" />
+                  <span className="text-[10px] sm:text-xs">Process Refund</span>
                 </Button>
                 <Button
                   onClick={() => activeShift && setShowVoidModal(true)}
                   variant="outline"
-                  className={`h-16 flex flex-col border-slate-300 ${
+                  className={`h-14 sm:h-16 flex flex-col border-slate-300 touch-manipulation ${
                     !activeShift ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                   disabled={!activeShift}
@@ -1381,8 +1381,8 @@ const CashierDashboardPage = ({
                     !activeShift ? "Start your shift to void transactions" : ""
                   }
                 >
-                  <XCircle className="h-5 w-5 mb-1" />
-                  <span className="text-xs">Void Transaction</span>
+                  <XCircle className="h-4 w-4 sm:h-5 sm:w-5 mb-1 shrink-0" />
+                  <span className="text-[10px] sm:text-xs">Void Transaction</span>
                 </Button>
                 <Button
                   onClick={() => {
@@ -1392,7 +1392,7 @@ const CashierDashboardPage = ({
                     }
                   }}
                   variant="outline"
-                  className={`h-16 flex flex-col border-slate-300 ${
+                  className={`h-14 sm:h-16 flex flex-col border-slate-300 touch-manipulation ${
                     !activeShift ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                   disabled={!activeShift}
@@ -1402,13 +1402,13 @@ const CashierDashboardPage = ({
                       : "Perform cash drawer count"
                   }
                 >
-                  <DollarSign className="h-5 w-5 mb-1" />
-                  <span className="text-xs">Cash Drawer Count</span>
+                  <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 mb-1 shrink-0" />
+                  <span className="text-[10px] sm:text-xs">Cash Drawer Count</span>
                 </Button>
                 <Button
                   onClick={activeShift ? onNewTransaction : undefined}
                   variant="outline"
-                  className={`h-16 flex flex-col border-slate-300 ${
+                  className={`h-14 sm:h-16 flex flex-col border-slate-300 touch-manipulation ${
                     !activeShift ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                   disabled={!activeShift}
@@ -1418,15 +1418,15 @@ const CashierDashboardPage = ({
                       : ""
                   }
                 >
-                  <ShoppingCart className="h-5 w-5 mb-1" />
-                  <span className="text-xs">New Transaction</span>
+                  <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mb-1 shrink-0" />
+                  <span className="text-[10px] sm:text-xs">New Transaction</span>
                 </Button>
               </div>
 
-              <div className="pt-4 border-t border-slate-200">
-                <h3 className="font-medium mb-2">Shift Performance</h3>
+              <div className="pt-3 sm:pt-4 border-t border-slate-200">
+                <h3 className="font-medium mb-2 text-sm sm:text-base">Shift Performance</h3>
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span>Transactions per hour:</span>
                     <span
                       className={`font-medium ${
@@ -1454,7 +1454,7 @@ const CashierDashboardPage = ({
                         : "--"}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span>Average basket size:</span>
                     <span
                       className={`font-medium ${
@@ -1464,7 +1464,7 @@ const CashierDashboardPage = ({
                       {activeShift ? `£${averageTransaction.toFixed(2)}` : "--"}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span>Cash vs Card ratio:</span>
                     <span
                       className={`font-medium ${
@@ -1486,16 +1486,16 @@ const CashierDashboardPage = ({
         open={showStartShiftDialog}
         onOpenChange={setShowStartShiftDialog}
       >
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Start Shift</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">Start Shift</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Enter the starting cash amount for your shift.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="starting-cash" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-3 sm:gap-4">
+              <Label htmlFor="starting-cash" className="text-left sm:text-right text-sm sm:text-base">
                 Starting Cash
               </Label>
               <Input
@@ -1504,35 +1504,38 @@ const CashierDashboardPage = ({
                 step="0.01"
                 value={startingCash}
                 onChange={(e) => setStartingCash(e.target.value)}
-                className="col-span-3"
+                className="col-span-1 sm:col-span-3 h-10 sm:h-11 text-sm sm:text-base"
                 placeholder="0.00"
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => setShowStartShiftDialog(false)}
+              className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
             >
               Cancel
             </Button>
-            <Button onClick={confirmStartShift}>Start Shift</Button>
+            <Button onClick={confirmStartShift} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+              Start Shift
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* End Shift Dialog */}
       <Dialog open={showEndShiftDialog} onOpenChange={setShowEndShiftDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>End Shift</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">End Shift</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Enter the final cash drawer amount to end your shift.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="final-cash" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-3 sm:gap-4">
+              <Label htmlFor="final-cash" className="text-left sm:text-right text-sm sm:text-base">
                 Final Cash
               </Label>
               <Input
@@ -1541,12 +1544,12 @@ const CashierDashboardPage = ({
                 step="0.01"
                 value={finalCash}
                 onChange={(e) => setFinalCash(e.target.value)}
-                className="col-span-3"
+                className="col-span-1 sm:col-span-3 h-10 sm:h-11 text-sm sm:text-base"
                 placeholder="0.00"
               />
             </div>
             {activeShift && (
-              <div className="text-sm text-muted-foreground">
+              <div className="text-xs sm:text-sm text-muted-foreground">
                 <p>
                   Expected: £
                   {(
@@ -1558,14 +1561,17 @@ const CashierDashboardPage = ({
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => setShowEndShiftDialog(false)}
+              className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
             >
               Cancel
             </Button>
-            <Button onClick={confirmEndShift}>End Shift</Button>
+            <Button onClick={confirmEndShift} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+              End Shift
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1575,10 +1581,10 @@ const CashierDashboardPage = ({
         open={showLateStartConfirm}
         onOpenChange={setShowLateStartConfirm}
       >
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Late Shift Start</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">Late Shift Start</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               You are{" "}
               {(() => {
                 const hours = Math.floor(lateStartMinutes / 60);
@@ -1597,19 +1603,22 @@ const CashierDashboardPage = ({
               late for your scheduled shift.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 text-xs sm:text-sm">
             <p>
               Do you want to start your shift now and mark it as a late start?
             </p>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => setShowLateStartConfirm(false)}
+              className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
             >
               Cancel
             </Button>
-            <Button onClick={confirmLateStart}>Start Late</Button>
+            <Button onClick={confirmLateStart} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+              Start Late
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
