@@ -89,7 +89,45 @@ export default /** @type import('electron-builder').Configuration */
     'LICENSE*',
     pkg.main,
     '!node_modules/@app/**',
+    // Exclude development and unnecessary files
+    '!**/*.d.ts',  // Exclude TypeScript definitions
+    '!**/*.map',   // Exclude source maps
+    '!**/test/**',
+    '!**/tests/**',
+    '!**/__tests__/**',
+    '!**/*.test.*',
+    '!**/*.spec.*',
+    // Exclude platform-specific native binaries for non-target platforms
+    // Windows x64 builds: exclude darwin, linux, android, and ia32 binaries
+    // Note: Only exclude prebuilds for non-Windows platforms
+    // The actual Windows binaries will be included via asarUnpack
+    '!**/usb/prebuilds/darwin-*/**',
+    '!**/usb/prebuilds/linux-*/**',
+    '!**/usb/prebuilds/android-*/**',
+    '!**/usb/prebuilds/win32-ia32/**',
+    '!**/usb/prebuilds/win32-arm64/**',
+    '!**/usb/bin/darwin-*/**',
+    '!**/better-sqlite3/bin/darwin-*/**',
+    '!**/better-sqlite3/bin/linux-*/**',
+    '!**/better-sqlite3/bin/android-*/**',
+    '!**/node-hid/prebuilds/darwin-*/**',
+    '!**/node-hid/prebuilds/linux-*/**',
+    '!**/node-hid/prebuilds/android-*/**',
+    '!**/node-hid/prebuilds/win32-ia32/**',
+    '!**/node-hid/prebuilds/win32-arm64/**',
+    '!**/serialport/prebuilds/darwin-*/**',
+    '!**/serialport/prebuilds/linux-*/**',
+    '!**/serialport/prebuilds/android-*/**',
+    '!**/serialport/prebuilds/win32-ia32/**',
+    '!**/serialport/prebuilds/win32-arm64/**',
     ...await getListOfFilesFromEachWorkspace(),
+  ],
+  // Unpack native modules from asar (required for native .node files)
+  asarUnpack: [
+    '**/better-sqlite3/**/*.node',
+    '**/node-hid/**/*.node',
+    '**/serialport/**/*.node',
+    '**/usb/**/*.node',
   ],
   // Include migrations as extraResources so they're accessible outside asar if needed
   // IMPORTANT: Include ALL files including meta/_journal.json and snapshot files

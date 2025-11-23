@@ -1,6 +1,6 @@
 /**
  * Staff Schedule Form Hook
- * 
+ *
  * Custom hook for managing staff schedule form state, validation, and submission
  * using React Hook Form with Zod validation.
  */
@@ -14,7 +14,8 @@ import {
   type ScheduleUpdateData,
 } from "../schemas/schedule-schema";
 import { useFormNotification } from "@/shared/hooks/use-form-notification";
-import { format } from "date-fns";
+// Optimized: Import individual function to reduce bundle size
+import format from "date-fns/format";
 
 interface Schedule {
   id: string;
@@ -93,7 +94,7 @@ const mapScheduleToFormData = (
 
 /**
  * Hook for managing schedule form
- * 
+ *
  * @example
  * ```tsx
  * const { form, handleSubmit, isSubmitting } = useScheduleForm({
@@ -135,12 +136,12 @@ export function useScheduleForm({
     try {
       await onSubmit(data);
       notifySuccess(isEditMode ? "update" : "create");
-      
+
       // Reset form after successful creation (not on update)
       if (!isEditMode) {
         form.reset(getDefaultValues(selectedDate, businessId));
       }
-      
+
       onSuccess?.();
     } catch (error) {
       const errorMessage =
@@ -157,4 +158,3 @@ export function useScheduleForm({
     isEditMode,
   };
 }
-
