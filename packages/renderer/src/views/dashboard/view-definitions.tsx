@@ -1,13 +1,14 @@
 import { type ReactNode } from "react";
 
-import AdminDashboardPage from "./pages/admin/admin-dashboard-page";
-import CashierDashboardPage from "./pages/cashier/cashier-dashboard-page";
-import ManagerDashboardPage from "./pages/manager/manager-dashboard-page";
-import NewTransactionView from "./pages/cashier/new-transaction";
-import UserManagementView from "@/features/users/components/user-management-view";
-import StaffSchedulesView from "@/features/users/components/staff-schedules-view";
-import CashierManagementView from "@/features/users/components/manage-cashier-view";
-import ProductManagementView from "@/features/products/components/manage-product-view";
+import AdminDashboardPage from "./pages/admin/views/admin-dashboard-page";
+import CashierDashboardPage from "./pages/cashier/views/cashier-dashboard-page";
+import ManagerDashboardPage from "./pages/manager/views/manager-dashboard-page";
+import NewTransactionView from "./pages/cashier/views/new-transaction";
+import ProductManagementView from "./pages/manager/views/stock/manage-product-view";
+
+import UserManagementView from "@/views/dashboard/pages/admin/views/user-management-view";
+import StaffSchedulesView from "@/views/dashboard/pages/manager/views/staff-schedules-view";
+import CashierManagementView from "@/views/dashboard/pages/manager/views/manage-cashier-view";
 
 export const ADMIN_VIEWS = ["dashboard", "userManagement"] as const;
 export const CASHIER_VIEWS = ["dashboard", "newTransaction"] as const;

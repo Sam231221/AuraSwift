@@ -99,11 +99,13 @@ declare global {
         ipAddress?: string;
         locationId?: string;
         autoClockIn?: boolean;
-      }) => Promise<APIResponse & {
-        clockEvent?: any;
-        shift?: any;
-        requiresClockIn?: boolean;
-      }>;
+      }) => Promise<
+        APIResponse & {
+          clockEvent?: any;
+          shift?: any;
+          requiresClockIn?: boolean;
+        }
+      >;
       validateSession: (token: string) => Promise<APIResponse>;
       logout: (
         token: string,
@@ -112,10 +114,12 @@ declare global {
           ipAddress?: string;
           autoClockOut?: boolean;
         }
-      ) => Promise<APIResponse & {
-        isClockedIn?: boolean;
-        activeShift?: any;
-      }>;
+      ) => Promise<
+        APIResponse & {
+          isClockedIn?: boolean;
+          activeShift?: any;
+        }
+      >;
       getUserById: (userId: string) => Promise<APIResponse>;
       updateUser: (
         userId: string,
@@ -170,6 +174,7 @@ declare global {
         cashierId: string;
         businessId: string;
         startingCash: number;
+        deviceId?: string;
         notes?: string;
       }) => Promise<APIResponse>;
       end: (
@@ -224,7 +229,7 @@ declare global {
       ) => Promise<APIResponse>;
       completeSession: (sessionId: string) => Promise<APIResponse>;
       cancelSession: (sessionId: string) => Promise<APIResponse>;
-      
+
       // Cart Item Operations
       addItem: (itemData: {
         cartSessionId: string;
@@ -585,33 +590,43 @@ declare global {
         locationId?: string;
         businessId: string;
         ipAddress?: string;
-      }) => Promise<APIResponse & {
-        clockEvent?: any;
-        shift?: any;
-      }>;
+      }) => Promise<
+        APIResponse & {
+          clockEvent?: any;
+          shift?: any;
+        }
+      >;
       clockOut: (data: {
         userId: string;
         terminalId: string;
         ipAddress?: string;
-      }) => Promise<APIResponse & {
-        clockEvent?: any;
-        shift?: any;
-      }>;
-      getActiveShift: (userId: string) => Promise<APIResponse & {
-        shift?: any;
-        breaks?: any[];
-      }>;
+      }) => Promise<
+        APIResponse & {
+          clockEvent?: any;
+          shift?: any;
+        }
+      >;
+      getActiveShift: (userId: string) => Promise<
+        APIResponse & {
+          shift?: any;
+          breaks?: any[];
+        }
+      >;
       startBreak: (data: {
         shiftId: string;
         userId: string;
         type?: "meal" | "rest" | "other";
         isPaid?: boolean;
-      }) => Promise<APIResponse & {
-        break?: any;
-      }>;
-      endBreak: (breakId: string) => Promise<APIResponse & {
-        break?: any;
-      }>;
+      }) => Promise<
+        APIResponse & {
+          break?: any;
+        }
+      >;
+      endBreak: (breakId: string) => Promise<
+        APIResponse & {
+          break?: any;
+        }
+      >;
     };
   }
 }

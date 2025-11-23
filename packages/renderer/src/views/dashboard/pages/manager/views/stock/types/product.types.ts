@@ -93,4 +93,3 @@ export interface ProductResponse {
   adjustments?: StockAdjustment[];
   errors?: string[];
 }
-
