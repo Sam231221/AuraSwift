@@ -23,9 +23,9 @@ export function ProductGrid({
 }: ProductGridProps) {
   if (products.length === 0 && !searchQuery) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Package className="h-12 w-12 text-slate-300 mb-4" />
-        <p className="text-slate-500 text-center">
+      <div className="flex flex-col items-center justify-center py-8 sm:py-12">
+        <Package className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-slate-300 mb-3 sm:mb-4" />
+        <p className="text-slate-500 text-center text-xs sm:text-sm">
           No products in this category
         </p>
       </div>
@@ -34,9 +34,9 @@ export function ProductGrid({
 
   if (products.length === 0 && searchQuery) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Search className="h-12 w-12 text-slate-300 mb-4" />
-        <p className="text-slate-500 text-center">
+      <div className="flex flex-col items-center justify-center py-8 sm:py-12">
+        <Search className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-slate-300 mb-3 sm:mb-4" />
+        <p className="text-slate-500 text-center text-xs sm:text-sm">
           No products found for "{searchQuery}"
         </p>
       </div>
@@ -47,7 +47,7 @@ export function ProductGrid({
 
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 max-h-96 overflow-y-auto">
         {products.map((product) => (
           <ProductCard
             key={product.id}

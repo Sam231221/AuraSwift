@@ -42,16 +42,16 @@ export function PaymentPanel({
       animate={{ opacity: 1, y: 0 }}
     >
       <Card className="bg-white border-slate-200 shadow-sm">
-        <CardHeader className="bg-slate-50 py-3">
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-700">
-              <CreditCard className="h-5 w-5 text-green-600" />
+        <CardHeader className="bg-slate-50 py-2 sm:py-3 px-4 sm:px-6">
+          <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+            <div className="flex items-center gap-2 text-slate-700 text-sm sm:text-base">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 shrink-0" />
               Payment Method
             </div>
             {/* Card Reader Status */}
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-xs sm:text-sm">
               <div
-                className={`h-2 w-2 rounded-full ${
+                className={`h-2 w-2 rounded-full shrink-0 ${
                   cardReaderReady ? "bg-green-500" : "bg-red-500"
                 }`}
               />
@@ -65,7 +65,7 @@ export function PaymentPanel({
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="pt-3 sm:pt-4 px-4 sm:px-6">
           {!paymentMethod ? (
             <PaymentMethodSelector
               cardReaderReady={cardReaderReady}

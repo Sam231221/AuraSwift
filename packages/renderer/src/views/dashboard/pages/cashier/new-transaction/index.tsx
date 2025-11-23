@@ -347,20 +347,20 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     !shift.todaySchedule
   ) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 p-6">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4 sm:p-6">
         <Card className="max-w-md w-full shadow-lg">
-          <CardContent className="text-center pb-4">
-            <div className="mx-auto mb-4 p-3 bg-amber-100 rounded-full w-16 h-16 flex items-center justify-center">
-              <AlertCircle className="h-8 w-8 text-amber-600" />
+          <CardContent className="text-center pb-4 px-4 sm:px-6">
+            <div className="mx-auto mb-4 p-2 sm:p-3 bg-amber-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
+              <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600" />
             </div>
-            <h2 className="text-2xl text-slate-900 font-bold mb-2">
+            <h2 className="text-xl sm:text-2xl text-slate-900 font-bold mb-2">
               No Active Shift
             </h2>
-            <p className="text-slate-600 mt-2 mb-4">
+            <p className="text-sm sm:text-base text-slate-600 mt-2 mb-4">
               You don't have any shift today.
             </p>
-            <Button onClick={() => logout()} variant="outline" size="lg">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button onClick={() => logout()} variant="outline" size="lg" className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               Logout
             </Button>
           </CardContent>
@@ -389,7 +389,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
       />
 
       {/* Main Layout */}
-      <div className="flex p-2 flex-col lg:flex-row gap-2 min-h-screen h-screen">
+      <div className="flex p-2 sm:p-3 lg:p-4 flex-col lg:flex-row gap-2 sm:gap-3 min-h-screen h-screen">
         {/* Left Column - Product Selection */}
         <div className="flex mb-2 flex-col flex-1 min-h-0 min-w-0">
           <ProductSelectionPanel
@@ -419,7 +419,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
         </div>
 
         {/* Right Column - Cart & Payment */}
-        <div className="flex flex-col flex-[0_1_480px] w-full lg:w-[480px] max-w-[520px] gap-2 h-full overflow-hidden">
+        <div className="flex flex-col flex-[0_1_480px] w-full lg:w-[480px] lg:max-w-[520px] gap-2 sm:gap-3 h-full overflow-hidden">
           <QuickActionsCarousel
             onRefund={() => setShowRefundModal(true)}
             onVoid={() => setShowVoidModal(true)}
@@ -429,7 +429,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
           />
 
           <div className="bg-white border-t-black-200 shadow-lg shrink-0">
-            <CardContent className="p-2">
+            <CardContent className="p-2 sm:p-3">
               {/* Scale Display for Weighted Products (shown by default) */}
               {weightInput.selectedWeightProduct &&
                 isWeightedProduct(weightInput.selectedWeightProduct) &&
@@ -537,20 +537,20 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
               <motion.div
                 initial={{ scale: 0.8 }}
                 animate={{ scale: 1 }}
-                className="bg-white p-6 rounded-lg text-center max-w-sm"
+                className="bg-white p-4 sm:p-6 rounded-lg text-center max-w-sm mx-4"
               >
-                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h2 className="text-xl font-bold mb-2 text-slate-800">
+                <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-500 mx-auto mb-3 sm:mb-4" />
+                <h2 className="text-lg sm:text-xl font-bold mb-2 text-slate-800">
                   Transaction Complete!
                 </h2>
-                <p className="text-slate-600">
+                <p className="text-sm sm:text-base text-slate-600">
                   Thank you for shopping with us.
                 </p>
-                <p className="mt-2 text-slate-700 font-semibold">
+                <p className="mt-2 text-sm sm:text-base text-slate-700 font-semibold">
                   Total: £{cart.total.toFixed(2)}
                 </p>
                 <Button
-                  className="mt-4 bg-sky-600 hover:bg-sky-700"
+                  className="mt-4 bg-sky-600 hover:bg-sky-700 h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                   onClick={() => {
                     payment.setTransactionComplete(false);
                   }}
@@ -619,7 +619,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                     "."
                   ) : !payment.paymentStep ? (
                     <Button
-                      className="w-full h-full py-4 font-semibold text-lg rounded transition-colors bg-sky-600 hover:bg-sky-700 text-white"
+                      className="w-full h-full py-2 sm:py-4 font-semibold text-sm sm:text-lg rounded transition-colors bg-sky-600 hover:bg-sky-700 text-white touch-manipulation"
                       style={{ minHeight: 0, minWidth: 0 }}
                       onClick={() => payment.setPaymentStep(true)}
                       disabled={
@@ -630,7 +630,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                     </Button>
                   ) : (
                     <Button
-                      className="w-full h-full py-4 font-semibold text-lg rounded transition-colors bg-slate-200 hover:bg-slate-300 text-slate-700"
+                      className="w-full h-full py-2 sm:py-4 font-semibold text-sm sm:text-lg rounded transition-colors bg-slate-200 hover:bg-slate-300 text-slate-700 touch-manipulation"
                       style={{ minHeight: 0, minWidth: 0 }}
                       onClick={() => payment.setPaymentStep(false)}
                     >

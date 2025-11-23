@@ -87,24 +87,24 @@ export const GenericItemPriceModal: React.FC<GenericItemPriceModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onCancel}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Enter Price for {product.name}
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Calculator className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+            <span className="line-clamp-1">Enter Price for {product.name}</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             Enter the price for this generic item
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-3 sm:space-y-4 py-4">
           {/* Price Display */}
-          <div className="bg-slate-50 p-6 rounded-lg text-center">
-            <Label className="text-sm text-slate-600 mb-2 block">
+          <div className="bg-slate-50 p-4 sm:p-6 rounded-lg text-center">
+            <Label className="text-xs sm:text-sm text-slate-600 mb-2 block">
               Entered Price
             </Label>
-            <div className="text-4xl font-bold text-slate-900">
+            <div className="text-3xl sm:text-4xl font-bold text-slate-900">
               £{displayPrice}
             </div>
           </div>
@@ -112,8 +112,8 @@ export const GenericItemPriceModal: React.FC<GenericItemPriceModalProps> = ({
           {/* Quick Price Buttons */}
           {product.genericDefaultPrice && (
             <div className="space-y-2">
-              <Label className="text-sm">Quick Select</Label>
-              <div className="grid grid-cols-4 gap-2">
+              <Label className="text-xs sm:text-sm">Quick Select</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   product.genericDefaultPrice * 0.5,
                   product.genericDefaultPrice,
@@ -125,7 +125,7 @@ export const GenericItemPriceModal: React.FC<GenericItemPriceModalProps> = ({
                     variant="outline"
                     size="sm"
                     onClick={() => handleQuickPrice(amount)}
-                    className="text-xs"
+                    className="text-[10px] sm:text-xs h-9 sm:h-10 touch-manipulation"
                   >
                     £{amount.toFixed(2)}
                   </Button>
@@ -136,7 +136,7 @@ export const GenericItemPriceModal: React.FC<GenericItemPriceModalProps> = ({
 
           {/* Numeric Keypad */}
           <div className="space-y-2">
-            <Label>Enter Amount</Label>
+            <Label className="text-xs sm:text-sm">Enter Amount</Label>
             <NumericKeypad
               onInput={handleKeypadInput}
               keysOverride={[
@@ -149,16 +149,16 @@ export const GenericItemPriceModal: React.FC<GenericItemPriceModalProps> = ({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancel}>
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+          <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={!price || parseFloat(price) <= 0}
-            className="bg-sky-600 hover:bg-sky-700"
+            className="bg-sky-600 hover:bg-sky-700 w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
           >
-            Add to Cart (£{displayPrice})
+            <span className="truncate">Add to Cart (£{displayPrice})</span>
           </Button>
         </DialogFooter>
       </DialogContent>

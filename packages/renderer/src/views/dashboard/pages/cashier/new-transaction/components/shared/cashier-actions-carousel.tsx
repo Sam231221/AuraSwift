@@ -152,18 +152,18 @@ export const QuickActionsCarousel: React.FC<QuickActionsCarouselProps> = ({
   };
 
   return (
-    <div className="mb-4 p-2 bg-white rounded-lg shadow-sm">
-      <div className="flex items-center w-full gap-2">
+    <div className="mb-3 sm:mb-4 p-2 bg-white rounded-lg shadow-sm">
+      <div className="flex items-center w-full gap-1.5 sm:gap-2">
         {/* Left Arrow */}
         <button
           onClick={handlePrev}
           disabled={currentIndex === 0}
-          className="shrink-0 w-8 h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+          className="shrink-0 w-6 h-12 sm:w-8 sm:h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-manipulation"
           style={{
             clipPath: "polygon(30% 0, 100% 0, 100% 100%, 30% 100%, 0 50%)",
           }}
         >
-          <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-gray-700 rotate-180" />
+          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-gray-700 rotate-180" />
         </button>
 
         {/* Carousel Container */}
@@ -211,12 +211,12 @@ export const QuickActionsCarousel: React.FC<QuickActionsCarouselProps> = ({
         <button
           onClick={handleNext}
           disabled={currentIndex === maxIndex}
-          className="shrink-0 w-8 h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+          className="shrink-0 w-6 h-12 sm:w-8 sm:h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-manipulation"
           style={{
             clipPath: "polygon(0 0, 70% 0, 100% 50%, 70% 100%, 0 100%)",
           }}
         >
-          <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-gray-700" />
+          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-gray-700" />
         </button>
       </div>
     </div>
@@ -234,7 +234,7 @@ const CarouselCard: React.FC<{
   <button
     onClick={disabled ? undefined : onClick}
     disabled={disabled}
-    className={`shrink-0 basis-1/3 w-16 h-16 p-2 rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${
+    className={`shrink-0 basis-1/3 w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 p-1.5 sm:p-2 rounded-lg flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all touch-manipulation ${
       disabled
         ? "bg-gray-100 opacity-50 cursor-not-allowed"
         : `bg-gray-100 hover:shadow-md ${hoverColor}`
@@ -244,8 +244,8 @@ const CarouselCard: React.FC<{
       disabled ? "Please start your shift to use this feature" : undefined
     }
   >
-    <Icon className={`w-6 h-6 ${disabled ? "text-gray-400" : ""}`} />
-    <span className={`text-sm ${disabled ? "text-gray-400" : ""}`}>
+    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${disabled ? "text-gray-400" : ""} shrink-0`} />
+    <span className={`text-[10px] sm:text-xs lg:text-sm ${disabled ? "text-gray-400" : ""} text-center line-clamp-2`}>
       {title}
     </span>
   </button>

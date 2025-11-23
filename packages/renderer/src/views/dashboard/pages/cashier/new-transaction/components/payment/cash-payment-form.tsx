@@ -20,14 +20,14 @@ export function CashPaymentForm({
   const shortfall = cashAmount > 0 && cashAmount < total ? total - cashAmount : 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between text-slate-700">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="flex justify-between text-slate-700 text-sm sm:text-base">
         <span>Amount Due:</span>
         <span className="font-semibold">£{total.toFixed(2)}</span>
       </div>
 
       <div>
-        <label className="text-sm text-slate-600">Cash Received:</label>
+        <label className="text-xs sm:text-sm text-slate-600">Cash Received:</label>
         <Input
           type="number"
           step="0.01"
@@ -36,21 +36,21 @@ export function CashPaymentForm({
           onChange={(e) =>
             onCashAmountChange(parseFloat(e.target.value) || 0)
           }
-          className={`mt-1 ${
+          className={`mt-1 h-10 sm:h-11 text-sm sm:text-base ${
             cashAmount > 0 && cashAmount < total
               ? "border-red-300 bg-red-50"
               : "bg-white border-slate-300"
           }`}
         />
         {shortfall > 0 && (
-          <p className="text-red-600 text-sm mt-1">
+          <p className="text-red-600 text-xs sm:text-sm mt-1">
             Insufficient funds. Need £{shortfall.toFixed(2)} more.
           </p>
         )}
       </div>
 
       <div
-        className={`flex justify-between font-bold text-lg pt-2 border-t border-slate-200 ${
+        className={`flex justify-between font-bold text-base sm:text-lg pt-2 border-t border-slate-200 ${
           cashAmount >= total
             ? "text-sky-700"
             : cashAmount > 0
@@ -76,7 +76,7 @@ export function CashPaymentForm({
             variant="outline"
             size="sm"
             onClick={() => onCashAmountChange(amount)}
-            className="text-xs h-8"
+            className="text-[10px] sm:text-xs h-9 sm:h-10 touch-manipulation"
           >
             £{amount}
           </Button>
@@ -88,7 +88,7 @@ export function CashPaymentForm({
           variant="outline"
           size="sm"
           onClick={() => onCashAmountChange(total)}
-          className="flex-1 text-xs"
+          className="flex-1 text-[10px] sm:text-xs h-9 sm:h-10 touch-manipulation"
         >
           Exact Amount
         </Button>
@@ -96,7 +96,7 @@ export function CashPaymentForm({
           variant="outline"
           size="sm"
           onClick={() => onCashAmountChange(Math.ceil(total))}
-          className="flex-1 text-xs"
+          className="flex-1 text-[10px] sm:text-xs h-9 sm:h-10 touch-manipulation"
         >
           Round Up
         </Button>

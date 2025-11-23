@@ -20,16 +20,16 @@ export function WeightInputDisplay({
   if (!selectedProduct) return null;
 
   return (
-    <div className="mt-1 flex flex-col gap-2 p-2 rounded bg-blue-50 border border-blue-200">
+    <div className="mt-1 flex flex-col gap-2 p-2 sm:p-3 rounded bg-blue-50 border border-blue-200">
       <div className="flex items-center gap-2">
-        <Scale className="h-4 w-4 text-blue-600" />
-        <span className="text-sm text-blue-700 font-medium">
+        <Scale className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 shrink-0" />
+        <span className="text-xs sm:text-sm text-blue-700 font-medium line-clamp-1">
           Weight for {selectedProduct.name}:
         </span>
       </div>
       {/* Weight Display */}
-      <div className="bg-white p-4 rounded-lg text-center border border-blue-200">
-        <div className="text-3xl font-bold text-slate-900">
+      <div className="bg-white p-3 sm:p-4 rounded-lg text-center border border-blue-200">
+        <div className="text-2xl sm:text-3xl font-bold text-slate-900">
           {weightDisplayPrice} {selectedProduct.unit || "units"}
         </div>
       </div>
@@ -38,9 +38,9 @@ export function WeightInputDisplay({
         <Button
           variant="outline"
           onClick={onShowScaleDisplay}
-          className="w-full mt-2"
+          className="w-full mt-2 h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
         >
-          <Scale className="h-4 w-4 mr-2" />
+          <Scale className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 shrink-0" />
           Use Scale Instead
         </Button>
       )}

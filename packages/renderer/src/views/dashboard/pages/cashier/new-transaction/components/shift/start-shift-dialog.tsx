@@ -36,10 +36,10 @@ export function StartShiftDialog({
       {/* Late Start Confirmation Dialog */}
       {lateStartMinutes !== undefined && lateStartMinutes > 0 && (
         <Dialog open={false} onOpenChange={() => {}}>
-          <DialogContent>
+          <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Late Shift Start</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-base sm:text-lg">Late Shift Start</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">
                 You are{" "}
                 {(() => {
                   const hours = Math.floor(lateStartMinutes / 60);
@@ -58,16 +58,18 @@ export function StartShiftDialog({
                 late for your scheduled shift.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
+            <div className="py-4 text-xs sm:text-sm">
               <p>
                 Do you want to start your shift now and mark it as a late start?
               </p>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
                 Cancel
               </Button>
-              <Button onClick={onConfirm}>Start Late</Button>
+              <Button onClick={onConfirm} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+                Start Late
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -75,16 +77,16 @@ export function StartShiftDialog({
 
       {/* Start Shift Dialog */}
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Start Shift</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg">Start Shift</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Enter the starting cash amount for your shift.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="starting-cash" className="text-right">
+            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-3 sm:gap-4">
+              <Label htmlFor="starting-cash" className="text-left sm:text-right text-sm sm:text-base">
                 Starting Cash
               </Label>
               <Input
@@ -93,23 +95,26 @@ export function StartShiftDialog({
                 step="0.01"
                 value={startingCash}
                 onChange={(e) => onStartingCashChange(e.target.value)}
-                className="col-span-3"
+                className="col-span-1 sm:col-span-3 h-10 sm:h-11 text-sm sm:text-base"
                 placeholder="0.00"
                 autoFocus
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
             <Button
               variant="outline"
               onClick={() => {
                 onOpenChange(false);
                 onStartingCashChange("");
               }}
+              className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
             >
               Cancel
             </Button>
-            <Button onClick={onConfirm}>Start Shift</Button>
+            <Button onClick={onConfirm} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+              Start Shift
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

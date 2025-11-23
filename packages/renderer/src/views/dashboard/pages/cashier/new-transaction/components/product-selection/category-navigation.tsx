@@ -32,7 +32,7 @@ export function CategoryNavigation({
 
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
         {currentCategories.map((category) => {
           const childCount = categories.filter(
             (c) => c.parentId === category.id
@@ -94,20 +94,20 @@ export function CategoryNavigation({
               }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="relative bg-linear-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg p-6 shadow-md transition-all h-28 flex flex-col items-center justify-center"
+              className="relative bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg p-3 sm:p-4 lg:p-6 shadow-md transition-all h-20 sm:h-24 lg:h-28 flex flex-col items-center justify-center touch-manipulation"
             >
-              <div className="text-center">
-                <p className="font-bold text-lg uppercase tracking-wide mb-1">
+              <div className="text-center min-w-0 w-full px-1">
+                <p className="font-bold text-sm sm:text-base lg:text-lg uppercase tracking-wide mb-1 line-clamp-2">
                   {category.name}
                 </p>
-                <p className="text-xs opacity-90">
+                <p className="text-[10px] sm:text-xs opacity-90">
                   {childCount > 0
                     ? `${childCount} subcategories`
                     : `${productCount} items`}
                 </p>
               </div>
               {childCount > 0 && (
-                <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 opacity-75" />
+                <ChevronRight className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 opacity-75 shrink-0" />
               )}
             </motion.button>
           );

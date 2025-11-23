@@ -117,29 +117,29 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onCancel}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-orange-500" />
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 shrink-0" />
             Age Verification Required
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             This product requires age verification ({requiredAge}+)
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-3 sm:space-y-4 py-4">
           {/* Product Info */}
-          <div className="bg-slate-50 p-3 rounded-lg">
-            <p className="font-semibold text-slate-900">{product.name}</p>
+          <div className="bg-slate-50 p-2 sm:p-3 rounded-lg">
+            <p className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2">{product.name}</p>
             <Badge
               variant="outline"
-              className="mt-1 bg-orange-50 text-orange-700 border-orange-200"
+              className="mt-1 text-[10px] sm:text-xs bg-orange-50 text-orange-700 border-orange-200"
             >
               {product.ageRestrictionLevel}
             </Badge>
             {product.restrictionReason && (
-              <p className="text-sm text-slate-600 mt-1">
+              <p className="text-xs sm:text-sm text-slate-600 mt-1">
                 {product.restrictionReason}
               </p>
             )}
@@ -147,12 +147,13 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
 
           {/* Verification Method Selection */}
           <div className="space-y-2">
-            <Label>Verification Method</Label>
+            <Label className="text-xs sm:text-sm">Verification Method</Label>
             <div className="grid grid-cols-3 gap-2">
               <Button
                 variant={verificationMethod === "manual" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setVerificationMethod("manual")}
+                className="h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
               >
                 Manual
               </Button>
@@ -161,6 +162,7 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
                 size="sm"
                 onClick={() => setVerificationMethod("scan")}
                 disabled={true} // TODO: Enable when ID scanner is integrated
+                className="h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
               >
                 ID Scan
               </Button>
@@ -174,6 +176,7 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
                   currentUser?.role !== "manager" &&
                   currentUser?.role !== "admin"
                 }
+                className="h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
               >
                 Override
               </Button>
@@ -183,42 +186,42 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
           {/* Manual Entry */}
           {verificationMethod === "manual" && (
             <div className="space-y-2">
-              <Label htmlFor="birthdate">Customer Date of Birth</Label>
+              <Label htmlFor="birthdate" className="text-xs sm:text-sm">Customer Date of Birth</Label>
               <Input
                 id="birthdate"
                 type="date"
                 value={birthdate}
                 onChange={(e) => handleDateChange(e.target.value)}
                 max={new Date().toISOString().split("T")[0]}
-                className="w-full"
+                className="w-full h-10 sm:h-11 text-sm sm:text-base"
               />
 
               {calculatedAge !== null && (
                 <div
-                  className={`p-3 rounded-lg ${
+                  className={`p-2 sm:p-3 rounded-lg ${
                     isEligible
                       ? "bg-green-50 border border-green-200"
                       : "bg-red-50 border border-red-200"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
                     <div className="flex items-center gap-2">
                       {isEligible ? (
-                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 shrink-0" />
                       ) : (
-                        <XCircle className="h-5 w-5 text-red-600" />
+                        <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 shrink-0" />
                       )}
-                      <span className="font-semibold">
+                      <span className="font-semibold text-xs sm:text-sm">
                         Age: {calculatedAge} years
                       </span>
                     </div>
                     <Badge
                       variant={isEligible ? "default" : "destructive"}
-                      className={
+                      className={`text-[10px] sm:text-xs ${
                         isEligible
                           ? "bg-green-600"
                           : "bg-red-600"
-                      }
+                      }`}
                     >
                       {isEligible
                         ? "Eligible to purchase"
@@ -232,23 +235,23 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
 
           {/* ID Scan */}
           {verificationMethod === "scan" && (
-            <div className="p-4 bg-blue-50 rounded-lg text-center">
-              <p className="text-sm text-slate-600">
+            <div className="p-3 sm:p-4 bg-blue-50 rounded-lg text-center">
+              <p className="text-xs sm:text-sm text-slate-600">
                 ID Scanner integration coming soon. Please use manual entry for
                 now.
               </p>
               <div className="mt-3 space-y-2">
-                <Label htmlFor="scan-birthdate">Customer Date of Birth</Label>
+                <Label htmlFor="scan-birthdate" className="text-xs sm:text-sm">Customer Date of Birth</Label>
                 <Input
                   id="scan-birthdate"
                   type="date"
                   value={birthdate}
                   onChange={(e) => handleDateChange(e.target.value)}
                   max={new Date().toISOString().split("T")[0]}
-                  className="w-full"
+                  className="w-full h-10 sm:h-11 text-sm sm:text-base"
                 />
                 {calculatedAge !== null && (
-                  <p className="text-sm font-semibold">
+                  <p className="text-xs sm:text-sm font-semibold">
                     Age: {calculatedAge} years
                   </p>
                 )}
@@ -259,24 +262,24 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
           {/* Manager Override */}
           {verificationMethod === "override" && (
             <div className="space-y-2">
-              <Label htmlFor="override-reason">Override Reason</Label>
+              <Label htmlFor="override-reason" className="text-xs sm:text-sm">Override Reason</Label>
               <Input
                 id="override-reason"
                 type="text"
                 value={overrideReason}
                 onChange={(e) => setOverrideReason(e.target.value)}
                 placeholder="e.g., Parent present, Valid ID shown, etc."
-                className="w-full"
+                className="w-full h-10 sm:h-11 text-sm sm:text-base"
               />
-              <p className="text-xs text-slate-500">
+              <p className="text-[10px] sm:text-xs text-slate-500">
                 Manager override will be logged for audit purposes.
               </p>
             </div>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onCancel}>
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+          <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
             Cancel
           </Button>
           <Button
@@ -284,15 +287,15 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
             disabled={
               verificationMethod === "manual" && !isEligible
             }
-            className={
+            className={`w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation ${
               verificationMethod === "override"
                 ? "bg-orange-600 hover:bg-orange-700"
                 : ""
-            }
+            }`}
           >
-            {verificationMethod === "override"
+            <span className="truncate">{verificationMethod === "override"
               ? "Override & Continue"
-              : "Verify & Continue"}
+              : "Verify & Continue"}</span>
           </Button>
         </DialogFooter>
       </DialogContent>

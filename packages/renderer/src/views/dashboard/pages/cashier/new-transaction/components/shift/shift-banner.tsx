@@ -28,14 +28,14 @@ export function ShiftBanner({
   if (!isOperationsDisabled) return null;
 
   return (
-    <div className="bg-amber-50 border-b-2 border-amber-300 p-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <AlertCircle className="h-5 w-5 text-amber-600" />
+    <div className="bg-amber-50 border-b-2 border-amber-300 p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+      <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
         <div>
-          <p className="font-semibold text-amber-900">
+          <p className="font-semibold text-amber-900 text-sm sm:text-base">
             Start Your Shift to Begin Transactions
           </p>
-          <p className="text-sm text-amber-700">
+          <p className="text-xs sm:text-sm text-amber-700">
             {todaySchedule
               ? `Scheduled: ${new Date(
                   todaySchedule.startTime
@@ -57,15 +57,15 @@ export function ShiftBanner({
       </div>
       <Button
         onClick={onStartShift}
-        className={`bg-amber-600 hover:bg-amber-700 text-white ${
+        className={`bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto h-10 sm:h-11 text-xs sm:text-base touch-manipulation ${
           !shiftTimingInfo.canStart ? "opacity-50" : ""
         }`}
         size="lg"
         disabled={!todaySchedule || !shiftTimingInfo.canStart}
         title={shiftTimingInfo.reason}
       >
-        <Clock className="h-4 w-4 mr-2" />
-        {shiftTimingInfo.buttonText}
+        <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 shrink-0" />
+        <span className="truncate">{shiftTimingInfo.buttonText}</span>
       </Button>
     </div>
   );

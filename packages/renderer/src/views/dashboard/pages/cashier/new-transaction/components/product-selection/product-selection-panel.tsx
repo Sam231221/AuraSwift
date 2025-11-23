@@ -51,7 +51,7 @@ export function ProductSelectionPanel({
 }: ProductSelectionPanelProps) {
   return (
     <Card className="bg-white border-slate-200 flex-1 flex flex-col shadow-sm overflow-hidden">
-      <CardHeader className="bg-slate-50 py-1">
+      <CardHeader className="bg-slate-50 py-1 px-3 sm:px-6">
         <div className="flex items-center justify-between">
           <Breadcrumb
             breadcrumb={breadcrumb}
@@ -59,22 +59,22 @@ export function ProductSelectionPanel({
           />
         </div>
       </CardHeader>
-      <CardContent className="pt-1 flex-1 overflow-y-auto scroll-smooth">
+      <CardContent className="pt-1 px-3 sm:px-6 flex-1 overflow-y-auto scroll-smooth">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-            <span className="ml-2 text-slate-600">Loading products...</span>
+          <div className="flex items-center justify-center py-8 sm:py-12">
+            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-slate-400" />
+            <span className="ml-2 text-xs sm:text-sm text-slate-600">Loading products...</span>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-            <p className="text-red-600 mb-4">Failed to load products</p>
-            <Button variant="outline" size="sm" onClick={onRetry}>
+          <div className="flex flex-col items-center justify-center py-8 sm:py-12">
+            <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-red-500 mb-3 sm:mb-4" />
+            <p className="text-red-600 mb-3 sm:mb-4 text-sm sm:text-base">Failed to load products</p>
+            <Button variant="outline" size="sm" onClick={onRetry} className="h-9 sm:h-10 text-xs sm:text-sm touch-manipulation">
               Retry
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <CategoryNavigation
               categories={categories}
               products={products}

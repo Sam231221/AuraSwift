@@ -30,31 +30,31 @@ export function CartItemsTable({
     <div className="border border-slate-200 rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
       <div className="shrink-0">
         <Table>
-          <TableHeader className="bg-linear-to-r from-sky-200 to-blue-300">
-            <TableRow className="h-10 border-b-0">
+          <TableHeader className="bg-gradient-to-r from-sky-200 to-blue-300">
+            <TableRow className="h-8 sm:h-10 border-b-0">
               <TableHead
-                className="text-center font-semibold text-slate-800 h-10"
+                className="text-center font-semibold text-slate-800 h-8 sm:h-10 text-xs sm:text-sm"
                 style={{ width: "100px" }}
               >
                 Unit/Weight
               </TableHead>
-              <TableHead className="text-left font-semibold text-slate-800 h-10">
+              <TableHead className="text-left font-semibold text-slate-800 h-8 sm:h-10 text-xs sm:text-sm">
                 Product
               </TableHead>
               <TableHead
-                className="text-center font-semibold text-slate-800 h-10"
+                className="text-center font-semibold text-slate-800 h-8 sm:h-10 text-xs sm:text-sm"
                 style={{ width: "120px" }}
               >
                 Price
               </TableHead>
               <TableHead
-                className="text-center font-semibold text-slate-800 h-10"
+                className="text-center font-semibold text-slate-800 h-8 sm:h-10 text-xs sm:text-sm"
                 style={{ width: "100px" }}
               >
                 Total
               </TableHead>
               <TableHead
-                className="text-center font-semibold text-slate-800 h-10"
+                className="text-center font-semibold text-slate-800 h-8 sm:h-10 text-xs sm:text-sm"
                 style={{ width: "80px" }}
               >
                 Actions
@@ -71,9 +71,9 @@ export function CartItemsTable({
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-slate-400 text-center py-8"
+                    className="text-slate-400 text-center py-6 sm:py-8 text-xs sm:text-sm"
                   >
-                    <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+                    <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mx-auto mb-2" />
                     Loading cart...
                   </TableCell>
                 </TableRow>
@@ -81,7 +81,7 @@ export function CartItemsTable({
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-slate-400 text-center py-8"
+                    className="text-slate-400 text-center py-6 sm:py-8 text-xs sm:text-sm"
                   >
                     No items in Basket. Scan or search for products.
                   </TableCell>
