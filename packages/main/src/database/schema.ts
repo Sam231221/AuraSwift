@@ -1060,6 +1060,7 @@ export const shifts = createTable("shifts", {
   businessId: text("businessId")
     .notNull()
     .references(() => businesses.id),
+  deviceId: text("deviceId"), // Device/terminal identifier for concurrent access tracking
   startTime: text("startTime").notNull(),
   endTime: text("endTime"),
   status: text("status", { enum: ["active", "ended"] }).notNull(),

@@ -781,13 +781,22 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
     // Check if cashier already has an active shift (only check today's shifts)
     const existingShift = db.shifts.getTodaysActiveShift(shiftData.cashierId);
     if (existingShift) {
+      // Check if shift is on different device
+      const isDifferentDevice =
+        shiftData.deviceId &&
+        existingShift.deviceId &&
+        shiftData.deviceId !== existingShift.deviceId;
+
       // Convert to plain object to ensure serialization works
       const serializedExistingShift = JSON.parse(JSON.stringify(existingShift));
 
       return {
         success: false,
-        message: "You already have an active shift running",
+        message: isDifferentDevice
+          ? "You already have an active shift running on another device"
+          : "You already have an active shift running",
         data: serializedExistingShift,
+        isDifferentDevice,
       };
     }
 
@@ -800,31 +809,62 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
       };
     }
 
-    const shift = db.shifts.createShift({
-      scheduleId: shiftData.scheduleId ?? null,
-      timeShiftId: activeTimeShift.id, // Link to time shift
-      cashierId: shiftData.cashierId,
-      businessId: shiftData.businessId,
-      startTime: new Date().toISOString(),
-      endTime: null,
-      status: "active",
-      startingCash: shiftData.startingCash,
-      finalCashDrawer: null,
-      expectedCashDrawer: null,
-      cashVariance: null,
-      totalSales: 0,
-      totalTransactions: 0,
-      totalRefunds: 0,
-      totalVoids: 0,
-      notes: shiftData.notes ?? null,
-    } as any);
+    // Validate starting cash before creating shift
+    if (shiftData.startingCash < 0) {
+      return {
+        success: false,
+        message: "Starting cash cannot be negative",
+      };
+    }
 
-    // Update schedule status if linked
+    if (shiftData.startingCash > 100000) {
+      return {
+        success: false,
+        message: "Starting cash exceeds maximum limit of £100,000",
+      };
+    }
+
+    // Create shift with transaction support
+    // Note: Schedule status update is done separately as it's not critical for shift creation
+    let shift;
+    try {
+      shift = db.shifts.createShift({
+        scheduleId: shiftData.scheduleId ?? null,
+        timeShiftId: activeTimeShift.id, // Link to time shift
+        cashierId: shiftData.cashierId,
+        businessId: shiftData.businessId,
+        deviceId: shiftData.deviceId ?? null, // Device/terminal identifier
+        startTime: new Date().toISOString(),
+        endTime: null,
+        status: "active",
+        startingCash: shiftData.startingCash,
+        finalCashDrawer: null,
+        expectedCashDrawer: null,
+        cashVariance: null,
+        totalSales: 0,
+        totalTransactions: 0,
+        totalRefunds: 0,
+        totalVoids: 0,
+        notes: shiftData.notes ?? null,
+      } as any);
+    } catch (error) {
+      console.error("Failed to create shift:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to create shift due to validation error",
+      };
+    }
+
+    // Update schedule status if linked (non-critical, so we don't fail if this errors)
     if (shiftData.scheduleId) {
       try {
         db.schedules.updateScheduleStatus(shiftData.scheduleId, "active");
       } catch (error) {
         console.warn("Could not update schedule status:", error);
+        // Don't fail shift creation if schedule update fails
       }
     }
 

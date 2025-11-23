@@ -13,40 +13,62 @@ export class ShiftManager {
   }
 
   /**
-   * Create shift
+   * Create shift with transaction support for atomicity
    */
   createShift(shiftData: Omit<Shift, "id" | "createdAt" | "updatedAt">): Shift {
     const shiftId = this.uuid.v4();
     const now = new Date();
 
-    this.db
-      .insert(schema.shifts)
-      .values({
-        id: shiftId,
-        scheduleId: shiftData.scheduleId ?? null,
-        timeShiftId: (shiftData as any).timeShiftId ?? null, // Link to time shift
-        cashierId: shiftData.cashierId,
-        businessId: shiftData.businessId,
-        startTime: shiftData.startTime,
-        endTime: shiftData.endTime ?? null,
-        status: shiftData.status,
-        startingCash: shiftData.startingCash,
-        finalCashDrawer: shiftData.finalCashDrawer ?? null,
-        expectedCashDrawer: shiftData.expectedCashDrawer ?? null,
-        cashVariance: shiftData.cashVariance ?? null,
-        totalSales: shiftData.totalSales ?? 0,
-        totalTransactions: shiftData.totalTransactions ?? 0,
-        totalRefunds: shiftData.totalRefunds ?? 0,
-        totalVoids: shiftData.totalVoids ?? 0,
-        notes: shiftData.notes ?? null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    // Validate data before creating shift
+    if (!shiftData.cashierId) {
+      throw new Error("Cashier ID is required");
+    }
+    if (!shiftData.businessId) {
+      throw new Error("Business ID is required");
+    }
+    if (shiftData.startingCash < 0) {
+      throw new Error("Starting cash cannot be negative");
+    }
+    if (shiftData.startingCash > 100000) {
+      throw new Error("Starting cash exceeds maximum limit");
+    }
+    if (!shiftData.startTime) {
+      throw new Error("Start time is required");
+    }
+
+    // Use transaction to ensure atomicity
+    const result = this.db.transaction((tx) => {
+      tx.insert(schema.shifts)
+        .values({
+          id: shiftId,
+          scheduleId: shiftData.scheduleId ?? null,
+          timeShiftId: (shiftData as any).timeShiftId ?? null, // Link to time shift
+          cashierId: shiftData.cashierId,
+          businessId: shiftData.businessId,
+          deviceId: (shiftData as any).deviceId ?? null, // Device/terminal identifier
+          startTime: shiftData.startTime,
+          endTime: shiftData.endTime ?? null,
+          status: shiftData.status,
+          startingCash: shiftData.startingCash,
+          finalCashDrawer: shiftData.finalCashDrawer ?? null,
+          expectedCashDrawer: shiftData.expectedCashDrawer ?? null,
+          cashVariance: shiftData.cashVariance ?? null,
+          totalSales: shiftData.totalSales ?? 0,
+          totalTransactions: shiftData.totalTransactions ?? 0,
+          totalRefunds: shiftData.totalRefunds ?? 0,
+          totalVoids: shiftData.totalVoids ?? 0,
+          notes: shiftData.notes ?? null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+
+      return shiftId;
+    });
 
     return {
       ...shiftData,
-      id: shiftId,
+      id: result,
       createdAt: now,
       updatedAt: now,
     };
@@ -191,7 +213,11 @@ export class ShiftManager {
    * Auto-close old unclosed shifts that are more than 24 hours old
    * Returns array of closed shift info (id, timeShiftId, cashierId) for clock-out handling
    */
-  autoCloseOldActiveShifts(): Array<{ id: string; timeShiftId: string | null; cashierId: string }> {
+  autoCloseOldActiveShifts(): Array<{
+    id: string;
+    timeShiftId: string | null;
+    cashierId: string;
+  }> {
     const now = new Date();
     const nowString = now.toISOString();
 
@@ -213,7 +239,11 @@ export class ShiftManager {
       .where(eq(schema.shifts.status, "active"))
       .all();
 
-    const closedShifts: Array<{ id: string; timeShiftId: string | null; cashierId: string }> = [];
+    const closedShifts: Array<{
+      id: string;
+      timeShiftId: string | null;
+      cashierId: string;
+    }> = [];
 
     for (const { shift, scheduledEndTime } of activeShifts) {
       let shouldClose = false;
@@ -274,7 +304,7 @@ export class ShiftManager {
           timeShiftId: shift.timeShiftId,
           cashierId: shift.cashierId,
         });
-        
+
         console.log(`Auto-closed shift ${shift.id}: ${closeReason}`);
       }
     }
@@ -286,7 +316,11 @@ export class ShiftManager {
    * Auto-end overdue shifts today (more aggressive than 24-hour cleanup)
    * Returns array of closed shift info (id, timeShiftId, cashierId) for clock-out handling
    */
-  autoEndOverdueShiftsToday(): Array<{ id: string; timeShiftId: string | null; cashierId: string }> {
+  autoEndOverdueShiftsToday(): Array<{
+    id: string;
+    timeShiftId: string | null;
+    cashierId: string;
+  }> {
     const now = new Date();
     const nowString = now.toISOString();
 
@@ -308,7 +342,11 @@ export class ShiftManager {
       )
       .all();
 
-    const closedShifts: Array<{ id: string; timeShiftId: string | null; cashierId: string }> = [];
+    const closedShifts: Array<{
+      id: string;
+      timeShiftId: string | null;
+      cashierId: string;
+    }> = [];
 
     for (const { shift, scheduledEndTime } of activeShifts) {
       let shouldClose = false;
@@ -361,7 +399,7 @@ export class ShiftManager {
           timeShiftId: shift.timeShiftId,
           cashierId: shift.cashierId,
         });
-        
+
         console.log(`Auto-ended overdue shift ${shift.id}: ${closeReason}`);
       }
     }
