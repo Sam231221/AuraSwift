@@ -11,7 +11,7 @@ export function NumericKeypad({ onInput, keysOverride }: NumericKeypadProps) {
   // Remove all Back keys from the grid
   // Color classes matching the main interface (slate/sky)
   const keyBase =
-    "py-2 sm:py-3 lg:py-4 font-semibold text-sm sm:text-base lg:text-lg rounded transition-colors select-none focus:outline-none touch-manipulation";
+    "min-h-[44px] py-2 sm:py-3 lg:py-4 font-semibold text-sm sm:text-base lg:text-lg rounded transition-colors select-none focus:outline-none touch-manipulation";
   const keyNumber =
     "bg-slate-100 text-slate-700 hover:bg-sky-100 active:bg-sky-200";
   const keyEnter = "bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800";

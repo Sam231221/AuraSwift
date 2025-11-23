@@ -35,7 +35,7 @@ export function QuickActionButtons({
         {topButtons.map((btn) => (
           <button
             key={btn.label}
-            className="bg-slate-200 text-slate-700 font-semibold py-2 sm:py-2.5 lg:py-3 rounded text-xs sm:text-sm hover:bg-slate-300 transition-colors touch-manipulation"
+            className="min-h-[44px] bg-slate-200 text-slate-700 font-semibold py-2 sm:py-2.5 lg:py-3 rounded text-xs sm:text-sm hover:bg-slate-300 transition-colors touch-manipulation"
           >
             {btn.label}
           </button>
@@ -55,7 +55,7 @@ export function QuickActionButtons({
                 ? onLogOff
                 : undefined
             }
-            className="bg-sky-600 text-white font-semibold py-2 sm:py-2.5 lg:py-3 rounded text-xs sm:text-sm hover:bg-sky-700 transition-colors touch-manipulation"
+            className="min-h-[44px] bg-sky-600 text-white font-semibold py-2 sm:py-2.5 lg:py-3 rounded text-xs sm:text-sm hover:bg-sky-700 transition-colors touch-manipulation"
           >
             {btn.label}
           </button>
@@ -68,7 +68,7 @@ export function QuickActionButtons({
           <button
             key={btn.label}
             onClick={btn.label === "Log off" ? onLogOff : undefined}
-            className="bg-slate-100 text-slate-700 font-semibold py-2 sm:py-2.5 lg:py-3 rounded text-xs sm:text-sm hover:bg-slate-200 transition-colors touch-manipulation"
+            className="min-h-[44px] bg-slate-100 text-slate-700 font-semibold py-2 sm:py-2.5 lg:py-3 rounded text-xs sm:text-sm hover:bg-slate-200 transition-colors touch-manipulation"
           >
             {btn.label}
           </button>

@@ -61,7 +61,10 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
 
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birth.getDate())
+    ) {
       age--;
     }
 
@@ -131,7 +134,9 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
         <div className="space-y-3 sm:space-y-4 py-4">
           {/* Product Info */}
           <div className="bg-slate-50 p-2 sm:p-3 rounded-lg">
-            <p className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2">{product.name}</p>
+            <p className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2">
+              {product.name}
+            </p>
             <Badge
               variant="outline"
               className="mt-1 text-[10px] sm:text-xs bg-orange-50 text-orange-700 border-orange-200"
@@ -150,7 +155,9 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
             <Label className="text-xs sm:text-sm">Verification Method</Label>
             <div className="grid grid-cols-3 gap-2">
               <Button
-                variant={verificationMethod === "manual" ? "default" : "outline"}
+                variant={
+                  verificationMethod === "manual" ? "default" : "outline"
+                }
                 size="sm"
                 onClick={() => setVerificationMethod("manual")}
                 className="h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
@@ -186,7 +193,9 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
           {/* Manual Entry */}
           {verificationMethod === "manual" && (
             <div className="space-y-2">
-              <Label htmlFor="birthdate" className="text-xs sm:text-sm">Customer Date of Birth</Label>
+              <Label htmlFor="birthdate" className="text-xs sm:text-sm">
+                Customer Date of Birth
+              </Label>
               <Input
                 id="birthdate"
                 type="date"
@@ -218,9 +227,7 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
                     <Badge
                       variant={isEligible ? "default" : "destructive"}
                       className={`text-[10px] sm:text-xs ${
-                        isEligible
-                          ? "bg-green-600"
-                          : "bg-red-600"
+                        isEligible ? "bg-green-600" : "bg-red-600"
                       }`}
                     >
                       {isEligible
@@ -241,7 +248,9 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
                 now.
               </p>
               <div className="mt-3 space-y-2">
-                <Label htmlFor="scan-birthdate" className="text-xs sm:text-sm">Customer Date of Birth</Label>
+                <Label htmlFor="scan-birthdate" className="text-xs sm:text-sm">
+                  Customer Date of Birth
+                </Label>
                 <Input
                   id="scan-birthdate"
                   type="date"
@@ -262,7 +271,9 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
           {/* Manager Override */}
           {verificationMethod === "override" && (
             <div className="space-y-2">
-              <Label htmlFor="override-reason" className="text-xs sm:text-sm">Override Reason</Label>
+              <Label htmlFor="override-reason" className="text-xs sm:text-sm">
+                Override Reason
+              </Label>
               <Input
                 id="override-reason"
                 type="text"
@@ -279,27 +290,30 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-          <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+          >
             Cancel
           </Button>
           <Button
             onClick={handleVerify}
-            disabled={
-              verificationMethod === "manual" && !isEligible
-            }
-            className={`w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation ${
+            disabled={verificationMethod === "manual" && !isEligible}
+            className={`w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation ${
               verificationMethod === "override"
                 ? "bg-orange-600 hover:bg-orange-700"
                 : ""
             }`}
           >
-            <span className="truncate">{verificationMethod === "override"
-              ? "Override & Continue"
-              : "Verify & Continue"}</span>
+            <span className="truncate">
+              {verificationMethod === "override"
+                ? "Override & Continue"
+                : "Verify & Continue"}
+            </span>
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
-

@@ -38,7 +38,7 @@ export function PaymentActions({
       )}
 
       <Button
-        className={`w-full mt-3 sm:mt-4 h-10 sm:h-11 text-sm sm:text-base lg:text-lg touch-manipulation ${
+        className={`w-full mt-3 sm:mt-4 min-h-[44px] h-10 sm:h-11 text-sm sm:text-base lg:text-lg touch-manipulation ${
           isDisabled
             ? "bg-slate-400 cursor-not-allowed"
             : "bg-sky-600 hover:bg-sky-700"
@@ -47,13 +47,15 @@ export function PaymentActions({
         disabled={isDisabled}
       >
         <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-1.5 sm:mr-2 shrink-0" />
-        <span className="truncate">{isCashPayment && !isCashValid
-          ? `Need £${(total - cashAmount).toFixed(2)} More`
-          : "Complete Transaction"}</span>
+        <span className="truncate">
+          {isCashPayment && !isCashValid
+            ? `Need £${(total - cashAmount).toFixed(2)} More`
+            : "Complete Transaction"}
+        </span>
       </Button>
       <Button
         variant="ghost"
-        className="col-span-2 mt-2 h-10 sm:h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 text-sm sm:text-base touch-manipulation"
+        className="col-span-2 mt-2 min-h-[44px] h-10 sm:h-12 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 text-sm sm:text-base touch-manipulation"
         onClick={onCancel}
       >
         Cancel
@@ -61,4 +63,3 @@ export function PaymentActions({
     </>
   );
 }
-

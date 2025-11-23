@@ -26,7 +26,9 @@ interface ProductSelectionPanelProps {
   onGenericItemClick?: (product: Product) => void;
   onCategoryClick: (category: Category, addToCart: boolean) => void;
   onBreadcrumbClick: (index: number) => void;
-  onSetLastClickTime: (time: { productId: string; timestamp: number } | null) => void;
+  onSetLastClickTime: (
+    time: { productId: string; timestamp: number } | null
+  ) => void;
   onRetry: () => void;
   DOUBLE_CLICK_DELAY: number;
 }
@@ -63,13 +65,22 @@ export function ProductSelectionPanel({
         {loading ? (
           <div className="flex items-center justify-center py-8 sm:py-12">
             <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-slate-400" />
-            <span className="ml-2 text-xs sm:text-sm text-slate-600">Loading products...</span>
+            <span className="ml-2 text-xs sm:text-sm text-slate-600">
+              Loading products...
+            </span>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-8 sm:py-12">
             <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-red-500 mb-3 sm:mb-4" />
-            <p className="text-red-600 mb-3 sm:mb-4 text-sm sm:text-base">Failed to load products</p>
-            <Button variant="outline" size="sm" onClick={onRetry} className="h-9 sm:h-10 text-xs sm:text-sm touch-manipulation">
+            <p className="text-red-600 mb-3 sm:mb-4 text-sm sm:text-base">
+              Failed to load products
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRetry}
+              className="min-h-[44px] h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
+            >
               Retry
             </Button>
           </div>
@@ -98,4 +109,3 @@ export function ProductSelectionPanel({
     </Card>
   );
 }
-

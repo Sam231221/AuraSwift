@@ -23,7 +23,9 @@ export function CartItemRow({ item, onRemove }: CartItemRowProps) {
           : "-"}
       </td>
       <td className="font-medium text-xs sm:text-sm">
-        <span className="line-clamp-2">{item.product?.name || item.itemName || "Unknown Product"}</span>
+        <span className="line-clamp-2">
+          {item.product?.name || item.itemName || "Unknown Product"}
+        </span>
         {item.ageRestrictionLevel !== "NONE" && (
           <Badge
             variant="outline"
@@ -36,10 +38,16 @@ export function CartItemRow({ item, onRemove }: CartItemRowProps) {
       <td className="text-center text-xs sm:text-sm" style={{ width: "120px" }}>
         £{item.unitPrice.toFixed(2)}
         {item.itemType === "WEIGHT" && item.unitOfMeasure && (
-          <span className="text-[10px] sm:text-xs text-slate-500"> / {item.unitOfMeasure}</span>
+          <span className="text-[10px] sm:text-xs text-slate-500">
+            {" "}
+            / {item.unitOfMeasure}
+          </span>
         )}
       </td>
-      <td className="text-center font-semibold text-xs sm:text-sm" style={{ width: "100px" }}>
+      <td
+        className="text-center font-semibold text-xs sm:text-sm"
+        style={{ width: "100px" }}
+      >
         £{item.totalPrice.toFixed(2)}
       </td>
       <td className="text-center" style={{ width: "80px" }}>
@@ -47,12 +55,11 @@ export function CartItemRow({ item, onRemove }: CartItemRowProps) {
           size="sm"
           variant="ghost"
           onClick={() => onRemove(item.id)}
-          className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-red-500 hover:text-red-700 touch-manipulation"
+          className="min-h-[44px] min-w-[44px] h-10 w-10 sm:h-11 sm:w-11 p-0 text-red-500 hover:text-red-700 touch-manipulation"
         >
-          <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+          <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
         </Button>
       </td>
     </tr>
   );
 }
-

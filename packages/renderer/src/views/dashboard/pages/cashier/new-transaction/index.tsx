@@ -393,9 +393,9 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
       />
 
       {/* Main Layout */}
-      <div className="flex p-2 sm:p-3 lg:p-4 flex-col lg:flex-row gap-2 sm:gap-3 min-h-screen h-screen">
+      <div className="flex p-2 sm:p-3 lg:p-4 flex-col lg:flex-row gap-2 sm:gap-3 min-h-screen">
         {/* Left Column - Product Selection */}
-        <div className="flex mb-2 flex-col flex-1 min-h-0 min-w-0">
+        <div className="flex mb-0 lg:mb-2 flex-col flex-1 min-h-0 min-w-0">
           <ProductSelectionPanel
             products={displayProducts}
             categories={categories.categories}
@@ -423,7 +423,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
         </div>
 
         {/* Right Column - Cart & Payment */}
-        <div className="flex flex-col flex-[0_1_480px] w-full lg:w-[480px] lg:max-w-[520px] gap-2 sm:gap-3 h-full overflow-hidden">
+        <div className="flex flex-col w-full lg:flex-[0_1_480px] lg:w-[480px] lg:max-w-[520px] gap-2 sm:gap-3 min-h-0 overflow-y-auto">
           <QuickActionsCarousel
             onRefund={() => setShowRefundModal(true)}
             onVoid={() => setShowVoidModal(true)}
@@ -537,12 +537,12 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
             >
               <motion.div
                 initial={{ scale: 0.8 }}
                 animate={{ scale: 1 }}
-                className="bg-white p-4 sm:p-6 rounded-lg text-center max-w-sm mx-4"
+                className="bg-white p-4 sm:p-6 rounded-lg text-center w-full max-w-sm"
               >
                 <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-green-500 mx-auto mb-3 sm:mb-4" />
                 <h2 className="text-lg sm:text-xl font-bold mb-2 text-slate-800">
@@ -555,7 +555,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                   Total: £{cart.total.toFixed(2)}
                 </p>
                 <Button
-                  className="mt-4 bg-sky-600 hover:bg-sky-700 h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+                  className="mt-4 bg-sky-600 hover:bg-sky-700 min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                   onClick={() => {
                     payment.setTransactionComplete(false);
                   }}
@@ -624,8 +624,8 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                     "."
                   ) : !payment.paymentStep ? (
                     <Button
-                      className="w-full h-full py-2 sm:py-4 font-semibold text-sm sm:text-lg rounded transition-colors bg-sky-600 hover:bg-sky-700 text-white touch-manipulation"
-                      style={{ minHeight: 0, minWidth: 0 }}
+                      className="w-full h-full min-h-[44px] py-3 sm:py-4 font-semibold text-sm sm:text-lg rounded transition-colors bg-sky-600 hover:bg-sky-700 text-white touch-manipulation"
+                      style={{ minHeight: 44, minWidth: 0 }}
                       onClick={() => payment.setPaymentStep(true)}
                       disabled={
                         cart.cartItems.length === 0 || !cart.cartSession
@@ -635,8 +635,8 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                     </Button>
                   ) : (
                     <Button
-                      className="w-full h-full py-2 sm:py-4 font-semibold text-sm sm:text-lg rounded transition-colors bg-slate-200 hover:bg-slate-300 text-slate-700 touch-manipulation"
-                      style={{ minHeight: 0, minWidth: 0 }}
+                      className="w-full h-full min-h-[44px] py-3 sm:py-4 font-semibold text-sm sm:text-lg rounded transition-colors bg-slate-200 hover:bg-slate-300 text-slate-700 touch-manipulation"
+                      style={{ minHeight: 44, minWidth: 0 }}
                       onClick={() => payment.setPaymentStep(false)}
                     >
                       Back to Cart
@@ -658,6 +658,11 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
         onStartingCashChange={shift.setStartingCash}
         onConfirm={shift.confirmStartShift}
         lateStartMinutes={shift.lateStartMinutes}
+        showLateStartConfirm={shift.showLateStartConfirm}
+        onLateStartConfirm={shift.confirmLateStart}
+        onLateStartCancel={() => {
+          shift.setShowLateStartConfirm(false);
+        }}
       />
 
       {pendingProductForAgeVerification && (

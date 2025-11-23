@@ -150,13 +150,17 @@ export const GenericItemPriceModal: React.FC<GenericItemPriceModalProps> = ({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-          <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+          >
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={!price || parseFloat(price) <= 0}
-            className="bg-sky-600 hover:bg-sky-700 w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+            className="bg-sky-600 hover:bg-sky-700 w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
           >
             <span className="truncate">Add to Cart (£{displayPrice})</span>
           </Button>

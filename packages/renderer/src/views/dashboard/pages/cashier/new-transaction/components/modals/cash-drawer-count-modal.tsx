@@ -299,7 +299,9 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
         <div className="bg-blue-600 text-white p-3 sm:p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calculator className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" />
-            <h2 className="text-lg sm:text-xl font-semibold">{getCountTypeDisplay()}</h2>
+            <h2 className="text-lg sm:text-xl font-semibold">
+              {getCountTypeDisplay()}
+            </h2>
           </div>
           <Button
             variant="ghost"
@@ -359,27 +361,27 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
                                   <Label className="text-xs sm:text-sm font-medium min-w-[50px] sm:min-w-[60px]">
                                     {denom.label}
                                   </Label>
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        value={denom.count || ""}
-                                        onChange={(e) =>
-                                          updateDenominationCount(
-                                            originalIndex,
-                                            e.target.value
-                                          )
-                                        }
-                                        className="w-16 sm:w-20 text-center h-9 sm:h-10 text-sm sm:text-base"
-                                        placeholder="0"
-                                      />
-                                      <span className="text-xs sm:text-sm text-slate-600 min-w-[60px] sm:min-w-[80px] text-right">
-                                        {formatCurrency(denom.total)}
-                                      </span>
-                                    </div>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={denom.count || ""}
+                                      onChange={(e) =>
+                                        updateDenominationCount(
+                                          originalIndex,
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-16 sm:w-20 text-center h-9 sm:h-10 text-sm sm:text-base"
+                                      placeholder="0"
+                                    />
+                                    <span className="text-xs sm:text-sm text-slate-600 min-w-[60px] sm:min-w-[80px] text-right">
+                                      {formatCurrency(denom.total)}
+                                    </span>
                                   </div>
-                                );
-                              })}
+                                </div>
+                              );
+                            })}
                         </div>
                       </CardContent>
                     </Card>
@@ -423,9 +425,9 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
                                       className="w-16 sm:w-20 text-center h-9 sm:h-10 text-sm sm:text-base"
                                       placeholder="0"
                                     />
-                                      <span className="text-xs sm:text-sm text-slate-600 min-w-[60px] sm:min-w-[80px] text-right">
-                                        {formatCurrency(denom.total)}
-                                      </span>
+                                    <span className="text-xs sm:text-sm text-slate-600 min-w-[60px] sm:min-w-[80px] text-right">
+                                      {formatCurrency(denom.total)}
+                                    </span>
                                   </div>
                                 </div>
                               );
@@ -452,13 +454,17 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-                  <Button variant="outline" onClick={resetModal} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+                  <Button
+                    variant="outline"
+                    onClick={resetModal}
+                    className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+                  >
                     Cancel
                   </Button>
                   <Button
                     onClick={proceedToReview}
                     disabled={countedTotal === 0}
-                    className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+                    className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                   >
                     Review Count
                   </Button>
@@ -476,12 +482,16 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
                 className="space-y-6"
               >
                 <div>
-                  <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Review Count</h3>
+                  <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">
+                    Review Count
+                  </h3>
 
                   {/* Count Summary */}
                   <Card className="mb-4 sm:mb-6">
                     <CardHeader className="p-3 sm:p-6">
-                      <CardTitle className="text-base sm:text-lg">Cash Count Summary</CardTitle>
+                      <CardTitle className="text-base sm:text-lg">
+                        Cash Count Summary
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="p-3 sm:p-6">
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
@@ -578,7 +588,10 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
                   {/* Notes */}
                   <div className="space-y-3 sm:space-y-4">
                     <div>
-                      <Label htmlFor="count-notes" className="text-xs sm:text-sm">
+                      <Label
+                        htmlFor="count-notes"
+                        className="text-xs sm:text-sm"
+                      >
                         Notes {discrepancy !== 0 && "(Required)"}
                       </Label>
                       <Textarea
@@ -615,9 +628,11 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
                         : "bg-blue-600 hover:bg-blue-700"
                     }`}
                   >
-                    <span className="truncate">{requiresManagerApproval
-                      ? "Request Manager Approval"
-                      : "Complete Count"}</span>
+                    <span className="truncate">
+                      {requiresManagerApproval
+                        ? "Request Manager Approval"
+                        : "Complete Count"}
+                    </span>
                   </Button>
                 </div>
               </motion.div>
@@ -659,7 +674,9 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-3 sm:py-4">
-            <Label htmlFor="manager-pin" className="text-xs sm:text-sm">Manager PIN</Label>
+            <Label htmlFor="manager-pin" className="text-xs sm:text-sm">
+              Manager PIN
+            </Label>
             <Input
               id="manager-pin"
               type="password"

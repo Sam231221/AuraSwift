@@ -25,7 +25,9 @@ export function PaymentMethodSelector({
       >
         <div className="flex flex-col items-center">
           <span>Cash</span>
-          <span className="text-[10px] sm:text-xs text-slate-500">Physical currency</span>
+          <span className="text-[10px] sm:text-xs text-slate-500">
+            Physical currency
+          </span>
         </div>
       </Button>
       <Button
@@ -52,7 +54,9 @@ export function PaymentMethodSelector({
       >
         <div className="flex flex-col items-center">
           <span>Mobile Pay</span>
-          <span className="text-[10px] sm:text-xs text-slate-500">Apple/Google Pay</span>
+          <span className="text-[10px] sm:text-xs text-slate-500">
+            Apple/Google Pay
+          </span>
         </div>
       </Button>
       <Button
@@ -62,7 +66,9 @@ export function PaymentMethodSelector({
       >
         <div className="flex flex-col items-center">
           <span>Voucher</span>
-          <span className="text-[10px] sm:text-xs text-slate-500">Gift card/Coupon</span>
+          <span className="text-[10px] sm:text-xs text-slate-500">
+            Gift card/Coupon
+          </span>
         </div>
       </Button>
       <Button
@@ -75,4 +81,3 @@ export function PaymentMethodSelector({
     </div>
   );
 }
-

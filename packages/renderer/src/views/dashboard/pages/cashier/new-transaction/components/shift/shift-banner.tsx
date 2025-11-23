@@ -43,21 +43,18 @@ export function ShiftBanner({
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: true,
-                })} - ${new Date(todaySchedule.endTime).toLocaleTimeString(
-                  [],
-                  {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: true,
-                  }
-                )}. ${shiftTimingInfo.reason}`
+                })} - ${new Date(todaySchedule.endTime).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })}. ${shiftTimingInfo.reason}`
               : "You have a scheduled shift today. Please start your shift to perform transactions."}
           </p>
         </div>
       </div>
       <Button
         onClick={onStartShift}
-        className={`bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto h-10 sm:h-11 text-xs sm:text-base touch-manipulation ${
+        className={`bg-amber-600 hover:bg-amber-700 text-white w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-xs sm:text-base touch-manipulation ${
           !shiftTimingInfo.canStart ? "opacity-50" : ""
         }`}
         size="lg"
@@ -70,4 +67,3 @@ export function ShiftBanner({
     </div>
   );
 }
-

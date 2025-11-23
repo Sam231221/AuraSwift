@@ -38,7 +38,7 @@ export function WeightInputDisplay({
         <Button
           variant="outline"
           onClick={onShowScaleDisplay}
-          className="w-full mt-2 h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
+          className="w-full mt-2 min-h-[44px] h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
         >
           <Scale className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 shrink-0" />
           Use Scale Instead

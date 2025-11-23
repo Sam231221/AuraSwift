@@ -374,7 +374,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
             variant="ghost"
             size="icon"
             onClick={resetModal}
-            className="text-white hover:bg-red-700 h-8 w-8 sm:h-9 sm:w-9 touch-manipulation"
+            className="text-white hover:bg-red-700 min-h-[44px] min-w-[44px] h-10 w-10 sm:h-11 sm:w-11 touch-manipulation"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -403,7 +403,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
                         searchMethod === "recent" ? "default" : "outline"
                       }
                       onClick={() => setSearchMethod("recent")}
-                      className="w-full h-10 sm:h-11 text-xs sm:text-sm touch-manipulation"
+                      className="w-full min-h-[44px] h-10 sm:h-11 text-xs sm:text-sm touch-manipulation"
                     >
                       Recent Sales
                     </Button>
@@ -412,14 +412,14 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
                         searchMethod === "receipt" ? "default" : "outline"
                       }
                       onClick={() => setSearchMethod("receipt")}
-                      className="w-full h-10 sm:h-11 text-xs sm:text-sm touch-manipulation"
+                      className="w-full min-h-[44px] h-10 sm:h-11 text-xs sm:text-sm touch-manipulation"
                     >
                       Receipt #
                     </Button>
                     <Button
                       variant={searchMethod === "id" ? "default" : "outline"}
                       onClick={() => setSearchMethod("id")}
-                      className="w-full h-10 sm:h-11 text-xs sm:text-sm touch-manipulation"
+                      className="w-full min-h-[44px] h-10 sm:h-11 text-xs sm:text-sm touch-manipulation"
                     >
                       Transaction ID
                     </Button>
@@ -444,7 +444,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
                       <Button
                         onClick={searchTransaction}
                         disabled={isLoading || !searchValue.trim()}
-                        className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+                        className="min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                       >
                         <Search className="h-4 w-4 mr-1.5 sm:mr-2 shrink-0" />
                         <span className="hidden sm:inline">Search</span>
@@ -683,7 +683,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
                       !voidReason ||
                       (voidReason === "Other" && !customReason.trim())
                     }
-                    className="bg-red-600 hover:bg-red-700 w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+                    className="bg-red-600 hover:bg-red-700 w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
                   >
                     <span className="truncate">
                       {requiresManagerApproval

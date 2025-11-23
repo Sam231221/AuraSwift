@@ -158,9 +158,10 @@ export const QuickActionsCarousel: React.FC<QuickActionsCarouselProps> = ({
         <button
           onClick={handlePrev}
           disabled={currentIndex === 0}
-          className="shrink-0 w-6 h-12 sm:w-8 sm:h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-manipulation"
+          className="shrink-0 min-w-[44px] w-6 h-12 sm:w-8 sm:h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-manipulation"
           style={{
             clipPath: "polygon(30% 0, 100% 0, 100% 100%, 30% 100%, 0 50%)",
+            minWidth: "44px",
           }}
         >
           <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-gray-700 rotate-180" />
@@ -211,9 +212,10 @@ export const QuickActionsCarousel: React.FC<QuickActionsCarouselProps> = ({
         <button
           onClick={handleNext}
           disabled={currentIndex === maxIndex}
-          className="shrink-0 w-6 h-12 sm:w-8 sm:h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-manipulation"
+          className="shrink-0 min-w-[44px] w-6 h-12 sm:w-8 sm:h-16 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors touch-manipulation"
           style={{
             clipPath: "polygon(0 0, 70% 0, 100% 50%, 70% 100%, 0 100%)",
+            minWidth: "44px",
           }}
         >
           <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-gray-700" />
@@ -234,18 +236,24 @@ const CarouselCard: React.FC<{
   <button
     onClick={disabled ? undefined : onClick}
     disabled={disabled}
-    className={`shrink-0 basis-1/3 w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 p-1.5 sm:p-2 rounded-lg flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all touch-manipulation ${
+    className={`shrink-0 basis-1/3 min-h-[44px] min-w-[44px] w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 p-1.5 sm:p-2 rounded-lg flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all touch-manipulation ${
       disabled
         ? "bg-gray-100 opacity-50 cursor-not-allowed"
         : `bg-gray-100 hover:shadow-md ${hoverColor}`
     }`}
-    style={{ minWidth: "0" }}
-    title={
-      disabled ? "Please start your shift to use this feature" : undefined
-    }
+    style={{ minWidth: "44px", minHeight: "44px" }}
+    title={disabled ? "Please start your shift to use this feature" : undefined}
   >
-    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${disabled ? "text-gray-400" : ""} shrink-0`} />
-    <span className={`text-[10px] sm:text-xs lg:text-sm ${disabled ? "text-gray-400" : ""} text-center line-clamp-2`}>
+    <Icon
+      className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${
+        disabled ? "text-gray-400" : ""
+      } shrink-0`}
+    />
+    <span
+      className={`text-[10px] sm:text-xs lg:text-sm ${
+        disabled ? "text-gray-400" : ""
+      } text-center line-clamp-2`}
+    >
       {title}
     </span>
   </button>

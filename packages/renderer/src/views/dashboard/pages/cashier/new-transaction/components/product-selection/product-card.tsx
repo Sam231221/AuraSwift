@@ -62,7 +62,10 @@ export function ProductCard({
         </span>
 
         {product.requiresWeight && (
-          <Badge variant="outline" className="mt-1 text-[10px] sm:text-xs bg-blue-50">
+          <Badge
+            variant="outline"
+            className="mt-1 text-[10px] sm:text-xs bg-blue-50"
+          >
             <Scale className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1 shrink-0" />
             Weighed
           </Badge>

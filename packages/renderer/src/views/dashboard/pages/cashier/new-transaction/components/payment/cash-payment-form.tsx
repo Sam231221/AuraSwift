@@ -17,7 +17,8 @@ export function CashPaymentForm({
   onCashAmountChange,
 }: CashPaymentFormProps) {
   const change = cashAmount >= total ? cashAmount - total : 0;
-  const shortfall = cashAmount > 0 && cashAmount < total ? total - cashAmount : 0;
+  const shortfall =
+    cashAmount > 0 && cashAmount < total ? total - cashAmount : 0;
 
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -27,15 +28,15 @@ export function CashPaymentForm({
       </div>
 
       <div>
-        <label className="text-xs sm:text-sm text-slate-600">Cash Received:</label>
+        <label className="text-xs sm:text-sm text-slate-600">
+          Cash Received:
+        </label>
         <Input
           type="number"
           step="0.01"
           placeholder="Enter cash amount"
           value={cashAmount ? cashAmount.toFixed(2) : ""}
-          onChange={(e) =>
-            onCashAmountChange(parseFloat(e.target.value) || 0)
-          }
+          onChange={(e) => onCashAmountChange(parseFloat(e.target.value) || 0)}
           className={`mt-1 h-10 sm:h-11 text-sm sm:text-base ${
             cashAmount > 0 && cashAmount < total
               ? "border-red-300 bg-red-50"
@@ -76,7 +77,7 @@ export function CashPaymentForm({
             variant="outline"
             size="sm"
             onClick={() => onCashAmountChange(amount)}
-            className="text-[10px] sm:text-xs h-9 sm:h-10 touch-manipulation"
+            className="text-[10px] sm:text-xs min-h-[44px] h-9 sm:h-10 touch-manipulation"
           >
             £{amount}
           </Button>
@@ -88,7 +89,7 @@ export function CashPaymentForm({
           variant="outline"
           size="sm"
           onClick={() => onCashAmountChange(total)}
-          className="flex-1 text-[10px] sm:text-xs h-9 sm:h-10 touch-manipulation"
+          className="flex-1 text-[10px] sm:text-xs min-h-[44px] h-9 sm:h-10 touch-manipulation"
         >
           Exact Amount
         </Button>
@@ -96,7 +97,7 @@ export function CashPaymentForm({
           variant="outline"
           size="sm"
           onClick={() => onCashAmountChange(Math.ceil(total))}
-          className="flex-1 text-[10px] sm:text-xs h-9 sm:h-10 touch-manipulation"
+          className="flex-1 text-[10px] sm:text-xs min-h-[44px] h-9 sm:h-10 touch-manipulation"
         >
           Round Up
         </Button>
@@ -104,4 +105,3 @@ export function CashPaymentForm({
     </div>
   );
 }
-

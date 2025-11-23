@@ -90,7 +90,9 @@ export function ReceiptOptionsModal({
               <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-xl sm:text-2xl font-bold">Payment Successful!</h2>
+              <h2 className="text-xl sm:text-2xl font-bold">
+                Payment Successful!
+              </h2>
               <p className="text-green-100 text-xs sm:text-sm mt-1">
                 Receipt #{transactionData.receiptNumber}
               </p>
@@ -103,7 +105,9 @@ export function ReceiptOptionsModal({
           {/* Transaction Summary */}
           <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-4 sm:p-5 mb-4 sm:mb-6 border border-slate-200">
             <div className="flex justify-between items-center mb-3">
-              <span className="text-slate-600 font-medium text-sm sm:text-base">Total Paid:</span>
+              <span className="text-slate-600 font-medium text-sm sm:text-base">
+                Total Paid:
+              </span>
               <span className="text-2xl sm:text-3xl font-bold text-slate-900">
                 £{transactionData.total.toFixed(2)}
               </span>
@@ -148,7 +152,7 @@ export function ReceiptOptionsModal({
               <Button
                 onClick={onPrint}
                 disabled={!printerStatus.connected}
-                className="w-full h-14 sm:h-16 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 disabled:from-slate-400 disabled:to-slate-500 disabled:cursor-not-allowed text-white flex items-center justify-between px-4 sm:px-6 text-sm sm:text-base font-semibold shadow-md hover:shadow-lg transition-all touch-manipulation"
+                className="w-full min-h-[44px] h-14 sm:h-16 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 disabled:from-slate-400 disabled:to-slate-500 disabled:cursor-not-allowed text-white flex items-center justify-between px-4 sm:px-6 text-sm sm:text-base font-semibold shadow-md hover:shadow-lg transition-all touch-manipulation"
               >
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="p-1.5 sm:p-2 bg-white/20 rounded-lg shrink-0">
@@ -170,7 +174,7 @@ export function ReceiptOptionsModal({
             <Button
               onClick={onDownload}
               variant="outline"
-              className="w-full h-14 sm:h-16 border-2 border-slate-300 hover:border-sky-400 hover:bg-sky-50 flex items-center justify-between px-4 sm:px-6 text-sm sm:text-base font-semibold transition-all touch-manipulation"
+              className="w-full min-h-[44px] h-14 sm:h-16 border-2 border-slate-300 hover:border-sky-400 hover:bg-sky-50 flex items-center justify-between px-4 sm:px-6 text-sm sm:text-base font-semibold transition-all touch-manipulation"
             >
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-sky-100 rounded-lg shrink-0">
@@ -185,7 +189,7 @@ export function ReceiptOptionsModal({
             <Button
               onClick={onEmail}
               variant="outline"
-              className="w-full h-14 sm:h-16 border-2 border-slate-300 hover:border-purple-400 hover:bg-purple-50 flex items-center justify-between px-4 sm:px-6 text-sm sm:text-base font-semibold transition-all touch-manipulation"
+              className="w-full min-h-[44px] h-14 sm:h-16 border-2 border-slate-300 hover:border-purple-400 hover:bg-purple-50 flex items-center justify-between px-4 sm:px-6 text-sm sm:text-base font-semibold transition-all touch-manipulation"
             >
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg shrink-0">
@@ -212,7 +216,9 @@ export function ReceiptOptionsModal({
               variant="ghost"
               className="w-full h-12 sm:h-14 text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs sm:text-sm font-medium transition-all touch-manipulation"
             >
-              <span className="truncate">No Receipt - Continue to Next Customer</span>
+              <span className="truncate">
+                No Receipt - Continue to Next Customer
+              </span>
             </Button>
           </div>
 
