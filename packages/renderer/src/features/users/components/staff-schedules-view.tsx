@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -65,6 +65,7 @@ import {
   isToday,
   startOfDay,
 } from "date-fns";
+import { TimePicker } from "./time-picker";
 
 // Using database interfaces
 interface Cashier {
@@ -203,25 +204,44 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     notes: "",
   });
 
-  // Calendar view functions
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
-  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  // Validation errors state for inline feedback
+  const [validationErrors, setValidationErrors] = useState<{
+    staffId?: string;
+    selectedDate?: string;
+    startTime?: string;
+    endTime?: string;
+    assignedRegister?: string;
+  }>({});
 
-  const goToPreviousWeek = () => {
+  // Calendar view functions - memoized for performance
+  const weekStart = useMemo(
+    () => startOfWeek(currentWeek, { weekStartsOn: 1 }),
+    [currentWeek]
+  );
+  const weekEnd = useMemo(
+    () => endOfWeek(currentWeek, { weekStartsOn: 1 }),
+    [currentWeek]
+  );
+  const weekDays = useMemo(
+    () => eachDayOfInterval({ start: weekStart, end: weekEnd }),
+    [weekStart, weekEnd]
+  );
+
+  // Memoized event handlers
+  const goToPreviousWeek = useCallback(() => {
     setCurrentWeek(addWeeks(currentWeek, -1));
-  };
+  }, [currentWeek]);
 
-  const goToNextWeek = () => {
+  const goToNextWeek = useCallback(() => {
     setCurrentWeek(addWeeks(currentWeek, 1));
-  };
+  }, [currentWeek]);
 
-  const goToToday = () => {
+  const goToToday = useCallback(() => {
     setCurrentWeek(new Date());
     setSelectedDate(new Date());
-  };
+  }, []);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setFormData({
       staffId: "",
       startTime: "",
@@ -231,37 +251,42 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     });
     setSelectedDate(new Date());
     setEditingSchedule(null);
-  };
+    setValidationErrors({});
+  }, []);
 
-  const openDrawer = (schedule?: Schedule, date?: Date) => {
-    if (schedule) {
-      setEditingSchedule(schedule);
-      const startDate = new Date(schedule.startTime);
-      const endDate = new Date(schedule.endTime);
+  const openDrawer = useCallback(
+    (schedule?: Schedule, date?: Date) => {
+      if (schedule) {
+        setEditingSchedule(schedule);
+        const startDate = new Date(schedule.startTime);
+        const endDate = new Date(schedule.endTime);
 
-      const formDataToSet = {
-        staffId: schedule.staffId,
-        startTime: format(startDate, "HH:mm"),
-        endTime: format(endDate, "HH:mm"),
-        assignedRegister: schedule.assignedRegister || "",
-        notes: schedule.notes || "",
-      };
+        const formDataToSet = {
+          staffId: schedule.staffId,
+          startTime: format(startDate, "HH:mm"),
+          endTime: format(endDate, "HH:mm"),
+          assignedRegister: schedule.assignedRegister || "",
+          notes: schedule.notes || "",
+        };
 
-      setFormData(formDataToSet);
-      setSelectedDate(new Date(schedule.startTime.split("T")[0]));
-    } else {
-      resetForm();
-      if (date) {
-        setSelectedDate(date);
+        setFormData(formDataToSet);
+        setSelectedDate(new Date(schedule.startTime.split("T")[0]));
+      } else {
+        resetForm();
+        if (date) {
+          setSelectedDate(date);
+        }
       }
-    }
-    setIsDrawerOpen(true);
-  };
+      setIsDrawerOpen(true);
+      setValidationErrors({});
+    },
+    [resetForm]
+  );
 
-  const closeDrawer = () => {
+  const closeDrawer = useCallback(() => {
     setIsDrawerOpen(false);
     resetForm();
-  };
+  }, [resetForm]);
 
   // Configuration constants for shift validation
   const SHIFT_CONFIG = {
@@ -271,17 +296,31 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   };
 
   // Helper function to validate shift data and return array of errors
-  const validateShiftData = () => {
+  // Also updates inline validation errors state
+  const validateShiftData = useCallback(() => {
     const errors: string[] = [];
+    const inlineErrors: typeof validationErrors = {};
 
     // Basic field validation
-    if (
-      !formData.staffId ||
-      !selectedDate ||
-      !formData.startTime ||
-      !formData.endTime
-    ) {
-      errors.push("Please fill in all required fields.");
+    if (!formData.staffId) {
+      errors.push("Please select a staff member.");
+      inlineErrors.staffId = "Staff member is required";
+    }
+    if (!selectedDate) {
+      errors.push("Please select a date.");
+      inlineErrors.selectedDate = "Date is required";
+    }
+    if (!formData.startTime) {
+      errors.push("Please select a start time.");
+      inlineErrors.startTime = "Start time is required";
+    }
+    if (!formData.endTime) {
+      errors.push("Please select an end time.");
+      inlineErrors.endTime = "End time is required";
+    }
+
+    if (errors.length > 0) {
+      setValidationErrors(inlineErrors);
       return errors; // Return early if basic fields are missing
     }
 
@@ -292,9 +331,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       const shiftDate = startOfDay(selectedDate);
 
       if (shiftDate < today) {
-        errors.push(
-          "Cannot schedule shifts in the past. Please select today or a future date."
-        );
+        const errorMsg =
+          "Cannot schedule shifts in the past. Please select today or a future date.";
+        errors.push(errorMsg);
+        inlineErrors.selectedDate = errorMsg;
       }
     }
 
@@ -305,13 +345,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     );
 
     if (shiftDurationMinutes === -1) {
-      errors.push(
-        "Invalid time format. Please ensure times are in HH:MM format."
-      );
+      const errorMsg =
+        "Invalid time format. Please ensure times are in HH:MM format.";
+      errors.push(errorMsg);
+      inlineErrors.startTime = errorMsg;
+      inlineErrors.endTime = errorMsg;
     } else if (shiftDurationMinutes === 0) {
-      errors.push(
-        "End time must be later than start time. A shift cannot have zero duration."
-      );
+      const errorMsg =
+        "End time must be later than start time. A shift cannot have zero duration.";
+      errors.push(errorMsg);
+      inlineErrors.endTime = errorMsg;
     } else {
       // Duration-based validations
       if (shiftDurationMinutes < SHIFT_CONFIG.MIN_DURATION_MINUTES) {
@@ -321,12 +364,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           minMinutes > 0
             ? `${minHours} hours and ${minMinutes} minutes`
             : `${minHours} hour${minHours > 1 ? "s" : ""}`;
-        errors.push(`Shift duration must be at least ${minDurationText}.`);
+        const errorMsg = `Shift duration must be at least ${minDurationText}.`;
+        errors.push(errorMsg);
+        inlineErrors.endTime = errorMsg;
       }
 
       if (shiftDurationMinutes > SHIFT_CONFIG.MAX_DURATION_MINUTES) {
         const maxHours = SHIFT_CONFIG.MAX_DURATION_MINUTES / 60;
-        errors.push(`Shift cannot be longer than ${maxHours} hours.`);
+        const errorMsg = `Shift cannot be longer than ${maxHours} hours.`;
+        errors.push(errorMsg);
+        inlineErrors.endTime = errorMsg;
       }
 
       // Check for overlapping shifts
@@ -343,12 +390,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         const staffName = staffMember
           ? `${staffMember.firstName} ${staffMember.lastName}`
           : "This staff member";
-        errors.push(`${staffName} already has an overlapping shift scheduled.`);
+        const errorMsg = `${staffName} already has an overlapping shift scheduled.`;
+        errors.push(errorMsg);
+        inlineErrors.startTime = errorMsg;
+        inlineErrors.endTime = errorMsg;
       }
     }
 
+    setValidationErrors(inlineErrors);
     return errors;
-  };
+  }, [formData, selectedDate, editingSchedule, schedules, cashiers]);
 
   // Helper function to calculate shift duration handling overnight shifts
   const calculateShiftDuration = (startTime: string, endTime: string) => {
@@ -466,7 +517,26 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     });
   };
 
-  const handleSubmit = async () => {
+  // Validate on field change for inline feedback
+  const validateField = useCallback(
+    (field: keyof typeof formData, value: string) => {
+      // Clear error for this field when user starts typing
+      setValidationErrors((prev) => {
+        const newErrors = { ...prev };
+        if (field === "staffId") {
+          delete newErrors.staffId;
+        } else if (field === "startTime") {
+          delete newErrors.startTime;
+        } else if (field === "endTime") {
+          delete newErrors.endTime;
+        }
+        return newErrors;
+      });
+    },
+    []
+  );
+
+  const handleSubmit = useCallback(async () => {
     // Run comprehensive validation
     const validationErrors = validateShiftData();
 
@@ -593,14 +663,21 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [
+    validateShiftData,
+    formData,
+    selectedDate,
+    editingSchedule,
+    businessId,
+    schedules,
+  ]);
 
-  const handleDeleteClick = (schedule: Schedule) => {
+  const handleDeleteClick = useCallback((schedule: Schedule) => {
     setScheduleToDelete(schedule);
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     if (!scheduleToDelete) {
       setDeleteDialogOpen(false);
       return;
@@ -633,7 +710,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       setDeleteDialogOpen(false);
       setScheduleToDelete(null);
     }
-  };
+  }, [scheduleToDelete, schedules]);
 
   const getShiftDuration = (startTime: string, endTime: string) => {
     const start = new Date(startTime);
@@ -664,13 +741,23 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     };
   };
 
-  const getSchedulesForDate = (date: Date) => {
-    const dateString = format(date, "yyyy-MM-dd");
-    return schedules.filter((schedule) => {
-      const scheduleDate = schedule.startTime.split("T")[0];
-      return scheduleDate === dateString;
-    });
-  };
+  // Memoized function to get schedules for a date
+  const getSchedulesForDate = useCallback(
+    (date: Date) => {
+      const dateString = format(date, "yyyy-MM-dd");
+      return schedules.filter((schedule) => {
+        const scheduleDate = schedule.startTime.split("T")[0];
+        return scheduleDate === dateString;
+      });
+    },
+    [schedules]
+  );
+
+  // Memoized schedules for selected date
+  const schedulesForSelectedDate = useMemo(
+    () => getSchedulesForDate(selectedDate || new Date()),
+    [getSchedulesForDate, selectedDate]
+  );
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -700,7 +787,13 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       >
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-4">
-            <Button onClick={onBack} variant="ghost" size="sm" className="p-2">
+            <Button
+              onClick={onBack}
+              variant="ghost"
+              size="sm"
+              className="p-2"
+              aria-label="Go back to previous page"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
@@ -719,8 +812,9 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 onClick={() => openDrawer()}
                 className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                 size="lg"
+                aria-label="Open schedule shift form"
               >
-                <Plus className="w-5 h-5 mr-2" />
+                <Plus className="w-5 h-5 mr-2" aria-hidden="true" />
                 Schedule Shift
               </Button>
             </DrawerTrigger>
@@ -742,12 +836,18 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               <div className="px-4 pb-4 space-y-6 overflow-y-auto flex-1">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="cashier">Staff Member</Label>
+                    <Label htmlFor="cashier" className={validationErrors.staffId ? "text-red-600" : ""}>
+                      Staff Member
+                    </Label>
                     <Select
                       value={formData.staffId}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, staffId: value })
-                      }
+                      onValueChange={(value) => {
+                        validateField("staffId", value);
+                        setFormData({ ...formData, staffId: value });
+                      }}
+                      aria-label="Select staff member"
+                      aria-invalid={validationErrors.staffId ? "true" : "false"}
+                      aria-describedby={validationErrors.staffId ? "cashier-error" : undefined}
                     >
                       <SelectTrigger>
                         <SelectValue
@@ -786,10 +886,22 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                         )}
                       </SelectContent>
                     </Select>
+                    {validationErrors.staffId && (
+                      <p
+                        id="cashier-error"
+                        className="text-sm text-red-600"
+                        role="alert"
+                        aria-live="polite"
+                      >
+                        {validationErrors.staffId}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Schedule Date</Label>
+                    <Label className={validationErrors.selectedDate ? "text-red-600" : ""}>
+                      Schedule Date
+                    </Label>
                     <Popover
                       open={isDatePickerOpen}
                       onOpenChange={setIsDatePickerOpen}
@@ -799,8 +911,12 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                           variant="outline"
                           className={cn(
                             "w-full justify-start text-left font-normal",
-                            !selectedDate && "text-muted-foreground"
+                            !selectedDate && "text-muted-foreground",
+                            validationErrors.selectedDate && "border-red-500"
                           )}
+                          aria-label="Select schedule date"
+                          aria-invalid={validationErrors.selectedDate ? "true" : "false"}
+                          aria-describedby={validationErrors.selectedDate ? "date-error" : undefined}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {selectedDate
@@ -817,6 +933,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                         />
                       </PopoverContent>
                     </Popover>
+                    {validationErrors.selectedDate && (
+                      <p
+                        id="date-error"
+                        className="text-sm text-red-600"
+                        role="alert"
+                        aria-live="polite"
+                      >
+                        {validationErrors.selectedDate}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -835,147 +961,29 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="startTime">Start Time</Label>
-                    <div className="flex gap-2">
-                      <Select
-                        value={formData.startTime.split(":")[0] || ""}
-                        onValueChange={(value) => {
-                          const minutes =
-                            formData.startTime.split(":")[1] || "00";
-                          setFormData({
-                            ...formData,
-                            startTime: `${value}:${minutes}`,
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Hour" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 24 }, (_, i) => {
-                            const hour24 = i;
-                            const hour12 =
-                              hour24 === 0
-                                ? 12
-                                : hour24 > 12
-                                ? hour24 - 12
-                                : hour24;
-                            const period = hour24 < 12 ? "AM" : "PM";
-                            const display = `${hour12}:00 ${period}`;
-                            return (
-                              <SelectItem
-                                key={i}
-                                value={i.toString().padStart(2, "0")}
-                              >
-                                {display}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={formData.startTime.split(":")[1] || ""}
-                        onValueChange={(value) => {
-                          const hour = formData.startTime.split(":")[0] || "00";
-                          setFormData({
-                            ...formData,
-                            startTime: `${hour}:${value}`,
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Min" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 4 }, (_, i) => i * 15).map(
-                            (minute) => (
-                              <SelectItem
-                                key={minute}
-                                value={minute.toString().padStart(2, "0")}
-                              >
-                                {minute.toString().padStart(2, "0")}
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Select hour (12 AM = midnight, 12 PM = noon) and minutes
-                    </p>
-                  </div>
+                  <TimePicker
+                    id="startTime"
+                    label="Start Time"
+                    value={formData.startTime}
+                    onChange={(value) => {
+                      validateField("startTime", value);
+                      setFormData({ ...formData, startTime: value });
+                    }}
+                    error={validationErrors.startTime}
+                    aria-label="Start time"
+                  />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="endTime">End Time</Label>
-                    <div className="flex gap-2">
-                      <Select
-                        value={formData.endTime.split(":")[0] || ""}
-                        onValueChange={(value) => {
-                          const minutes =
-                            formData.endTime.split(":")[1] || "00";
-                          setFormData({
-                            ...formData,
-                            endTime: `${value}:${minutes}`,
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Hour" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 24 }, (_, i) => {
-                            const hour24 = i;
-                            const hour12 =
-                              hour24 === 0
-                                ? 12
-                                : hour24 > 12
-                                ? hour24 - 12
-                                : hour24;
-                            const period = hour24 < 12 ? "AM" : "PM";
-                            const display = `${hour12}:00 ${period}`;
-                            return (
-                              <SelectItem
-                                key={i}
-                                value={i.toString().padStart(2, "0")}
-                              >
-                                {display}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={formData.endTime.split(":")[1] || ""}
-                        onValueChange={(value) => {
-                          const hour = formData.endTime.split(":")[0] || "00";
-                          setFormData({
-                            ...formData,
-                            endTime: `${hour}:${value}`,
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Min" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 4 }, (_, i) => i * 15).map(
-                            (minute) => (
-                              <SelectItem
-                                key={minute}
-                                value={minute.toString().padStart(2, "0")}
-                              >
-                                {minute.toString().padStart(2, "0")}
-                              </SelectItem>
-                            )
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Select hour (12 AM = midnight, 12 PM = noon) and minutes
-                    </p>
-                  </div>
+                  <TimePicker
+                    id="endTime"
+                    label="End Time"
+                    value={formData.endTime}
+                    onChange={(value) => {
+                      validateField("endTime", value);
+                      setFormData({ ...formData, endTime: value });
+                    }}
+                    error={validationErrors.endTime}
+                    aria-label="End time"
+                  />
 
                   {formData.startTime && formData.endTime && (
                     <div className="md:col-span-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
@@ -1184,6 +1192,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 variant="outline"
                 onClick={goToToday}
                 className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                aria-label="Go to today's date"
               >
                 Today
               </Button>
@@ -1192,11 +1201,17 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                   variant="outline"
                   size="icon"
                   onClick={goToPreviousWeek}
+                  aria-label="Go to previous week"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                 </Button>
-                <Button variant="outline" size="icon" onClick={goToNextWeek}>
-                  <ChevronRight className="h-4 w-4" />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={goToNextWeek}
+                  aria-label="Go to next week"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
               <h2 className="text-xl font-semibold text-slate-800">
@@ -1235,6 +1250,15 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                     : ""
                 )}
                 onClick={() => setSelectedDate(day)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Select ${format(day, "EEEE, MMMM d, yyyy")}`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedDate(day);
+                  }
+                }}
               >
                 <div className="text-sm font-medium">{format(day, "EEE")}</div>
                 <div className="text-lg font-semibold">{format(day, "d")}</div>
@@ -1287,7 +1311,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             Add Shift for This Date
           </Button>
 
-          {getSchedulesForDate(selectedDate || new Date()).length === 0 ? (
+          {schedulesForSelectedDate.length === 0 ? (
             <div className="text-center py-8 bg-white rounded-lg shadow">
               <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <p className="text-slate-500">
@@ -1302,8 +1326,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
             >
               <AnimatePresence>
-                {getSchedulesForDate(selectedDate || new Date()).map(
-                  (schedule) => {
+                {schedulesForSelectedDate.map((schedule) => {
                     const scheduleStatus = getScheduleStatus(
                       schedule.startTime,
                       schedule.endTime
@@ -1402,8 +1425,9 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                                   size="sm"
                                   variant="outline"
                                   className="flex-1 hover:bg-emerald-50 hover:border-emerald-300"
+                                  aria-label={`Edit schedule for ${staffName}`}
                                 >
-                                  <Edit2 className="w-4 h-4 mr-1" />
+                                  <Edit2 className="w-4 h-4 mr-1" aria-hidden="true" />
                                   Edit
                                 </Button>
                                 <Button
@@ -1412,8 +1436,9 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                                   variant="outline"
                                   disabled={isDeleting}
                                   className="flex-1 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                                  aria-label={`Delete schedule for ${staffName}`}
                                 >
-                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  <Trash2 className="w-4 h-4 mr-1" aria-hidden="true" />
                                   Delete
                                 </Button>
                               </div>
