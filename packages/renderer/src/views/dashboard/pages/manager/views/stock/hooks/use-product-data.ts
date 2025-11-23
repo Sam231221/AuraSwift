@@ -4,12 +4,20 @@ import type { Product } from "@/features/products/types/product.types";
 interface Category {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   businessId: string;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string | null;
+  image?: string | null;
+  color?: string | null;
+  parentId?: string | null;
+  vatCategoryId?: string | null;
+  vatOverridePercent?: number | null;
+  ageRestrictionLevel?: "NONE" | "AGE_16" | "AGE_18" | "AGE_21" | null;
+  requireIdScan?: boolean | null;
+  restrictionReason?: string | null;
 }
 
 interface VatCategory {
@@ -113,4 +121,3 @@ export const useProductData = ({ businessId }: UseProductDataProps) => {
 };
 
 export type { Category, VatCategory };
-

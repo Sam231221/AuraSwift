@@ -1,89 +1,80 @@
-import { z } from "zod";
-
 /**
  * Product Validation Schema
- * Centralized validation rules for product management
- * Promotes reusability and consistent error messages
+ *
+ * Validation schemas for product management forms.
+ * Uses common schemas from shared/validation/common for consistency.
  */
 
-// Base string validations
-const requiredString = (fieldName: string) =>
-  z
-    .string({ message: `${fieldName} must be text` })
-    .min(1, `${fieldName} is required`)
-    .trim();
+import { z } from "zod";
+import {
+  requiredStringSchema,
+  optionalStringSchema,
+  skuSchema as commonSkuSchema,
+  nonNegativeNumberSchema,
+  percentageSchema,
+  nonNegativeIntegerSchema,
+  uuidSchema,
+} from "@/shared/validation/common";
 
-const optionalString = z
+/**
+ * PLU validation: alphanumeric only (optional)
+ */
+const pluSchema = z
   .string()
-  .trim()
-  .optional()
-  .or(z.literal(""))
-  .or(z.null())
-  .transform((val) => val || "");
-
-// SKU validation: alphanumeric, dashes, underscores only
-export const skuSchema = z
-  .string({ message: "SKU must be text" })
-  .min(1, "SKU is required")
-  .regex(
-    /^[a-zA-Z0-9_-]+$/,
-    "SKU can only contain letters, numbers, dashes, and underscores"
-  )
-  .trim();
-
-// PLU validation: alphanumeric only
-export const pluSchema = z
-  .string()
-  .regex(/^[a-zA-Z0-9]+$/, "PLU can only contain letters and numbers")
+  .regex(/^[a-zA-Z0-9]*$/, "PLU can only contain letters and numbers")
   .trim()
   .optional()
   .or(z.literal(""));
 
-// Price validations
-export const priceSchema = z
-  .number({ message: "Price must be a number" })
-  .positive("Price must be greater than 0")
-  .finite("Price must be a valid number");
+/**
+ * Sales unit validation
+ */
+export const salesUnitSchema = z.enum([
+  "PIECE",
+  "KG",
+  "GRAM",
+  "LITRE",
+  "ML",
+  "PACK",
+]);
 
-export const costPriceSchema = z
-  .number({ message: "Cost price must be a number" })
-  .nonnegative("Cost price cannot be negative")
-  .finite("Cost price must be a valid number");
+/**
+ * Product type validation
+ */
+export const productTypeSchema = z.enum(["STANDARD", "WEIGHTED", "GENERIC"]);
 
-export const taxRateSchema = z
-  .number({ message: "Tax rate must be a number" })
-  .min(0, "Tax rate cannot be negative")
-  .max(100, "Tax rate cannot exceed 100%")
-  .finite("Tax rate must be a valid number");
+/**
+ * Stock rotation method validation
+ */
+export const stockRotationMethodSchema = z.enum(["FIFO", "FEFO", "NONE"]);
 
-// Stock validations
-export const stockLevelSchema = z
-  .number({ message: "Stock level must be a number" })
-  .int("Stock level must be a whole number")
-  .nonnegative("Stock level cannot be negative")
-  .finite("Stock level must be a valid number");
+/**
+ * Age restriction level validation
+ */
+export const ageRestrictionLevelSchema = z.enum([
+  "NONE",
+  "AGE_16",
+  "AGE_18",
+  "AGE_21",
+]);
 
-export const minStockLevelSchema = z
-  .number({ message: "Minimum stock level must be a number" })
-  .int("Minimum stock level must be a whole number")
-  .nonnegative("Minimum stock level cannot be negative")
-  .finite("Minimum stock level must be a valid number");
-
-// Weight unit validation
-export const weightUnitSchema = z.enum(["lb", "kg", "oz", "g", "each"]);
-
-// Modifier option schema
+/**
+ * Modifier option schema
+ */
 const modifierOptionSchema = z.object({
   id: z.string().optional(),
-  name: requiredString("Option name"),
-  price: z.number().nonnegative("Option price cannot be negative"),
+  name: requiredStringSchema("Option name"),
+  price: nonNegativeNumberSchema,
 });
 
-// Modifier schema
+/**
+ * Modifier schema
+ * Supports both old (type) and new (multiSelect) property formats
+ */
 const modifierSchema = z
   .object({
     id: z.string().optional(),
-    name: requiredString("Modifier name"),
+    name: requiredStringSchema("Modifier name"),
     required: z.boolean(),
     // Support both old (type) and new (multiSelect) property formats
     type: z.enum(["single", "multiple"]).optional(),
@@ -105,148 +96,155 @@ const modifierSchema = z
     }
   );
 
-// Main product schema for regular products
-export const productSchema = z
+/**
+ * Base product schema (shared between create and update)
+ * This defines the common fields and validation logic
+ */
+const baseProductSchema = z
   .object({
-    name: requiredString("Product name"),
-    description: optionalString,
-    sku: skuSchema,
+    name: requiredStringSchema("Product name"),
+    description: optionalStringSchema,
+    basePrice: nonNegativeNumberSchema,
+    costPrice: nonNegativeNumberSchema,
+    sku: commonSkuSchema,
+    barcode: optionalStringSchema,
     plu: pluSchema,
-    category: z
-      .string({ message: "Category must be text" })
-      .min(1, "Please select a category"),
-    price: z
-      .number({ message: "Price must be a number" })
-      .nonnegative("Price cannot be negative")
-      .finite("Price must be a valid number"),
-    costPrice: costPriceSchema,
-    taxRate: taxRateSchema,
-    stockLevel: stockLevelSchema,
-    minStockLevel: minStockLevelSchema,
-    image: z.string().optional(),
-    requiresWeight: z.boolean(),
-    unit: weightUnitSchema,
-    pricePerUnit: z.number().nonnegative().finite(),
+    image: optionalStringSchema,
+    categoryId: uuidSchema.min(1, "Please select a category"),
+    productType: productTypeSchema.default("STANDARD"),
+    salesUnit: salesUnitSchema.default("PIECE"),
+    usesScale: z.boolean().default(false),
+    pricePerKg: nonNegativeNumberSchema.optional(),
+    isGenericButton: z.boolean().default(false),
+    genericDefaultPrice: nonNegativeNumberSchema.optional(),
+    trackInventory: z.boolean().default(true),
+    stockLevel: nonNegativeIntegerSchema,
+    minStockLevel: nonNegativeIntegerSchema,
+    reorderPoint: nonNegativeIntegerSchema,
+    vatCategoryId: uuidSchema.optional().or(z.literal("")),
+    vatOverridePercent: percentageSchema.optional(),
+    isActive: z.boolean().default(true),
+    allowPriceOverride: z.boolean().default(false),
+    allowDiscount: z.boolean().default(true),
     modifiers: z.array(modifierSchema).optional(),
-    businessId: z.string().optional(),
+    hasExpiry: z.boolean().default(false),
+    shelfLifeDays: nonNegativeIntegerSchema.optional(),
+    requiresBatchTracking: z.boolean().default(false),
+    stockRotationMethod: stockRotationMethodSchema.default("FIFO"),
+    ageRestrictionLevel: ageRestrictionLevelSchema.default("NONE"),
+    requireIdScan: z.boolean().default(false),
+    restrictionReason: optionalStringSchema,
+    businessId: uuidSchema,
   })
   .superRefine((data, ctx) => {
+    // Weight-based product validations
+    if (data.usesScale) {
+      if (data.salesUnit === "PIECE") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Weight-based products must have a weight unit (e.g., KG, GRAM)",
+          path: ["salesUnit"],
+        });
+      }
+      if (!data.pricePerKg || data.pricePerKg <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Price per KG/GRAM is required for weight-based products",
+          path: ["pricePerKg"],
+        });
+      }
+    } else {
+      if (data.basePrice <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Base price must be greater than 0 for standard products",
+          path: ["basePrice"],
+        });
+      }
+    }
+
+    // Generic button product validations
+    if (data.isGenericButton) {
+      if (!data.genericDefaultPrice || data.genericDefaultPrice <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Default price is required for generic button products",
+          path: ["genericDefaultPrice"],
+        });
+      }
+    }
+
+    // Expiry tracking validations
+    if (data.hasExpiry) {
+      if (!data.shelfLifeDays || data.shelfLifeDays <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Shelf life in days is required for products with expiry tracking",
+          path: ["shelfLifeDays"],
+        });
+      }
+    }
+
+    // Batch tracking validations
+    if (data.requiresBatchTracking) {
+      if (data.stockRotationMethod === "NONE") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Stock rotation method is required for batch tracked products",
+          path: ["stockRotationMethod"],
+        });
+      }
+    }
+
+    // Age restriction validations
+    if (data.ageRestrictionLevel !== "NONE") {
+      if (!data.restrictionReason || data.restrictionReason.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Restriction reason is required for age-restricted products",
+          path: ["restrictionReason"],
+        });
+      }
+    }
+
     // Cost price should not exceed sale price (only for non-weight-based products)
-    if (!data.requiresWeight && data.costPrice > data.price) {
+    if (!data.usesScale && data.costPrice > data.basePrice) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Cost price cannot be higher than sale price",
         path: ["costPrice"],
       });
     }
-
-    // Weight-based product validations
-    if (data.requiresWeight) {
-      // Must have a valid unit (not 'each')
-      if (data.unit === "each") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Please select a valid weight unit (lb, kg, oz, or g)",
-          path: ["unit"],
-        });
-      }
-
-      // Must have price per unit
-      if (data.pricePerUnit <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Price per unit must be greater than 0",
-          path: ["pricePerUnit"],
-        });
-      }
-    } else {
-      // Regular product must have price > 0
-      if (data.price <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Price must be greater than 0",
-          path: ["price"],
-        });
-      }
-    }
   });
 
-// Product update schema (for existing products)
-// Cannot use .extend() on schemas with refinements, so we create a new schema
-export const productUpdateSchema = z
-  .object({
-    id: z.string().min(1, "Product ID is required"),
-    name: requiredString("Product name"),
-    description: optionalString,
-    sku: skuSchema,
-    plu: pluSchema,
-    category: z
-      .string({ message: "Category must be text" })
-      .min(1, "Please select a category"),
-    price: z
-      .number({ message: "Price must be a number" })
-      .nonnegative("Price cannot be negative")
-      .finite("Price must be a valid number"),
-    costPrice: costPriceSchema,
-    taxRate: taxRateSchema,
-    stockLevel: stockLevelSchema,
-    minStockLevel: minStockLevelSchema,
-    image: z.string().optional(),
-    requiresWeight: z.boolean(),
-    unit: weightUnitSchema,
-    pricePerUnit: z.number().nonnegative().finite(),
-    modifiers: z.array(modifierSchema).optional(),
-    businessId: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    // Cost price should not exceed sale price (only for non-weight-based products)
-    if (!data.requiresWeight && data.costPrice > data.price) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Cost price cannot be higher than sale price",
-        path: ["costPrice"],
-      });
-    }
+/**
+ * Product create schema
+ * Used for creating new products
+ */
+export const productCreateSchema = baseProductSchema;
 
-    // Weight-based product validations
-    if (data.requiresWeight) {
-      // Must have a valid unit (not 'each')
-      if (data.unit === "each") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Please select a valid weight unit (lb, kg, oz, or g)",
-          path: ["unit"],
-        });
-      }
+/**
+ * Product update schema
+ * Extends base schema with required ID field
+ * Uses safeExtend() because baseProductSchema contains refinements
+ */
+export const productUpdateSchema = baseProductSchema.safeExtend({
+  id: uuidSchema,
+});
 
-      // Must have price per unit
-      if (data.pricePerUnit <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Price per unit must be greater than 0",
-          path: ["pricePerUnit"],
-        });
-      }
-    } else {
-      // Regular product must have price > 0
-      if (data.price <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Price must be greater than 0",
-          path: ["price"],
-        });
-      }
-    }
-  });
-
-// Type inference from schema
-export type ProductFormData = z.infer<typeof productSchema>;
+/**
+ * Type exports
+ * Inferred from schemas for type safety
+ */
+export type ProductFormData = z.infer<typeof productCreateSchema>;
 export type ProductUpdateData = z.infer<typeof productUpdateSchema>;
 
 /**
- * Helper function to transform Zod errors into field-specific error messages
- * @param error - Zod error object
- * @returns Object with field names as keys and error messages as values
+ * @deprecated Use zodResolver with productCreateSchema or productUpdateSchema instead
+ * These functions are kept for backward compatibility but will be removed in future versions
  */
 export function getFieldErrors(error: z.ZodError): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
@@ -262,18 +260,14 @@ export function getFieldErrors(error: z.ZodError): Record<string, string> {
 }
 
 /**
- * Helper function to get all error messages as an array
- * @param error - Zod error object
- * @returns Array of error messages
+ * @deprecated Use zodResolver with productCreateSchema or productUpdateSchema instead
  */
 export function getAllErrorMessages(error: z.ZodError): string[] {
   return error.issues.map((issue) => issue.message);
 }
 
 /**
- * Validate product data and return typed result
- * @param data - Raw product data
- * @returns Validation result with success flag, data, or errors
+ * @deprecated Use zodResolver with productCreateSchema or productUpdateSchema instead
  */
 export function validateProduct(data: unknown): {
   success: boolean;
@@ -281,7 +275,7 @@ export function validateProduct(data: unknown): {
   errors?: Record<string, string>;
   fieldErrors?: Record<string, string>;
 } {
-  const result = productSchema.safeParse(data);
+  const result = productCreateSchema.safeParse(data);
 
   if (result.success) {
     return {
@@ -298,9 +292,7 @@ export function validateProduct(data: unknown): {
 }
 
 /**
- * Validate product update data
- * @param data - Raw product data with ID
- * @returns Validation result
+ * @deprecated Use zodResolver with productCreateSchema or productUpdateSchema instead
  */
 export function validateProductUpdate(data: unknown): {
   success: boolean;

@@ -9,15 +9,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -44,6 +51,10 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  useCashierForm,
+  useCashierEditForm,
+} from "./manage-cashier/hooks/use-cashier-form";
 
 interface StaffUser {
   id: string;
@@ -66,7 +77,7 @@ export default function CashierManagementView({
 }: {
   onBack: () => void;
 }) {
-  const { user, createUser } = useAuth();
+  const { user } = useAuth();
   const [cashiers, setCashiers] = useState<StaffUser[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole] = useState<string>("all");
@@ -74,33 +85,7 @@ export default function CashierManagementView({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<StaffUser | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-
-  // Form state for new user
-  const [newUser, setNewUser] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    firstName: "",
-    lastName: "",
-    role: "",
-    avatar: "",
-    address: "",
-  });
-
-  // Form validation errors
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  // Form state for editing user
-  const [editUser, setEditUser] = useState({
-    email: "",
-    firstName: "",
-    lastName: "",
-    avatar: "",
-    address: "",
-    isActive: true,
-  });
 
   // Load existing staff users
   useEffect(() => {
@@ -144,92 +129,6 @@ export default function CashierManagementView({
     }
   };
 
-  const handleAddUser = async () => {
-    setFormErrors({});
-    if (!user?.businessId) {
-      toast.error("Business ID not found");
-      return;
-    }
-
-    // Validation
-    const errors: Record<string, string> = {};
-    if (!newUser.firstName.trim()) {
-      errors.firstName = "First name is required";
-    }
-    if (!newUser.lastName.trim()) {
-      errors.lastName = "Last name is required";
-    }
-    if (!newUser.email.trim()) {
-      errors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUser.email)) {
-      errors.email = "Please enter a valid email address";
-    }
-    if (!newUser.password) {
-      errors.password = "Password is required";
-    } else if (newUser.password.length < 8) {
-      errors.password = "Password must be at least 8 characters";
-    }
-    if (!newUser.confirmPassword) {
-      errors.confirmPassword = "Please confirm your password";
-    } else if (newUser.password !== newUser.confirmPassword) {
-      errors.confirmPassword = "Passwords do not match";
-    }
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      toast.error("Please fix the errors in the form");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const userData = {
-        businessId: user.businessId,
-        email: newUser.email,
-        password: newUser.password,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        role: "cashier" as "cashier" | "manager",
-        avatar: newUser.avatar || undefined,
-        address: newUser.address || undefined,
-        // Required for PIN-based system
-        username: newUser.email, // Use email as username for now
-        pin: "1234", // Default PIN, should be set by admin or user later
-      };
-
-      const response = await createUser(userData);
-
-      if (response.success) {
-        toast.success("Cashier created successfully");
-
-        // Reload the staff users list to get the fresh data
-        await loadStaffUsers();
-
-        // Reset form and close dialog
-        setNewUser({
-          email: "",
-          password: "",
-          confirmPassword: "",
-          firstName: "",
-          lastName: "",
-          role: "cashier",
-          avatar: "",
-          address: "",
-        });
-        setIsAddDialogOpen(false);
-      } else {
-        toast.error(response.message || "Failed to create cashier");
-        if (response.errors && response.errors.length > 0) {
-          response.errors.forEach((error) => toast.error(error));
-        }
-      }
-    } catch (error) {
-      console.error("Error creating user:", error);
-      toast.error("Failed to create cashier");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleDeleteUser = async (userId: string, userName: string) => {
     if (
       !confirm(
@@ -257,58 +156,12 @@ export default function CashierManagementView({
 
   const handleEditUser = (staffUser: StaffUser) => {
     setSelectedUser(staffUser);
-    setEditUser({
-      email: staffUser.email,
-      firstName: staffUser.firstName,
-      lastName: staffUser.lastName,
-      avatar: staffUser.avatar || "",
-      address: "", // We'll need to get this from the backend if stored
-      isActive: staffUser.isActive,
-    });
     setIsEditDialogOpen(true);
   };
 
   const handleViewUser = (staffUser: StaffUser) => {
     setSelectedUser(staffUser);
     setIsViewDialogOpen(true);
-  };
-
-  const handleUpdateUser = async () => {
-    if (!selectedUser) return;
-
-    try {
-      const updates: Record<string, string | number | boolean> = {
-        firstName: editUser.firstName,
-        lastName: editUser.lastName,
-
-        isActive: editUser.isActive,
-      };
-
-      if (editUser.avatar) {
-        updates.avatar = editUser.avatar;
-      }
-      if (editUser.address) {
-        updates.address = editUser.address;
-      }
-
-      const response = await window.authAPI.updateUser(
-        selectedUser.id,
-        updates
-      );
-
-      if (response.success) {
-        toast.success("Cashier updated successfully");
-        setIsEditDialogOpen(false);
-        setSelectedUser(null);
-        // Reload the staff users list
-        await loadStaffUsers();
-      } else {
-        toast.error(response.message || "Failed to update cashier");
-      }
-    } catch (error) {
-      console.error("Error updating user:", error);
-      toast.error("Failed to update cashier");
-    }
   };
 
   // Filter users based on search and role
@@ -377,339 +230,26 @@ export default function CashierManagementView({
           <p className="text-gray-600 mt-1">Manage cashiers</p>
         </div>
 
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Cashier
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Add New Cashier</DialogTitle>
-              <DialogDescription>
-                Create a new staff account with role-based permissions.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              {/* Avatar Upload */}
-
-              <AvatarUpload
-                value={newUser.avatar}
-                onChange={(avatar) =>
-                  setNewUser((prev) => ({ ...prev, avatar: avatar || "" }))
-                }
-                type="user"
-                size="md"
-              />
-
-              {/* Name Fields */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name *</Label>
-                  <Input
-                    id="firstName"
-                    value={newUser.firstName}
-                    onChange={(e) => {
-                      setNewUser((prev) => ({
-                        ...prev,
-                        firstName: e.target.value,
-                      }));
-                      if (formErrors.firstName) {
-                        setFormErrors((prev) => {
-                          const newErrors = { ...prev };
-                          delete newErrors.firstName;
-                          return newErrors;
-                        });
-                      }
-                    }}
-                    placeholder="John"
-                    className={formErrors.firstName ? "border-red-500" : ""}
-                  />
-                  {formErrors.firstName && (
-                    <p className="text-xs text-red-500">
-                      {formErrors.firstName}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name *</Label>
-                  <Input
-                    id="lastName"
-                    value={newUser.lastName}
-                    onChange={(e) => {
-                      setNewUser((prev) => ({
-                        ...prev,
-                        lastName: e.target.value,
-                      }));
-                      if (formErrors.lastName) {
-                        setFormErrors((prev) => {
-                          const newErrors = { ...prev };
-                          delete newErrors.lastName;
-                          return newErrors;
-                        });
-                      }
-                    }}
-                    placeholder="Smith"
-                    className={formErrors.lastName ? "border-red-500" : ""}
-                  />
-                  {formErrors.lastName && (
-                    <p className="text-xs text-red-500">
-                      {formErrors.lastName}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newUser.email}
-                  onChange={(e) => {
-                    setNewUser((prev) => ({ ...prev, email: e.target.value }));
-                    if (formErrors.email) {
-                      setFormErrors((prev) => {
-                        const newErrors = { ...prev };
-                        delete newErrors.email;
-                        return newErrors;
-                      });
-                    }
-                  }}
-                  placeholder="john.smith@example.com"
-                  className={formErrors.email ? "border-red-500" : ""}
-                />
-                {formErrors.email && (
-                  <p className="text-xs text-red-500">{formErrors.email}</p>
-                )}
-              </div>
-
-              {/* Address */}
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  value={newUser.address}
-                  onChange={(e) =>
-                    setNewUser((prev) => ({ ...prev, address: e.target.value }))
-                  }
-                  placeholder="123 Main Street, City, State"
-                />
-              </div>
-
-              {/* Password Fields */}
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={newUser.password}
-                    onChange={(e) => {
-                      setNewUser((prev) => ({
-                        ...prev,
-                        password: e.target.value,
-                      }));
-                      if (formErrors.password) {
-                        setFormErrors((prev) => {
-                          const newErrors = { ...prev };
-                          delete newErrors.password;
-                          return newErrors;
-                        });
-                      }
-                    }}
-                    placeholder="Minimum 8 characters"
-                    className={formErrors.password ? "border-red-500" : ""}
-                  />
-                  {formErrors.password && (
-                    <p className="text-xs text-red-500">
-                      {formErrors.password}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={newUser.confirmPassword}
-                    onChange={(e) => {
-                      setNewUser((prev) => ({
-                        ...prev,
-                        confirmPassword: e.target.value,
-                      }));
-                      if (formErrors.confirmPassword) {
-                        setFormErrors((prev) => {
-                          const newErrors = { ...prev };
-                          delete newErrors.confirmPassword;
-                          return newErrors;
-                        });
-                      }
-                    }}
-                    placeholder="Confirm password"
-                    className={
-                      formErrors.confirmPassword ? "border-red-500" : ""
-                    }
-                  />
-                  {formErrors.confirmPassword && (
-                    <p className="text-xs text-red-500">
-                      {formErrors.confirmPassword}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex space-x-2 pt-4">
-                <Button
-                  onClick={handleAddUser}
-                  disabled={isLoading}
-                  className="flex-1"
-                >
-                  {isLoading ? "Creating..." : "Create Cashier"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsAddDialogOpen(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <CreateCashierDialog
+          isOpen={isAddDialogOpen}
+          onOpenChange={setIsAddDialogOpen}
+          businessId={user?.businessId || ""}
+          onSuccess={loadStaffUsers}
+        />
 
         {/* Edit User Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Edit Cashier</DialogTitle>
-              <DialogDescription>
-                Update cashier information and permissions.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3 py-3">
-              {/* Avatar Upload */}
-              <div className="flex">
-                <AvatarUpload
-                  value={editUser.avatar}
-                  onChange={(avatar) =>
-                    setEditUser((prev) => ({ ...prev, avatar: avatar || "" }))
-                  }
-                  type="user"
-                  className="w-15 h-15"
-                  size="md"
-                />
-              </div>
-
-              {/* Name Fields */}
-              <div className="grid mt-12 grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="editFirstName">First Name *</Label>
-                  <Input
-                    id="editFirstName"
-                    value={editUser.firstName}
-                    onChange={(e) =>
-                      setEditUser((prev) => ({
-                        ...prev,
-                        firstName: e.target.value,
-                      }))
-                    }
-                    placeholder="John"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="editLastName">Last Name *</Label>
-                  <Input
-                    id="editLastName"
-                    value={editUser.lastName}
-                    onChange={(e) =>
-                      setEditUser((prev) => ({
-                        ...prev,
-                        lastName: e.target.value,
-                      }))
-                    }
-                    placeholder="Smith"
-                  />
-                </div>
-              </div>
-
-              {/* Email (Read-only) */}
-              <div className="space-y-2">
-                <Label htmlFor="editEmail">Email</Label>
-                <Input
-                  id="editEmail"
-                  type="email"
-                  value={editUser.email}
-                  disabled
-                  className="bg-gray-50"
-                />
-                <p className="text-xs text-gray-500">Email cannot be changed</p>
-              </div>
-
-              {/* Address */}
-              <div className="space-y-2">
-                <Label htmlFor="editAddress">Address</Label>
-                <Input
-                  id="editAddress"
-                  value={editUser.address}
-                  onChange={(e) =>
-                    setEditUser((prev) => ({
-                      ...prev,
-                      address: e.target.value,
-                    }))
-                  }
-                  placeholder="123 Main Street, City, State"
-                />
-              </div>
-
-              {/* Status */}
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="editIsActive"
-                    checked={editUser.isActive}
-                    onChange={(e) =>
-                      setEditUser((prev) => ({
-                        ...prev,
-                        isActive: e.target.checked,
-                      }))
-                    }
-                    className="rounded"
-                  />
-                  <Label htmlFor="editIsActive" className="text-sm">
-                    Active (user can log in)
-                  </Label>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex space-x-2 pt-4">
-                <Button
-                  onClick={handleUpdateUser}
-                  disabled={isLoading}
-                  className="flex-1"
-                >
-                  {isLoading ? "Updating..." : "Update Cashier"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsEditDialogOpen(false)}
-                  className="flex-1"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {selectedUser && (
+          <EditCashierDialog
+            isOpen={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            cashier={selectedUser}
+            businessId={user?.businessId || ""}
+            onSuccess={() => {
+              setSelectedUser(null);
+              loadStaffUsers();
+            }}
+          />
+        )}
 
         {/* View User Dialog */}
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
@@ -982,5 +522,435 @@ export default function CashierManagementView({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Create Cashier Dialog Component
+interface CreateCashierDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  businessId: string;
+  onSuccess: () => void;
+}
+
+function CreateCashierDialog({
+  isOpen,
+  onOpenChange,
+  businessId,
+  onSuccess,
+}: CreateCashierDialogProps) {
+  const { createUser } = useAuth();
+
+  const { form, handleSubmit, isSubmitting } = useCashierForm({
+    businessId,
+    onSubmit: async (data) => {
+      if (!businessId) {
+        throw new Error("Business ID not found");
+      }
+
+      // Type guard: create form has password field
+      if (!("password" in data)) {
+        throw new Error("Invalid form data");
+      }
+
+      const userData = {
+        businessId,
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: "cashier" as "cashier" | "manager",
+        avatar: data.avatar || undefined,
+        address: data.address || undefined,
+        // Required for PIN-based system
+        username: data.email, // Use email as username for now
+        pin: "1234", // Default PIN, should be set by admin or user later
+      };
+
+      const response = await createUser(userData);
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to create cashier");
+      }
+    },
+    onSuccess: () => {
+      onOpenChange(false);
+      onSuccess();
+    },
+  });
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md md:max-w-lg lg:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Add New Cashier</DialogTitle>
+          <DialogDescription>
+            Create a new staff account with role-based permissions.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={handleSubmit} className="space-y-4 py-4">
+            {/* Avatar Upload */}
+            <FormField
+              control={form.control}
+              name="avatar"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <AvatarUpload
+                      value={field.value || ""}
+                      onChange={(avatar) => field.onChange(avatar || "")}
+                      type="user"
+                      size="md"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Name Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="John"
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Smith"
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Email */}
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email *</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="email"
+                      placeholder="john.smith@example.com"
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Address */}
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="123 Main Street, City, State"
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Password Fields */}
+            <div className="space-y-3">
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="password"
+                        placeholder="Minimum 8 characters"
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="password"
+                        placeholder="Confirm password"
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-4">
+              <Button type="submit" disabled={isSubmitting} className="flex-1">
+                {isSubmitting ? "Creating..." : "Create Cashier"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Cashier Dialog Component
+interface EditCashierDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  cashier: StaffUser;
+  businessId: string;
+  onSuccess: () => void;
+}
+
+function EditCashierDialog({
+  isOpen,
+  onOpenChange,
+  cashier,
+  businessId,
+  onSuccess,
+}: EditCashierDialogProps) {
+  const { form, handleSubmit, isSubmitting } = useCashierEditForm({
+    cashier,
+    businessId,
+    onSubmit: async (data) => {
+      // Type guard: update form has isActive field
+      if (!("isActive" in data)) {
+        throw new Error("Invalid form data");
+      }
+
+      const updates: Record<string, string | number | boolean> = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        isActive: data.isActive,
+      };
+
+      if (data.avatar) {
+        updates.avatar = data.avatar;
+      }
+      if (data.address) {
+        updates.address = data.address;
+      }
+
+      const response = await window.authAPI.updateUser(cashier.id, updates);
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to update cashier");
+      }
+    },
+    onSuccess: () => {
+      onOpenChange(false);
+      onSuccess();
+    },
+  });
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Cashier</DialogTitle>
+          <DialogDescription>
+            Update cashier information and permissions.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={handleSubmit} className="space-y-3 py-3">
+            {/* Avatar Upload */}
+            <FormField
+              control={form.control}
+              name="avatar"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <div className="flex">
+                      <AvatarUpload
+                        value={field.value || ""}
+                        onChange={(avatar) => field.onChange(avatar || "")}
+                        type="user"
+                        className="w-15 h-15"
+                        size="md"
+                      />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Name Fields */}
+            <div className="grid mt-12 grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="John"
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Smith"
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Email (Read-only) */}
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="email"
+                      disabled
+                      className="bg-gray-50"
+                    />
+                  </FormControl>
+                  <p className="text-xs text-gray-500">
+                    Email cannot be changed
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Address */}
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="123 Main Street, City, State"
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Status */}
+            <FormField
+              control={form.control}
+              name="isActive"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Active (user can log in)</FormLabel>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Actions */}
+            <div className="flex space-x-2 pt-4">
+              <Button type="submit" disabled={isSubmitting} className="flex-1">
+                {isSubmitting ? "Updating..." : "Update Cashier"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }

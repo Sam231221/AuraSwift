@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -35,6 +34,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -66,6 +73,7 @@ import {
   startOfDay,
 } from "date-fns";
 import { TimePicker } from "../../../../../components/time-picker";
+import { useScheduleForm } from "./staff-schedules/hooks/use-schedule-form";
 
 // Using database interfaces
 interface Cashier {
@@ -110,7 +118,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   // Loading states
   const [isLoadingCashiers, setIsLoadingCashiers] = useState(true);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -196,22 +203,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
-  const [formData, setFormData] = useState({
-    staffId: "",
-    startTime: "",
-    endTime: "",
-    assignedRegister: "",
-    notes: "",
-  });
-
-  // Validation errors state for inline feedback
-  const [validationErrors, setValidationErrors] = useState<{
-    staffId?: string;
-    selectedDate?: string;
-    startTime?: string;
-    endTime?: string;
-    assignedRegister?: string;
-  }>({});
 
   // Calendar view functions - memoized for performance
   const weekStart = useMemo(
@@ -242,34 +233,14 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   }, []);
 
   const resetForm = useCallback(() => {
-    setFormData({
-      staffId: "",
-      startTime: "",
-      endTime: "",
-      assignedRegister: "",
-      notes: "",
-    });
     setSelectedDate(new Date());
     setEditingSchedule(null);
-    setValidationErrors({});
   }, []);
 
   const openDrawer = useCallback(
     (schedule?: Schedule, date?: Date) => {
       if (schedule) {
         setEditingSchedule(schedule);
-        const startDate = new Date(schedule.startTime);
-        const endDate = new Date(schedule.endTime);
-
-        const formDataToSet = {
-          staffId: schedule.staffId,
-          startTime: format(startDate, "HH:mm"),
-          endTime: format(endDate, "HH:mm"),
-          assignedRegister: schedule.assignedRegister || "",
-          notes: schedule.notes || "",
-        };
-
-        setFormData(formDataToSet);
         setSelectedDate(new Date(schedule.startTime.split("T")[0]));
       } else {
         resetForm();
@@ -278,7 +249,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         }
       }
       setIsDrawerOpen(true);
-      setValidationErrors({});
     },
     [resetForm]
   );
@@ -294,112 +264,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     MAX_DURATION_MINUTES: 16 * 60, // 16 hours maximum (configurable between 12-16)
     ALLOW_BACKDATED_SHIFTS: false, // Only managers should be able to create past shifts
   };
-
-  // Helper function to validate shift data and return array of errors
-  // Also updates inline validation errors state
-  const validateShiftData = useCallback(() => {
-    const errors: string[] = [];
-    const inlineErrors: typeof validationErrors = {};
-
-    // Basic field validation
-    if (!formData.staffId) {
-      errors.push("Please select a staff member.");
-      inlineErrors.staffId = "Staff member is required";
-    }
-    if (!selectedDate) {
-      errors.push("Please select a date.");
-      inlineErrors.selectedDate = "Date is required";
-    }
-    if (!formData.startTime) {
-      errors.push("Please select a start time.");
-      inlineErrors.startTime = "Start time is required";
-    }
-    if (!formData.endTime) {
-      errors.push("Please select an end time.");
-      inlineErrors.endTime = "End time is required";
-    }
-
-    if (errors.length > 0) {
-      setValidationErrors(inlineErrors);
-      return errors; // Return early if basic fields are missing
-    }
-
-    // Case 7: Validate backdated shifts
-    // Use startOfDay from date-fns for consistent timezone handling
-    if (!SHIFT_CONFIG.ALLOW_BACKDATED_SHIFTS && selectedDate) {
-      const today = startOfDay(new Date());
-      const shiftDate = startOfDay(selectedDate);
-
-      if (shiftDate < today) {
-        const errorMsg =
-          "Cannot schedule shifts in the past. Please select today or a future date.";
-        errors.push(errorMsg);
-        inlineErrors.selectedDate = errorMsg;
-      }
-    }
-
-    // Calculate shift duration with validation
-    const shiftDurationMinutes = calculateShiftDuration(
-      formData.startTime,
-      formData.endTime
-    );
-
-    if (shiftDurationMinutes === -1) {
-      const errorMsg =
-        "Invalid time format. Please ensure times are in HH:MM format.";
-      errors.push(errorMsg);
-      inlineErrors.startTime = errorMsg;
-      inlineErrors.endTime = errorMsg;
-    } else if (shiftDurationMinutes === 0) {
-      const errorMsg =
-        "End time must be later than start time. A shift cannot have zero duration.";
-      errors.push(errorMsg);
-      inlineErrors.endTime = errorMsg;
-    } else {
-      // Duration-based validations
-      if (shiftDurationMinutes < SHIFT_CONFIG.MIN_DURATION_MINUTES) {
-        const minHours = Math.floor(SHIFT_CONFIG.MIN_DURATION_MINUTES / 60);
-        const minMinutes = SHIFT_CONFIG.MIN_DURATION_MINUTES % 60;
-        const minDurationText =
-          minMinutes > 0
-            ? `${minHours} hours and ${minMinutes} minutes`
-            : `${minHours} hour${minHours > 1 ? "s" : ""}`;
-        const errorMsg = `Shift duration must be at least ${minDurationText}.`;
-        errors.push(errorMsg);
-        inlineErrors.endTime = errorMsg;
-      }
-
-      if (shiftDurationMinutes > SHIFT_CONFIG.MAX_DURATION_MINUTES) {
-        const maxHours = SHIFT_CONFIG.MAX_DURATION_MINUTES / 60;
-        const errorMsg = `Shift cannot be longer than ${maxHours} hours.`;
-        errors.push(errorMsg);
-        inlineErrors.endTime = errorMsg;
-      }
-
-      // Check for overlapping shifts
-      const hasOverlap = selectedDate ? checkShiftOverlap(
-        formData.startTime,
-        formData.endTime,
-        selectedDate,
-        formData.staffId,
-        editingSchedule?.id
-      ) : false;
-
-      if (hasOverlap) {
-        const staffMember = cashiers.find((c) => c.id === formData.staffId);
-        const staffName = staffMember
-          ? `${staffMember.firstName} ${staffMember.lastName}`
-          : "This staff member";
-        const errorMsg = `${staffName} already has an overlapping shift scheduled.`;
-        errors.push(errorMsg);
-        inlineErrors.startTime = errorMsg;
-        inlineErrors.endTime = errorMsg;
-      }
-    }
-
-    setValidationErrors(inlineErrors);
-    return errors;
-  }, [formData, selectedDate, editingSchedule, schedules, cashiers]);
 
   // Helper function to calculate shift duration handling overnight shifts
   const calculateShiftDuration = (startTime: string, endTime: string) => {
@@ -517,160 +381,497 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     });
   };
 
-  // Validate on field change for inline feedback
-  const validateField = useCallback(
-    (field: keyof typeof formData) => {
-      // Clear error for this field when user starts typing
-      setValidationErrors((prev) => {
-        const newErrors = { ...prev };
-        if (field === "staffId") {
-          delete newErrors.staffId;
-        } else if (field === "startTime") {
-          delete newErrors.startTime;
-        } else if (field === "endTime") {
-          delete newErrors.endTime;
-        }
-        return newErrors;
-      });
-    },
-    []
-  );
-
-  const handleSubmit = useCallback(async () => {
-    // Run comprehensive validation
-    const validationErrors = validateShiftData();
-
-    if (validationErrors.length > 0) {
-      // Show all validation errors in a single toast
-      toast.error("Validation Error", {
-        description: validationErrors
-          .map((error, index) => `${index + 1}. ${error}`)
-          .join("\n"),
-        duration: 5000,
-      });
-      return;
-    }
-
-    // Create proper Date objects in local timezone, then convert to ISO strings for UTC storage
-    // This ensures proper timezone handling as recommended in shiftallCases.md (Case 9)
-    if (!selectedDate) {
-      toast.error("Date Required", {
-        description: "Please select a date for the shift.",
-      });
-      return;
-    }
-
-    const [startHour, startMinute] = formData.startTime.split(":").map(Number);
-    const startDateTime = new Date(selectedDate);
-    startDateTime.setHours(startHour, startMinute, 0, 0);
-
-    const [endHour, endMinute] = formData.endTime.split(":").map(Number);
-    const endDateTime = new Date(selectedDate);
-    endDateTime.setHours(endHour, endMinute, 0, 0);
-
-    // Case 3: Handle overnight shifts (crossing midnight)
-    if (isOvernightShift(formData.startTime, formData.endTime)) {
-      endDateTime.setDate(endDateTime.getDate() + 1);
-    }
-
-    // Convert to ISO strings for UTC storage in database
-    const startDateTimeISO = startDateTime.toISOString();
-    const endDateTimeISO = endDateTime.toISOString();
-
-    setIsSubmitting(true);
-    const toastId = toast.loading(
-      editingSchedule ? "Updating schedule..." : "Creating schedule..."
-    );
-
-    try {
-      if (editingSchedule) {
-        // Update existing schedule
-        if (!editingSchedule.id) {
-          toast.error("Error", {
-            description: "Schedule ID is missing. Please try again.",
-            id: toastId,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-
-        const response = await window.scheduleAPI.update(editingSchedule.id, {
-          staffId: formData.staffId,
-          startTime: startDateTimeISO,
-          endTime: endDateTimeISO,
-          assignedRegister: formData.assignedRegister,
-          notes: formData.notes,
-        });
-
-        if (response.success) {
-          // Update local state with the response data directly
-          // Trust the API response instead of making an unnecessary refresh call
-          const updatedSchedule: Schedule = response.data
-            ? (response.data as Schedule)
-            : {
-                ...editingSchedule,
-                staffId: formData.staffId,
-                startTime: startDateTimeISO,
-                endTime: endDateTimeISO,
-                assignedRegister: formData.assignedRegister,
-                notes: formData.notes,
-                updatedAt: new Date().toISOString(),
-              };
-
-          setSchedules(
-            schedules.map((schedule) =>
-              schedule.id === editingSchedule.id ? updatedSchedule : schedule
-            )
-          );
-
-          toast.success("Schedule updated successfully", { id: toastId });
-          closeDrawer();
-        } else {
-          toast.error("Failed to update schedule", {
-            description: response.message || "Please try again",
-            id: toastId,
-          });
-        }
-      } else {
-        // Create new schedule
-        const response = await window.scheduleAPI.create({
-          staffId: formData.staffId,
-          businessId: businessId,
-          startTime: startDateTimeISO,
-          endTime: endDateTimeISO,
-          assignedRegister: formData.assignedRegister,
-          notes: formData.notes,
-        });
-
-        if (response.success && response.data) {
-          // Add to local state
-          setSchedules([...schedules, response.data as Schedule]);
-          toast.success("Schedule created successfully", { id: toastId });
-          closeDrawer();
-        } else {
-          toast.error("Failed to create schedule", {
-            description: response.message || "Please try again",
-            id: toastId,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error saving schedule:", error);
-      toast.error("An error occurred", {
-        description: "Failed to save the schedule. Please try again.",
-        id: toastId,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    validateShiftData,
-    formData,
-    selectedDate,
+  // Schedule form component - using React Hook Form
+  const ScheduleFormContent: React.FC<{
+    editingSchedule: Schedule | null;
+    selectedDate: Date;
+    setSelectedDate: (date: Date | undefined) => void;
+    isDatePickerOpen: boolean;
+    setIsDatePickerOpen: (open: boolean) => void;
+    cashiers: Cashier[];
+    isLoadingCashiers: boolean;
+    businessId: string;
+    checkShiftOverlap: (
+      newStartTime: string,
+      newEndTime: string,
+      selectedDate: Date,
+      staffId: string,
+      excludeScheduleId?: string
+    ) => boolean;
+    onClose: () => void;
+    onSuccess: (schedule: Schedule) => void;
+  }> = ({
     editingSchedule,
+    selectedDate,
+    setSelectedDate,
+    isDatePickerOpen,
+    setIsDatePickerOpen,
+    cashiers,
+    isLoadingCashiers,
     businessId,
-    schedules,
-  ]);
+    checkShiftOverlap,
+    onClose,
+    onSuccess,
+  }) => {
+    const { form, handleSubmit, isSubmitting, isEditMode } = useScheduleForm({
+      schedule: editingSchedule
+        ? {
+            id: editingSchedule.id,
+            staffId: editingSchedule.staffId,
+            startTime: editingSchedule.startTime,
+            endTime: editingSchedule.endTime,
+            assignedRegister: editingSchedule.assignedRegister,
+            notes: editingSchedule.notes,
+            businessId: editingSchedule.businessId,
+          }
+        : null,
+      selectedDate,
+      businessId,
+      onSubmit: async (data) => {
+        // Check for overlapping shifts (business logic)
+        if (
+          checkShiftOverlap(
+            data.startTime,
+            data.endTime,
+            new Date(data.date),
+            data.staffId,
+            editingSchedule?.id
+          )
+        ) {
+          const staffMember = cashiers.find((c) => c.id === data.staffId);
+          const staffName = staffMember
+            ? `${staffMember.firstName} ${staffMember.lastName}`
+            : "This staff member";
+          throw new Error(
+            `${staffName} already has an overlapping shift scheduled.`
+          );
+        }
+
+        // Create proper Date objects in local timezone, then convert to ISO strings for UTC storage
+        const [startHour, startMinute] = data.startTime.split(":").map(Number);
+        const startDateTime = new Date(data.date);
+        startDateTime.setHours(startHour, startMinute, 0, 0);
+
+        const [endHour, endMinute] = data.endTime.split(":").map(Number);
+        const endDateTime = new Date(data.date);
+        endDateTime.setHours(endHour, endMinute, 0, 0);
+
+        // Handle overnight shifts (crossing midnight)
+        if (isOvernightShift(data.startTime, data.endTime)) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+
+        // Convert to ISO strings for UTC storage in database
+        const startDateTimeISO = startDateTime.toISOString();
+        const endDateTimeISO = endDateTime.toISOString();
+
+        if (isEditMode && editingSchedule) {
+          const response = await window.scheduleAPI.update(editingSchedule.id, {
+            staffId: data.staffId,
+            startTime: startDateTimeISO,
+            endTime: endDateTimeISO,
+            assignedRegister: data.assignedRegister || undefined,
+            notes: data.notes || undefined,
+          });
+
+          if (response.success && response.data) {
+            onSuccess(response.data as Schedule);
+          } else {
+            throw new Error(response.message || "Failed to update schedule");
+          }
+        } else {
+          const response = await window.scheduleAPI.create({
+            staffId: data.staffId,
+            businessId: businessId,
+            startTime: startDateTimeISO,
+            endTime: endDateTimeISO,
+            assignedRegister: data.assignedRegister || undefined,
+            notes: data.notes || undefined,
+          });
+
+          if (response.success && response.data) {
+            onSuccess(response.data as Schedule);
+          } else {
+            throw new Error(response.message || "Failed to create schedule");
+          }
+        }
+      },
+      onSuccess: onClose,
+    });
+
+    // Update form date when selectedDate changes
+    useEffect(() => {
+      if (selectedDate) {
+        form.setValue("date", format(selectedDate, "yyyy-MM-dd"));
+      }
+    }, [selectedDate, form]);
+
+    const startTime = form.watch("startTime");
+    const endTime = form.watch("endTime");
+
+    return (
+      <>
+        <DrawerHeader className="shrink-0">
+          <DrawerTitle className="text-2xl">
+            {isEditMode ? "Edit Staff Schedule" : "Create New Schedule"}
+          </DrawerTitle>
+          <DrawerDescription>
+            {isEditMode
+              ? "Update the schedule details below."
+              : "Schedule a new staff shift for the POS system."}
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <Form {...form}>
+          <form onSubmit={handleSubmit} className="flex flex-col h-full">
+            <div className="px-4 pb-4 space-y-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="staffId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Staff Member</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || ""}
+                        disabled={isSubmitting || isLoadingCashiers}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                isLoadingCashiers
+                                  ? "Loading staff..."
+                                  : "Select staff member"
+                              }
+                            />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {isLoadingCashiers ? (
+                            <SelectItem value="loading" disabled>
+                              Loading staff members...
+                            </SelectItem>
+                          ) : cashiers.length === 0 ? (
+                            <SelectItem value="no-staff" disabled>
+                              No staff members found. Create staff users first.
+                            </SelectItem>
+                          ) : (
+                            cashiers.map((cashier) => (
+                              <SelectItem key={cashier.id} value={cashier.id}>
+                                <div className="flex items-center gap-2">
+                                  <User className="w-4 h-4" />
+                                  <div>
+                                    <div className="font-medium">
+                                      {cashier.firstName} {cashier.lastName}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {cashier.email} • {cashier.role}
+                                    </div>
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Schedule Date</FormLabel>
+                      <Popover
+                        open={isDatePickerOpen}
+                        onOpenChange={setIsDatePickerOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              type="button"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {field.value
+                                ? format(new Date(field.value), "PPP")
+                                : "Pick a date"}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={(date) => {
+                              if (date) {
+                                setSelectedDate(date);
+                                field.onChange(format(date, "yyyy-MM-dd"));
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="assignedRegister"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assigned Register</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="e.g. Register 1, Main POS"
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <TimePicker
+                          id="startTime"
+                          label="Start Time"
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <TimePicker
+                          id="endTime"
+                          label="End Time"
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {startTime && endTime && (
+                  <div className="md:col-span-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-emerald-600" />
+                      <span className="font-medium text-emerald-800">
+                        Shift Duration:
+                      </span>
+                      <span className="text-emerald-700">
+                        {(() => {
+                          const formatTime = (time: string) => {
+                            const [hour, minute] = time.split(":").map(Number);
+                            const period = hour >= 12 ? "PM" : "AM";
+                            const displayHour =
+                              hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+                            return `${displayHour}:${minute
+                              .toString()
+                              .padStart(2, "0")} ${period}`;
+                          };
+
+                          const durationMinutes = calculateShiftDuration(
+                            startTime,
+                            endTime
+                          );
+
+                          if (durationMinutes === -1) {
+                            return "Invalid time format";
+                          }
+
+                          if (durationMinutes === 0) {
+                            return "Start and end time cannot be the same";
+                          }
+
+                          const hours = Math.floor(durationMinutes / 60);
+                          const minutes = durationMinutes % 60;
+
+                          const isOvernight = isOvernightShift(
+                            startTime,
+                            endTime
+                          );
+
+                          let warningText = "";
+                          if (
+                            durationMinutes < SHIFT_CONFIG.MIN_DURATION_MINUTES
+                          ) {
+                            warningText = " ⚠️ Too short";
+                          } else if (
+                            durationMinutes > SHIFT_CONFIG.MAX_DURATION_MINUTES
+                          ) {
+                            warningText = " ⚠️ Too long";
+                          }
+
+                          return `${formatTime(startTime)} - ${formatTime(
+                            endTime
+                          )}${
+                            isOvernight ? " (+1 day)" : ""
+                          } (${hours}h ${minutes}m)${warningText}`;
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2 md:col-span-2">
+                  <FormLabel>Quick Time Presets</FormLabel>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        form.setValue("startTime", "09:00");
+                        form.setValue("endTime", "17:00");
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      9 AM - 5 PM
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        form.setValue("startTime", "08:00");
+                        form.setValue("endTime", "16:00");
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      8 AM - 4 PM
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        form.setValue("startTime", "10:00");
+                        form.setValue("endTime", "18:00");
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      10 AM - 6 PM
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        form.setValue("startTime", "14:00");
+                        form.setValue("endTime", "22:00");
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      2 PM - 10 PM
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        form.setValue("startTime", "22:00");
+                        form.setValue("endTime", "06:00");
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      10 PM - 6 AM (Night)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        form.setValue("startTime", "23:00");
+                        form.setValue("endTime", "07:00");
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      11 PM - 7 AM (Night)
+                    </Button>
+                  </div>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Notes (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Add any special instructions or notes for this schedule..."
+                          rows={3}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <DrawerFooter className="px-0 shrink-0 border-t bg-white">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+              >
+                {isSubmitting
+                  ? "Saving..."
+                  : isEditMode
+                  ? "Update Schedule"
+                  : "Create Schedule"}
+              </Button>
+              <DrawerClose asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </form>
+        </Form>
+      </>
+    );
+  };
 
   const handleDeleteClick = useCallback((schedule: Schedule) => {
     setScheduleToDelete(schedule);
@@ -820,381 +1021,29 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             </DrawerTrigger>
 
             <DrawerContent className="max-h-[90vh] flex flex-col">
-              <DrawerHeader className="shrink-0">
-                <DrawerTitle className="text-2xl">
-                  {editingSchedule
-                    ? "Edit Staff Schedule"
-                    : "Create New Schedule"}
-                </DrawerTitle>
-                <DrawerDescription>
-                  {editingSchedule
-                    ? "Update the schedule details below."
-                    : "Schedule a new staff shift for the POS system."}
-                </DrawerDescription>
-              </DrawerHeader>
-
-              <div className="px-4 pb-4 space-y-6 overflow-y-auto flex-1">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="cashier"
-                      className={validationErrors.staffId ? "text-red-600" : ""}
-                    >
-                      Staff Member
-                    </Label>
-                    <Select
-                      value={formData.staffId}
-                      onValueChange={(value) => {
-                        validateField("staffId");
-                        setFormData({ ...formData, staffId: value });
-                      }}
-                      aria-label="Select staff member"
-                      aria-invalid={validationErrors.staffId ? "true" : "false"}
-                      aria-describedby={
-                        validationErrors.staffId ? "cashier-error" : undefined
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            isLoadingCashiers
-                              ? "Loading staff..."
-                              : "Select staff member"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {isLoadingCashiers ? (
-                          <SelectItem value="loading" disabled>
-                            Loading staff members...
-                          </SelectItem>
-                        ) : cashiers.length === 0 ? (
-                          <SelectItem value="no-staff" disabled>
-                            No staff members found. Create staff users first.
-                          </SelectItem>
-                        ) : (
-                          cashiers.map((cashier) => (
-                            <SelectItem key={cashier.id} value={cashier.id}>
-                              <div className="flex items-center gap-2">
-                                <User className="w-4 h-4" />
-                                <div>
-                                  <div className="font-medium">
-                                    {cashier.firstName} {cashier.lastName}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {cashier.email} • {cashier.role}
-                                  </div>
-                                </div>
-                              </div>
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {validationErrors.staffId && (
-                      <p
-                        id="cashier-error"
-                        className="text-sm text-red-600"
-                        role="alert"
-                        aria-live="polite"
-                      >
-                        {validationErrors.staffId}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label
-                      className={
-                        validationErrors.selectedDate ? "text-red-600" : ""
-                      }
-                    >
-                      Schedule Date
-                    </Label>
-                    <Popover
-                      open={isDatePickerOpen}
-                      onOpenChange={setIsDatePickerOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !selectedDate && "text-muted-foreground",
-                            validationErrors.selectedDate && "border-red-500"
-                          )}
-                          aria-label="Select schedule date"
-                          aria-invalid={
-                            validationErrors.selectedDate ? "true" : "false"
-                          }
-                          aria-describedby={
-                            validationErrors.selectedDate
-                              ? "date-error"
-                              : undefined
-                          }
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDate
-                            ? format(selectedDate, "PPP")
-                            : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={setSelectedDate}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    {validationErrors.selectedDate && (
-                      <p
-                        id="date-error"
-                        className="text-sm text-red-600"
-                        role="alert"
-                        aria-live="polite"
-                      >
-                        {validationErrors.selectedDate}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="assignedRegister">Assigned Register</Label>
-                    <Input
-                      id="assignedRegister"
-                      type="text"
-                      value={formData.assignedRegister}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          assignedRegister: e.target.value,
-                        })
-                      }
-                      placeholder="e.g. Register 1, Main POS"
-                    />
-                  </div>
-
-                  <TimePicker
-                    id="startTime"
-                    label="Start Time"
-                    value={formData.startTime}
-                    onChange={(value) => {
-                      validateField("startTime");
-                      setFormData({ ...formData, startTime: value });
-                    }}
-                    error={validationErrors.startTime}
-                    aria-label="Start time"
-                  />
-
-                  <TimePicker
-                    id="endTime"
-                    label="End Time"
-                    value={formData.endTime}
-                    onChange={(value) => {
-                      validateField("endTime");
-                      setFormData({ ...formData, endTime: value });
-                    }}
-                    error={validationErrors.endTime}
-                    aria-label="End time"
-                  />
-
-                  {formData.startTime && formData.endTime && (
-                    <div className="md:col-span-2 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-emerald-600" />
-                        <span className="font-medium text-emerald-800">
-                          Shift Duration:
-                        </span>
-                        <span className="text-emerald-700">
-                          {(() => {
-                            const formatTime = (time: string) => {
-                              const [hour, minute] = time
-                                .split(":")
-                                .map(Number);
-                              const period = hour >= 12 ? "PM" : "AM";
-                              const displayHour =
-                                hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-                              return `${displayHour}:${minute
-                                .toString()
-                                .padStart(2, "0")} ${period}`;
-                            };
-
-                            const durationMinutes = calculateShiftDuration(
-                              formData.startTime,
-                              formData.endTime
-                            );
-
-                            // Handle invalid durations
-                            if (durationMinutes === -1) {
-                              return "Invalid time format";
-                            }
-
-                            if (durationMinutes === 0) {
-                              return "Start and end time cannot be the same";
-                            }
-
-                            const hours = Math.floor(durationMinutes / 60);
-                            const minutes = durationMinutes % 60;
-
-                            const isOvernight = isOvernightShift(
-                              formData.startTime,
-                              formData.endTime
-                            );
-
-                            // Show validation warnings in the duration display
-                            let warningText = "";
-                            if (
-                              durationMinutes <
-                              SHIFT_CONFIG.MIN_DURATION_MINUTES
-                            ) {
-                              warningText = " ⚠️ Too short";
-                            } else if (
-                              durationMinutes >
-                              SHIFT_CONFIG.MAX_DURATION_MINUTES
-                            ) {
-                              warningText = " ⚠️ Too long";
-                            }
-
-                            return `${formatTime(
-                              formData.startTime
-                            )} - ${formatTime(formData.endTime)}${
-                              isOvernight ? " (+1 day)" : ""
-                            } (${hours}h ${minutes}m)${warningText}`;
-                          })()}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Quick Time Presets</Label>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            startTime: "09:00",
-                            endTime: "17:00",
-                          })
-                        }
-                      >
-                        9 AM - 5 PM
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            startTime: "08:00",
-                            endTime: "16:00",
-                          })
-                        }
-                      >
-                        8 AM - 4 PM
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            startTime: "10:00",
-                            endTime: "18:00",
-                          })
-                        }
-                      >
-                        10 AM - 6 PM
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            startTime: "14:00",
-                            endTime: "22:00",
-                          })
-                        }
-                      >
-                        2 PM - 10 PM
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            startTime: "22:00",
-                            endTime: "06:00",
-                          })
-                        }
-                      >
-                        10 PM - 6 AM (Night)
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            startTime: "23:00",
-                            endTime: "07:00",
-                          })
-                        }
-                      >
-                        11 PM - 7 AM (Night)
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="notes">Notes (Optional)</Label>
-                    <Textarea
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) =>
-                        setFormData({ ...formData, notes: e.target.value })
-                      }
-                      placeholder="Add any special instructions or notes for this schedule..."
-                      rows={3}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <DrawerFooter className="px-0 shrink-0 border-t bg-white">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                >
-                  {isSubmitting
-                    ? "Saving..."
-                    : editingSchedule
-                    ? "Update Schedule"
-                    : "Create Schedule"}
-                </Button>
-                <DrawerClose asChild>
-                  <Button
-                    variant="outline"
-                    onClick={closeDrawer}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                </DrawerClose>
-              </DrawerFooter>
+              <ScheduleFormContent
+                editingSchedule={editingSchedule}
+                selectedDate={selectedDate || new Date()}
+                setSelectedDate={setSelectedDate}
+                isDatePickerOpen={isDatePickerOpen}
+                setIsDatePickerOpen={setIsDatePickerOpen}
+                cashiers={cashiers}
+                isLoadingCashiers={isLoadingCashiers}
+                businessId={businessId}
+                checkShiftOverlap={checkShiftOverlap}
+                onClose={closeDrawer}
+                onSuccess={(schedule) => {
+                  if (editingSchedule) {
+                    setSchedules(
+                      schedules.map((s) =>
+                        s.id === editingSchedule.id ? schedule : s
+                      )
+                    );
+                  } else {
+                    setSchedules([...schedules, schedule]);
+                  }
+                }}
+              />
             </DrawerContent>
           </Drawer>
         </div>

@@ -1,28 +1,17 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Plus, ChevronLeft, Tag, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerClose,
-} from "@/components/ui/drawer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
-import { validateCategory } from "./schemas/category-schema";
 import type {
   Category,
   VatCategory,
 } from "../../../../../../../../../types/db";
 
-import { buildCategoryTree, focusFirstErrorField } from "./utils";
+import { buildCategoryTree } from "./utils";
 import { CategoryRow } from "./utils/category-row";
+import { CategoryFormDrawer } from "./components/category-form-drawer";
 
 interface ManageCategoriesViewProps {
   onBack: () => void;
@@ -38,21 +27,9 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set()
   );
-
-  const [newCategory, setNewCategory] = useState({
-    name: "",
-    description: "",
-    parentId: "",
-    vatCategoryId: "",
-    vatOverridePercent: "",
-    color: "",
-    image: "",
-    isActive: true,
-  });
 
   const [vatCategories, setVatCategories] = useState<VatCategory[]>([]);
 
@@ -152,171 +129,146 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     }
   }, [user, loadCategories]);
 
-  const resetForm = useCallback(() => {
-    setNewCategory({
-      name: "",
-      description: "",
-      parentId: "",
-      vatCategoryId: "",
-      vatOverridePercent: "",
-      color: "",
-      image: "",
-      isActive: true,
-    });
-    setEditingCategory(null);
-    setFormErrors({});
+  // Normalize category from API response
+  const normalizeCategory = useCallback((cat: unknown): Category => {
+    const c = cat as Partial<Category> & { [key: string]: unknown };
+    return {
+      ...c,
+      parentId: c.parentId ?? null,
+      vatCategoryId: c.vatCategoryId ?? null,
+      color: c.color ?? null,
+      image: c.image ?? null,
+      isActive: typeof c.isActive === "boolean" ? c.isActive : true,
+      sortOrder: c.sortOrder ?? 0,
+      createdAt: c.createdAt
+        ? new Date(c.createdAt as string | Date)
+        : new Date(),
+      updatedAt: c.updatedAt ? new Date(c.updatedAt as string | Date) : null,
+      description: c.description ?? "",
+      vatOverridePercent: c.vatOverridePercent ?? null,
+    } as Category;
   }, []);
 
-  const handleAddCategory = async () => {
-    setFormErrors({});
-
-    if (!user?.businessId) {
-      toast.error("Business ID not found");
-      return;
-    }
-
-    // Prepare data for validation and API
-    // For validation, convert empty strings to undefined
-    const validationPayload = {
-      name: newCategory.name,
-      description: newCategory.description || undefined,
-      businessId: user.businessId,
-      parentId: newCategory.parentId ? newCategory.parentId : undefined,
-      ...(editingCategory && { id: editingCategory.id }),
-    };
-
-    // Validate using Zod schema (only validates basic fields)
-    const validationResult = validateCategory(validationPayload);
-    if (!validationResult.success && validationResult.errors) {
-      setFormErrors(validationResult.errors);
-      focusFirstErrorField(validationResult.errors);
-      toast.error("Please fix the errors in the form");
-      return;
-    }
-
-    // Prepare full payload for API (with all fields, using null for empty values)
-    const categoryPayload = {
-      name: newCategory.name,
-      description: newCategory.description || undefined,
-      businessId: user.businessId,
-      sortOrder:
-        editingCategory && typeof editingCategory.sortOrder === "number"
-          ? editingCategory.sortOrder
-          : categories.length + 1,
-      parentId: newCategory.parentId ? newCategory.parentId : null,
-      vatCategoryId: newCategory.vatCategoryId
-        ? newCategory.vatCategoryId
-        : null,
-      vatOverridePercent:
-        newCategory.vatOverridePercent !== ""
-          ? parseFloat(newCategory.vatOverridePercent)
-          : null,
-      color: newCategory.color ? newCategory.color : null,
-      image: newCategory.image ? newCategory.image : null,
-      isActive:
-        typeof newCategory.isActive === "boolean" ? newCategory.isActive : true,
-      ...(editingCategory && { id: editingCategory.id }),
-    };
-
-    try {
-      setLoading(true);
-      let response;
-      if (editingCategory) {
-        response = await window.categoryAPI.update(
-          editingCategory.id,
-          categoryPayload
-        );
-      } else {
-        response = await window.categoryAPI.create(categoryPayload);
+  const handleSaveCategory = useCallback(
+    async (data: {
+      name: string;
+      description?: string;
+      parentId?: string | null;
+      vatCategoryId?: string | null;
+      vatOverridePercent?: number | null;
+      color?: string | null;
+      image?: string | null;
+      isActive: boolean;
+      sortOrder?: number;
+    }) => {
+      if (!user?.businessId) {
+        throw new Error("Business ID not found");
       }
 
-      // Normalize the returned category object
-      const normalizeCategory = (cat: unknown): Category => {
-        const c = cat as Partial<Category> & { [key: string]: unknown };
-        return {
-          ...c,
-          parentId: c.parentId ?? null,
-          vatCategoryId: c.vatCategoryId ?? null,
-          color: c.color ?? null,
-          image: c.image ?? null,
-          isActive: typeof c.isActive === "boolean" ? c.isActive : true,
-          sortOrder: c.sortOrder ?? 0,
-          createdAt: c.createdAt
-            ? new Date(c.createdAt as string | Date)
-            : new Date(),
-          updatedAt: c.updatedAt
-            ? new Date(c.updatedAt as string | Date)
-            : null,
-          description: c.description ?? "",
-        } as Category;
-      };
+      try {
+        setLoading(true);
+        const categoryPayload = {
+          ...data,
+          businessId: user.businessId,
+          sortOrder: data.sortOrder ?? categories.length + 1,
+        };
 
-      if (response.success && response.category) {
-        const normalizedCat = normalizeCategory(response.category);
-        if (editingCategory) {
-          setCategories(
-            categories.map((c) =>
-              c.id === editingCategory.id ? normalizedCat : c
-            )
-          );
-          toast.success("Category updated successfully");
-        } else {
+        const response = await window.categoryAPI.create(categoryPayload);
+
+        if (response.success && response.category) {
+          const normalizedCat = normalizeCategory(response.category);
           setCategories([...categories, normalizedCat]);
-          toast.success("Category created successfully");
-        }
-        resetForm();
-        setIsDrawerOpen(false);
-      } else {
-        const errorMsg =
-          response.message ||
-          (editingCategory
-            ? "Failed to update category"
-            : "Failed to create category");
-        const lowerErrorMsg = errorMsg.toLowerCase();
-        if (
-          (lowerErrorMsg.includes("name") &&
-            lowerErrorMsg.includes("already exists")) ||
-          lowerErrorMsg.includes("unique constraint failed: categories.name")
-        ) {
-          setFormErrors({
-            name: "This category name already exists. Please use a different name.",
-          });
-          focusFirstErrorField({
-            name: "This category name already exists. Please use a different name.",
-          });
-          toast.error("Category name already exists");
+          await loadCategories();
         } else {
-          toast.error(errorMsg);
+          const errorMsg = response.message || "Failed to create category";
+          const lowerErrorMsg = errorMsg.toLowerCase();
+          if (
+            (lowerErrorMsg.includes("name") &&
+              lowerErrorMsg.includes("already exists")) ||
+            lowerErrorMsg.includes("unique constraint failed: categories.name")
+          ) {
+            throw new Error(
+              "This category name already exists. Please use a different name."
+            );
+          }
+          throw new Error(errorMsg);
         }
+      } catch (error) {
+        console.error("Error saving category:", error);
+        throw error;
+      } finally {
+        setLoading(false);
       }
-      await loadCategories();
-    } catch (error) {
-      console.error("Error saving category:", error);
-      toast.error("Failed to save category");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [user, categories, normalizeCategory, loadCategories]
+  );
 
-  const handleEditCategory = (category: Category) => {
+  const handleUpdateCategory = useCallback(
+    async (
+      id: string,
+      data: {
+        name: string;
+        description?: string;
+        parentId?: string | null;
+        vatCategoryId?: string | null;
+        vatOverridePercent?: number | null;
+        color?: string | null;
+        image?: string | null;
+        isActive: boolean;
+      }
+    ) => {
+      if (!user?.businessId) {
+        throw new Error("Business ID not found");
+      }
+
+      try {
+        setLoading(true);
+        const categoryPayload = {
+          ...data,
+          businessId: user.businessId,
+        };
+
+        const response = await window.categoryAPI.update(id, categoryPayload);
+
+        if (response.success && response.category) {
+          const normalizedCat = normalizeCategory(response.category);
+          setCategories(
+            categories.map((c) => (c.id === id ? normalizedCat : c))
+          );
+          await loadCategories();
+        } else {
+          const errorMsg = response.message || "Failed to update category";
+          const lowerErrorMsg = errorMsg.toLowerCase();
+          if (
+            (lowerErrorMsg.includes("name") &&
+              lowerErrorMsg.includes("already exists")) ||
+            lowerErrorMsg.includes("unique constraint failed: categories.name")
+          ) {
+            throw new Error(
+              "This category name already exists. Please use a different name."
+            );
+          }
+          throw new Error(errorMsg);
+        }
+      } catch (error) {
+        console.error("Error updating category:", error);
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user, categories, normalizeCategory, loadCategories]
+  );
+
+  const handleEditCategory = useCallback((category: Category) => {
     setEditingCategory(category);
-    setNewCategory({
-      name: category.name,
-      description: category.description || "",
-      parentId: category.parentId ?? "",
-      vatCategoryId: category.vatCategoryId ?? "",
-      vatOverridePercent:
-        category.vatOverridePercent !== null &&
-        category.vatOverridePercent !== undefined
-          ? category.vatOverridePercent.toString()
-          : "",
-      color: category.color ?? "",
-      image: category.image ?? "",
-      isActive:
-        typeof category.isActive === "boolean" ? category.isActive : true,
-    });
     setIsDrawerOpen(true);
-  };
+  }, []);
+
+  const handleCloseDrawer = useCallback(() => {
+    setIsDrawerOpen(false);
+    setEditingCategory(null);
+  }, []);
 
   const handleDeleteCategory = async (id: string) => {
     if (
@@ -419,17 +371,6 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     }
   };
 
-  // Helper function to clear field-specific errors
-  const clearFieldError = (field: string) => {
-    if (formErrors[field]) {
-      setFormErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-  };
-
   return (
     <>
       <div className="p-6 space-y-6">
@@ -452,7 +393,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
 
           <Button
             onClick={() => {
-              resetForm();
+              setEditingCategory(null);
               setIsDrawerOpen(true);
             }}
           >
@@ -531,7 +472,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                   size="sm"
                   className="mt-2"
                   onClick={() => {
-                    resetForm();
+                    setEditingCategory(null);
                     setIsDrawerOpen(true);
                   }}
                 >
@@ -576,7 +517,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
               </p>
               <Button
                 onClick={() => {
-                  resetForm();
+                  setEditingCategory(null);
                   setIsDrawerOpen(true);
                 }}
               >
@@ -606,259 +547,16 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       </div>
 
       {/* Add/Edit Category Drawer */}
-      <Drawer
-        open={isDrawerOpen}
-        onOpenChange={(open) => {
-          setIsDrawerOpen(open);
-          if (!open) {
-            resetForm();
-          }
-        }}
-        direction="right"
-      >
-        <DrawerContent className="h-full w-[500px] mt-0 rounded-none fixed right-0 top-0">
-          <DrawerHeader className="border-b">
-            <DrawerTitle>
-              {editingCategory ? "Edit Category" : "Add New Category"}
-            </DrawerTitle>
-            <DrawerDescription>
-              {editingCategory
-                ? "Update the category information below."
-                : "Create a new category to organize your products."}
-            </DrawerDescription>
-          </DrawerHeader>
-
-          <div className="p-6 overflow-y-auto flex-1">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Category Name *</Label>
-                <Input
-                  id="name"
-                  value={newCategory.name}
-                  onChange={(e) => {
-                    setNewCategory({ ...newCategory, name: e.target.value });
-                    clearFieldError("name");
-                  }}
-                  placeholder="Enter category name"
-                  className={formErrors.name ? "border-red-500" : ""}
-                />
-                {formErrors.name && (
-                  <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description (Optional)</Label>
-                <Textarea
-                  id="description"
-                  value={newCategory.description}
-                  onChange={(e) => {
-                    setNewCategory({
-                      ...newCategory,
-                      description: e.target.value,
-                    });
-                    clearFieldError("description");
-                  }}
-                  placeholder="Enter category description"
-                  rows={3}
-                  className={formErrors.description ? "border-red-500" : ""}
-                />
-                {formErrors.description && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {formErrors.description}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="parentId">Parent Category</Label>
-                <select
-                  id="parentId"
-                  className={`w-full border rounded px-3 py-2 mt-1 ${
-                    formErrors.parentId ? "border-red-500" : ""
-                  }`}
-                  value={newCategory.parentId}
-                  onChange={(e) => {
-                    setNewCategory({
-                      ...newCategory,
-                      parentId: e.target.value,
-                    });
-                    clearFieldError("parentId");
-                  }}
-                >
-                  <option value="">None (Top-level)</option>
-                  {buildCategoryTree(categories)
-                    .filter(
-                      (cat) => !editingCategory || cat.id !== editingCategory.id
-                    )
-                    .map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                </select>
-                {formErrors.parentId && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {formErrors.parentId}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="vatCategoryId">VAT Category</Label>
-                <select
-                  id="vatCategoryId"
-                  className={`w-full border rounded px-3 py-2 mt-1 ${
-                    formErrors.vatCategoryId ? "border-red-500" : ""
-                  }`}
-                  value={newCategory.vatCategoryId}
-                  onChange={(e) => {
-                    setNewCategory({
-                      ...newCategory,
-                      vatCategoryId: e.target.value,
-                    });
-                    clearFieldError("vatCategoryId");
-                  }}
-                >
-                  <option value="">None</option>
-                  {vatCategories.map((vat) => (
-                    <option key={vat.id} value={vat.id}>
-                      {vat.name} ({vat.ratePercent}%)
-                    </option>
-                  ))}
-                </select>
-                {formErrors.vatCategoryId && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {formErrors.vatCategoryId}
-                  </p>
-                )}
-                <div>
-                  <Label htmlFor="vatOverridePercent">VAT Override (%)</Label>
-                  <Input
-                    id="vatOverridePercent"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={newCategory.vatOverridePercent}
-                    onChange={(e) => {
-                      setNewCategory({
-                        ...newCategory,
-                        vatOverridePercent: e.target.value,
-                      });
-                      clearFieldError("vatOverridePercent");
-                    }}
-                    placeholder="Override VAT percent (optional)"
-                    className={
-                      formErrors.vatOverridePercent ? "border-red-500" : ""
-                    }
-                  />
-                  {formErrors.vatOverridePercent && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {formErrors.vatOverridePercent}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="color">Color</Label>
-                <Input
-                  id="color"
-                  value={newCategory.color}
-                  onChange={(e) => {
-                    setNewCategory({ ...newCategory, color: e.target.value });
-                    clearFieldError("color");
-                  }}
-                  placeholder="Enter color (optional)"
-                  className={formErrors.color ? "border-red-500" : ""}
-                />
-                {formErrors.color && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {formErrors.color}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="image">Image URL</Label>
-                <Input
-                  id="image"
-                  value={newCategory.image}
-                  onChange={(e) => {
-                    setNewCategory({ ...newCategory, image: e.target.value });
-                    clearFieldError("image");
-                  }}
-                  placeholder="Enter image URL (optional)"
-                  className={formErrors.image ? "border-red-500" : ""}
-                />
-                {formErrors.image && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {formErrors.image}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  id="isActive"
-                  type="checkbox"
-                  checked={newCategory.isActive}
-                  onChange={(e) =>
-                    setNewCategory({
-                      ...newCategory,
-                      isActive: e.target.checked,
-                    })
-                  }
-                />
-                <Label htmlFor="isActive">Active</Label>
-              </div>
-
-              {editingCategory && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">
-                    Category Information
-                  </h4>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>
-                      Created:{" "}
-                      {editingCategory.createdAt instanceof Date
-                        ? editingCategory.createdAt.toLocaleString()
-                        : new Date(editingCategory.createdAt).toLocaleString()}
-                    </div>
-                    <div>
-                      Last Updated:{" "}
-                      {editingCategory.updatedAt
-                        ? editingCategory.updatedAt instanceof Date
-                          ? editingCategory.updatedAt.toLocaleString()
-                          : new Date(editingCategory.updatedAt).toLocaleString()
-                        : "-"}
-                    </div>
-                    <div>Sort Order: {editingCategory.sortOrder}</div>
-                    <div>
-                      Status: {editingCategory.isActive ? "Active" : "Inactive"}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex space-x-2 pt-6 border-t mt-6">
-              <Button onClick={handleAddCategory} className="flex-1">
-                {editingCategory ? "Update Category" : "Add Category"}
-              </Button>
-              <DrawerClose asChild>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={resetForm}
-                >
-                  Cancel
-                </Button>
-              </DrawerClose>
-            </div>
-          </div>
-        </DrawerContent>
-      </Drawer>
+      <CategoryFormDrawer
+        isOpen={isDrawerOpen}
+        category={editingCategory as any}
+        categories={categories as any}
+        vatCategories={vatCategories}
+        businessId={user?.businessId || ""}
+        onClose={handleCloseDrawer}
+        onSave={handleSaveCategory}
+        onUpdate={handleUpdateCategory}
+      />
     </>
   );
 };

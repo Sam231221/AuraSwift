@@ -1,7 +1,6 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -19,48 +18,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImageIcon, Upload } from "lucide-react";
-import { toast } from "sonner";
-import type { Product, Modifier } from "@/features/products/types/product.types";
+import type { Product } from "@/features/products/types/product.types";
 import type { Category, VatCategory } from "../hooks/use-product-data";
-
-interface ProductFormData {
-  name: string;
-  description: string;
-  basePrice: number;
-  costPrice: number;
-  sku: string;
-  barcode: string;
-  plu: string;
-  image: string;
-  categoryId: string;
-  productType: "STANDARD" | "WEIGHTED" | "GENERIC";
-  salesUnit: "PIECE" | "KG" | "GRAM" | "LITRE" | "ML" | "PACK";
-  usesScale: boolean;
-  pricePerKg: number;
-  isGenericButton: boolean;
-  genericDefaultPrice: number;
-  trackInventory: boolean;
-  stockLevel: number;
-  minStockLevel: number;
-  reorderPoint: number;
-  vatCategoryId: string;
-  vatOverridePercent: string;
-  isActive: boolean;
-  allowPriceOverride: boolean;
-  allowDiscount: boolean;
-  modifiers: Modifier[];
-  // Expiry tracking fields
-  hasExpiry: boolean;
-  shelfLifeDays: number;
-  requiresBatchTracking: boolean;
-  stockRotationMethod: "FIFO" | "FEFO" | "NONE";
-  // Age restriction fields
-  ageRestrictionLevel: "NONE" | "AGE_16" | "AGE_18" | "AGE_21";
-  requireIdScan: boolean;
-  restrictionReason: string;
-}
+import { useProductForm } from "../hooks/use-product-form";
 
 interface ProductFormDrawerProps {
   isOpen: boolean;
@@ -73,43 +43,6 @@ interface ProductFormDrawerProps {
   onUpdate: (productId: string, product: Product) => void;
 }
 
-const getDefaultFormData = (categories: Category[]): ProductFormData => ({
-  name: "",
-  description: "",
-  basePrice: 0,
-  costPrice: 0,
-  sku: "",
-  barcode: "",
-  plu: "",
-  image: "",
-  categoryId: categories.length > 0 ? categories[0].id : "",
-  productType: "STANDARD",
-  salesUnit: "PIECE",
-  usesScale: false,
-  pricePerKg: 0,
-  isGenericButton: false,
-  genericDefaultPrice: 0,
-  trackInventory: true,
-  stockLevel: 0,
-  minStockLevel: 5,
-  reorderPoint: 0,
-  vatCategoryId: "",
-  vatOverridePercent: "",
-  isActive: true,
-  allowPriceOverride: false,
-  allowDiscount: true,
-  modifiers: [],
-  // Expiry tracking defaults
-  hasExpiry: false,
-  shelfLifeDays: 0,
-  requiresBatchTracking: false,
-  stockRotationMethod: "FIFO",
-  // Age restriction defaults
-  ageRestrictionLevel: "NONE",
-  requireIdScan: false,
-  restrictionReason: "",
-});
-
 const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
   isOpen,
   editingProduct,
@@ -120,346 +53,84 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
   onSave,
   onUpdate,
 }) => {
-  const [formData, setFormData] = useState<ProductFormData>(() => {
-    try {
-      return getDefaultFormData(categories || []);
-    } catch (error) {
-      console.error("Error initializing form data:", error);
-      return getDefaultFormData([]);
-    }
-  });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<string>("basic");
-  const [loading, setLoading] = useState(false);
 
-  // Reset form when drawer opens/closes or editing product changes
-  useEffect(() => {
-    try {
-      if (!isOpen) {
-        setFormData(getDefaultFormData(categories || []));
-        setFormErrors({});
-        setActiveTab("basic");
-        return;
-      }
-
-      if (editingProduct) {
-      // Map product to form data
-      const dbProduct = editingProduct as unknown as Record<string, unknown>;
-      const productCategoryId =
-        (dbProduct.categoryId as string | undefined) ||
-        editingProduct.category;
-      const safeCategories = categories || [];
-      const categoryExists = safeCategories.some((cat) => cat.id === productCategoryId);
-      const validCategory = categoryExists
-        ? productCategoryId
-        : safeCategories.length > 0
-        ? safeCategories[0].id
-        : "";
-
-      if (!categoryExists && productCategoryId) {
-        toast.error(
-          "This product's category no longer exists. Please select a new category."
-        );
-      }
-
-      const normalizedModifiers = (editingProduct.modifiers || []).map(
-        (modifier) => ({
-          ...modifier,
-          multiSelect:
-            "multiSelect" in modifier
-              ? Boolean((modifier as { multiSelect?: boolean }).multiSelect)
-              : modifier.type === "multiple",
-          required: modifier.required ?? false,
-        })
-      );
-
-      setFormData({
-        name: editingProduct.name,
-        description: editingProduct.description || "",
-        basePrice:
-          (dbProduct.basePrice as number | undefined) ??
-          editingProduct.price ??
-          0,
-        costPrice: editingProduct.costPrice || 0,
-        sku: editingProduct.sku,
-        barcode: (dbProduct.barcode as string | undefined) || "",
-        plu: editingProduct.plu || "",
-        image: editingProduct.image || "",
-        categoryId: (dbProduct.categoryId as string | undefined) || validCategory,
-        productType:
-          (dbProduct.productType as
-            | "STANDARD"
-            | "WEIGHTED"
-            | "GENERIC"
-            | undefined) || "STANDARD",
-        salesUnit:
-          (dbProduct.salesUnit as
-            | "PIECE"
-            | "KG"
-            | "GRAM"
-            | "LITRE"
-            | "ML"
-            | "PACK"
-            | undefined) ||
-          ((dbProduct.usesScale as boolean | undefined) ? "KG" : "PIECE"),
-        usesScale:
-          (dbProduct.usesScale as boolean | undefined) ??
-          Boolean(editingProduct.requiresWeight),
-        pricePerKg:
-          (dbProduct.pricePerKg as number | undefined) ??
-          editingProduct.pricePerUnit ??
-          0,
-        isGenericButton:
-          (dbProduct.isGenericButton as boolean | undefined) || false,
-        genericDefaultPrice:
-          (dbProduct.genericDefaultPrice as number | undefined) || 0,
-        trackInventory:
-          (dbProduct.trackInventory as boolean | undefined) !== undefined
-            ? (dbProduct.trackInventory as boolean)
-            : true,
-        stockLevel: editingProduct.stockLevel || 0,
-        minStockLevel: editingProduct.minStockLevel || 0,
-        reorderPoint: (dbProduct.reorderPoint as number | undefined) || 0,
-        vatCategoryId: (dbProduct.vatCategoryId as string | undefined) || "",
-        vatOverridePercent: dbProduct.vatOverridePercent
-          ? (dbProduct.vatOverridePercent as number).toString()
-          : "",
-        isActive:
-          editingProduct.isActive !== undefined ? editingProduct.isActive : true,
-        allowPriceOverride:
-          (dbProduct.allowPriceOverride as boolean | undefined) || false,
-        allowDiscount:
-          (dbProduct.allowDiscount as boolean | undefined) !== undefined
-            ? (dbProduct.allowDiscount as boolean)
-            : true,
-        modifiers: normalizedModifiers,
-        // Expiry tracking fields
-        hasExpiry: (dbProduct.hasExpiry as boolean | undefined) || false,
-        shelfLifeDays: (dbProduct.shelfLifeDays as number | undefined) || 0,
-        requiresBatchTracking:
-          (dbProduct.requiresBatchTracking as boolean | undefined) || false,
-        stockRotationMethod:
-          (dbProduct.stockRotationMethod as "FIFO" | "FEFO" | "NONE" | undefined) ||
-          "FIFO",
-        // Age restriction fields
-        ageRestrictionLevel:
-          (dbProduct.ageRestrictionLevel as
-            | "NONE"
-            | "AGE_16"
-            | "AGE_18"
-            | "AGE_21"
-            | undefined) ||
-          (editingProduct.ageRestrictionLevel || "NONE"),
-        requireIdScan:
-          (dbProduct.requireIdScan as boolean | undefined) ??
-          (editingProduct.requireIdScan || false),
-        restrictionReason:
-          (dbProduct.restrictionReason as string | undefined) ||
-          (editingProduct.restrictionReason || ""),
-      });
-
-      if (!validCategory) {
-        setFormErrors({ categoryId: "Please select a category" });
-      }
-    } else {
-      setFormData(getDefaultFormData(categories || []));
-      setFormErrors({});
-    }
-    } catch (error) {
-      console.error("Error in ProductFormDrawer useEffect:", error);
-      setFormData(getDefaultFormData(categories || []));
-      setFormErrors({});
-    }
-  }, [isOpen, editingProduct, categories]);
-
-  const handleInputChange = useCallback(
-    (field: keyof ProductFormData, value: string | number | boolean) => {
-      setFormData((prev) => ({ ...prev, [field]: value }));
-      if (formErrors[field]) {
-        setFormErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors[field];
-          return newErrors;
-        });
-      }
-    },
-    [formErrors]
-  );
-
-  const clearFieldError = useCallback((field: string) => {
-    setFormErrors((prev) => {
-      const newErrors = { ...prev };
-      delete newErrors[field];
-      return newErrors;
-    });
-  }, []);
-
-  const handleImageUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          handleInputChange("image", e.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-      }
-    },
-    [handleInputChange]
-  );
-
-  const validateForm = (): { success: boolean; errors: Record<string, string> } => {
-    const errors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      errors.name = "Product name is required";
-    }
-    if (!formData.sku.trim()) {
-      errors.sku = "SKU is required";
-    }
-    if (!formData.categoryId) {
-      errors.categoryId = "Category is required";
-    }
-    if (formData.basePrice <= 0) {
-      errors.basePrice = "Sale price must be greater than 0";
-    }
-    if (formData.usesScale && formData.pricePerKg <= 0) {
-      errors.pricePerKg =
-        "Price per kg must be greater than 0 for weighted products";
-    }
-
-    return {
-      success: Object.keys(errors).length === 0,
-      errors,
-    };
-  };
-
-  const handleSubmit = async () => {
-    setFormErrors({});
-    const validation = validateForm();
-
-    if (!validation.success) {
-      setFormErrors(validation.errors);
-
-      const errorFields = Object.keys(validation.errors);
-      const basicInfoFields = ["name", "sku", "plu", "categoryId", "barcode"];
-      const pricingFields = [
-        "basePrice",
-        "costPrice",
-        "stockLevel",
-        "minStockLevel",
-        "reorderPoint",
-        "salesUnit",
-        "pricePerKg",
-        "vatCategoryId",
-        "vatOverridePercent",
-      ];
-
-      if (errorFields.some((field) => basicInfoFields.includes(field))) {
-        setActiveTab("basic");
-        setTimeout(() => {
-          const firstErrorField = errorFields.find((field) =>
-            basicInfoFields.includes(field)
-          );
-          if (firstErrorField) {
-            const element = document.getElementById(firstErrorField);
-            if (element) {
-              if (firstErrorField === "categoryId") {
-                element.click();
-              } else {
-                element.focus();
-              }
-              element.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-          }
-        }, 100);
-      } else if (errorFields.some((field) => pricingFields.includes(field))) {
-        setActiveTab("pricing");
-        setTimeout(() => {
-          const firstErrorField = errorFields.find((field) =>
-            pricingFields.includes(field)
-          );
-          if (firstErrorField) {
-            const element = document.getElementById(firstErrorField);
-            if (element) {
-              element.focus();
-              element.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
-          }
-        }, 100);
-      }
-
-      toast.error("Please fix the errors in the form");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
+  const { form, handleSubmit, isSubmitting, isEditMode } = useProductForm({
+    product: editingProduct,
+    categories,
+    vatCategories,
+    businessId,
+    onSubmit: async (data) => {
+      // Transform form data to API format
       const productData = {
-        name: formData.name.trim(),
-        description: (formData.description || "").trim() || undefined,
-        basePrice: formData.basePrice,
-        costPrice: formData.costPrice || 0,
-        sku: formData.sku.trim(),
-        barcode: (formData.barcode || "").trim() || undefined,
-        plu: (formData.plu || "").trim() || undefined,
-        image: (formData.image || "").trim() || undefined,
-        categoryId: formData.categoryId,
-        productType: formData.productType || "STANDARD",
-        salesUnit: formData.salesUnit || "PIECE",
-        usesScale: formData.usesScale || false,
+        name: data.name.trim(),
+        description: (data.description || "").trim() || undefined,
+        basePrice: data.basePrice,
+        costPrice: data.costPrice || 0,
+        sku: data.sku.trim(),
+        barcode: (data.barcode || "").trim() || undefined,
+        plu: (data.plu || "").trim() || undefined,
+        image: (data.image || "").trim() || undefined,
+        categoryId: data.categoryId,
+        productType: data.productType || "STANDARD",
+        salesUnit: data.salesUnit || "PIECE",
+        usesScale: data.usesScale || false,
         pricePerKg:
-          formData.usesScale && formData.pricePerKg > 0
-            ? formData.pricePerKg
+          data.usesScale && data.pricePerKg && data.pricePerKg > 0
+            ? data.pricePerKg
             : undefined,
-        isGenericButton: formData.isGenericButton || false,
+        isGenericButton: data.isGenericButton || false,
         genericDefaultPrice:
-          formData.isGenericButton && formData.genericDefaultPrice > 0
-            ? formData.genericDefaultPrice
+          data.isGenericButton &&
+          data.genericDefaultPrice &&
+          data.genericDefaultPrice > 0
+            ? data.genericDefaultPrice
             : undefined,
         trackInventory:
-          formData.trackInventory !== undefined ? formData.trackInventory : true,
-        stockLevel: formData.stockLevel || 0,
-        minStockLevel: formData.minStockLevel || 0,
-        reorderPoint: formData.reorderPoint || 0,
-        vatCategoryId: formData.vatCategoryId || undefined,
-        vatOverridePercent: formData.vatOverridePercent
-          ? parseFloat(formData.vatOverridePercent)
-          : undefined,
+          data.trackInventory !== undefined ? data.trackInventory : true,
+        stockLevel: data.stockLevel || 0,
+        minStockLevel: data.minStockLevel || 0,
+        reorderPoint: data.reorderPoint || 0,
+        vatCategoryId:
+          data.vatCategoryId && data.vatCategoryId !== ""
+            ? data.vatCategoryId
+            : undefined,
+        vatOverridePercent:
+          data.vatOverridePercent && data.vatOverridePercent > 0
+            ? data.vatOverridePercent
+            : undefined,
         businessId,
-        isActive:
-          formData.isActive !== undefined ? formData.isActive : true,
-        allowPriceOverride: formData.allowPriceOverride || false,
+        isActive: data.isActive !== undefined ? data.isActive : true,
+        allowPriceOverride: data.allowPriceOverride || false,
         allowDiscount:
-          formData.allowDiscount !== undefined ? formData.allowDiscount : true,
+          data.allowDiscount !== undefined ? data.allowDiscount : true,
+        modifiers: data.modifiers || [],
         // Expiry tracking fields
-        hasExpiry: formData.hasExpiry || false,
-        shelfLifeDays: formData.hasExpiry && formData.shelfLifeDays > 0
-          ? formData.shelfLifeDays
-          : undefined,
-        requiresBatchTracking: formData.requiresBatchTracking || false,
-        stockRotationMethod: formData.requiresBatchTracking
-          ? formData.stockRotationMethod
+        hasExpiry: data.hasExpiry || false,
+        shelfLifeDays:
+          data.hasExpiry && data.shelfLifeDays && data.shelfLifeDays > 0
+            ? data.shelfLifeDays
+            : undefined,
+        requiresBatchTracking: data.requiresBatchTracking || false,
+        stockRotationMethod: data.requiresBatchTracking
+          ? data.stockRotationMethod
           : undefined,
         // Age restriction fields
-        ageRestrictionLevel: formData.ageRestrictionLevel || "NONE",
-        requireIdScan: formData.requireIdScan || false,
+        ageRestrictionLevel: data.ageRestrictionLevel || "NONE",
+        requireIdScan: data.requireIdScan || false,
         restrictionReason:
-          formData.ageRestrictionLevel !== "NONE" && formData.restrictionReason
-            ? formData.restrictionReason.trim()
+          data.ageRestrictionLevel !== "NONE" && data.restrictionReason
+            ? data.restrictionReason.trim()
             : undefined,
       };
 
-      if (editingProduct) {
+      if (isEditMode && editingProduct) {
         const response = await window.productAPI.update(
           editingProduct.id,
           productData
         );
         if (response.success && response.product) {
           onUpdate(editingProduct.id, response.product);
-          toast.success("Product updated successfully");
-          onClose();
         } else {
           const errorMsg = response.message || "Failed to update product";
           const lowerErrorMsg = errorMsg.toLowerCase();
@@ -469,31 +140,32 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
               lowerErrorMsg.includes("already exists")) ||
             lowerErrorMsg.includes("unique constraint failed: products.sku")
           ) {
-            setFormErrors({
-              sku: "This SKU already exists. Please use a different SKU.",
+            form.setError("sku", {
+              type: "manual",
+              message: "This SKU already exists. Please use a different SKU.",
             });
             setActiveTab("basic");
-            toast.error("SKU already exists");
+            throw new Error("SKU already exists");
           } else if (
             (lowerErrorMsg.includes("plu") &&
               lowerErrorMsg.includes("already exists")) ||
             lowerErrorMsg.includes("unique constraint failed: products.plu")
           ) {
-            setFormErrors({
-              plu: "This PLU code already exists. Please use a different PLU.",
+            form.setError("plu", {
+              type: "manual",
+              message:
+                "This PLU code already exists. Please use a different PLU.",
             });
             setActiveTab("basic");
-            toast.error("PLU code already exists");
+            throw new Error("PLU code already exists");
           } else {
-            toast.error(errorMsg);
+            throw new Error(errorMsg);
           }
         }
       } else {
         const response = await window.productAPI.create(productData);
         if (response.success && response.product) {
           onSave(response.product);
-          toast.success("Product created successfully");
-          onClose();
         } else {
           const errorMsg = response.message || "Failed to create product";
           const lowerErrorMsg = errorMsg.toLowerCase();
@@ -503,37 +175,48 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
               lowerErrorMsg.includes("already exists")) ||
             lowerErrorMsg.includes("unique constraint failed: products.sku")
           ) {
-            setFormErrors({
-              sku: "This SKU already exists. Please use a different SKU.",
+            form.setError("sku", {
+              type: "manual",
+              message: "This SKU already exists. Please use a different SKU.",
             });
             setActiveTab("basic");
-            toast.error("SKU already exists");
+            throw new Error("SKU already exists");
           } else if (
             (lowerErrorMsg.includes("plu") &&
               lowerErrorMsg.includes("already exists")) ||
             lowerErrorMsg.includes("unique constraint failed: products.plu")
           ) {
-            setFormErrors({
-              plu: "This PLU code already exists. Please use a different PLU.",
+            form.setError("plu", {
+              type: "manual",
+              message:
+                "This PLU code already exists. Please use a different PLU.",
             });
             setActiveTab("basic");
-            toast.error("PLU code already exists");
+            throw new Error("PLU code already exists");
           } else {
-            toast.error(errorMsg);
+            throw new Error(errorMsg);
           }
         }
       }
-    } catch (error) {
-      console.error("Error saving product:", error);
-      toast.error("Failed to save product");
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    onSuccess: onClose,
+  });
+
+  const handleImageUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          form.setValue("image", e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    },
+    [form]
+  );
 
   const handleClose = () => {
-    setFormData(getDefaultFormData(categories || []));
-    setFormErrors({});
     setActiveTab("basic");
     onClose();
   };
@@ -544,7 +227,11 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
   }
 
   return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && handleClose()} direction="right">
+    <Drawer
+      open={isOpen}
+      onOpenChange={(open) => !open && handleClose()}
+      direction="right"
+    >
       <DrawerContent className="h-full w-[800px] mt-0 rounded-none fixed right-0 top-0">
         <DrawerHeader className="border-b">
           <DrawerTitle>
@@ -557,744 +244,1019 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="p-6 overflow-y-auto flex-1">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="flex w-full gap-1 h-auto py-1.5 overflow-x-auto">
-              <TabsTrigger value="basic" className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm">
-                Basic Info
-              </TabsTrigger>
-              <TabsTrigger value="pricing" className="flex-1 min-w-[100px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm">
-                Pricing & Stock
-              </TabsTrigger>
-              <TabsTrigger value="expiry" className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm">
-                Expiry
-              </TabsTrigger>
-              <TabsTrigger value="age-restriction" className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm">
-                Age
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="basic" className="space-y-4 mt-6">
-              {/* Image Upload */}
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                  {formData.image ? (
-                    <img
-                      src={formData.image}
-                      alt="Product"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <ImageIcon className="w-12 h-12 text-gray-400" />
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="image" className="cursor-pointer">
-                    <div className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-md transition-colors">
-                      <Upload className="w-4 h-4" />
-                      <span className="text-sm">Upload Image</span>
-                    </div>
-                  </Label>
-                  <Input
-                    id="image"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label htmlFor="name">Product Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    placeholder="Enter product name"
-                    className={formErrors.name ? "border-red-500" : ""}
-                  />
-                  {formErrors.name && (
-                    <p className="text-sm text-red-500 mt-1">{formErrors.name}</p>
-                  )}
-                </div>
-
-                <div className="col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) =>
-                      handleInputChange("description", e.target.value)
-                    }
-                    placeholder="Enter product description"
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="categoryId">Category *</Label>
-                  <Select
-                    value={
-                      !categories || categories.length === 0
-                        ? undefined
-                        : formData.categoryId &&
-                          categories.some((cat) => cat.id === formData.categoryId)
-                        ? formData.categoryId
-                        : categories[0].id
-                    }
-                    onValueChange={(value) => {
-                      handleInputChange("categoryId", value);
-                      clearFieldError("categoryId");
-                    }}
-                    disabled={!categories || categories.length === 0}
+        <Form {...form}>
+          <form onSubmit={handleSubmit} className="flex flex-col h-full">
+            <div className="p-6 overflow-y-auto flex-1">
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full"
+              >
+                <TabsList className="flex w-full gap-1 h-auto py-1.5 overflow-x-auto">
+                  <TabsTrigger
+                    value="basic"
+                    className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm"
                   >
-                    <SelectTrigger
-                      id="categoryId"
-                      className={
-                        formErrors.categoryId ? "border-red-500" : ""
-                      }
-                    >
-                      <SelectValue
-                        placeholder={
-                          !categories || categories.length === 0
-                            ? "No categories available"
-                            : "Select a category"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {!categories || categories.length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No categories found - please add a category first
+                    Basic Info
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="pricing"
+                    className="flex-1 min-w-[100px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm"
+                  >
+                    Pricing & Stock
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="expiry"
+                    className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm"
+                  >
+                    Expiry
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="age-restriction"
+                    className="flex-1 min-w-[80px] !whitespace-nowrap px-3 py-2 text-xs sm:text-sm"
+                  >
+                    Age
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="basic" className="space-y-4 mt-6">
+                  {/* Image Upload */}
+                  <FormField
+                    control={form.control}
+                    name="image"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex flex-col items-center space-y-4">
+                          <div className="w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                            {field.value ? (
+                              <img
+                                src={field.value}
+                                alt="Product"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <ImageIcon className="w-12 h-12 text-gray-400" />
+                            )}
+                          </div>
+                          <div>
+                            <FormLabel
+                              htmlFor="image"
+                              className="cursor-pointer"
+                            >
+                              <div className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-md transition-colors">
+                                <Upload className="w-4 h-4" />
+                                <span className="text-sm">Upload Image</span>
+                              </div>
+                            </FormLabel>
+                            <Input
+                              id="image"
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleImageUpload}
+                              disabled={isSubmitting}
+                            />
+                          </div>
                         </div>
-                      ) : (
-                        categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {formErrors.categoryId && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {formErrors.categoryId}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="sku">SKU *</Label>
-                  <Input
-                    id="sku"
-                    value={formData.sku}
-                    onChange={(e) => {
-                      handleInputChange("sku", e.target.value);
-                      clearFieldError("sku");
-                    }}
-                    placeholder="Enter SKU"
-                    className={formErrors.sku ? "border-red-500" : ""}
-                  />
-                  {formErrors.sku && (
-                    <p className="text-sm text-red-500 mt-1">{formErrors.sku}</p>
-                  )}
-                </div>
-
-                <div className="col-span-2">
-                  <Label htmlFor="plu">PLU Code (Optional)</Label>
-                  <Input
-                    id="plu"
-                    value={formData.plu}
-                    onChange={(e) => {
-                      handleInputChange("plu", e.target.value);
-                      clearFieldError("plu");
-                    }}
-                    placeholder="Enter PLU code"
-                    className={formErrors.plu ? "border-red-500" : ""}
-                  />
-                  {formErrors.plu && (
-                    <p className="text-sm text-red-500 mt-1">{formErrors.plu}</p>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="pricing" className="space-y-4 mt-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="basePrice">Sale Price *</Label>
-                  <Input
-                    id="basePrice"
-                    type="number"
-                    step="0.01"
-                    value={formData.basePrice}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "basePrice",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    placeholder="0.00"
-                    className={formErrors.basePrice ? "border-red-500" : ""}
-                  />
-                  {formErrors.basePrice && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {formErrors.basePrice}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="costPrice">Cost Price *</Label>
-                  <Input
-                    id="costPrice"
-                    type="number"
-                    step="0.01"
-                    value={formData.costPrice}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "costPrice",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    placeholder="0.00"
-                    className={formErrors.costPrice ? "border-red-500" : ""}
-                  />
-                  {formErrors.costPrice && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {formErrors.costPrice}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="barcode">Barcode (Optional)</Label>
-                  <Input
-                    id="barcode"
-                    value={formData.barcode}
-                    onChange={(e) => handleInputChange("barcode", e.target.value)}
-                    placeholder="Enter barcode"
-                  />
-                </div>
-
-                <div>
-                  <Label>Profit Margin</Label>
-                  <div className="mt-1 p-2 bg-gray-50 rounded text-sm">
-                    {(formData.basePrice || 0) > 0 && (formData.costPrice || 0) > 0
-                      ? `${(
-                          (((formData.basePrice || 0) - (formData.costPrice || 0)) /
-                            (formData.basePrice || 1)) *
-                          100
-                        ).toFixed(1)}%`
-                      : "N/A"}
-                  </div>
-                </div>
-              </div>
-
-              {/* Weight-based Product Configuration */}
-              <div className="border-t pt-4">
-                <h4 className="text-lg font-medium mb-4">
-                  Product Type & Weight Configuration
-                </h4>
-
-                <div className="mb-4">
-                  <Label htmlFor="productType">Product Type</Label>
-                  <Select
-                    value={formData.productType}
-                    onValueChange={(value: "STANDARD" | "WEIGHTED" | "GENERIC") => {
-                      handleInputChange("productType", value);
-                      handleInputChange("usesScale", value === "WEIGHTED");
-                    }}
-                  >
-                    <SelectTrigger id="productType">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="STANDARD">Standard Product</SelectItem>
-                      <SelectItem value="WEIGHTED">Weighted Product</SelectItem>
-                      <SelectItem value="GENERIC">Generic Button</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center space-x-2 mb-4">
-                  <Switch
-                    id="usesScale"
-                    checked={Boolean(formData.usesScale)}
-                    onCheckedChange={(checked) => {
-                      handleInputChange("usesScale", Boolean(checked));
-                      handleInputChange(
-                        "productType",
-                        checked ? "WEIGHTED" : "STANDARD"
-                      );
-                      handleInputChange(
-                        "pricePerKg",
-                        checked ? formData.basePrice : 0
-                      );
-                    }}
-                  />
-                  <Label htmlFor="usesScale">Sold by Weight (Uses Scale)</Label>
-                </div>
-
-                {formData.usesScale && (
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
-                    <div>
-                      <Label htmlFor="salesUnit">Sales Unit</Label>
-                      <Select
-                        value={formData.salesUnit}
-                        onValueChange={(
-                          value:
-                            | "PIECE"
-                            | "KG"
-                            | "GRAM"
-                            | "LITRE"
-                            | "ML"
-                            | "PACK"
-                        ) => handleInputChange("salesUnit", value)}
-                      >
-                        <SelectTrigger
-                          className={
-                            formErrors.salesUnit ? "border-red-500" : ""
-                          }
-                        >
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="KG">Kilograms (KG)</SelectItem>
-                          <SelectItem value="GRAM">Grams (GRAM)</SelectItem>
-                          <SelectItem value="LITRE">Litres (LITRE)</SelectItem>
-                          <SelectItem value="ML">Millilitres (ML)</SelectItem>
-                          <SelectItem value="PACK">Pack (PACK)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {formErrors.salesUnit && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {formErrors.salesUnit}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="pricePerKg">
-                        Price per {formData.salesUnit}
-                      </Label>
-                      <Input
-                        id="pricePerKg"
-                        type="number"
-                        step="0.01"
-                        value={formData.pricePerKg}
-                        onChange={(e) => {
-                          const value = parseFloat(e.target.value) || 0;
-                          handleInputChange("pricePerKg", value);
-                          handleInputChange("basePrice", value);
-                        }}
-                        placeholder="0.00"
-                        className={
-                          formErrors.pricePerKg ? "border-red-500" : ""
-                        }
-                      />
-                      {formErrors.pricePerKg && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {formErrors.pricePerKg}
-                        </p>
-                      )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        This will be multiplied by the weight during checkout
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {formData.productType === "GENERIC" && (
-                  <div className="p-4 bg-purple-50 rounded-lg">
-                    <div>
-                      <Label htmlFor="genericDefaultPrice">Default Price</Label>
-                      <Input
-                        id="genericDefaultPrice"
-                        type="number"
-                        step="0.01"
-                        value={formData.genericDefaultPrice}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "genericDefaultPrice",
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                        placeholder="0.00"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Suggested price for generic items
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="stockLevel">Current Stock</Label>
-                  <Input
-                    id="stockLevel"
-                    type="number"
-                    value={formData.stockLevel}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "stockLevel",
-                        parseInt(e.target.value) || 0
-                      )
-                    }
-                    placeholder="0"
-                    className={formErrors.stockLevel ? "border-red-500" : ""}
-                  />
-                  {formErrors.stockLevel && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {formErrors.stockLevel}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="minStockLevel">Minimum Stock Level</Label>
-                  <Input
-                    id="minStockLevel"
-                    type="number"
-                    value={formData.minStockLevel}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "minStockLevel",
-                        parseInt(e.target.value) || 0
-                      )
-                    }
-                    placeholder="5"
-                    className={
-                      formErrors.minStockLevel ? "border-red-500" : ""
-                    }
-                  />
-                  {formErrors.minStockLevel && (
-                    <p className="text-sm text-red-500 mt-1">
-                      {formErrors.minStockLevel}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="reorderPoint">Reorder Point</Label>
-                  <Input
-                    id="reorderPoint"
-                    type="number"
-                    value={formData.reorderPoint}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "reorderPoint",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    placeholder="0"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Stock level at which to reorder
-                  </p>
-                </div>
-              </div>
-
-              {/* VAT Configuration */}
-              <div className="border-t pt-4">
-                <h4 className="text-lg font-medium mb-4">VAT Configuration</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="vatCategoryId">VAT Category</Label>
-                    <select
-                      id="vatCategoryId"
-                      className="w-full border rounded px-3 py-2 mt-1"
-                      value={formData.vatCategoryId}
-                      onChange={(e) =>
-                        handleInputChange("vatCategoryId", e.target.value)
-                      }
-                    >
-                      <option value="">None (Use Category Default)</option>
-                      {vatCategories && vatCategories.length > 0
-                        ? vatCategories.map((vat) => (
-                            <option key={vat.id} value={vat.id}>
-                              {vat.name} ({vat.ratePercent}%)
-                            </option>
-                          ))
-                        : null}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor="vatOverridePercent">VAT Override (%)</Label>
-                    <Input
-                      id="vatOverridePercent"
-                      type="number"
-                      step="0.01"
-                      value={formData.vatOverridePercent}
-                      onChange={(e) =>
-                        handleInputChange("vatOverridePercent", e.target.value)
-                      }
-                      placeholder="Override VAT percent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Override VAT rate for this product
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Product Settings */}
-              <div className="border-t pt-4">
-                <h4 className="text-lg font-medium mb-4">Product Settings</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="trackInventory"
-                      checked={formData.trackInventory}
-                      onCheckedChange={(checked) =>
-                        handleInputChange("trackInventory", checked)
-                      }
-                    />
-                    <Label htmlFor="trackInventory">Track Inventory</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="allowPriceOverride"
-                      checked={formData.allowPriceOverride}
-                      onCheckedChange={(checked) =>
-                        handleInputChange("allowPriceOverride", checked)
-                      }
-                    />
-                    <Label htmlFor="allowPriceOverride">
-                      Allow Price Override
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="allowDiscount"
-                      checked={formData.allowDiscount}
-                      onCheckedChange={(checked) =>
-                        handleInputChange("allowDiscount", checked)
-                      }
-                    />
-                    <Label htmlFor="allowDiscount">Allow Discount</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="isActive"
-                      checked={formData.isActive}
-                      onCheckedChange={(checked) =>
-                        handleInputChange("isActive", checked)
-                      }
-                    />
-                    <Label htmlFor="isActive">Active</Label>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="expiry" className="space-y-4 mt-6">
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-lg font-medium mb-4">Expiry Tracking Settings</h4>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Configure batch tracking and expiry date management for this product.
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="hasExpiry"
-                    checked={formData.hasExpiry}
-                    onCheckedChange={(checked) => {
-                      handleInputChange("hasExpiry", checked);
-                      if (!checked) {
-                        handleInputChange("requiresBatchTracking", false);
-                      }
-                    }}
-                  />
-                  <Label htmlFor="hasExpiry">Product Has Expiry Date</Label>
-                </div>
-
-                {formData.hasExpiry && (
-                  <>
-                    <div>
-                      <Label htmlFor="shelfLifeDays">Expected Shelf Life (Days)</Label>
-                      <Input
-                        id="shelfLifeDays"
-                        type="number"
-                        min="1"
-                        value={formData.shelfLifeDays}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "shelfLifeDays",
-                            parseInt(e.target.value) || 0
-                          )
-                        }
-                        placeholder="e.g., 30"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Expected number of days before product expires
-                      </p>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="requiresBatchTracking"
-                        checked={formData.requiresBatchTracking}
-                        onCheckedChange={(checked) =>
-                          handleInputChange("requiresBatchTracking", checked)
-                        }
-                      />
-                      <Label htmlFor="requiresBatchTracking">
-                        Require Batch/Lot Tracking
-                      </Label>
-                    </div>
-                    <p className="text-xs text-gray-500 -mt-2">
-                      When enabled, stock must be tracked by batch numbers with expiry dates
-                    </p>
-
-                    {formData.requiresBatchTracking && (
-                      <div>
-                        <Label htmlFor="stockRotationMethod">Stock Rotation Method</Label>
-                        <Select
-                          value={formData.stockRotationMethod}
-                          onValueChange={(value: "FIFO" | "FEFO" | "NONE") =>
-                            handleInputChange("stockRotationMethod", value)
-                          }
-                        >
-                          <SelectTrigger id="stockRotationMethod">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="FEFO">
-                              FEFO (First Expiry, First Out) - Recommended
-                            </SelectItem>
-                            <SelectItem value="FIFO">
-                              FIFO (First In, First Out)
-                            </SelectItem>
-                            <SelectItem value="NONE">No Automatic Rotation</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-gray-500 mt-1">
-                          FEFO automatically sells items with the earliest expiry date first
-                        </p>
-                      </div>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </>
-                )}
-              </div>
-            </TabsContent>
+                  />
 
-            <TabsContent value="age-restriction" className="space-y-4 mt-6">
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-lg font-medium mb-4">Age Verification Settings</h4>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Configure age restrictions for this product. Age-restricted items require
-                    verification at checkout.
-                  </p>
-                </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Product Name *</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter product name"
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <div>
-                  <Label htmlFor="ageRestrictionLevel">Minimum Age Requirement</Label>
-                  <Select
-                    value={formData.ageRestrictionLevel}
-                    onValueChange={(value: "NONE" | "AGE_16" | "AGE_18" | "AGE_21") => {
-                      handleInputChange("ageRestrictionLevel", value);
-                      if (value === "NONE") {
-                        handleInputChange("requireIdScan", false);
-                        handleInputChange("restrictionReason", "");
-                      }
-                    }}
-                  >
-                    <SelectTrigger id="ageRestrictionLevel">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NONE">No Restriction</SelectItem>
-                      <SelectItem value="AGE_16">16+ (Age 16 and above)</SelectItem>
-                      <SelectItem value="AGE_18">18+ (Age 18 and above)</SelectItem>
-                      <SelectItem value="AGE_21">21+ (Age 21 and above)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Select the minimum age required to purchase this product
-                  </p>
-                </div>
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              placeholder="Enter product description"
+                              rows={3}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                {formData.ageRestrictionLevel !== "NONE" && (
-                  <>
+                    <FormField
+                      control={form.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category *</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value || ""}
+                            disabled={
+                              !categories ||
+                              categories.length === 0 ||
+                              isSubmitting
+                            }
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue
+                                  placeholder={
+                                    !categories || categories.length === 0
+                                      ? "No categories available"
+                                      : "Select a category"
+                                  }
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {!categories || categories.length === 0 ? (
+                                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                  No categories found - please add a category
+                                  first
+                                </div>
+                              ) : (
+                                categories.map((category) => (
+                                  <SelectItem
+                                    key={category.id}
+                                    value={category.id}
+                                  >
+                                    {category.name}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="sku"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>SKU *</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter SKU"
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="plu"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>PLU Code (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter PLU code"
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="pricing" className="space-y-4 mt-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="basePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sale Price *</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              disabled={isSubmitting}
+                              value={field.value || ""}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="costPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cost Price *</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              disabled={isSubmitting}
+                              value={field.value || ""}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="barcode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Barcode (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter barcode"
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <div>
-                      <Label htmlFor="restrictionReason">Restriction Reason</Label>
-                      <Input
-                        id="restrictionReason"
-                        value={formData.restrictionReason}
-                        onChange={(e) =>
-                          handleInputChange("restrictionReason", e.target.value)
-                        }
-                        placeholder="e.g., Alcoholic beverage, Tobacco product..."
+                      <FormLabel>Profit Margin</FormLabel>
+                      <div className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                        {form.watch("basePrice") > 0 &&
+                        form.watch("costPrice") > 0
+                          ? `${(
+                              ((form.watch("basePrice") -
+                                form.watch("costPrice")) /
+                                form.watch("basePrice")) *
+                              100
+                            ).toFixed(1)}%`
+                          : "N/A"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weight-based Product Configuration */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-lg font-medium mb-4">
+                      Product Type & Weight Configuration
+                    </h4>
+
+                    <FormField
+                      control={form.control}
+                      name="productType"
+                      render={({ field }) => (
+                        <FormItem className="mb-4">
+                          <FormLabel>Product Type</FormLabel>
+                          <Select
+                            onValueChange={(
+                              value: "STANDARD" | "WEIGHTED" | "GENERIC"
+                            ) => {
+                              field.onChange(value);
+                              form.setValue("usesScale", value === "WEIGHTED");
+                            }}
+                            value={field.value}
+                            disabled={isSubmitting}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="STANDARD">
+                                Standard Product
+                              </SelectItem>
+                              <SelectItem value="WEIGHTED">
+                                Weighted Product
+                              </SelectItem>
+                              <SelectItem value="GENERIC">
+                                Generic Button
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="usesScale"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0 mb-4">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                form.setValue(
+                                  "productType",
+                                  checked ? "WEIGHTED" : "STANDARD"
+                                );
+                                if (checked) {
+                                  form.setValue(
+                                    "pricePerKg",
+                                    form.getValues("basePrice") || 0
+                                  );
+                                } else {
+                                  form.setValue("pricePerKg", 0);
+                                }
+                              }}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormLabel>Sold by Weight (Uses Scale)</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="usesScale"
+                      render={({ field }) => (
+                        <FormItem>
+                          {field.value && (
+                            <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+                              <FormField
+                                control={form.control}
+                                name="salesUnit"
+                                render={({ field: salesUnitField }) => (
+                                  <FormItem>
+                                    <FormLabel>Sales Unit</FormLabel>
+                                    <Select
+                                      onValueChange={salesUnitField.onChange}
+                                      value={salesUnitField.value || "PIECE"}
+                                      disabled={isSubmitting}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select unit" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="KG">
+                                          Kilograms (KG)
+                                        </SelectItem>
+                                        <SelectItem value="GRAM">
+                                          Grams (GRAM)
+                                        </SelectItem>
+                                        <SelectItem value="LITRE">
+                                          Litres (LITRE)
+                                        </SelectItem>
+                                        <SelectItem value="ML">
+                                          Millilitres (ML)
+                                        </SelectItem>
+                                        <SelectItem value="PACK">
+                                          Pack (PACK)
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name="pricePerKg"
+                                render={({ field: priceField }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      Price per{" "}
+                                      {form.watch("salesUnit") || "KG"}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        {...priceField}
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        disabled={isSubmitting}
+                                        value={priceField.value || ""}
+                                        onChange={(e) => {
+                                          const value =
+                                            parseFloat(e.target.value) || 0;
+                                          priceField.onChange(value);
+                                          form.setValue("basePrice", value);
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      This will be multiplied by the weight
+                                      during checkout
+                                    </p>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          )}
+                        </FormItem>
+                      )}
+                    />
+
+                    {form.watch("productType") === "GENERIC" && (
+                      <FormField
+                        control={form.control}
+                        name="genericDefaultPrice"
+                        render={({ field: priceField }) => (
+                          <FormItem>
+                            <div className="p-4 bg-purple-50 rounded-lg">
+                              <FormLabel>Default Price</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...priceField}
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  disabled={isSubmitting}
+                                  value={priceField.value || ""}
+                                  onChange={(e) =>
+                                    priceField.onChange(
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                              <p className="text-xs text-gray-500 mt-1">
+                                Suggested price for generic items
+                              </p>
+                            </div>
+                          </FormItem>
+                        )}
                       />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Brief reason for the age restriction (for reporting and compliance)
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="stockLevel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Current Stock</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              placeholder="0"
+                              disabled={isSubmitting}
+                              value={field.value || ""}
+                              onChange={(e) =>
+                                field.onChange(parseInt(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="minStockLevel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Minimum Stock Level</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              placeholder="5"
+                              disabled={isSubmitting}
+                              value={field.value || ""}
+                              onChange={(e) =>
+                                field.onChange(parseInt(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="reorderPoint"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Reorder Point</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              placeholder="0"
+                              disabled={isSubmitting}
+                              value={field.value || ""}
+                              onChange={(e) =>
+                                field.onChange(parseFloat(e.target.value) || 0)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Stock level at which to reorder
+                          </p>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* VAT Configuration */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-lg font-medium mb-4">
+                      VAT Configuration
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="vatCategoryId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>VAT Category</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value || ""}
+                              disabled={isSubmitting}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="None (Use Category Default)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="">
+                                  None (Use Category Default)
+                                </SelectItem>
+                                {vatCategories && vatCategories.length > 0
+                                  ? vatCategories.map((vat) => (
+                                      <SelectItem key={vat.id} value={vat.id}>
+                                        {vat.name} ({vat.ratePercent}%)
+                                      </SelectItem>
+                                    ))
+                                  : null}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="vatOverridePercent"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>VAT Override (%)</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                placeholder="Override VAT percent"
+                                disabled={isSubmitting}
+                                value={field.value || ""}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    parseFloat(e.target.value) || undefined
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Override VAT rate for this product
+                            </p>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Product Settings */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-lg font-medium mb-4">
+                      Product Settings
+                    </h4>
+                    <div className="space-y-3">
+                      <FormField
+                        control={form.control}
+                        name="trackInventory"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Track Inventory
+                              </FormLabel>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="allowPriceOverride"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Allow Price Override
+                              </FormLabel>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="allowDiscount"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Allow Discount
+                              </FormLabel>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="isActive"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">
+                                Active
+                              </FormLabel>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="expiry" className="space-y-4 mt-6">
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-lg font-medium mb-4">
+                        Expiry Tracking Settings
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Configure batch tracking and expiry date management for
+                        this product.
                       </p>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="requireIdScan"
-                        checked={formData.requireIdScan}
-                        onCheckedChange={(checked) =>
-                          handleInputChange("requireIdScan", checked)
-                        }
-                      />
-                      <Label htmlFor="requireIdScan">
-                        Require ID Scan for Verification
-                      </Label>
-                    </div>
-                    <p className="text-xs text-gray-500 -mt-2">
-                      When enabled, staff must scan a valid ID for verification. If disabled,
-                      manual date entry is allowed.
-                    </p>
+                    <FormField
+                      control={form.control}
+                      name="hasExpiry"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">
+                              Product Has Expiry Date
+                            </FormLabel>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (!checked) {
+                                  form.setValue("requiresBatchTracking", false);
+                                }
+                              }}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
 
-                    <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                      <div className="flex items-start space-x-2">
-                        <div className="text-orange-600 text-lg">⚠️</div>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-orange-900 mb-1">
-                            Age Verification Required
+                    {form.watch("hasExpiry") && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="shelfLifeDays"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Expected Shelf Life (Days)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  type="number"
+                                  min="1"
+                                  placeholder="e.g., 30"
+                                  disabled={isSubmitting}
+                                  value={field.value || ""}
+                                  onChange={(e) =>
+                                    field.onChange(
+                                      parseInt(e.target.value) || 0
+                                    )
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                              <p className="text-xs text-gray-500 mt-1">
+                                Expected number of days before product expires
+                              </p>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="requiresBatchTracking"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Require Batch/Lot Tracking
+                                </FormLabel>
+                                <p className="text-xs text-gray-500">
+                                  When enabled, stock must be tracked by batch
+                                  numbers with expiry dates
+                                </p>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  disabled={isSubmitting}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        {form.watch("requiresBatchTracking") && (
+                          <FormField
+                            control={form.control}
+                            name="stockRotationMethod"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Stock Rotation Method</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value || "FIFO"}
+                                  disabled={isSubmitting}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="FEFO">
+                                      FEFO (First Expiry, First Out) -
+                                      Recommended
+                                    </SelectItem>
+                                    <SelectItem value="FIFO">
+                                      FIFO (First In, First Out)
+                                    </SelectItem>
+                                    <SelectItem value="NONE">
+                                      No Automatic Rotation
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  FEFO automatically sells items with the
+                                  earliest expiry date first
+                                </p>
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="age-restriction" className="space-y-4 mt-6">
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-lg font-medium mb-4">
+                        Age Verification Settings
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Configure age restrictions for this product.
+                        Age-restricted items require verification at checkout.
+                      </p>
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="ageRestrictionLevel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Minimum Age Requirement</FormLabel>
+                          <Select
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              if (value === "NONE") {
+                                form.setValue("requireIdScan", false);
+                                form.setValue("restrictionReason", "");
+                              }
+                            }}
+                            value={field.value || "NONE"}
+                            disabled={isSubmitting}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="NONE">
+                                No Restriction
+                              </SelectItem>
+                              <SelectItem value="AGE_16">
+                                16+ (Age 16 and above)
+                              </SelectItem>
+                              <SelectItem value="AGE_18">
+                                18+ (Age 18 and above)
+                              </SelectItem>
+                              <SelectItem value="AGE_21">
+                                21+ (Age 21 and above)
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Select the minimum age required to purchase this
+                            product
                           </p>
-                          <p className="text-xs text-orange-700">
-                            This product will require age verification at checkout. Staff must
-                            verify the customer's age before completing the sale.
-                          </p>
+                        </FormItem>
+                      )}
+                    />
+
+                    {form.watch("ageRestrictionLevel") !== "NONE" && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="restrictionReason"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Restriction Reason</FormLabel>
+                              <FormControl>
+                                <Input
+                                  {...field}
+                                  placeholder="e.g., Alcoholic beverage, Tobacco product..."
+                                  disabled={isSubmitting}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                              <p className="text-xs text-gray-500 mt-1">
+                                Brief reason for the age restriction (for
+                                reporting and compliance)
+                              </p>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="requireIdScan"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Require ID Scan for Verification
+                                </FormLabel>
+                                <p className="text-xs text-gray-500">
+                                  When enabled, staff must scan a valid ID for
+                                  verification. If disabled, manual date entry
+                                  is allowed.
+                                </p>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  disabled={isSubmitting}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                          <div className="flex items-start space-x-2">
+                            <div className="text-orange-600 text-lg">⚠️</div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-orange-900 mb-1">
+                                Age Verification Required
+                              </p>
+                              <p className="text-xs text-orange-700">
+                                This product will require age verification at
+                                checkout. Staff must verify the customer's age
+                                before completing the sale.
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
+                      </>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
 
-          <div className="flex space-x-2 pt-6 border-t mt-6">
-            <Button onClick={handleSubmit} className="flex-1" disabled={loading}>
-              {loading
-                ? "Saving..."
-                : editingProduct
-                ? "Update Product"
-                : "Add Product"}
-            </Button>
-            <DrawerClose asChild>
-              <Button variant="outline" className="flex-1" onClick={handleClose}>
-                Cancel
-              </Button>
-            </DrawerClose>
-          </div>
-        </div>
+              <div className="flex space-x-2 pt-6 border-t mt-6">
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? "Saving..."
+                    : isEditMode
+                    ? "Update Product"
+                    : "Add Product"}
+                </Button>
+                <DrawerClose asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleClose}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                </DrawerClose>
+              </div>
+            </div>
+          </form>
+        </Form>
       </DrawerContent>
     </Drawer>
   );
 };
 
 export default ProductFormDrawer;
-

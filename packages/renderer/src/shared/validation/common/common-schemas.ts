@@ -1,6 +1,6 @@
 /**
  * Common Validation Schemas
- * 
+ *
  * Reusable Zod schemas for common field types used across multiple features.
  * These schemas can be composed into feature-specific validation schemas.
  */
@@ -56,6 +56,8 @@ export const requiredStringSchema = (fieldName: string = "Field") =>
 /**
  * Optional string schema
  * Handles empty strings, null, and undefined
+ * Note: To apply max/min, use it before the transform:
+ * z.string().max(100).trim().optional().or(z.literal("")).transform(...)
  */
 export const optionalStringSchema = z
   .string()
@@ -64,6 +66,19 @@ export const optionalStringSchema = z
   .or(z.literal(""))
   .or(z.null())
   .transform((val) => val || "");
+
+/**
+ * Helper to create optional string with max length
+ */
+export const optionalStringWithMax = (max: number, message?: string) =>
+  z
+    .string()
+    .max(max, message || `Must not exceed ${max} characters`)
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .or(z.null())
+    .transform((val) => val || "");
 
 /**
  * Positive number schema
@@ -155,10 +170,7 @@ export const uuidSchema = z.string().uuid("Invalid ID format");
  */
 export const dateStringSchema = z
   .string()
-  .refine(
-    (val) => !isNaN(Date.parse(val)),
-    "Please enter a valid date"
-  )
+  .refine((val) => !isNaN(Date.parse(val)), "Please enter a valid date")
   .optional();
 
 /**
@@ -213,4 +225,3 @@ export const optionalSkuSchema = z
   .toUpperCase()
   .optional()
   .or(z.literal(""));
-

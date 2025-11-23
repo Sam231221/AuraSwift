@@ -233,7 +233,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           {currentView === "productDashboard" ? (
             <ProductDashboardView
               products={products}
-              categories={categories}
+              categories={categories as any}
               lowStockProducts={lowStockProducts}
               onBack={onBack}
               onManageProducts={() => setCurrentView("productManagement")}
@@ -253,7 +253,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           ) : (
             <ProductDetailsView
               products={products}
-              categories={categories}
+              categories={categories as any}
               filteredProducts={filteredProducts}
               currentProducts={currentProducts}
               loading={loading}
