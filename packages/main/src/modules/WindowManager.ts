@@ -2,6 +2,7 @@ import type { AppModule } from "../AppModule.js";
 import { ModuleContext } from "../ModuleContext.js";
 import { BrowserWindow, Menu, shell, app as electronApp } from "electron";
 import type { AppInitConfig } from "../AppInitConfig.js";
+import type { UpdateCheckResult } from "electron-updater";
 import { join } from "node:path";
 
 class WindowManager implements AppModule {
@@ -70,10 +71,15 @@ class WindowManager implements AppModule {
               if (updaterInstance) {
                 // Use existing AutoUpdater instance for consistent state
                 try {
-                  const result = await updaterInstance.runAutoUpdater();
+                  const result =
+                    (await updaterInstance.runAutoUpdater()) as UpdateCheckResult | null;
 
                   // If no update found, show confirmation
-                  if (!result || (result.updateInfo && result.updateInfo.version === electronApp.getVersion())) {
+                  if (
+                    !result ||
+                    (result.updateInfo &&
+                      result.updateInfo.version === electronApp.getVersion())
+                  ) {
                     dialog.showMessageBox({
                       type: "info",
                       title: "You're Up to Date ✅",
