@@ -9,6 +9,7 @@ export * from "./layout/loading-state";
 export * from "./shift/overtime-warning";
 export * from "./shift/shift-banner";
 export * from "./shift/start-shift-dialog";
+export * from "./shift/no-active-shift-modal";
 
 // Product Selection
 export * from "./product-selection/breadcrumb";

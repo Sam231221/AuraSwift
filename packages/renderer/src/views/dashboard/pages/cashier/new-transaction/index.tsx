@@ -3,12 +3,12 @@
  * Integrates all hooks and components for the transaction flow
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 // Hooks
@@ -33,6 +33,7 @@ import {
   ShiftBanner,
   OvertimeWarning,
   StartShiftDialog,
+  NoActiveShiftModal,
   ProductSelectionPanel,
   CartPanel,
   PaymentPanel,
@@ -182,6 +183,17 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     (user?.role === "cashier" || user?.role === "manager") &&
     !shift.activeShift &&
     shift.todaySchedule !== null;
+
+  // Check if shift has ended and no future shift is available
+  const shiftHasEnded = useMemo(() => {
+    if (!shift.todaySchedule) return false;
+    const now = new Date();
+    const scheduledEnd = new Date(shift.todaySchedule.endTime);
+    const timeFromEnd = now.getTime() - scheduledEnd.getTime();
+    const minutesAfterEnd = timeFromEnd / (1000 * 60);
+    // Shift has ended if it's more than 60 minutes past the end time
+    return minutesAfterEnd > 60;
+  }, [shift.todaySchedule]);
 
   // Handle product click
   const handleProductClick = useCallback(
@@ -338,38 +350,15 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     return <LoadingState message="Loading shift data..." />;
   }
 
-  // Show blocking UI if no scheduled shift
+  // Show blocking UI if no scheduled shift OR if shift has ended with no future shift
   if (
     (user.role === "cashier" || user.role === "manager") &&
     !shift.isLoadingShift &&
     !shift.activeShift &&
-    !shift.todaySchedule
+    (!shift.todaySchedule || shiftHasEnded)
   ) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4 sm:p-6">
-        <Card className="max-w-md w-full shadow-lg">
-          <CardContent className="text-center pb-4 px-4 sm:px-6">
-            <div className="mx-auto mb-4 p-2 sm:p-3 bg-amber-100 rounded-full w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center">
-              <AlertCircle className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600" />
-            </div>
-            <h2 className="text-xl sm:text-2xl text-slate-900 font-bold mb-2">
-              No Active Shift
-            </h2>
-            <p className="text-sm sm:text-base text-slate-600 mt-2 mb-4">
-              You don't have any shift today.
-            </p>
-            <Button
-              onClick={() => logout()}
-              variant="outline"
-              size="lg"
-              className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
-            >
-              <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-              Logout
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <NoActiveShiftModal shiftHasEnded={shiftHasEnded} onLogout={logout} />
     );
   }
 
