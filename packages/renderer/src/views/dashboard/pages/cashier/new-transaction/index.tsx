@@ -46,7 +46,6 @@ import {
   QuickActionsCarousel,
   QuickActionButtons,
   NumericKeypad,
-  PaymentStatusModal,
 } from "./components/shared";
 import {
   AgeVerificationModal,
@@ -359,7 +358,12 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             <p className="text-sm sm:text-base text-slate-600 mt-2 mb-4">
               You don't have any shift today.
             </p>
-            <Button onClick={() => logout()} variant="outline" size="lg" className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
+            <Button
+              onClick={() => logout()}
+              variant="outline"
+              size="lg"
+              className="h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+            >
               <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               Logout
             </Button>
@@ -518,6 +522,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             paymentMethod={payment.paymentMethod}
             total={cart.total}
             cashAmount={payment.cashAmount}
+            cardReaderReady={true}
             onPaymentMethodSelect={payment.handlePayment}
             onCashAmountChange={payment.setCashAmount}
             onCompleteTransaction={payment.completeTransaction}

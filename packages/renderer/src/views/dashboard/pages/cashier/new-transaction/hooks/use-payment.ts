@@ -649,7 +649,6 @@ export function usePayment({
    */
   const handlePayment = useCallback(
     async (method: PaymentMethod["type"]) => {
-      setShowCardPayment(false);
       setPaymentMethod({ type: method });
 
       if (method === "cash") {
@@ -855,7 +854,6 @@ export function usePayment({
       toast.info("Receipt skipped. Transaction saved in history.");
     }
   }, [resetAndInitCart]);
-
 
   return {
     paymentStep,
