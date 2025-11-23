@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import {
   Plus,
   Edit2,
@@ -43,6 +44,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/shared/utils/cn";
 import {
   format,
@@ -52,6 +63,7 @@ import {
   eachDayOfInterval,
   isSameDay,
   isToday,
+  startOfDay,
 } from "date-fns";
 
 // Using database interfaces
@@ -97,8 +109,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   // Loading states
   const [isLoadingCashiers, setIsLoadingCashiers] = useState(true);
   const [isLoadingSchedules, setIsLoadingSchedules] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<Schedule | null>(
+    null
+  );
 
   // Get business ID from current authenticated user
   const businessId = user?.businessId || "";
@@ -120,9 +140,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             (user) => user.role === "cashier"
           );
           setCashiers(cashierUsers);
+        } else {
+          toast.error("Failed to load staff members", {
+            description: response.message || "Please try again",
+          });
         }
       } catch (error) {
         console.error("Error loading cashiers:", error);
+        toast.error("Error loading staff members", {
+          description: "Please refresh the page and try again",
+        });
       } finally {
         setIsLoadingCashiers(false);
       }
@@ -144,9 +171,16 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         const response = await window.scheduleAPI.getByBusiness(businessId);
         if (response.success && response.data) {
           setSchedules(response.data as Schedule[]);
+        } else {
+          toast.error("Failed to load schedules", {
+            description: response.message || "Please try again",
+          });
         }
       } catch (error) {
         console.error("Error loading schedules:", error);
+        toast.error("Error loading schedules", {
+          description: "Please refresh the page and try again",
+        });
       } finally {
         setIsLoadingSchedules(false);
       }
@@ -252,11 +286,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     }
 
     // Case 7: Validate backdated shifts
+    // Use startOfDay from date-fns for consistent timezone handling
     if (!SHIFT_CONFIG.ALLOW_BACKDATED_SHIFTS) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const shiftDate = new Date(selectedDate);
-      shiftDate.setHours(0, 0, 0, 0);
+      const today = startOfDay(new Date());
+      const shiftDate = startOfDay(selectedDate);
 
       if (shiftDate < today) {
         errors.push(
@@ -369,7 +402,22 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     return endTotalMinutes < startTotalMinutes;
   };
 
-  // Helper function to check for shift overlaps
+  /**
+   * Helper function to check for shift overlaps
+   *
+   * Overlap detection rules:
+   * - Two shifts overlap if they have any time in common
+   * - Exact boundaries are NOT considered overlaps (e.g., shift ending at 5pm and another starting at 5pm are allowed)
+   * - Uses strict comparison (< and >) so shifts can be back-to-back
+   * - Handles overnight shifts correctly by extending end time to next day
+   *
+   * @param newStartTime - Start time in HH:mm format
+   * @param newEndTime - End time in HH:mm format
+   * @param selectedDate - Date for the new shift
+   * @param staffId - Staff member ID to check overlaps for
+   * @param excludeScheduleId - Optional schedule ID to exclude from overlap check (for editing)
+   * @returns true if there's an overlap, false otherwise
+   */
   const checkShiftOverlap = (
     newStartTime: string,
     newEndTime: string,
@@ -377,16 +425,17 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     staffId: string,
     excludeScheduleId?: string
   ) => {
-    // Create proper Date objects for comparison
-    const newStart = new Date(selectedDate);
+    // Create proper Date objects for comparison using startOfDay for consistency
+    const baseDate = startOfDay(selectedDate);
+    const newStart = new Date(baseDate);
     const [startHour, startMinute] = newStartTime.split(":").map(Number);
     newStart.setHours(startHour, startMinute, 0, 0);
 
-    const newEnd = new Date(selectedDate);
+    const newEnd = new Date(baseDate);
     const [endHour, endMinute] = newEndTime.split(":").map(Number);
     newEnd.setHours(endHour, endMinute, 0, 0);
 
-    // Handle overnight shifts
+    // Handle overnight shifts (end time is next day)
     if (isOvernightShift(newStartTime, newEndTime)) {
       newEnd.setDate(newEnd.getDate() + 1);
     }
@@ -403,11 +452,17 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         return false;
       }
 
+      // Parse existing schedule times (already in ISO format from database)
       const existingStart = new Date(schedule.startTime);
       const existingEnd = new Date(schedule.endTime);
 
-      // Check for overlap: new shift starts before existing ends AND new shift ends after existing starts
-      return newStart < existingEnd && newEnd > existingStart;
+      // Overlap detection: shifts overlap if they have any time in common
+      // Using strict comparison (< and >) means exact boundaries are NOT overlaps
+      // Example: Shift 1 ends at 5:00 PM, Shift 2 starts at 5:00 PM → No overlap (allowed)
+      // Example: Shift 1 ends at 5:00 PM, Shift 2 starts at 4:59 PM → Overlap (not allowed)
+      const hasOverlap = newStart < existingEnd && newEnd > existingStart;
+
+      return hasOverlap;
     });
   };
 
@@ -416,20 +471,22 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     const validationErrors = validateShiftData();
 
     if (validationErrors.length > 0) {
-      // Show all validation errors in a single alert
-      alert(
-        "Please fix the following issues:\n\n" +
-          validationErrors
-            .map((error, index) => `${index + 1}. ${error}`)
-            .join("\n")
-      );
+      // Show all validation errors in a single toast
+      toast.error("Validation Error", {
+        description: validationErrors
+          .map((error, index) => `${index + 1}. ${error}`)
+          .join("\n"),
+        duration: 5000,
+      });
       return;
     }
 
     // Create proper Date objects in local timezone, then convert to ISO strings for UTC storage
     // This ensures proper timezone handling as recommended in shiftallCases.md (Case 9)
     if (!selectedDate) {
-      alert("Please select a date for the shift.");
+      toast.error("Date Required", {
+        description: "Please select a date for the shift.",
+      });
       return;
     }
 
@@ -450,11 +507,20 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     const startDateTimeISO = startDateTime.toISOString();
     const endDateTimeISO = endDateTime.toISOString();
 
+    setIsSubmitting(true);
+    const toastId = toast.loading(
+      editingSchedule ? "Updating schedule..." : "Creating schedule..."
+    );
+
     try {
       if (editingSchedule) {
         // Update existing schedule
         if (!editingSchedule.id) {
-          alert("Error: Schedule ID is missing. Please try again.");
+          toast.error("Error", {
+            description: "Schedule ID is missing. Please try again.",
+            id: toastId,
+          });
+          setIsSubmitting(false);
           return;
         }
 
@@ -467,7 +533,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         });
 
         if (response.success) {
-          // Update local state with the response data if available, otherwise use form data
+          // Update local state with the response data directly
+          // Trust the API response instead of making an unnecessary refresh call
           const updatedSchedule: Schedule = response.data
             ? (response.data as Schedule)
             : {
@@ -486,25 +553,13 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             )
           );
 
-          // Optional: Reload schedules from database to ensure consistency
-          // This helps prevent issues where local state gets out of sync with database
-          try {
-            const refreshResponse = await window.scheduleAPI.getByBusiness(
-              businessId
-            );
-            if (refreshResponse.success && refreshResponse.data) {
-              setSchedules(refreshResponse.data as Schedule[]);
-            }
-          } catch (refreshError) {
-            console.error(
-              "Error refreshing schedules after update:",
-              refreshError
-            );
-            // Don't fail the whole operation if refresh fails
-          }
+          toast.success("Schedule updated successfully", { id: toastId });
+          closeDrawer();
         } else {
-          alert("Failed to update schedule: " + response.message);
-          return;
+          toast.error("Failed to update schedule", {
+            description: response.message || "Please try again",
+            id: toastId,
+          });
         }
       } else {
         // Create new schedule
@@ -520,30 +575,63 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         if (response.success && response.data) {
           // Add to local state
           setSchedules([...schedules, response.data as Schedule]);
+          toast.success("Schedule created successfully", { id: toastId });
+          closeDrawer();
         } else {
-          alert("Failed to create schedule: " + response.message);
-          return;
+          toast.error("Failed to create schedule", {
+            description: response.message || "Please try again",
+            id: toastId,
+          });
         }
       }
-
-      closeDrawer();
     } catch (error) {
       console.error("Error saving schedule:", error);
-      alert("An error occurred while saving the schedule.");
+      toast.error("An error occurred", {
+        description: "Failed to save the schedule. Please try again.",
+        id: toastId,
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const deleteSchedule = async (id: string) => {
+  const handleDeleteClick = (schedule: Schedule) => {
+    setScheduleToDelete(schedule);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!scheduleToDelete) {
+      setDeleteDialogOpen(false);
+      return;
+    }
+
+    setIsDeleting(true);
+    const toastId = toast.loading("Deleting schedule...");
+
     try {
-      const response = await window.scheduleAPI.delete(id);
+      const response = await window.scheduleAPI.delete(scheduleToDelete.id);
       if (response.success) {
-        setSchedules(schedules.filter((schedule) => schedule.id !== id));
+        setSchedules(
+          schedules.filter((schedule) => schedule.id !== scheduleToDelete.id)
+        );
+        toast.success("Schedule deleted successfully", { id: toastId });
       } else {
-        alert("Failed to delete schedule: " + response.message);
+        toast.error("Failed to delete schedule", {
+          description: response.message || "Please try again",
+          id: toastId,
+        });
       }
     } catch (error) {
       console.error("Error deleting schedule:", error);
-      alert("An error occurred while deleting the schedule.");
+      toast.error("An error occurred", {
+        description: "Failed to delete the schedule. Please try again.",
+        id: toastId,
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setScheduleToDelete(null);
     }
   };
 
@@ -638,7 +726,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             </DrawerTrigger>
 
             <DrawerContent className="max-h-[90vh] flex flex-col">
-              <DrawerHeader className="flex-shrink-0">
+              <DrawerHeader className="shrink-0">
                 <DrawerTitle className="text-2xl">
                   {editingSchedule
                     ? "Edit Staff Schedule"
@@ -1065,12 +1153,21 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               <DrawerFooter className="px-0 shrink-0 border-t bg-white">
                 <Button
                   onClick={handleSubmit}
+                  disabled={isSubmitting}
                   className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
                 >
-                  {editingSchedule ? "Update Schedule" : "Create Schedule"}
+                  {isSubmitting
+                    ? "Saving..."
+                    : editingSchedule
+                    ? "Update Schedule"
+                    : "Create Schedule"}
                 </Button>
                 <DrawerClose asChild>
-                  <Button variant="outline" onClick={closeDrawer}>
+                  <Button
+                    variant="outline"
+                    onClick={closeDrawer}
+                    disabled={isSubmitting}
+                  >
                     Cancel
                   </Button>
                 </DrawerClose>
@@ -1286,7 +1383,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
 
                             {schedule.notes && (
                               <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg">
-                                <StickyNote className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                <StickyNote className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                                 <div>
                                   <p className="text-sm font-medium text-amber-800 mb-1">
                                     Notes:
@@ -1310,9 +1407,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                                   Edit
                                 </Button>
                                 <Button
-                                  onClick={() => deleteSchedule(schedule.id)}
+                                  onClick={() => handleDeleteClick(schedule)}
                                   size="sm"
                                   variant="outline"
+                                  disabled={isDeleting}
                                   className="flex-1 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
                                 >
                                   <Trash2 className="w-4 h-4 mr-1" />
@@ -1354,6 +1452,40 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           </motion.div>
         ) : null}
       </motion.div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Schedule?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {scheduleToDelete &&
+                (() => {
+                  const staffMember = cashiers.find(
+                    (c) => c.id === scheduleToDelete.staffId
+                  );
+                  const staffName = staffMember
+                    ? `${staffMember.firstName} ${staffMember.lastName}`
+                    : "This staff member";
+                  return `Are you sure you want to delete the schedule for ${staffName} on ${format(
+                    new Date(scheduleToDelete.startTime),
+                    "PPP"
+                  )}? This action cannot be undone.`;
+                })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
