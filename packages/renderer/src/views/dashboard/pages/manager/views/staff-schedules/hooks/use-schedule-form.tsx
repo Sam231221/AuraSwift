@@ -15,7 +15,7 @@ import {
 } from "../schemas/schedule-schema";
 import { useFormNotification } from "@/shared/hooks/use-form-notification";
 // Optimized: Import individual function to reduce bundle size
-import format from "date-fns/format";
+import { format } from "date-fns/format";
 
 interface Schedule {
   id: string;

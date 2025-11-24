@@ -63,14 +63,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/shared/utils/cn";
 // Optimized: Import individual functions to reduce bundle size
-import format from "date-fns/format";
-import addWeeks from "date-fns/addWeeks";
-import startOfWeek from "date-fns/startOfWeek";
-import endOfWeek from "date-fns/endOfWeek";
-import eachDayOfInterval from "date-fns/eachDayOfInterval";
-import isSameDay from "date-fns/isSameDay";
-import isToday from "date-fns/isToday";
-import startOfDay from "date-fns/startOfDay";
+import { format } from "date-fns/format";
+import { addWeeks } from "date-fns/addWeeks";
+import { startOfWeek } from "date-fns/startOfWeek";
+import { endOfWeek } from "date-fns/endOfWeek";
+import { eachDayOfInterval } from "date-fns/eachDayOfInterval";
+import { isSameDay } from "date-fns/isSameDay";
+import { isToday } from "date-fns/isToday";
+import { startOfDay } from "date-fns/startOfDay";
 import { TimePicker } from "../../../../../components/time-picker";
 import { useScheduleForm } from "./staff-schedules/hooks/use-schedule-form";
 
