@@ -27,7 +27,7 @@
     "postinstall": "electron-rebuild",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run",
+    "test:run": "node scripts/run-vitest.js",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
     "test:unit": "vitest run tests/unit",
