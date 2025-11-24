@@ -2,6 +2,59 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/Sam231221/AuraSwift/compare/v1.7.1...v1.8.0) (2025-11-24)
+
+
+### chore
+
+* **WindowManager:** add type annotation for update check result and improve update check logic for better clarity ([](https://github.com/Sam231221/AuraSwift/commit/f9b02559afb1a663a64aea5a898a828f22f38f38))
+* **release:** migrate from .releaserc.json to .releaserc.js for enhanced semantic release configuration and remove deprecated versioning files ([](https://github.com/Sam231221/AuraSwift/commit/76621aa86356438b5adc847f8b960b9bc942a171))
+* **database:** remove DATABASE_CONFIG.md and test-db-path.mjs files to streamline database configuration and testing utilities ([](https://github.com/Sam231221/AuraSwift/commit/88ec3742cb717bc98b4ff111de062f32cfb54f8e))
+* remove unused assets and scripts, including react.svg and bridge-migration.mjs, to streamline the project structure ([](https://github.com/Sam231221/AuraSwift/commit/1480f4c3ac99fc379957b06d410002ff938ce6a0))
+
+
+### feat
+
+* **staff-schedules:** add delete confirmation dialog, improve error handling with toast notifications, and enhance shift validation logic for better user experience ([](https://github.com/Sam231221/AuraSwift/commit/65862b60048019a921533dedcb9e3f70f55466ef))
+* **transactions:** add IPC handler for creating transactions from cart, including validation and total calculation ([](https://github.com/Sam231221/AuraSwift/commit/d6830a7a568b5601c3ef626543162ab06570fcff))
+* **cashier:** add NoActiveShiftModal component to handle scenarios with no scheduled or ended shifts, enhancing user feedback and experience ([](https://github.com/Sam231221/AuraSwift/commit/b750deefa522ed984a214cadc4316c3c97a0666d))
+* **tests:** add script to run Vitest with graceful handling of "no tests found" case; update test run command in package.json ([](https://github.com/Sam231221/AuraSwift/commit/944d38dcbe131c561523150fcf060f7c40421c4d))
+* **build:** enhance build configuration with improved file exclusions, conditional sourcemaps for production, and add bundle visualizer for performance analysis ([](https://github.com/Sam231221/AuraSwift/commit/f8bcd1294691e391e9d024ac5097895f0f542ae7))
+* **database:** enhance DBManager to ensure database directory creation and validation; improve error handling in recovery dialogs for test and CI modes ([](https://github.com/Sam231221/AuraSwift/commit/225f605bab3235fae4a847b58b1fa3cb1d1f7e35))
+* **shift-management:** enhance shift creation logic with device tracking, validation for starting cash limits, and improved error handling during shift creation ([](https://github.com/Sam231221/AuraSwift/commit/2f4a15c000963f50bb42fe32748d97dc9f3db994))
+* **auto-updater:** enhance update handling with improved error management, user notifications, and consistent state management ([](https://github.com/Sam231221/AuraSwift/commit/8da2e4134b423428e35ff828cca71da6a1445ca9))
+* **database:** implement comprehensive database validation, migration, and recovery mechanisms. ([](https://github.com/Sam231221/AuraSwift/commit/f51db1ea14f6fcd198e16833a2e26b45b5b18c02))
+* **transactions:** implement inventory update logic after transaction creation and enhance payment method options ([](https://github.com/Sam231221/AuraSwift/commit/5c8be4eed52994b1d8d22ceee9cbc113b7a86add))
+* **auto-updater:** implement request timeout, retry logic, and performance metrics tracking for update checks ([](https://github.com/Sam231221/AuraSwift/commit/1a957167b3a96b505d65a6d9f164d7202813907d))
+* **auto-updater:** implement smart scheduling for update checks based on user activity and enhance caching mechanism for update results ([](https://github.com/Sam231221/AuraSwift/commit/f34d4bf6b24d5adc12d887de24f1d1f7d4111f8a))
+* **staff-schedules:** implement time picker component for improved time selection, enhance validation feedback, and optimize performance with memoization and callbacks ([](https://github.com/Sam231221/AuraSwift/commit/c27409cf0c6804c44d1ed9ef2e08dbd4e1b562e8))
+* **tests:** integrate Vitest for testing framework, add comprehensive test structure and utilities ([](https://github.com/Sam231221/AuraSwift/commit/6975537a73d1c987cc7edf946df04469c4fdd4a4))
+* **validation:** introduce new validation schemas and hooks for login, registration, and payment forms; enhance existing schemas for better error handling and user experience ([](https://github.com/Sam231221/AuraSwift/commit/b2d7b3622c3c38a0f3d6e8d92c606a755049e656))
+
+
+### fix
+
+* **transactions:** expand payment method options and update unused parameter for interface compatibility ([](https://github.com/Sam231221/AuraSwift/commit/be484948e29b25e05ae76810d208bc7d5f5a4b31))
+* **imports:** optimize date-fns imports in staff schedules view and hook to reduce bundle size ([](https://github.com/Sam231221/AuraSwift/commit/1e104185b4a9bb0ddce694a991db6c77d684f5ef))
+* **dependencies:** update package-lock.json to include new dev dependencies and adjust existing ones for improved build performance ([](https://github.com/Sam231221/AuraSwift/commit/fa6d7706d6bfd3777cf0b1c5e26728a7719d6803))
+* **release:** update release configuration to use ES module syntax and remove unnecessary comments ([](https://github.com/Sam231221/AuraSwift/commit/d5ead1bda1d770375e6afa225b4097d48c9d26c4))
+
+
+### refactor
+
+* **cashier:** clean up unused imports, enhance button formatting for better readability, and ensure card reader readiness in payment processing ([](https://github.com/Sam231221/AuraSwift/commit/29db7a3d59a896c91e940f0d3137c02bf7d00d5f))
+* **database:** enhance transaction items schema to support category items and update transaction manager for improved item handling ([](https://github.com/Sam231221/AuraSwift/commit/198f2c7ba8f15eff03a9a117e3c422d45322ebc7))
+* **views:** major Files and Folders refactors ([](https://github.com/Sam231221/AuraSwift/commit/4c9086fcdef910db0e84f78c5c6fd41b4d52e8e4))
+* **payment:** remove Stripe integration references, simplify payment service, and update related interfaces ([](https://github.com/Sam231221/AuraSwift/commit/f4d9382c65eb099950a6e2e3e4c32d101d901a0d))
+
+
+### style
+
+* **cashier:** enhance button dimensions for improved accessibility and visual consistency across transaction components, including adjustments to padding and layout in various modals and panels ([](https://github.com/Sam231221/AuraSwift/commit/067f6ee5f457be43fbcceda48ffc57b9729f820d))
+* **dashboard:** enhance UI responsiveness and visual consistency across admin, cashier, and manager dashboard pages, including adjustments to layout, spacing, and typography ([](https://github.com/Sam231221/AuraSwift/commit/7fe32af53601a713aed88f6920ee2cfbd1d05b5d))
+* **cashier:** improve UI responsiveness and visual consistency across transaction components, including adjustments to layout, spacing, and typography ([](https://github.com/Sam231221/AuraSwift/commit/1b530f2ed6ee56b172c3c910b3a9dbf1b73c8751))
+* **auth:** update UI components for improved responsiveness and visual consistency, including adjustments to layout, spacing, and typography across authentication views ([](https://github.com/Sam231221/AuraSwift/commit/e0a07861d2b513718254fd64b7345e7ddc94a048))
+
 ## [1.7.1](https://github.com/Sam231221/AuraSwift/compare/v1.7.0...v1.7.1) (2025-11-20)
 
 
