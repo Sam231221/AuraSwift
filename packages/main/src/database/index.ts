@@ -121,6 +121,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const bcryptWrapper = {
       hash: bcrypt.hash,
       compare: bcrypt.compare,
+      genSalt: bcrypt.genSalt,
     };
 
     const uuid = { v4: uuidv4 };
