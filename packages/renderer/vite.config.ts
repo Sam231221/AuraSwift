@@ -2,7 +2,7 @@ import path from "path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { visualizer } from "vite-bundle-visualizer";
+import { visualizer } from "rollup-plugin-visualizer";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -13,7 +13,7 @@ export default defineConfig({
     process.env.ANALYZE === "true" &&
       visualizer({
         open: true,
-        filename: "dist/stats.html",
+        filename: "./dist/stats.html",
         gzipSize: true,
         brotliSize: true,
       }),
