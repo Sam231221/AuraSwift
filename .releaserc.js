@@ -1,11 +1,4 @@
-/**
- * Semantic Release Configuration
- *
- * This configuration generates release notes with emoji-prefixed section headers
- * for better UX in client update dialogs.
- */
-
-module.exports = {
+export default {
   branches: ["main"],
   repositoryUrl: "https://github.com/Sam231221/AuraSwift",
   plugins: [
