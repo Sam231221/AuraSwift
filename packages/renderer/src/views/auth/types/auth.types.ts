@@ -14,6 +14,14 @@ export interface User {
   updatedAt: string;
   isActive: boolean;
 }
+export interface UserForLogin {
+  id: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  role: "admin" | "manager" | "cashier";
+  color: string;
+}
 
 export interface Business {
   id: string;
@@ -73,7 +81,10 @@ export interface AuthContextType {
   logout: (options?: { clockOut?: boolean }) => Promise<{
     needsClockOutWarning?: boolean;
   }>;
-  clockIn: (userId: string, businessId: string) => Promise<{
+  clockIn: (
+    userId: string,
+    businessId: string
+  ) => Promise<{
     success: boolean;
     message?: string;
   }>;

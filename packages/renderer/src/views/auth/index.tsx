@@ -11,10 +11,7 @@ export default function AuthPage() {
       <AuthHeader />
       <main className="flex-1 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center px-4 sm:px-6 lg:px-8">
         <AuthHeroSection />
-
-        <div className="w-full flex items-center justify-center lg:w-auto">
-          <AuthUserSelection />
-        </div>
+        <AuthUserSelection />
       </main>
       <AuthFooter />
     </div>

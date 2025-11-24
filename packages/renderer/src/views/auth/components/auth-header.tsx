@@ -19,12 +19,14 @@ export function AuthHeader() {
 
   return (
     <header className="w-full flex items-center justify-between px-2 sm:px-4 lg:px-6 py-2 sm:py-3 border-b border-gray-200 bg-white/90 shadow-sm select-none">
-      <div className="flex py-2 items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-xl flex items-center justify-center shrink-0">
           <Store className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-base sm:text-xl font-bold text-foreground truncate">AuraSwift</h1>
+          <h1 className="text-base sm:text-xl font-bold text-foreground truncate">
+            AuraSwift
+          </h1>
           <p className="text-[10px] sm:text-[12px] text-muted-foreground truncate">
             Point of Sale System
           </p>
@@ -39,7 +41,10 @@ export function AuthHeader() {
       <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 min-w-0">
         <span className="hidden md:inline-flex items-center gap-1.5 lg:gap-2 text-gray-400">
           <Wifi className="w-4 h-4 lg:w-5 lg:h-5" aria-label="Network Status" />
-          <BatteryFull className="w-4 h-4 lg:w-5 lg:h-5" aria-label="Battery Status" />
+          <BatteryFull
+            className="w-4 h-4 lg:w-5 lg:h-5"
+            aria-label="Battery Status"
+          />
           <Bell className="w-4 h-4 lg:w-5 lg:h-5" aria-label="Notifications" />
         </span>
         <span
