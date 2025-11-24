@@ -131,7 +131,28 @@ export class DBManager {
         // LAYER 1: Pre-Connection Health Assessment
         // ========================================
 
-        // Validate directory first
+        // Ensure directory exists first (before validation)
+        const dbDir = path.dirname(dbPath);
+        if (!fs.existsSync(dbDir)) {
+          try {
+            fs.mkdirSync(dbDir, { recursive: true });
+            console.log(`✅ Created database directory: ${dbDir}`);
+          } catch (mkdirError) {
+            const errorMessage =
+              mkdirError instanceof Error
+                ? mkdirError.message
+                : String(mkdirError);
+            console.error(`❌ Failed to create database directory: ${errorMessage}`);
+            await showDatabaseErrorDialog(
+              "Database Directory Error",
+              `Failed to create database directory: ${dbDir}`,
+              errorMessage
+            );
+            throw new Error(`Failed to create database directory: ${errorMessage}`);
+          }
+        }
+
+        // Validate directory after ensuring it exists
         const dirValidation = validateDatabaseDirectory(dbPath);
         if (!dirValidation.valid) {
           const errorMessage =
@@ -143,12 +164,6 @@ export class DBManager {
             `Database directory: ${dirValidation.directory || "unknown"}`
           );
           throw new Error(errorMessage);
-        }
-
-        // Ensure directory exists
-        const dbDir = path.dirname(dbPath);
-        if (!fs.existsSync(dbDir)) {
-          fs.mkdirSync(dbDir, { recursive: true });
         }
 
         // Validate database file (if it exists)

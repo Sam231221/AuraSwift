@@ -33,8 +33,41 @@ export interface RecoveryDialogOptions {
 export async function showRecoveryDialog(
   options: RecoveryDialogOptions
 ): Promise<RecoveryAction> {
-  const { title, message, detail, backupPath, showRepairOption, showRestoreOption } =
-    options;
+  const {
+    title,
+    message,
+    detail,
+    backupPath,
+    showRepairOption,
+    showRestoreOption,
+  } = options;
+
+  // Skip dialog in test/CI mode - app may not be ready
+  const isTestMode =
+    process.env.PLAYWRIGHT_TEST === "true" ||
+    process.env.CI === "true" ||
+    process.env.NODE_ENV === "test";
+
+  if (isTestMode) {
+    console.warn(`[TEST MODE] ${title}: ${message}`);
+    if (detail) {
+      console.warn(`[TEST MODE] Detail: ${detail}`);
+    }
+    // In test mode, automatically use the recommended action
+    return "backup-and-fresh";
+  }
+
+  // Only show dialog if app is ready
+  if (!app.isReady()) {
+    console.warn(`${title}: ${message}`);
+    if (detail) {
+      console.warn(`Detail: ${detail}`);
+    }
+    console.warn(
+      "⚠️  App not ready, using default recovery action: backup-and-fresh"
+    );
+    return "backup-and-fresh";
+  }
 
   // Build detail message with backup location if available
   let detailMessage = detail || "";
@@ -96,7 +129,9 @@ export async function showRecoveryDialog(
 /**
  * Show database too old dialog
  */
-export async function showDatabaseTooOldDialog(backupPath?: string): Promise<RecoveryAction> {
+export async function showDatabaseTooOldDialog(
+  backupPath?: string
+): Promise<RecoveryAction> {
   return showRecoveryDialog({
     title: "⚠️  Incompatible Database Detected",
     message: "Your database cannot be automatically migrated.",
@@ -157,7 +192,9 @@ export async function showMigrationFailureDialog(
 /**
  * Show incompatible schema dialog
  */
-export async function showIncompatibleSchemaDialog(backupPath?: string): Promise<RecoveryAction> {
+export async function showIncompatibleSchemaDialog(
+  backupPath?: string
+): Promise<RecoveryAction> {
   return showRecoveryDialog({
     title: "⚠️  Database Schema Incompatible",
     message: "Your database schema is incompatible with this version.",
@@ -173,12 +210,39 @@ export async function showIncompatibleSchemaDialog(backupPath?: string): Promise
 
 /**
  * Show simple error dialog (for non-recoverable errors)
+ * Skips dialog in test/CI mode to avoid "app not ready" errors
  */
 export async function showDatabaseErrorDialog(
   title: string,
   message: string,
   detail?: string
 ): Promise<void> {
+  // Skip dialog in test/CI mode - app may not be ready
+  const isTestMode =
+    process.env.PLAYWRIGHT_TEST === "true" ||
+    process.env.CI === "true" ||
+    process.env.NODE_ENV === "test";
+
+  if (isTestMode) {
+    console.error(`[TEST MODE] ${title}: ${message}`);
+    if (detail) {
+      console.error(`[TEST MODE] Detail: ${detail}`);
+    }
+    return;
+  }
+
+  // Only show dialog if app is ready
+  if (!app.isReady()) {
+    console.error(`${title}: ${message}`);
+    if (detail) {
+      console.error(`Detail: ${detail}`);
+    }
+    console.warn(
+      "⚠️  App not ready, skipping dialog. Directory will be created automatically."
+    );
+    return;
+  }
+
   await dialog.showMessageBox({
     type: "error",
     title,
@@ -188,4 +252,3 @@ export async function showDatabaseErrorDialog(
     defaultId: 0,
   });
 }
-
