@@ -9,7 +9,6 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -69,6 +68,8 @@ export function AddUserForm({
       lastName: { keyboardMode: "qwerty" },
       email: { keyboardMode: "qwerty" },
       address: { keyboardMode: "qwerty" },
+      password: { keyboardMode: "qwerty" },
+      confirmPassword: { keyboardMode: "qwerty" },
     },
   });
 
@@ -124,7 +125,7 @@ export function AddUserForm({
           name="avatar"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Profile Picture (Optional)</FormLabel>
+
               <FormControl>
                 <AvatarUpload
                   label="Profile Picture (Optional)"
@@ -144,7 +145,7 @@ export function AddUserForm({
           <FormField
             control={form.control}
             name="firstName"
-            render={({ field }) => (
+            render={() => (
               <FormItem>
 
                 <FormControl>
@@ -170,7 +171,7 @@ export function AddUserForm({
           <FormField
             control={form.control}
             name="lastName"
-            render={({ field }) => (
+            render={() => (
               <FormItem>
 
                 <FormControl>
@@ -198,11 +199,9 @@ export function AddUserForm({
         <FormField
           control={form.control}
           name="email"
-          render={({ field }) => (
+          render={() => (
             <FormItem>
-              <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                Email *
-              </FormLabel>
+        
               <FormControl>
                 <AdaptiveFormField
                   {...form.register("email")}
@@ -227,7 +226,7 @@ export function AddUserForm({
         <FormField
           control={form.control}
           name="address"
-          render={({ field }) => (
+          render={() => (
             <FormItem>
 
               <FormControl>
@@ -298,17 +297,22 @@ export function AddUserForm({
           <FormField
             control={form.control}
             name="password"
-            render={({ field }) => (
+            render={() => (
               <FormItem>
-                <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                  Password *
-                </FormLabel>
                 <FormControl>
-                  <Input
+                  <AdaptiveFormField
+                    {...form.register("password")}
+                    label="Password *"
                     type="password"
+                    value={keyboard.formValues.password || ""}
+                    error={form.formState.errors.password?.message}
+                    onFocus={() => keyboard.handleFieldFocus("password")}
                     placeholder="Minimum 8 characters"
-                    className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
-                    {...field}
+                    className={cn(
+                      "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                      keyboard.activeField === "password" && "ring-2 ring-primary border-primary"
+                    )}
+                    readOnly
                   />
                 </FormControl>
                 <FormMessage />
@@ -319,17 +323,22 @@ export function AddUserForm({
           <FormField
             control={form.control}
             name="confirmPassword"
-            render={({ field }) => (
+            render={() => (
               <FormItem>
-                <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                  Confirm Password *
-                </FormLabel>
                 <FormControl>
-                  <Input
+                  <AdaptiveFormField
+                    {...form.register("confirmPassword")}
+                    label="Confirm Password *"
                     type="password"
+                    value={keyboard.formValues.confirmPassword || ""}
+                    error={form.formState.errors.confirmPassword?.message}
+                    onFocus={() => keyboard.handleFieldFocus("confirmPassword")}
                     placeholder="Confirm password"
-                    className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
-                    {...field}
+                    className={cn(
+                      "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                      keyboard.activeField === "confirmPassword" && "ring-2 ring-primary border-primary"
+                    )}
+                    readOnly
                   />
                 </FormControl>
                 <FormMessage />
@@ -372,7 +381,7 @@ export function AddUserForm({
               onClear={keyboard.handleClear}
               onEnter={() => {
                 // Move to next field or submit if last field
-                if (keyboard.activeField === "address") {
+                if (keyboard.activeField === "confirmPassword") {
                   form.handleSubmit(handleSubmit)();
                 }
               }}
