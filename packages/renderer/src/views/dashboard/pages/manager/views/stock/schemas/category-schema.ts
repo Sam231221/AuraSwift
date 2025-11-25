@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { requiredStringSchema, uuidSchema } from "@/shared/validation/common";
+import { requiredStringSchema } from "@/shared/validation/common";
 
 /**
  * Category name schema with custom validation
@@ -54,7 +54,8 @@ export const categoryCreateSchema = z.object({
   name: categoryNameSchema,
   description: descriptionSchema,
   parentId: parentIdSchema,
-  businessId: uuidSchema,
+  // Accept any non-empty string for businessId (not just UUIDs) to support legacy IDs
+  businessId: z.string().min(1, "Business ID is required"),
   // Optional UI fields (not validated but included for form state)
   vatCategoryId: z.string().optional().or(z.literal("")),
   vatOverridePercent: z.string().optional().or(z.literal("")),
@@ -69,7 +70,8 @@ export const categoryCreateSchema = z.object({
  * Uses safeExtend() because categoryCreateSchema contains refinements
  */
 export const categoryUpdateSchema = categoryCreateSchema.safeExtend({
-  id: uuidSchema,
+  // Accept any non-empty string for id (not just UUIDs) to support legacy IDs
+  id: z.string().min(1, "ID is required"),
 });
 
 /**

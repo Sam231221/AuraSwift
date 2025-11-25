@@ -1,10 +1,11 @@
 /**
  * Category Form Hook
- * 
+ *
  * Custom hook for managing category form state, validation, and submission
  * using React Hook Form with Zod validation.
  */
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { configuredZodResolver } from "@/shared/validation/resolvers";
 import {
@@ -74,7 +75,7 @@ const mapCategoryToFormData = (
 
 /**
  * Hook for managing category form
- * 
+ *
  * @example
  * ```tsx
  * const { form, handleSubmit, isSubmitting } = useCategoryForm({
@@ -103,30 +104,45 @@ export function useCategoryForm({
     defaultValues: category
       ? mapCategoryToFormData(category, businessId)
       : getDefaultValues(businessId),
-    mode: "onBlur", // Validate on blur for better UX
+    mode: "onChange", // Enable real-time validation for better UX with keyboard
   });
+
+  // Reset form when category changes (for edit mode)
+  useEffect(() => {
+    if (category) {
+      form.reset(mapCategoryToFormData(category, businessId));
+    } else {
+      form.reset(getDefaultValues(businessId));
+    }
+  }, [category, businessId, form]);
 
   const { notifySuccess, notifyError } = useFormNotification({
     entityName: "Category",
   });
 
-  const handleSubmit = form.handleSubmit(async (data) => {
-    try {
-      await onSubmit(data);
-      notifySuccess(isEditMode ? "update" : "create");
-      
-      // Reset form after successful creation (not on update)
-      if (!isEditMode) {
-        form.reset(getDefaultValues(businessId));
+  const handleSubmit = form.handleSubmit(
+    async (data) => {
+      try {
+        await onSubmit(data);
+        notifySuccess(isEditMode ? "update" : "create");
+
+        // Reset form after successful creation (not on update)
+        if (!isEditMode) {
+          form.reset(getDefaultValues(businessId));
+        }
+
+        onSuccess?.();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+        notifyError(errorMessage);
       }
-      
-      onSuccess?.();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "An error occurred";
-      notifyError(errorMessage);
+    },
+    (errors) => {
+      // Log validation errors for debugging
+      console.error("Category form validation errors:", errors);
     }
-  });
+  );
 
   return {
     form,
@@ -136,4 +152,3 @@ export function useCategoryForm({
     isEditMode,
   };
 }
-

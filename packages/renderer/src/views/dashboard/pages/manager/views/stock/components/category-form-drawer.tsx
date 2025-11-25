@@ -1,12 +1,16 @@
 /**
  * Category Form Drawer Component
- * 
+ *
  * Form drawer for creating and editing categories using React Hook Form.
  */
 
+import React from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { AdaptiveFormField } from "@/components/adaptive-keyboard/adaptive-form-field";
+import { AdaptiveTextarea } from "@/components/adaptive-keyboard/adaptive-textarea";
+import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/shared/hooks";
+import { cn } from "@/shared/utils/cn";
 import {
   Drawer,
   DrawerContent,
@@ -89,9 +93,10 @@ export function CategoryFormDrawer({
         name: data.name,
         description: data.description || undefined,
         parentId: data.parentId || null,
-        vatCategoryId: data.vatCategoryId && data.vatCategoryId !== "" 
-          ? data.vatCategoryId 
-          : null,
+        vatCategoryId:
+          data.vatCategoryId && data.vatCategoryId !== ""
+            ? data.vatCategoryId
+            : null,
         vatOverridePercent:
           data.vatOverridePercent && data.vatOverridePercent !== ""
             ? parseFloat(data.vatOverridePercent)
@@ -99,9 +104,7 @@ export function CategoryFormDrawer({
         color: data.color && data.color !== "" ? data.color : null,
         image: data.image && data.image !== "" ? data.image : null,
         isActive: data.isActive ?? true,
-        ...(isEditMode && category
-          ? {}
-          : { sortOrder: categories.length + 1 }),
+        ...(isEditMode && category ? {} : { sortOrder: categories.length + 1 }),
       };
 
       if (isEditMode && category) {
@@ -113,6 +116,26 @@ export function CategoryFormDrawer({
     onSuccess: onClose,
   });
 
+  // Keyboard integration hook
+  const keyboard = useKeyboardWithRHF({
+    setValue: form.setValue,
+    watch: form.watch,
+    fieldConfigs: {
+      name: { keyboardMode: "qwerty" },
+      description: { keyboardMode: "qwerty" },
+      vatOverridePercent: { keyboardMode: "numeric" },
+      color: { keyboardMode: "qwerty" },
+      image: { keyboardMode: "qwerty" },
+    },
+  });
+
+  // Close keyboard when drawer closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      keyboard.handleCloseKeyboard();
+    }
+  }, [isOpen, keyboard]);
+
   // Filter out current category from parent options
   const parentOptions = buildCategoryTree(categories as any).filter(
     (cat) => !category || cat.id !== category.id
@@ -120,7 +143,7 @@ export function CategoryFormDrawer({
 
   return (
     <Drawer open={isOpen} onOpenChange={onClose} direction="right">
-      <DrawerContent className="h-full w-[500px] mt-0 rounded-none fixed right-0 top-0">
+      <DrawerContent className="h-full w-[95%] sm:w-[900px] md:w-[1000px] lg:w-[1200px] xl:w-[1400px] sm:max-w-none mt-0 rounded-none fixed right-0 top-0">
         <DrawerHeader className="border-b">
           <DrawerTitle>
             {isEditMode ? "Edit Category" : "Add New Category"}
@@ -138,14 +161,22 @@ export function CategoryFormDrawer({
               <FormField
                 control={form.control}
                 name="name"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
-                    <FormLabel>Category Name *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        {...form.register("name")}
+                        label="Category Name *"
+                        value={keyboard.formValues.name || ""}
+                        error={form.formState.errors.name?.message}
+                        onFocus={() => keyboard.handleFieldFocus("name")}
                         placeholder="Enter category name"
                         disabled={isSubmitting}
+                        className={cn(
+                          keyboard.activeField === "name" &&
+                            "ring-2 ring-primary border-primary"
+                        )}
+                        readOnly
                       />
                     </FormControl>
                     <FormMessage />
@@ -156,15 +187,22 @@ export function CategoryFormDrawer({
               <FormField
                 control={form.control}
                 name="description"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
-                    <FormLabel>Description (Optional)</FormLabel>
                     <FormControl>
-                      <Textarea
-                        {...field}
+                      <AdaptiveTextarea
+                        {...form.register("description")}
+                        label="Description (Optional)"
+                        value={keyboard.formValues.description || ""}
+                        error={form.formState.errors.description?.message}
+                        onFocus={() => keyboard.handleFieldFocus("description")}
                         placeholder="Enter category description"
-                        rows={3}
                         disabled={isSubmitting}
+                        className={cn(
+                          keyboard.activeField === "description" &&
+                            "ring-2 ring-primary border-primary"
+                        )}
+                        readOnly
                       />
                     </FormControl>
                     <FormMessage />
@@ -180,10 +218,11 @@ export function CategoryFormDrawer({
                     <FormLabel>Parent Category</FormLabel>
                     <Select
                       onValueChange={(value) =>
-                        field.onChange(value === "" ? undefined : value)
+                        field.onChange(value === "none" ? undefined : value)
                       }
-                      value={field.value || ""}
+                      value={field.value || "none"}
                       disabled={isSubmitting}
+                      onOpenChange={() => keyboard.handleCloseKeyboard()}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -191,7 +230,7 @@ export function CategoryFormDrawer({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None (Top-level)</SelectItem>
+                        <SelectItem value="none">None (Top-level)</SelectItem>
                         {parentOptions.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>
                             {cat.name}
@@ -211,9 +250,12 @@ export function CategoryFormDrawer({
                   <FormItem>
                     <FormLabel>VAT Category</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value || ""}
+                      onValueChange={(value) =>
+                        field.onChange(value === "none" ? undefined : value)
+                      }
+                      value={field.value || "none"}
                       disabled={isSubmitting}
+                      onOpenChange={() => keyboard.handleCloseKeyboard()}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -221,7 +263,7 @@ export function CategoryFormDrawer({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {vatCategories.map((vat) => (
                           <SelectItem key={vat.id} value={vat.id}>
                             {vat.name} ({vat.ratePercent}%)
@@ -237,17 +279,26 @@ export function CategoryFormDrawer({
               <FormField
                 control={form.control}
                 name="vatOverridePercent"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
-                    <FormLabel>VAT Override (%)</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        min="0"
-                        step="0.01"
+                      <AdaptiveFormField
+                        {...form.register("vatOverridePercent")}
+                        label="VAT Override (%)"
+                        value={keyboard.formValues.vatOverridePercent || ""}
+                        error={
+                          form.formState.errors.vatOverridePercent?.message
+                        }
+                        onFocus={() =>
+                          keyboard.handleFieldFocus("vatOverridePercent")
+                        }
                         placeholder="Override VAT percent (optional)"
                         disabled={isSubmitting}
+                        className={cn(
+                          keyboard.activeField === "vatOverridePercent" &&
+                            "ring-2 ring-primary border-primary"
+                        )}
+                        readOnly
                       />
                     </FormControl>
                     <FormMessage />
@@ -258,14 +309,22 @@ export function CategoryFormDrawer({
               <FormField
                 control={form.control}
                 name="color"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
-                    <FormLabel>Color</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        {...form.register("color")}
+                        label="Color"
+                        value={keyboard.formValues.color || ""}
+                        error={form.formState.errors.color?.message}
+                        onFocus={() => keyboard.handleFieldFocus("color")}
                         placeholder="Enter color (optional)"
                         disabled={isSubmitting}
+                        className={cn(
+                          keyboard.activeField === "color" &&
+                            "ring-2 ring-primary border-primary"
+                        )}
+                        readOnly
                       />
                     </FormControl>
                     <FormMessage />
@@ -276,14 +335,22 @@ export function CategoryFormDrawer({
               <FormField
                 control={form.control}
                 name="image"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
-                    <FormLabel>Image URL</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        {...form.register("image")}
+                        label="Image URL"
+                        value={keyboard.formValues.image || ""}
+                        error={form.formState.errors.image?.message}
+                        onFocus={() => keyboard.handleFieldFocus("image")}
                         placeholder="Enter image URL (optional)"
                         disabled={isSubmitting}
+                        className={cn(
+                          keyboard.activeField === "image" &&
+                            "ring-2 ring-primary border-primary"
+                        )}
+                        readOnly
                       />
                     </FormControl>
                     <FormMessage />
@@ -299,7 +366,10 @@ export function CategoryFormDrawer({
                     <FormControl>
                       <Checkbox
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(checked) => {
+                          keyboard.handleCloseKeyboard();
+                          field.onChange(checked);
+                        }}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -317,8 +387,7 @@ export function CategoryFormDrawer({
                   </h4>
                   <div className="text-sm text-gray-600 space-y-1">
                     <div>
-                      Created:{" "}
-                      {new Date(category.createdAt).toLocaleString()}
+                      Created: {new Date(category.createdAt).toLocaleString()}
                     </div>
                     <div>
                       Last Updated:{" "}
@@ -334,6 +403,31 @@ export function CategoryFormDrawer({
                 </div>
               )}
             </div>
+
+            {/* Adaptive Keyboard */}
+            {keyboard.showKeyboard && (
+              <div className="border-t bg-background px-2 py-2">
+                <div className="max-w-full overflow-hidden">
+                  <AdaptiveKeyboard
+                    onInput={keyboard.handleInput}
+                    onBackspace={keyboard.handleBackspace}
+                    onClear={keyboard.handleClear}
+                    onEnter={() => {
+                      // Submit form when Enter is pressed on the last field
+                      if (keyboard.activeField === "image") {
+                        handleSubmit();
+                      }
+                    }}
+                    initialMode={
+                      (keyboard.activeFieldConfig as any)?.keyboardMode ||
+                      "qwerty"
+                    }
+                    visible={keyboard.showKeyboard}
+                    onClose={keyboard.handleCloseKeyboard}
+                  />
+                </div>
+              </div>
+            )}
 
             <DrawerFooter className="border-t">
               <Button type="submit" disabled={isSubmitting} className="flex-1">
@@ -361,4 +455,3 @@ export function CategoryFormDrawer({
     </Drawer>
   );
 }
-
