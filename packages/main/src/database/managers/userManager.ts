@@ -784,6 +784,8 @@ export class UserManager {
       lastName: string;
       businessName: string;
       role: "cashier" | "manager" | "admin";
+      isActive: boolean;
+      address: string;
     }>
   ): AuthResponse {
     try {

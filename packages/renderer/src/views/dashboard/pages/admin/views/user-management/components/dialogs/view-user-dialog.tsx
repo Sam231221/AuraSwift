@@ -67,6 +67,18 @@ export function ViewUserDialog({
               </p>
             </div>
 
+            {user.address && (
+              <div>
+                <Label className="text-xs sm:text-sm md:text-base lg:text-base font-medium text-gray-500">
+                  Address
+                </Label>
+                <p className="text-xs sm:text-sm md:text-base lg:text-base">
+                  {user.address}
+                </p>
+              </div>
+            )}
+
+
             <div>
               <Label className="text-xs sm:text-sm md:text-base lg:text-base font-medium text-gray-500">
                 Role

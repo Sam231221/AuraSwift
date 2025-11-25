@@ -20,6 +20,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AvatarUpload } from "@/shared/components/avatar-upload";
+import { AdaptiveFormField } from "@/components/adaptive-keyboard/adaptive-form-field";
+import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/shared/hooks";
+import { cn } from "@/shared/utils/cn";
 import {
   userUpdateSchema,
   type UserUpdateFormData,
@@ -31,6 +35,7 @@ interface EditUserFormProps {
   onSubmit: (data: UserUpdateFormData) => Promise<void>;
   onCancel: () => void;
   isLoading: boolean;
+  isOpen?: boolean; // Dialog open state to close keyboard when dialog closes
 }
 
 export function EditUserForm({
@@ -38,9 +43,11 @@ export function EditUserForm({
   onSubmit,
   onCancel,
   isLoading,
+  isOpen = true,
 }: EditUserFormProps) {
   const form = useForm<UserUpdateFormData>({
     resolver: zodResolver(userUpdateSchema),
+    mode: "onChange", // Enable real-time validation for better UX with keyboard
     defaultValues: {
       id: user.id,
       email: user.email,
@@ -48,11 +55,29 @@ export function EditUserForm({
       lastName: user.lastName,
       role: user.role,
       avatar: user.avatar || "",
-      address: "",
+      address: user.address || "",
       isActive: user.isActive,
       businessId: user.businessId,
     },
   });
+
+  // Keyboard integration hook
+  const keyboard = useKeyboardWithRHF({
+    setValue: form.setValue,
+    watch: form.watch,
+    fieldConfigs: {
+      firstName: { keyboardMode: "qwerty" },
+      lastName: { keyboardMode: "qwerty" },
+      address: { keyboardMode: "qwerty" },
+    },
+  });
+
+  // Close keyboard when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      keyboard.handleCloseKeyboard();
+    }
+  }, [isOpen, keyboard]);
 
   // Update form when user changes
   useEffect(() => {
@@ -68,7 +93,7 @@ export function EditUserForm({
       lastName: user.lastName,
       role: user.role,
       avatar: user.avatar || "",
-      address: "",
+      address: user.address || "",
       isActive: user.isActive,
       businessId: user.businessId,
     });
@@ -98,6 +123,8 @@ export function EditUserForm({
 
     try {
       await onSubmit(data);
+      // Close keyboard on successful submit
+      keyboard.handleCloseKeyboard();
     } catch (error) {
       console.error("Error submitting form:", error);
       form.setError("root", {
@@ -144,7 +171,6 @@ export function EditUserForm({
           name="avatar"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Profile Picture (Optional)</FormLabel>
               <FormControl>
                 <AvatarUpload
                   label="Profile Picture (Optional)"
@@ -166,14 +192,21 @@ export function EditUserForm({
             name="firstName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                  First Name *
-                </FormLabel>
+
                 <FormControl>
-                  <Input
+                  <AdaptiveFormField
+                    {...form.register("firstName")}
+                    label="First Name *"
+                    value={keyboard.formValues.firstName || ""}
+                    error={form.formState.errors.firstName?.message}
+                    onFocus={() => keyboard.handleFieldFocus("firstName")}
                     placeholder="John"
-                    className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
-                    {...field}
+                    className={cn(
+                      "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                      keyboard.activeField === "firstName" &&
+                        "ring-2 ring-primary border-primary"
+                    )}
+                    readOnly
                   />
                 </FormControl>
                 <FormMessage />
@@ -186,14 +219,20 @@ export function EditUserForm({
             name="lastName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                  Last Name *
-                </FormLabel>
                 <FormControl>
-                  <Input
+                  <AdaptiveFormField
+                    {...form.register("lastName")}
+                    label="Last Name *"
+                    value={keyboard.formValues.lastName || ""}
+                    error={form.formState.errors.lastName?.message}
+                    onFocus={() => keyboard.handleFieldFocus("lastName")}
                     placeholder="Smith"
-                    className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
-                    {...field}
+                    className={cn(
+                      "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                      keyboard.activeField === "lastName" &&
+                        "ring-2 ring-primary border-primary"
+                    )}
+                    readOnly
                   />
                 </FormControl>
                 <FormMessage />
@@ -233,14 +272,20 @@ export function EditUserForm({
           name="address"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                Address
-              </FormLabel>
               <FormControl>
-                <Input
+                <AdaptiveFormField
+                  {...form.register("address")}
+                  label="Address"
+                  value={keyboard.formValues.address || ""}
+                  error={form.formState.errors.address?.message}
+                  onFocus={() => keyboard.handleFieldFocus("address")}
                   placeholder="123 Main Street, City, State"
-                  className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
-                  {...field}
+                  className={cn(
+                    "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                    keyboard.activeField === "address" &&
+                      "ring-2 ring-primary border-primary"
+                  )}
+                  readOnly
                 />
               </FormControl>
               <FormMessage />
@@ -324,7 +369,12 @@ export function EditUserForm({
         />
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 pt-4">
+        <div
+          className={cn(
+            "flex flex-col sm:flex-row gap-2 sm:gap-2 pt-4",
+            keyboard.showKeyboard && "pb-[340px]"
+          )}
+        >
           <Button
             type="submit"
             disabled={isLoading}
@@ -335,12 +385,35 @@ export function EditUserForm({
           <Button
             type="button"
             variant="outline"
-            onClick={onCancel}
+            onClick={() => {
+              keyboard.handleCloseKeyboard();
+              onCancel();
+            }}
             className="flex-1 text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
           >
             Cancel
           </Button>
         </div>
+
+        {/* Adaptive Keyboard - Positioned at bottom of form */}
+        {keyboard.showKeyboard && (
+          <div className="sticky bottom-0 left-0 right-0 z-50 mt-4 bg-background">
+            <AdaptiveKeyboard
+              onInput={keyboard.handleInput}
+              onBackspace={keyboard.handleBackspace}
+              onClear={keyboard.handleClear}
+              onEnter={() => {
+                // Move to next field or submit if last field
+                if (keyboard.activeField === "address") {
+                  form.handleSubmit(handleSubmit)();
+                }
+              }}
+              initialMode={keyboard.activeFieldConfig?.keyboardMode || "qwerty"}
+              visible={keyboard.showKeyboard}
+              onClose={keyboard.handleCloseKeyboard}
+            />
+          </div>
+        )}
       </form>
     </Form>
   );

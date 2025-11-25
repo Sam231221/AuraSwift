@@ -127,6 +127,7 @@ export const updateUserSchema = z.object({
   role: z.enum(["cashier", "manager", "admin"]).optional(),
   email: emailSchema.optional(),
   isActive: z.boolean().optional(),
+  address: z.string().max(200, "Address must be less than 200 characters").optional(),
 });
 
 // Create staff user schema (for business owners creating staff)

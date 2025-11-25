@@ -14,14 +14,12 @@ export function useUpdateUser() {
         lastName: data.lastName,
         role: data.role,
         isActive: data.isActive,
+        address: data.address || "",
       };
 
-      // Include avatar and address if they have values
+      // Include avatar if it has a value
       if (data.avatar && data.avatar.trim() !== "") {
         updates.avatar = data.avatar;
-      }
-      if (data.address && data.address.trim() !== "") {
-        updates.address = data.address;
       }
 
       const response = await window.authAPI.updateUser(data.id, updates);

@@ -502,6 +502,7 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
           </CardContent>
         </Card>
       </div>
+     
     </>
   );
 };

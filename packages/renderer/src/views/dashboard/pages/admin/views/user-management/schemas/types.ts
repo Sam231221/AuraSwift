@@ -8,4 +8,5 @@ export interface StaffUser {
   avatar?: string;
   createdAt: string;
   isActive: boolean;
+  address?: string;
 }
