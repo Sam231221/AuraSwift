@@ -5,6 +5,7 @@
  * using React Hook Form with Zod validation.
  */
 
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { configuredZodResolver } from "@/shared/validation/resolvers";
 import {
@@ -120,35 +121,76 @@ export function useScheduleForm({
   const isEditMode = !!schedule;
   const schema = isEditMode ? scheduleUpdateSchema : scheduleCreateSchema;
 
+  // Track the previous schedule ID to detect when we're switching schedules
+  const previousScheduleIdRef = useRef<string | null>(null);
+  const previousModeRef = useRef<boolean>(isEditMode);
+
   const form = useForm<ScheduleFormData | ScheduleUpdateData>({
     resolver: configuredZodResolver(schema),
     defaultValues: schedule
       ? mapScheduleToFormData(schedule, businessId)
       : getDefaultValues(selectedDate, businessId),
-    mode: "onBlur", // Validate on blur for better UX
+    mode: "onChange", // Validate on change for keyboard input
   });
 
   const { notifySuccess, notifyError } = useFormNotification({
     entityName: "Schedule",
   });
 
-  const handleSubmit = form.handleSubmit(async (data) => {
-    try {
-      await onSubmit(data);
-      notifySuccess(isEditMode ? "update" : "create");
+  // Only reset form when:
+  // 1. Switching between different schedules (schedule ID changes)
+  // 2. Switching between create/edit modes
+  useEffect(() => {
+    const currentScheduleId = schedule?.id ?? null;
+    const modeChanged = previousModeRef.current !== isEditMode;
+    const scheduleChanged = previousScheduleIdRef.current !== currentScheduleId;
 
-      // Reset form after successful creation (not on update)
-      if (!isEditMode) {
+    // Only reset if we're switching to a different schedule or changing modes
+    if (scheduleChanged || modeChanged) {
+      if (schedule) {
+        form.reset(mapScheduleToFormData(schedule, businessId));
+      } else {
         form.reset(getDefaultValues(selectedDate, businessId));
       }
 
-      onSuccess?.();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "An error occurred";
-      notifyError(errorMessage);
+      // Update refs
+      previousScheduleIdRef.current = currentScheduleId;
+      previousModeRef.current = isEditMode;
+    } else if (!schedule) {
+      // In create mode, only update the date field without resetting the entire form
+      // This prevents wiping out other fields when the user changes the date
+      const currentDate = form.getValues("date");
+      const newDate = format(selectedDate, "yyyy-MM-dd");
+      if (currentDate !== newDate) {
+        form.setValue("date", newDate, { shouldValidate: false });
+      }
     }
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedule?.id, isEditMode, businessId, selectedDate]);
+
+  const handleSubmit = form.handleSubmit(
+    async (data) => {
+      try {
+        await onSubmit(data);
+        notifySuccess(isEditMode ? "update" : "create");
+
+        // Reset form after successful creation (not on update)
+        if (!isEditMode) {
+          form.reset(getDefaultValues(selectedDate, businessId));
+        }
+
+        onSuccess?.();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+        notifyError(errorMessage);
+      }
+    },
+    (errors) => {
+      // Log validation errors for debugging
+      console.error("Schedule form validation errors:", errors);
+    }
+  );
 
   return {
     form,

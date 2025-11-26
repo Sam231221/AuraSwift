@@ -132,7 +132,7 @@ export class ScheduleManager {
       >
     >
   ): Schedule {
-    const now = new Date().toISOString();
+    const now = new Date(); // Keep as Date object for timestamp column
 
     // Build update object
     const updateData: any = { updatedAt: now };

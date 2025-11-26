@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { optionalStringSchema, uuidSchema } from "@/shared/validation/common";
+import { optionalStringSchema } from "@/shared/validation/common";
 
 /**
  * Time validation (HH:MM format)
@@ -32,7 +32,7 @@ const dateStringSchema = z
  */
 export const scheduleCreateSchema = z
   .object({
-    staffId: uuidSchema,
+    staffId: z.string().min(1, "Staff member is required"),
     date: dateStringSchema,
     startTime: timeSchema,
     endTime: timeSchema,
@@ -44,7 +44,7 @@ export const scheduleCreateSchema = z
       .optional()
       .or(z.literal(""))
       .transform((val) => val || ""),
-    businessId: uuidSchema,
+    businessId: z.string().min(1, "Business ID is required"),
   })
   .superRefine((data, ctx) => {
     // Parse times
@@ -127,11 +127,92 @@ export const scheduleCreateSchema = z
 /**
  * Schedule update schema
  * Extends create schema with required ID field
- * Uses safeExtend() because scheduleCreateSchema contains refinements
+ * Note: We need to merge with the base schema before refinements to maintain validation
  */
-export const scheduleUpdateSchema = scheduleCreateSchema.safeExtend({
-  id: uuidSchema,
-});
+export const scheduleUpdateSchema = z
+  .object({
+    id: z.string().min(1, "Schedule ID is required"),
+    staffId: z.string().min(1, "Staff member is required"),
+    date: dateStringSchema,
+    startTime: timeSchema,
+    endTime: timeSchema,
+    assignedRegister: optionalStringSchema,
+    notes: z
+      .string()
+      .max(500, "Notes must not exceed 500 characters")
+      .trim()
+      .optional()
+      .or(z.literal(""))
+      .transform((val) => val || ""),
+    businessId: z.string().min(1, "Business ID is required"),
+  })
+  .superRefine((data, ctx) => {
+    // Parse times
+    const [startHour, startMinute] = data.startTime.split(":").map(Number);
+    const [endHour, endMinute] = data.endTime.split(":").map(Number);
+
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+
+    // Check if it's an overnight shift (end time is before start time)
+    const isOvernight = endMinutes < startMinutes;
+
+    if (isOvernight) {
+      // For overnight shifts, calculate duration across midnight
+      const duration = 24 * 60 - startMinutes + endMinutes;
+
+      // Minimum duration: 1 hour (60 minutes)
+      if (duration < 60) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Shift duration must be at least 1 hour",
+          path: ["endTime"],
+        });
+      }
+
+      // Maximum duration: 16 hours (960 minutes)
+      if (duration > 16 * 60) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Shift duration cannot exceed 16 hours",
+          path: ["endTime"],
+        });
+      }
+    } else {
+      // Regular shift (same day)
+      const duration = endMinutes - startMinutes;
+
+      // Minimum duration: 1 hour (60 minutes)
+      if (duration < 60) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Shift duration must be at least 1 hour",
+          path: ["endTime"],
+        });
+      }
+
+      // Maximum duration: 16 hours (960 minutes)
+      if (duration > 16 * 60) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Shift duration cannot exceed 16 hours",
+          path: ["endTime"],
+        });
+      }
+
+      // End time must be after start time
+      if (endMinutes <= startMinutes) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "End time must be after start time",
+          path: ["endTime"],
+        });
+      }
+    }
+
+    // For updates, we don't validate past dates since we might be editing existing schedules
+    // Only validate that the date is valid
+  });
 
 /**
  * Type exports
