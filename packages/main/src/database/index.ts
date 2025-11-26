@@ -20,6 +20,7 @@ import { SettingsManager } from "./managers/settingsManager.js";
 import { AgeVerificationManager } from "./managers/ageVerificationManager.js";
 import { BatchManager } from "./managers/batchManager.js";
 import { SupplierManager } from "./managers/supplierManager.js";
+import { VatCategoryManager } from "./managers/vatCategoryManager.js";
 import { ExpirySettingManager } from "./managers/expirySettingsManager.js";
 import { ExpiryNotificationManager } from "./managers/expiryNotificationManager.js";
 import { StockMovementManager } from "./managers/stockMovementManager.js";
@@ -57,6 +58,7 @@ export interface DatabaseManagers {
   ageVerification: AgeVerificationManager;
   batches: BatchManager;
   suppliers: SupplierManager;
+  vatCategories: VatCategoryManager;
   expirySettings: ExpirySettingManager;
   expiryNotifications: ExpiryNotificationManager;
   stockMovements: StockMovementManager;
@@ -153,6 +155,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const ageVerification = new AgeVerificationManager(drizzle, uuid);
     const batches = new BatchManager(drizzle, uuid);
     const suppliers = new SupplierManager(drizzle, uuid);
+    const vatCategories = new VatCategoryManager(drizzle, uuid);
     const expirySettings = new ExpirySettingManager(drizzle, uuid);
     const expiryNotifications = new ExpiryNotificationManager(drizzle, uuid);
     const stockMovements = new StockMovementManager(drizzle, uuid, batches);
@@ -180,6 +183,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
       ageVerification,
       batches,
       suppliers,
+      vatCategories,
       expirySettings,
       expiryNotifications,
       stockMovements,

@@ -8,7 +8,7 @@ export function registerVatCategoryIpc() {
       try {
         const db = await getDatabase();
         // Get all VAT categories for the business
-        const vatCategories = await db.categories.getVatCategoriesByBusiness(
+        const vatCategories = await db.vatCategories.getVatCategoriesByBusiness(
           businessId
         );
         return { success: true, vatCategories };

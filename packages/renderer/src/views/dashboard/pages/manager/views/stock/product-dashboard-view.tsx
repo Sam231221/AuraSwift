@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -10,8 +10,10 @@ import {
   TrendingDown,
   Tag,
   PackageCheck,
+  FileSpreadsheet,
 } from "lucide-react";
 import type { Product } from "./types/product.types";
+import { ImportBookerModal } from "./components/import-booker-modal";
 
 interface Category {
   id: string;
@@ -34,6 +36,7 @@ interface ProductDashboardViewProps {
   onAddProduct: () => void;
   onRestockProduct: (product: Product) => void;
   onManageBatches?: () => void;
+  onProductsImported?: () => void;
 }
 
 const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
@@ -46,7 +49,9 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
 
   onRestockProduct,
   onManageBatches,
+  onProductsImported,
 }) => {
+  const [importModalOpen, setImportModalOpen] = useState(false);
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -184,6 +189,15 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
               <PackageCheck className="w-4 h-4 mr-3" />
               Batch & Expiry Management
             </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => setImportModalOpen(true)}
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-3" />
+              Import from Booker
+            </Button>
           </div>
         </div>
 
@@ -226,6 +240,14 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Import from Booker Modal */}
+      <ImportBookerModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        importType="product"
+        onSuccess={onProductsImported}
+      />
     </div>
   );
 };

@@ -13,6 +13,7 @@ import { allowExternalUrls } from "./modules/ExternalUrls.js";
 import "./appStore.js"; // Initialize auth handlers
 import { getDatabase } from "./database/index.js";
 import { registerVatCategoryIpc } from "./services/vatCategoryService.js";
+import { registerBookerImportHandlers } from "./ipc/bookerImportHandlers.js";
 
 // Global reference to autoUpdater instance for menu access
 let autoUpdaterInstance: ReturnType<typeof autoUpdater> | null = null;
@@ -22,8 +23,10 @@ export function getAutoUpdaterInstance() {
 }
 
 export async function initApp(initConfig: AppInitConfig) {
-  // Register IPC handler for VAT categories
+  // Register IPC handlers
   registerVatCategoryIpc();
+  registerBookerImportHandlers();
+  
   // Initialize database
   const db = await getDatabase();
 

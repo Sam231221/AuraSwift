@@ -241,6 +241,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               onAddProduct={openAddProductDrawer}
               onRestockProduct={setStockAdjustmentProduct}
               onManageBatches={() => setCurrentView("batchManagement")}
+              onProductsImported={loadProducts}
             />
           ) : currentView === "categoryManagement" ? (
             <ManageCategoriesView

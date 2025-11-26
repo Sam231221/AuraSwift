@@ -1,5 +1,11 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { Plus, ChevronLeft, Tag, Settings } from "lucide-react";
+import {
+  Plus,
+  ChevronLeft,
+  Tag,
+  Settings,
+  FileSpreadsheet,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -12,6 +18,7 @@ import type {
 import { buildCategoryTree } from "./utils";
 import { CategoryRow } from "./utils/category-row";
 import { CategoryFormDrawer } from "./components/category-form-drawer";
+import { ImportBookerModal } from "./components/import-booker-modal";
 
 interface ManageCategoriesViewProps {
   onBack: () => void;
@@ -32,6 +39,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
   );
 
   const [vatCategories, setVatCategories] = useState<VatCategory[]>([]);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   // Build hierarchical category tree
   const categoryTree = useMemo(
@@ -391,15 +399,21 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
             </div>
           </div>
 
-          <Button
-            onClick={() => {
-              setEditingCategory(null);
-              setIsDrawerOpen(true);
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Category
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Import from Booker
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingCategory(null);
+                setIsDrawerOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Category
+            </Button>
+          </div>
         </div>
 
         {/* Alert for no categories */}
@@ -556,6 +570,14 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
         onClose={handleCloseDrawer}
         onSave={handleSaveCategory}
         onUpdate={handleUpdateCategory}
+      />
+
+      {/* Import from Booker Modal */}
+      <ImportBookerModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        importType="department"
+        onSuccess={loadCategories}
       />
     </>
   );
