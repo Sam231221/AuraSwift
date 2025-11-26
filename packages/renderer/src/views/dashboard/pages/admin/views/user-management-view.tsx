@@ -134,27 +134,26 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6 px-2 sm:px-4 md:px-6">
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-[1600px] space-y-6 sm:space-y-8">
       {/* Back button */}
       <div className="flex items-center space-x-2 sm:space-x-4">
         <Button
           variant="outline"
           onClick={onBack}
-          className="flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
+          className="flex items-center space-x-2 h-9 sm:h-10"
         >
-          <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5" />
-          <span className="hidden sm:inline">Back to Dashboard</span>
-          <span className="sm:hidden">Back</span>
+          <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="text-sm sm:text-base">Back to Dashboard</span>
         </Button>
       </div>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 break-words">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 break-words tracking-tight">
             User Management
           </h1>
-          <p className="text-xs sm:text-sm md:text-base lg:text-lg text-gray-600 mt-1 break-words">
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 break-words">
             Manage staff members and their permissions
           </p>
         </div>
@@ -165,10 +164,9 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
           onSubmit={handleCreateUser}
           isLoading={isCreating}
           trigger={
-            <Button className="text-xs sm:text-sm md:text-base lg:text-base w-full sm:w-auto h-8 sm:h-9 md:h-10">
-              <Plus className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Add Staff Member</span>
-              <span className="sm:hidden">Add Staff</span>
+            <Button className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base shadow-sm">
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+              Add Staff Member
             </Button>
           }
         />

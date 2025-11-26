@@ -214,293 +214,287 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
 
   return (
     <>
-      {/* Backup Confirmation Dialog */}
-      <AlertDialog
-        open={isBackupDialogOpen}
-        onOpenChange={setIsBackupDialogOpen}
-      >
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] mx-4">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-sm sm:text-base md:text-lg lg:text-xl">
-              Backup Database
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-[10px] sm:text-xs md:text-sm lg:text-base">
-              You will be prompted to choose where to save your database backup
-              file. The backup will include all your business data, products,
-              transactions, and settings.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-            <AlertDialogCancel className="w-full sm:w-auto h-10 sm:h-11 text-xs sm:text-sm md:text-base lg:text-base touch-manipulation">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleBackupDatabase}
-              className="w-full sm:w-auto h-10 sm:h-11 text-xs sm:text-sm md:text-base lg:text-base touch-manipulation"
-            >
-              Choose Location & Backup
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-[1600px] space-y-6 sm:space-y-8">
+        {/* Backup Confirmation Dialog */}
+        <AlertDialog
+          open={isBackupDialogOpen}
+          onOpenChange={setIsBackupDialogOpen}
+        >
+          <AlertDialogContent className="max-w-[90vw] sm:max-w-lg mx-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-lg sm:text-xl">
+                Backup Database
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm sm:text-base">
+                You will be prompted to choose where to save your database backup
+                file. The backup will include all your business data, products,
+                transactions, and settings.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+              <AlertDialogCancel className="w-full sm:w-auto mt-2 sm:mt-0">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleBackupDatabase}
+                className="w-full sm:w-auto"
+              >
+                Choose Location & Backup
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      {/* Empty Database Confirmation Dialog */}
-      <AlertDialog open={isEmptyDialogOpen} onOpenChange={setIsEmptyDialogOpen}>
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] mx-4">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-sm sm:text-base md:text-lg lg:text-xl text-red-600">
-              ⚠️ Empty Database
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2 text-[10px] sm:text-xs md:text-sm lg:text-base">
-              <p className="font-semibold">This action cannot be undone!</p>
-              <p>This will permanently delete ALL data from your database:</p>
-              <ul className="list-disc list-inside space-y-1 text-[10px] sm:text-xs md:text-sm lg:text-base">
-                <li>All user accounts and permissions</li>
-                <li>All products and categories</li>
-                <li>All transactions and sales history</li>
-                <li>All business data</li>
-              </ul>
-              <p className="text-red-600 font-semibold mt-2">
-                A backup will be created automatically before emptying.
+        {/* Empty Database Confirmation Dialog */}
+        <AlertDialog open={isEmptyDialogOpen} onOpenChange={setIsEmptyDialogOpen}>
+          <AlertDialogContent className="max-w-[90vw] sm:max-w-lg mx-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-lg sm:text-xl text-red-600">
+                ⚠️ Empty Database
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3 text-sm sm:text-base">
+                <p className="font-semibold">This action cannot be undone!</p>
+                <p>This will permanently delete ALL data from your database:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>All user accounts and permissions</li>
+                  <li>All products and categories</li>
+                  <li>All transactions and sales history</li>
+                  <li>All business data</li>
+                </ul>
+                <p className="text-red-600 font-semibold mt-2">
+                  A backup will be created automatically before emptying.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+              <AlertDialogCancel className="w-full sm:w-auto mt-2 sm:mt-0">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmEmptyDatabase}
+                className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+              >
+                I Understand, Empty Database
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Admin Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Revenue
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$45,231.89</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                +20.1% from last month
               </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-            <AlertDialogCancel className="w-full sm:w-auto h-10 sm:h-11 text-xs sm:text-sm md:text-base lg:text-base touch-manipulation">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmEmptyDatabase}
-              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto h-10 sm:h-11 text-xs sm:text-sm md:text-base lg:text-base touch-manipulation"
-            >
-              I Understand, Empty Database
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Active Users
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">12</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                3 online now
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                System Health
+              </CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">99.9%</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Uptime this month
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Alerts
+              </CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">2</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Require attention
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Admin Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 sm:px-6">
-            <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-medium">
-              Total Revenue
-            </CardTitle>
-            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-muted-foreground shrink-0" />
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6">
-            <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold">
-              $45,231.89
-            </div>
-            <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm text-muted-foreground">
-              +20.1% from last month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 sm:px-6">
-            <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-medium">
-              Active Users
-            </CardTitle>
-            <Users className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-muted-foreground shrink-0" />
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6">
-            <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold">
-              12
-            </div>
-            <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm text-muted-foreground">
-              3 online now
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 sm:px-6">
-            <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-medium">
-              System Health
-            </CardTitle>
-            <Shield className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-muted-foreground shrink-0" />
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6">
-            <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold">
-              99.9%
-            </div>
-            <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm text-muted-foreground">
-              Uptime this month
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 sm:px-6">
-            <CardTitle className="text-[10px] sm:text-xs md:text-sm lg:text-base font-medium">
-              Alerts
-            </CardTitle>
-            <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-muted-foreground shrink-0" />
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6">
-            <div className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold">
-              2
-            </div>
-            <p className="text-[9px] sm:text-[10px] md:text-xs lg:text-sm text-muted-foreground">
-              Require attention
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Admin Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">
+                User Management
+              </CardTitle>
+              <CardDescription>
+                Manage staff and permissions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 flex-1">
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={onFront}
+              >
+                <Users className="w-4 h-4 mr-2 shrink-0" />
+                Manage Users
+              </Button>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Shield className="w-4 h-4 mr-2 shrink-0" />
+                Role Permissions
+              </Button>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Settings className="w-4 h-4 mr-2 shrink-0" />
+                Access Control
+              </Button>
+            </CardContent>
+          </Card>
 
-      {/* Admin Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-4 gap-4 sm:gap-6">
-        <Card>
-          <CardHeader className="px-4 sm:px-6">
-            <CardTitle className="text-sm sm:text-base md:text-lg lg:text-xl">
-              User Management
-            </CardTitle>
-            <CardDescription className="text-[10px] sm:text-xs md:text-sm lg:text-base">
-              Manage staff and permissions
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 sm:space-y-3 px-4 sm:px-6">
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-              onClick={onFront}
-            >
-              <Users className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              Manage Users
-            </Button>
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-            >
-              <Shield className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              Role Permissions
-            </Button>
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-            >
-              <Settings className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              Access Control
-            </Button>
-          </CardContent>
-        </Card>
+          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">
+                System Settings
+              </CardTitle>
+              <CardDescription>
+                Configure system preferences
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 flex-1">
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Settings className="w-4 h-4 mr-2 shrink-0" />
+                General Settings
+              </Button>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Store className="w-4 h-4 mr-2 shrink-0" />
+                Store Configuration
+              </Button>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Shield className="w-4 h-4 mr-2 shrink-0" />
+                Security Settings
+              </Button>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="px-4 sm:px-6">
-            <CardTitle className="text-sm sm:text-base md:text-lg lg:text-xl">
-              System Settings
-            </CardTitle>
-            <CardDescription className="text-[10px] sm:text-xs md:text-sm lg:text-base">
-              Configure system preferences
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 sm:space-y-3 px-4 sm:px-6">
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-            >
-              <Settings className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              General Settings
-            </Button>
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-            >
-              <Store className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              Store Configuration
-            </Button>
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-            >
-              <Shield className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              Security Settings
-            </Button>
-          </CardContent>
-        </Card>
+          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">
+                Advanced Reports
+              </CardTitle>
+              <CardDescription>
+                Comprehensive analytics
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 flex-1">
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <BarChart3 className="w-4 h-4 mr-2 shrink-0" />
+                Financial Reports
+              </Button>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <TrendingUp className="w-4 h-4 mr-2 shrink-0" />
+                Business Intelligence
+              </Button>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Users className="w-4 h-4 mr-2 shrink-0" />
+                User Activity Logs
+              </Button>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="px-4 sm:px-6">
-            <CardTitle className="text-sm sm:text-base md:text-lg lg:text-xl">
-              Advanced Reports
-            </CardTitle>
-            <CardDescription className="text-[10px] sm:text-xs md:text-sm lg:text-base">
-              Comprehensive analytics
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 sm:space-y-3 px-4 sm:px-6">
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-            >
-              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              Financial Reports
-            </Button>
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-            >
-              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              Business Intelligence
-            </Button>
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-            >
-              <Users className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              User Activity Logs
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="px-4 sm:px-6">
-            <CardTitle className="text-sm sm:text-base md:text-lg lg:text-xl">
-              DB Management
-            </CardTitle>
-            <CardDescription className="text-[10px] sm:text-xs md:text-sm lg:text-base">
-              Database backup and maintenance
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 sm:space-y-3 px-4 sm:px-6">
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-              onClick={handleImportDatabase}
-              disabled={isImporting}
-            >
-              <Upload className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              <span className="truncate">
-                {isImporting ? "Importing Database..." : "Import Database"}
-              </span>
-            </Button>
-            <Button
-              className="w-full justify-start bg-transparent text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-              onClick={() => setIsBackupDialogOpen(true)}
-              disabled={isBackingUp}
-            >
-              {isBackingUp ? (
-                <Download className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 animate-spin shrink-0" />
-              ) : (
-                <Download className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              )}
-              <span className="truncate">
-                {isBackingUp ? "Creating Backup..." : "Backup Database"}
-              </span>
-            </Button>
-            <Button
-              className="w-full justify-start bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50 text-xs sm:text-sm md:text-base lg:text-base h-9 sm:h-10 touch-manipulation"
-              variant="outline"
-              onClick={handleEmptyDatabase}
-              disabled={isEmptying}
-            >
-              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 mr-1.5 sm:mr-2 shrink-0" />
-              <span className="truncate">
-                {isEmptying ? "Emptying Database..." : "Empty Database"}
-              </span>
-            </Button>
-          </CardContent>
-        </Card>
+          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">
+                DB Management
+              </CardTitle>
+              <CardDescription>
+                Database backup and maintenance
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 flex-1">
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={handleImportDatabase}
+                disabled={isImporting}
+              >
+                <Upload className="w-4 h-4 mr-2 shrink-0" />
+                <span className="truncate">
+                  {isImporting ? "Importing Database..." : "Import Database"}
+                </span>
+              </Button>
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={() => setIsBackupDialogOpen(true)}
+                disabled={isBackingUp}
+              >
+                {isBackingUp ? (
+                  <Download className="w-4 h-4 mr-2 animate-spin shrink-0" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2 shrink-0" />
+                )}
+                <span className="truncate">
+                  {isBackingUp ? "Creating Backup..." : "Backup Database"}
+                </span>
+              </Button>
+              <Button
+                className="w-full justify-start bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
+                variant="outline"
+                onClick={handleEmptyDatabase}
+                disabled={isEmptying}
+              >
+                <Trash2 className="w-4 h-4 mr-2 shrink-0" />
+                <span className="truncate">
+                  {isEmptying ? "Emptying Database..." : "Empty Database"}
+                </span>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
      
     </>

@@ -59,7 +59,7 @@ export function useKeyboardWithRHF<T extends FieldValues>({
 
   const handleBackspace = useCallback(() => {
     if (!activeField) return;
-    const currentValue = formValues[activeField] || "";
+    const currentValue = String(formValues[activeField] || "");
     setValue(activeField, currentValue.slice(0, -1) as any, {
       shouldValidate: true,
       shouldDirty: true,

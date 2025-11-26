@@ -50,24 +50,24 @@ export function ClockOutWarningDialog({
             </DialogTitle>
           </div>
           <DialogDescription className="text-left pt-2">
-            <p className="text-xs sm:text-sm text-gray-600 mb-3">
+            <span className="text-xs sm:text-sm text-gray-600 mb-3 block">
               You're currently clocked in since{" "}
               <span className="font-semibold">
                 {formatTime(clockInTime)}
               </span>
               . Would you like to clock out before logging out?
-            </p>
-            <div className="bg-gray-50 rounded-lg p-2 sm:p-3 flex items-start gap-2">
-              <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 mt-0.5 shrink-0" />
-              <div className="text-[10px] sm:text-xs text-gray-600">
-                <p className="font-medium mb-1">Time tracking will continue</p>
-                <p>
-                  If you log out without clocking out, your time will continue
-                  to be tracked until you clock out.
-                </p>
-              </div>
-            </div>
+            </span>
           </DialogDescription>
+          <div className="bg-gray-50 rounded-lg p-2 sm:p-3 flex items-start gap-2 mt-3">
+            <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 mt-0.5 shrink-0" />
+            <div className="text-[10px] sm:text-xs text-gray-600">
+              <p className="font-medium mb-1">Time tracking will continue</p>
+              <p>
+                If you log out without clocking out, your time will continue
+                to be tracked until you clock out.
+              </p>
+            </div>
+          </div>
         </DialogHeader>
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
           <Button

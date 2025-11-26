@@ -33,7 +33,7 @@ export function useStaffUsers() {
             role: u.role as "cashier" | "manager",
             businessId: u.businessId,
             avatar: u.avatar,
-            address: u.address,
+            address: (u as any).address || "",
             createdAt: u.createdAt || new Date().toISOString(),
             isActive: u.isActive !== undefined ? u.isActive : true,
           }));

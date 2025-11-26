@@ -1,7 +1,9 @@
 /**
- * Start shift dialog component
+ * Start shift dialog component with adaptive keyboard integration
  */
 
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +15,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
+import { configuredZodResolver } from "@/shared/validation/resolvers";
+import { startShiftSchema, type StartShiftFormData } from "../../schemas/shift-schema";
 
 interface StartShiftDialogProps {
   open: boolean;
@@ -37,6 +43,67 @@ export function StartShiftDialog({
   onLateStartConfirm,
   onLateStartCancel,
 }: StartShiftDialogProps) {
+  // Initialize form with React Hook Form and Zod validation
+  const form = useForm<StartShiftFormData>({
+    resolver: configuredZodResolver(startShiftSchema),
+    defaultValues: {
+      startingCash: "" as any, // Schema will coerce string to number
+    },
+    mode: "onChange",
+  });
+
+  // Initialize adaptive keyboard integration
+  const keyboard = useKeyboardWithRHF({
+    setValue: form.setValue,
+    watch: form.watch,
+    fieldConfigs: {
+      startingCash: { keyboardMode: "numeric" },
+    },
+  });
+
+  // Sync external startingCash prop with form
+  useEffect(() => {
+    form.setValue("startingCash", (startingCash || "") as any, {
+      shouldValidate: true,
+    });
+  }, [startingCash, form]);
+
+  // Sync form value back to parent component
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      if (value.startingCash !== undefined) {
+        onStartingCashChange(String(value.startingCash));
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, onStartingCashChange]);
+
+  // Reset form and open keyboard when dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset({ startingCash: "" as any });
+      // Auto-open keyboard when dialog opens
+      setTimeout(() => {
+        keyboard.handleFieldFocus("startingCash");
+      }, 100);
+    } else {
+      keyboard.handleCloseKeyboard();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const handleSubmit = form.handleSubmit(() => {
+    onConfirm();
+    keyboard.handleCloseKeyboard();
+  });
+
+  const handleCancel = () => {
+    onOpenChange(false);
+    onStartingCashChange("");
+    form.reset({ startingCash: "" as any });
+    keyboard.handleCloseKeyboard();
+  };
+
   return (
     <>
       {/* Late Start Confirmation Dialog */}
@@ -116,55 +183,70 @@ export function StartShiftDialog({
               Enter the starting cash amount for your shift.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-3 sm:gap-4">
-              <Label
-                htmlFor="starting-cash"
-                className="text-left sm:text-right text-sm sm:text-base"
-              >
-                Starting Cash
-              </Label>
-              <Input
-                id="starting-cash"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100000"
-                value={startingCash}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Prevent negative values
-                  if (
-                    value === "" ||
-                    (!isNaN(Number(value)) && Number(value) >= 0)
-                  ) {
-                    onStartingCashChange(value);
-                  }
-                }}
-                className="col-span-1 sm:col-span-3 h-10 sm:h-11 text-sm sm:text-base"
-                placeholder="0.00"
-                autoFocus
-              />
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 items-center gap-3 sm:gap-4">
+                <Label
+                  htmlFor="starting-cash"
+                  className="text-left sm:text-right text-sm sm:text-base"
+                >
+                  Starting Cash
+                </Label>
+                <div className="col-span-1 sm:col-span-3">
+                  <Input
+                    id="starting-cash"
+                    type="text"
+                    inputMode="none"
+                    {...form.register("startingCash")}
+                    onFocus={() => keyboard.handleFieldFocus("startingCash")}
+                    className="h-10 sm:h-11 text-sm sm:text-base"
+                    placeholder="0.00"
+                    autoComplete="off"
+                    readOnly
+                  />
+                  {form.formState.errors.startingCash && (
+                    <p className="text-xs text-red-600 mt-1">
+                      {form.formState.errors.startingCash.message}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false);
-                onStartingCashChange("");
-              }}
-              className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={onConfirm}
-              className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
-            >
-              Start Shift
-            </Button>
-          </DialogFooter>
+
+            {/* Adaptive Keyboard */}
+            {keyboard.showKeyboard && (
+              <div className="mt-4">
+                <AdaptiveKeyboard
+                  onInput={keyboard.handleInput}
+                  onBackspace={keyboard.handleBackspace}
+                  onClear={keyboard.handleClear}
+                  onEnter={handleSubmit}
+                  initialMode={keyboard.activeFieldConfig?.keyboardMode || "numeric"}
+                  inputType="number"
+                  visible={keyboard.showKeyboard}
+                  onClose={keyboard.handleCloseKeyboard}
+                />
+              </div>
+            )}
+
+            <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
+                disabled={!form.formState.isValid || form.formState.isSubmitting}
+              >
+                Start Shift
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </>

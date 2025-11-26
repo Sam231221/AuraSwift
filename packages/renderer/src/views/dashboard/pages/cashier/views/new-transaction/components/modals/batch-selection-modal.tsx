@@ -110,7 +110,7 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
   onSelect,
   onAutoSelect,
   onCancel,
-  businessId,
+  businessId: _businessId, // Prefixed to indicate intentionally unused (reserved for future use)
 }) => {
   const [batches, setBatches] = useState<BatchInfo[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -127,9 +127,11 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
     setLoading(true);
     try {
       // Get active batches for this product sorted by FEFO
+      // Note: stockRotationMethod may not exist on all Product types, default to FEFO
+      const rotationMethod = ((product as any).stockRotationMethod as "FIFO" | "FEFO" | "NONE") || "FEFO";
       const response = await window.batchesAPI?.getActiveBatches(
         product.id,
-        (product.stockRotationMethod as "FIFO" | "FEFO" | "NONE") || "FEFO"
+        rotationMethod
       );
 
       if (response?.success && response.batches) {

@@ -190,7 +190,7 @@ export function EditUserForm({
           <FormField
             control={form.control}
             name="firstName"
-            render={({ field }) => (
+            render={() => (
               <FormItem>
 
                 <FormControl>
@@ -217,7 +217,7 @@ export function EditUserForm({
           <FormField
             control={form.control}
             name="lastName"
-            render={({ field }) => (
+            render={() => (
               <FormItem>
                 <FormControl>
                   <AdaptiveFormField
@@ -270,7 +270,7 @@ export function EditUserForm({
         <FormField
           control={form.control}
           name="address"
-          render={({ field }) => (
+          render={() => (
             <FormItem>
               <FormControl>
                 <AdaptiveFormField

@@ -134,7 +134,8 @@ export function CategoryFormDrawer({
     if (!isOpen) {
       keyboard.handleCloseKeyboard();
     }
-  }, [isOpen, keyboard]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Filter out current category from parent options
   const parentOptions = buildCategoryTree(categories as any).filter(
