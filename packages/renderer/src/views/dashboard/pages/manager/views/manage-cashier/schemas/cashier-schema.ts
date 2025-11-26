@@ -11,7 +11,6 @@ import {
   optionalStringSchema,
   emailSchema,
   passwordSchema,
-  uuidSchema,
 } from "@/shared/validation/common";
 
 /**
@@ -45,7 +44,7 @@ export const cashierCreateSchema = z
       .optional()
       .or(z.literal(""))
       .transform((val) => val || ""),
-    businessId: uuidSchema,
+    businessId: z.string().min(1, "Business ID is required"),
   })
   .superRefine((data, ctx) => {
     // Password confirmation must match password
@@ -63,7 +62,7 @@ export const cashierCreateSchema = z
  * Used for updating existing cashier/staff accounts
  */
 export const cashierUpdateSchema = z.object({
-  id: uuidSchema,
+  id: z.string().min(1, "Cashier ID is required"),
   email: emailSchema,
   firstName: nameSchema,
   lastName: nameSchema,
@@ -76,7 +75,7 @@ export const cashierUpdateSchema = z.object({
     .or(z.literal(""))
     .transform((val) => val || ""),
   isActive: z.boolean().default(true),
-  businessId: uuidSchema,
+  businessId: z.string().min(1, "Business ID is required"),
 });
 
 /**

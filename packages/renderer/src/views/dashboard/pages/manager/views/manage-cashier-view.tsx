@@ -49,12 +49,19 @@ import {
   Edit,
   Trash2,
   ChevronLeft,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useCashierForm,
   useCashierEditForm,
 } from "./manage-cashier/hooks/use-cashier-form";
+import {
+  AdaptiveKeyboard,
+  AdaptiveFormField,
+} from "@/components/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
+import type { CashierFormData, CashierUpdateData } from "./manage-cashier/schemas/cashier-schema";
 
 interface StaffUser {
   id: string;
@@ -64,6 +71,7 @@ interface StaffUser {
   role: "cashier" | "manager";
   businessId: string;
   avatar?: string;
+  address?: string;
   createdAt: string;
   isActive: boolean;
 }
@@ -112,6 +120,7 @@ export default function CashierManagementView({
             role: u.role as "cashier",
             businessId: u.businessId,
             avatar: u.avatar,
+            address: u.address || "",
             createdAt: u.createdAt || new Date().toISOString(),
             isActive: u.isActive !== undefined ? u.isActive : true,
           }));
@@ -285,6 +294,18 @@ export default function CashierManagementView({
                     </Label>
                     <p className="text-sm">{selectedUser.email}</p>
                   </div>
+
+                  {selectedUser.address && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500">
+                        Address
+                      </Label>
+                      <div className="flex items-start space-x-2 mt-1">
+                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm">{selectedUser.address}</p>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <Label className="text-sm font-medium text-gray-500">
@@ -579,9 +600,23 @@ function CreateCashierDialog({
     },
   });
 
+  // Keyboard integration
+  const keyboard = useKeyboardWithRHF<CashierFormData>({
+    setValue: form.setValue,
+    watch: form.watch,
+    fieldConfigs: {
+      firstName: { keyboardMode: "qwerty" },
+      lastName: { keyboardMode: "qwerty" },
+      email: { keyboardMode: "qwerty" },
+      password: { keyboardMode: "qwerty" },
+      confirmPassword: { keyboardMode: "qwerty" },
+      address: { keyboardMode: "qwerty" },
+    },
+  });
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md md:max-w-lg lg:max-w-xl">
+      <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Cashier</DialogTitle>
           <DialogDescription>
@@ -619,13 +654,17 @@ function CreateCashierDialog({
                   <FormItem>
                     <FormLabel>First Name *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        id="firstName"
+                        label=""
+                        value={field.value || ""}
                         placeholder="John"
                         disabled={isSubmitting}
+                        readOnly
+                        onFocus={() => keyboard.handleFieldFocus("firstName")}
+                        error={form.formState.errors.firstName?.message}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -636,13 +675,17 @@ function CreateCashierDialog({
                   <FormItem>
                     <FormLabel>Last Name *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        id="lastName"
+                        label=""
+                        value={field.value || ""}
                         placeholder="Smith"
                         disabled={isSubmitting}
+                        readOnly
+                        onFocus={() => keyboard.handleFieldFocus("lastName")}
+                        error={form.formState.errors.lastName?.message}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -656,14 +699,17 @@ function CreateCashierDialog({
                 <FormItem>
                   <FormLabel>Email *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      type="email"
+                    <AdaptiveFormField
+                      id="email"
+                      label=""
+                      value={field.value || ""}
                       placeholder="john.smith@example.com"
                       disabled={isSubmitting}
+                      readOnly
+                      onFocus={() => keyboard.handleFieldFocus("email")}
+                      error={form.formState.errors.email?.message}
                     />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -676,13 +722,17 @@ function CreateCashierDialog({
                 <FormItem>
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
+                    <AdaptiveFormField
+                      id="address"
+                      label=""
+                      value={field.value || ""}
                       placeholder="123 Main Street, City, State"
                       disabled={isSubmitting}
+                      readOnly
+                      onFocus={() => keyboard.handleFieldFocus("address")}
+                      error={form.formState.errors.address?.message}
                     />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -696,14 +746,18 @@ function CreateCashierDialog({
                   <FormItem>
                     <FormLabel>Password *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        id="password"
+                        label=""
                         type="password"
+                        value={field.value || ""}
                         placeholder="Minimum 8 characters"
                         disabled={isSubmitting}
+                        readOnly
+                        onFocus={() => keyboard.handleFieldFocus("password")}
+                        error={form.formState.errors.password?.message}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -714,18 +768,32 @@ function CreateCashierDialog({
                   <FormItem>
                     <FormLabel>Confirm Password *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        id="confirmPassword"
+                        label=""
                         type="password"
+                        value={field.value || ""}
                         placeholder="Confirm password"
                         disabled={isSubmitting}
+                        readOnly
+                        onFocus={() => keyboard.handleFieldFocus("confirmPassword")}
+                        error={form.formState.errors.confirmPassword?.message}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            {/* Adaptive Keyboard */}
+            <AdaptiveKeyboard
+              visible={keyboard.showKeyboard}
+              mode={keyboard.activeFieldConfig?.keyboardMode || "qwerty"}
+              onInput={keyboard.handleInput}
+              onBackspace={keyboard.handleBackspace}
+              onClear={keyboard.handleClear}
+              onClose={keyboard.handleCloseKeyboard}
+            />
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-2 pt-4">
@@ -799,9 +867,20 @@ function EditCashierDialog({
     },
   });
 
+  // Keyboard integration
+  const keyboard = useKeyboardWithRHF<CashierUpdateData>({
+    setValue: form.setValue,
+    watch: form.watch,
+    fieldConfigs: {
+      firstName: { keyboardMode: "qwerty" },
+      lastName: { keyboardMode: "qwerty" },
+      address: { keyboardMode: "qwerty" },
+    },
+  });
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Cashier</DialogTitle>
           <DialogDescription>
@@ -842,13 +921,17 @@ function EditCashierDialog({
                   <FormItem>
                     <FormLabel>First Name *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        id="edit-firstName"
+                        label=""
+                        value={field.value || ""}
                         placeholder="John"
                         disabled={isSubmitting}
+                        readOnly
+                        onFocus={() => keyboard.handleFieldFocus("firstName")}
+                        error={form.formState.errors.firstName?.message}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -859,13 +942,17 @@ function EditCashierDialog({
                   <FormItem>
                     <FormLabel>Last Name *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        id="edit-lastName"
+                        label=""
+                        value={field.value || ""}
                         placeholder="Smith"
                         disabled={isSubmitting}
+                        readOnly
+                        onFocus={() => keyboard.handleFieldFocus("lastName")}
+                        error={form.formState.errors.lastName?.message}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -884,6 +971,7 @@ function EditCashierDialog({
                       type="email"
                       disabled
                       className="bg-gray-50"
+                      onFocus={() => keyboard.handleCloseKeyboard()}
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">
@@ -902,13 +990,17 @@ function EditCashierDialog({
                 <FormItem>
                   <FormLabel>Address</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
+                    <AdaptiveFormField
+                      id="edit-address"
+                      label=""
+                      value={field.value || ""}
                       placeholder="123 Main Street, City, State"
                       disabled={isSubmitting}
+                      readOnly
+                      onFocus={() => keyboard.handleFieldFocus("address")}
+                      error={form.formState.errors.address?.message}
                     />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -922,7 +1014,10 @@ function EditCashierDialog({
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      onCheckedChange={field.onChange}
+                      onCheckedChange={(checked) => {
+                        keyboard.handleCloseKeyboard();
+                        field.onChange(checked);
+                      }}
                       disabled={isSubmitting}
                     />
                   </FormControl>
@@ -931,6 +1026,16 @@ function EditCashierDialog({
                   </div>
                 </FormItem>
               )}
+            />
+
+            {/* Adaptive Keyboard */}
+            <AdaptiveKeyboard
+              visible={keyboard.showKeyboard}
+              mode={keyboard.activeFieldConfig?.keyboardMode || "qwerty"}
+              onInput={keyboard.handleInput}
+              onBackspace={keyboard.handleBackspace}
+              onClear={keyboard.handleClear}
+              onClose={keyboard.handleCloseKeyboard}
             />
 
             {/* Actions */}

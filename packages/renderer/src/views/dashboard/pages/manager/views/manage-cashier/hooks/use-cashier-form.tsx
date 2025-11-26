@@ -1,10 +1,11 @@
 /**
  * Cashier Form Hook
- * 
+ *
  * Custom hook for managing cashier/staff form state, validation, and submission
  * using React Hook Form with Zod validation.
  */
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { configuredZodResolver } from "@/shared/validation/resolvers";
 import {
@@ -23,6 +24,7 @@ interface StaffUser {
   role: "cashier" | "manager";
   businessId: string;
   avatar?: string;
+  address?: string;
   isActive: boolean;
 }
 
@@ -75,14 +77,14 @@ const mapCashierToFormData = (
   firstName: cashier.firstName,
   lastName: cashier.lastName,
   avatar: cashier.avatar || "",
-  address: "",
+  address: cashier.address || "",
   isActive: cashier.isActive ?? true,
   businessId,
 });
 
 /**
  * Hook for managing cashier form (create)
- * 
+ *
  * @example
  * ```tsx
  * const { form, handleSubmit, isSubmitting } = useCashierForm({
@@ -104,25 +106,31 @@ export function useCashierForm({
   const form = useForm<CashierFormData>({
     resolver: configuredZodResolver(cashierCreateSchema),
     defaultValues: getDefaultValues(businessId),
-    mode: "onBlur", // Validate on blur for better UX
+    mode: "onChange", // Validate on change for keyboard input
   });
 
   const { notifySuccess, notifyError } = useFormNotification({
     entityName: "Cashier",
   });
 
-  const handleSubmit = form.handleSubmit(async (data) => {
-    try {
-      await onSubmit(data);
-      notifySuccess("create");
-      form.reset(getDefaultValues(businessId));
-      onSuccess?.();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "An error occurred";
-      notifyError(errorMessage);
+  const handleSubmit = form.handleSubmit(
+    async (data) => {
+      try {
+        await onSubmit(data);
+        notifySuccess("create");
+        form.reset(getDefaultValues(businessId));
+        onSuccess?.();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+        notifyError(errorMessage);
+      }
+    },
+    (errors) => {
+      // Log validation errors for debugging
+      console.error("Cashier create form validation errors:", errors);
     }
-  });
+  );
 
   return {
     form,
@@ -134,7 +142,7 @@ export function useCashierForm({
 
 /**
  * Hook for managing cashier form (update)
- * 
+ *
  * @example
  * ```tsx
  * const { form, handleSubmit, isSubmitting } = useCashierEditForm({
@@ -162,24 +170,37 @@ export function useCashierEditForm({
   const form = useForm<CashierUpdateData>({
     resolver: configuredZodResolver(cashierUpdateSchema),
     defaultValues: mapCashierToFormData(cashier, businessId),
-    mode: "onBlur", // Validate on blur for better UX
+    mode: "onChange", // Validate on change for keyboard input
   });
 
   const { notifySuccess, notifyError } = useFormNotification({
     entityName: "Cashier",
   });
 
-  const handleSubmit = form.handleSubmit(async (data) => {
-    try {
-      await onSubmit(data);
-      notifySuccess("update");
-      onSuccess?.();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "An error occurred";
-      notifyError(errorMessage);
+  // Reset form when cashier prop changes (important for edit mode)
+  useEffect(() => {
+    if (cashier) {
+      form.reset(mapCashierToFormData(cashier, businessId));
     }
-  });
+  }, [cashier, businessId, form]);
+
+  const handleSubmit = form.handleSubmit(
+    async (data) => {
+      try {
+        await onSubmit(data);
+        notifySuccess("update");
+        onSuccess?.();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+        notifyError(errorMessage);
+      }
+    },
+    (errors) => {
+      // Log validation errors for debugging
+      console.error("Cashier edit form validation errors:", errors);
+    }
+  );
 
   return {
     form,
@@ -188,4 +209,3 @@ export function useCashierEditForm({
     errors: form.formState.errors,
   };
 }
-
