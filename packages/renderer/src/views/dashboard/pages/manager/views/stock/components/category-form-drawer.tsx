@@ -1,6 +1,6 @@
 /**
  * Category Form Drawer Component
- *
+ * 
  * Form drawer for creating and editing categories using React Hook Form.
  */
 
@@ -95,8 +95,8 @@ export function CategoryFormDrawer({
         parentId: data.parentId || null,
         vatCategoryId:
           data.vatCategoryId && data.vatCategoryId !== ""
-            ? data.vatCategoryId
-            : null,
+          ? data.vatCategoryId 
+          : null,
         vatOverridePercent:
           data.vatOverridePercent && data.vatOverridePercent !== ""
             ? parseFloat(data.vatOverridePercent)

@@ -1462,23 +1462,23 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
 
             <div className="flex space-x-2 p-4 border-t">
               <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                {isSubmitting
-                  ? "Saving..."
-                  : isEditMode
-                  ? "Update Product"
-                  : "Add Product"}
-              </Button>
-              <DrawerClose asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={handleClose}
-                  disabled={isSubmitting}
-                >
-                  Cancel
+                  {isSubmitting
+                    ? "Saving..."
+                    : isEditMode
+                    ? "Update Product"
+                    : "Add Product"}
                 </Button>
-              </DrawerClose>
+                <DrawerClose asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleClose}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                </DrawerClose>
             </div>
           </form>
         </Form>

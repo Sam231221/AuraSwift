@@ -1,6 +1,6 @@
 /**
  * Category Form Hook
- *
+ * 
  * Custom hook for managing category form state, validation, and submission
  * using React Hook Form with Zod validation.
  */
@@ -75,7 +75,7 @@ const mapCategoryToFormData = (
 
 /**
  * Hook for managing category form
- *
+ * 
  * @example
  * ```tsx
  * const { form, handleSubmit, isSubmitting } = useCategoryForm({
@@ -122,21 +122,21 @@ export function useCategoryForm({
 
   const handleSubmit = form.handleSubmit(
     async (data) => {
-      try {
-        await onSubmit(data);
-        notifySuccess(isEditMode ? "update" : "create");
-
-        // Reset form after successful creation (not on update)
-        if (!isEditMode) {
-          form.reset(getDefaultValues(businessId));
-        }
-
-        onSuccess?.();
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "An error occurred";
-        notifyError(errorMessage);
+    try {
+      await onSubmit(data);
+      notifySuccess(isEditMode ? "update" : "create");
+      
+      // Reset form after successful creation (not on update)
+      if (!isEditMode) {
+        form.reset(getDefaultValues(businessId));
       }
+      
+      onSuccess?.();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An error occurred";
+      notifyError(errorMessage);
+    }
     },
     (errors) => {
       // Log validation errors for debugging

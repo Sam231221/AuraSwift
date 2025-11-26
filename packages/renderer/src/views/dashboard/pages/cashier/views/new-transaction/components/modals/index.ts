@@ -3,6 +3,12 @@
  */
 
 export { AgeVerificationModal } from "./age-verification-modal";
+export type { AgeVerificationData } from "./age-verification-modal";
+export { BatchSelectionModal } from "./batch-selection-modal";
+export type {
+  BatchInfo,
+  SelectedBatchData,
+} from "./batch-selection-modal";
 export { GenericItemPriceModal } from "./generic-item-price-modal";
 export { default as RefundTransactionView } from "./refund-transaction-modal";
 export { default as VoidTransactionModal } from "./void-transaction-modal";

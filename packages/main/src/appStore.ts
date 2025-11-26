@@ -1250,11 +1250,128 @@ ipcMain.handle("transactions:createFromCart", async (event, data) => {
 
     console.log("Calculated totals:", { subtotal, tax, total });
 
-    // Create transaction items from cart items
+    // ============================================================
+    // BATCH-AWARE CHECKOUT: FEFO Batch Selection and Deduction
+    // ============================================================
+    // For products with requiresBatchTracking = true, we:
+    // 1. Select batches using FEFO (First-Expiry-First-Out)
+    // 2. Deduct quantities from selected batches
+    // 3. Assign batch info to transaction items
+    // ============================================================
+
+    // Map to track batch selections for each cart item
+    interface BatchSelection {
+      batchId: string;
+      batchNumber: string;
+      expiryDate: number;
+      quantity: number;
+    }
+    const batchSelectionsMap = new Map<string, BatchSelection[]>();
+
+    // Pre-process: Select batches for products that require batch tracking
+    for (const item of cartItems) {
+      if (!item.productId) continue; // Skip category items
+
+      try {
+        const product = await db.products.getProductById(item.productId);
+
+        // Check if product requires batch tracking
+        if (product.requiresBatchTracking) {
+          // Calculate quantity needed
+          let quantityNeeded: number;
+          if (item.itemType === "WEIGHT" && item.weight) {
+            quantityNeeded = item.weight;
+          } else {
+            quantityNeeded = item.quantity || 1;
+          }
+
+          // If cart item already has batch info (pre-selected), use it
+          if (item.batchId && item.batchNumber) {
+            console.log(
+              `📦 Cart item already has batch info: ${item.batchNumber}`
+            );
+            batchSelectionsMap.set(item.id, [
+              {
+                batchId: item.batchId,
+                batchNumber: item.batchNumber,
+                expiryDate:
+                  typeof item.expiryDate === "number"
+                    ? item.expiryDate
+                    : item.expiryDate instanceof Date
+                    ? item.expiryDate.getTime()
+                    : new Date(item.expiryDate || Date.now()).getTime(),
+                quantity: quantityNeeded,
+              },
+            ]);
+          } else {
+            // Auto-select batches using FEFO
+            const rotationMethod =
+              (product.stockRotationMethod as "FIFO" | "FEFO" | "NONE") ||
+              "FEFO";
+
+            console.log(
+              `📦 Auto-selecting batches for ${product.name} using ${rotationMethod}`
+            );
+
+            try {
+              const selectedBatches = await db.batches.selectBatchesForSale(
+                item.productId,
+                quantityNeeded,
+                rotationMethod
+              );
+
+              if (selectedBatches.length > 0) {
+                const batchSelections: BatchSelection[] = selectedBatches.map(
+                  (batch) => ({
+                    batchId: batch.batchId,
+                    batchNumber: batch.batchNumber,
+                    expiryDate: batch.expiryDate.getTime(),
+                    quantity: batch.quantity,
+                  })
+                );
+                batchSelectionsMap.set(item.id, batchSelections);
+
+                console.log(
+                  `✅ Selected ${selectedBatches.length} batch(es) for ${product.name}:`,
+                  selectedBatches.map(
+                    (b) => `${b.batchNumber} (qty: ${b.quantity})`
+                  )
+                );
+              }
+            } catch (batchError) {
+              console.warn(
+                `⚠️ Could not auto-select batches for ${product.name}:`,
+                batchError instanceof Error
+                  ? batchError.message
+                  : "Unknown error"
+              );
+              // Continue without batch tracking for this item
+              // The sale will still go through, but without batch deduction
+            }
+          }
+        }
+      } catch (productError) {
+        console.warn(
+          `Could not get product ${item.productId} for batch processing:`,
+          productError
+        );
+        // Continue with next item
+      }
+    }
+
+    // Create transaction items from cart items (with batch info from selections)
     const transactionItems = cartItems.map((item) => {
-      // Convert expiryDate to timestamp in milliseconds if it exists
+      // Get batch selection for this item (use first batch if multiple)
+      const batchSelections = batchSelectionsMap.get(item.id);
+      const primaryBatch = batchSelections?.[0];
+
+      // Convert expiryDate to timestamp in milliseconds
       let expiryDateTimestamp: number | null = null;
-      if (item.expiryDate) {
+
+      // Use batch expiry date if available, otherwise use cart item's expiry date
+      if (primaryBatch?.expiryDate) {
+        expiryDateTimestamp = primaryBatch.expiryDate;
+      } else if (item.expiryDate) {
         try {
           if (item.expiryDate instanceof Date) {
             expiryDateTimestamp = item.expiryDate.getTime();
@@ -1265,7 +1382,6 @@ ipcMain.handle("transactions:createFromCart", async (event, data) => {
               expiryDateTimestamp = null;
             }
           } else if (typeof item.expiryDate === "number") {
-            // Already a timestamp
             expiryDateTimestamp = item.expiryDate;
           }
         } catch (e) {
@@ -1283,12 +1399,15 @@ ipcMain.handle("transactions:createFromCart", async (event, data) => {
         totalPrice: item.totalPrice,
         taxAmount: item.taxAmount,
         unitOfMeasure: item.unitOfMeasure || null,
-        batchId: item.batchId || null,
-        batchNumber: item.batchNumber || null,
+        // Use batch info from FEFO selection or cart item
+        batchId: primaryBatch?.batchId || item.batchId || null,
+        batchNumber: primaryBatch?.batchNumber || item.batchNumber || null,
         expiryDate: expiryDateTimestamp,
         ageRestrictionLevel: item.ageRestrictionLevel || "NONE",
         ageVerified: item.ageVerified || false,
-      } as any; // Type assertion needed because createTransactionWithItems expects partial TransactionItem
+        // Store cart item ID for reference
+        cartItemId: item.id,
+      } as any;
     });
 
     console.log(`Creating transaction with ${transactionItems.length} items`);
@@ -1321,7 +1440,13 @@ ipcMain.handle("transactions:createFromCart", async (event, data) => {
 
     console.log("Transaction created successfully:", transaction.id);
 
-    // Update inventory levels for sold products
+    // ============================================================
+    // BATCH-AWARE INVENTORY UPDATE
+    // ============================================================
+    // For products with batch tracking: deduct from batches (FEFO)
+    // For products without batch tracking: use standard stock adjustment
+    // ============================================================
+
     try {
       const cashierId = cartSession.cashierId;
 
@@ -1331,7 +1456,7 @@ ipcMain.handle("transactions:createFromCart", async (event, data) => {
           continue;
         }
 
-        // Get product to check if inventory tracking is enabled
+        // Get product to check if inventory/batch tracking is enabled
         try {
           const product = await db.products.getProductById(item.productId);
 
@@ -1345,21 +1470,75 @@ ipcMain.handle("transactions:createFromCart", async (event, data) => {
           // Calculate quantity to decrement
           let quantityToDecrement: number;
           if (item.itemType === "WEIGHT" && item.weight) {
-            // For weight-based items, decrement by weight
             quantityToDecrement = item.weight;
           } else {
-            // For unit-based items, decrement by quantity
             quantityToDecrement = item.quantity || 1;
           }
 
-          // Check if sufficient stock available
+          // ============================================================
+          // BATCH DEDUCTION (FEFO/FIFO)
+          // ============================================================
+          if (product.requiresBatchTracking) {
+            // Get batch selections for this item
+            const batchSelections = batchSelectionsMap.get(
+              (item as any).cartItemId
+            );
+
+            if (batchSelections && batchSelections.length > 0) {
+              console.log(
+                `📦 Deducting from ${batchSelections.length} batch(es) for ${product.name}`
+              );
+
+              for (const batchSelection of batchSelections) {
+                try {
+                  // Deduct quantity from batch
+                  await db.batches.updateBatchQuantity(
+                    batchSelection.batchId,
+                    batchSelection.quantity,
+                    "OUTBOUND"
+                  );
+
+                  // Create stock movement record for audit trail
+                  await db.stockMovements.createStockMovement({
+                    productId: item.productId,
+                    batchId: batchSelection.batchId,
+                    movementType: "OUTBOUND",
+                    quantity: batchSelection.quantity,
+                    reason: `Sale - Transaction ${transaction.id}`,
+                    reference: transaction.id,
+                    userId: cashierId,
+                    businessId: data.businessId,
+                  });
+
+                  console.log(
+                    `✅ Deducted ${batchSelection.quantity} from batch ${batchSelection.batchNumber}`
+                  );
+                } catch (batchDeductError) {
+                  console.error(
+                    `Failed to deduct from batch ${batchSelection.batchNumber}:`,
+                    batchDeductError
+                  );
+                  // Continue with other batches - don't fail the transaction
+                }
+              }
+
+              // Skip standard stock adjustment - batch deduction handles it
+              continue;
+            } else {
+              console.warn(
+                `⚠️ Product ${product.name} requires batch tracking but no batches were selected. Using standard stock adjustment.`
+              );
+            }
+          }
+
+          // ============================================================
+          // STANDARD STOCK ADJUSTMENT (non-batch tracked products)
+          // ============================================================
           const currentStock = product.stockLevel ?? 0;
           if (currentStock < quantityToDecrement) {
             console.warn(
               `⚠️ Insufficient stock for product ${item.productId}. Current: ${currentStock}, Required: ${quantityToDecrement}`
             );
-            // Still decrement (allow negative stock) but log warning
-            // In production, you might want to prevent the transaction or handle differently
           }
 
           // Create stock adjustment to record the sale
@@ -1381,15 +1560,12 @@ ipcMain.handle("transactions:createFromCart", async (event, data) => {
               `Failed to update inventory for product ${item.productId}:`,
               inventoryError
             );
-            // Don't fail the transaction if inventory update fails
-            // Log error but continue
           }
         } catch (productError) {
           console.error(
             `Failed to get product ${item.productId} for inventory update:`,
             productError
           );
-          // Continue with next item
         }
       }
     } catch (inventoryError) {

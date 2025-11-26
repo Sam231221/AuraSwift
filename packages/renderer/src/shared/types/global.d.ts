@@ -628,6 +628,39 @@ declare global {
         }
       >;
     };
+    ageVerificationAPI: {
+      create: (verificationData: {
+        transactionId?: string;
+        transactionItemId?: string;
+        productId: string;
+        verificationMethod: "manual" | "scan" | "override";
+        customerBirthdate?: Date | string;
+        calculatedAge?: number;
+        idScanData?: any;
+        verifiedBy: string;
+        managerOverrideId?: string;
+        overrideReason?: string;
+        businessId: string;
+      }) => Promise<APIResponse>;
+      getByTransaction: (transactionId: string) => Promise<APIResponse>;
+      getByTransactionItem: (transactionItemId: string) => Promise<APIResponse>;
+      getByBusiness: (
+        businessId: string,
+        options?: {
+          startDate?: Date;
+          endDate?: Date;
+          verificationMethod?: "manual" | "scan" | "override";
+        }
+      ) => Promise<APIResponse>;
+      getByProduct: (productId: string) => Promise<APIResponse>;
+      getByStaff: (
+        staffId: string,
+        options?: {
+          startDate?: Date;
+          endDate?: Date;
+        }
+      ) => Promise<APIResponse>;
+    };
   }
 }
 

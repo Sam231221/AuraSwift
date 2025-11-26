@@ -15,10 +15,23 @@ import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { Product } from "@/features/products/types/product.types";
 
+/**
+ * Age verification data returned when verification is successful
+ * Used to create audit records in the age_verification_records table
+ */
+export interface AgeVerificationData {
+  verified: boolean;
+  verificationMethod: "manual" | "scan" | "override";
+  customerBirthdate?: string;
+  calculatedAge?: number;
+  overrideReason?: string;
+  managerId?: string;
+}
+
 interface AgeVerificationModalProps {
   isOpen: boolean;
   product: Product;
-  onVerify: (verified: boolean) => void;
+  onVerify: (data: AgeVerificationData) => void;
   onCancel: () => void;
   currentUser: { id: string; role: string } | null;
 }
@@ -91,7 +104,12 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
         return;
       }
 
-      onVerify(true);
+      onVerify({
+        verified: true,
+        verificationMethod: "manual",
+        customerBirthdate: birthdate,
+        calculatedAge: calculatedAge,
+      });
     } else if (verificationMethod === "scan") {
       // TODO: Implement ID scanner integration
       toast.info("ID scanner integration coming soon");
@@ -100,7 +118,12 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
         toast.error("Please enter customer date of birth");
         return;
       }
-      onVerify(true);
+      onVerify({
+        verified: true,
+        verificationMethod: "scan",
+        customerBirthdate: birthdate,
+        calculatedAge: calculatedAge,
+      });
     } else if (verificationMethod === "override") {
       if (!overrideReason.trim()) {
         toast.error("Please provide a reason for override");
@@ -112,7 +135,12 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
         return;
       }
 
-      onVerify(true);
+      onVerify({
+        verified: true,
+        verificationMethod: "override",
+        overrideReason: overrideReason.trim(),
+        managerId: currentUser?.id,
+      });
     }
   };
 

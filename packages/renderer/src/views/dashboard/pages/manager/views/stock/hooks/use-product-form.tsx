@@ -255,21 +255,21 @@ export function useProductForm({
 
   const handleSubmit = form.handleSubmit(
     async (data) => {
-      try {
-        await onSubmit(data);
-        notifySuccess(isEditMode ? "update" : "create");
+    try {
+      await onSubmit(data);
+      notifySuccess(isEditMode ? "update" : "create");
 
-        // Reset form after successful creation (not on update)
-        if (!isEditMode) {
-          form.reset(getDefaultFormData(categories, businessId));
-        }
-
-        onSuccess?.();
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "An error occurred";
-        notifyError(errorMessage);
+      // Reset form after successful creation (not on update)
+      if (!isEditMode) {
+        form.reset(getDefaultFormData(categories, businessId));
       }
+
+      onSuccess?.();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "An error occurred";
+      notifyError(errorMessage);
+    }
     },
     (errors) => {
       // Log validation errors for debugging

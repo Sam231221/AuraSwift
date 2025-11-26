@@ -26,7 +26,6 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -44,7 +43,6 @@ import {
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
   PopoverContent,
@@ -62,6 +60,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/shared/utils/cn";
+import {
+  AdaptiveKeyboard,
+  AdaptiveFormField,
+  AdaptiveTextarea,
+} from "@/components/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
+import type {
+  ScheduleFormData,
+  ScheduleUpdateData,
+} from "./staff-schedules/schemas/schedule-schema";
 // Optimized: Import individual functions to reduce bundle size
 import { format } from "date-fns/format";
 import { addWeeks } from "date-fns/addWeeks";
@@ -196,9 +204,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     loadSchedules();
   }, [businessId]);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date()
-  );
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [viewMode, setViewMode] = useState<"week" | "day">("week");
@@ -240,7 +246,9 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     (schedule?: Schedule, date?: Date) => {
       if (schedule) {
         setEditingSchedule(schedule);
-        setSelectedDate(new Date(schedule.startTime.split("T")[0]));
+        // Parse the date from the schedule's startTime (ISO format)
+        const scheduleDate = new Date(schedule.startTime);
+        setSelectedDate(scheduleDate);
       } else {
         resetForm();
         if (date) {
@@ -384,7 +392,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   const ScheduleFormContent: React.FC<{
     editingSchedule: Schedule | null;
     selectedDate: Date;
-    setSelectedDate: (date: Date | undefined) => void;
+    setSelectedDate: (date: Date) => void;
     isDatePickerOpen: boolean;
     setIsDatePickerOpen: (open: boolean) => void;
     cashiers: Cashier[];
@@ -413,17 +421,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     onSuccess,
   }) => {
     const { form, handleSubmit, isSubmitting, isEditMode } = useScheduleForm({
-      schedule: editingSchedule
-        ? {
-            id: editingSchedule.id,
-            staffId: editingSchedule.staffId,
-            startTime: editingSchedule.startTime,
-            endTime: editingSchedule.endTime,
-            assignedRegister: editingSchedule.assignedRegister,
-            notes: editingSchedule.notes,
-            businessId: editingSchedule.businessId,
-          }
-        : null,
+      schedule: editingSchedule,
       selectedDate,
       businessId,
       onSubmit: async (data) => {
@@ -498,12 +496,15 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       onSuccess: onClose,
     });
 
-    // Update form date when selectedDate changes
-    useEffect(() => {
-      if (selectedDate) {
-        form.setValue("date", format(selectedDate, "yyyy-MM-dd"));
-      }
-    }, [selectedDate, form]);
+    // Keyboard integration
+    const keyboard = useKeyboardWithRHF<ScheduleFormData | ScheduleUpdateData>({
+      setValue: form.setValue,
+      watch: form.watch,
+      fieldConfigs: {
+        assignedRegister: { keyboardMode: "qwerty" },
+        notes: { keyboardMode: "qwerty" },
+      },
+    });
 
     const startTime = form.watch("startTime");
     const endTime = form.watch("endTime");
@@ -535,6 +536,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                         onValueChange={field.onChange}
                         value={field.value || ""}
                         disabled={isSubmitting || isLoadingCashiers}
+                        onOpenChange={() => keyboard.handleCloseKeyboard()}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -588,7 +590,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                       <FormLabel>Schedule Date</FormLabel>
                       <Popover
                         open={isDatePickerOpen}
-                        onOpenChange={setIsDatePickerOpen}
+                        onOpenChange={(open) => {
+                          keyboard.handleCloseKeyboard();
+                          setIsDatePickerOpen(open);
+                        }}
                       >
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -629,17 +634,32 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 <FormField
                   control={form.control}
                   name="assignedRegister"
-                  render={({ field }) => (
+                  render={() => (
                     <FormItem>
                       <FormLabel>Assigned Register</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
+                        <AdaptiveFormField
+                          id="assignedRegister"
+                          label=""
+                          value={keyboard.formValues.assignedRegister || ""}
                           placeholder="e.g. Register 1, Main POS"
-                          disabled={isSubmitting}
+                          readOnly
+                          onClick={() =>
+                            keyboard.handleFieldFocus("assignedRegister")
+                          }
+                          onFocus={() =>
+                            keyboard.handleFieldFocus("assignedRegister")
+                          }
+                          error={
+                            form.formState.errors.assignedRegister?.message
+                          }
+                          className={cn(
+                            keyboard.activeField === "assignedRegister" &&
+                              "ring-2 ring-primary border-primary",
+                            isSubmitting && "opacity-50 cursor-not-allowed"
+                          )}
                         />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -825,23 +845,48 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 <FormField
                   control={form.control}
                   name="notes"
-                  render={({ field }) => (
+                  render={() => (
                     <FormItem className="md:col-span-2">
                       <FormLabel>Notes (Optional)</FormLabel>
                       <FormControl>
-                        <Textarea
-                          {...field}
+                        <AdaptiveTextarea
+                          id="notes"
+                          label=""
+                          value={keyboard.formValues.notes || ""}
                           placeholder="Add any special instructions or notes for this schedule..."
-                          rows={3}
-                          disabled={isSubmitting}
+                          readOnly
+                          onClick={() => keyboard.handleFieldFocus("notes")}
+                          onFocus={() => keyboard.handleFieldFocus("notes")}
+                          error={form.formState.errors.notes?.message}
+                          className={cn(
+                            keyboard.activeField === "notes" &&
+                              "ring-2 ring-primary border-primary",
+                            isSubmitting && "opacity-50 cursor-not-allowed"
+                          )}
                         />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
             </div>
+
+            {/* Adaptive Keyboard */}
+            <AdaptiveKeyboard
+              visible={keyboard.showKeyboard}
+              initialMode={
+                (
+                  keyboard.activeFieldConfig as {
+                    keyboardMode?: "qwerty" | "numeric" | "symbols";
+                  }
+                )?.keyboardMode || "qwerty"
+              }
+              onInput={keyboard.handleInput}
+              onBackspace={keyboard.handleBackspace}
+              onClear={keyboard.handleClear}
+              onEnter={keyboard.handleCloseKeyboard}
+              onClose={keyboard.handleCloseKeyboard}
+            />
 
             <DrawerFooter className="px-0 shrink-0 border-t bg-white">
               <Button
@@ -913,32 +958,59 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   }, [scheduleToDelete, schedules]);
 
   const getShiftDuration = (startTime: string, endTime: string) => {
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    const diffMs = end.getTime() - start.getTime();
-    const diffHours = Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
-    return `${diffHours}h`;
+    try {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+
+      // Check if dates are valid
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return "Invalid date";
+      }
+
+      const diffMs = end.getTime() - start.getTime();
+      const diffHours = Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
+      return `${diffHours}h`;
+    } catch (error) {
+      console.error("Error calculating shift duration:", error);
+      return "N/A";
+    }
   };
 
   const getScheduleStatus = (startTime: string, endTime: string) => {
-    const now = new Date();
-    const start = new Date(startTime);
-    const end = new Date(endTime);
+    try {
+      const now = new Date();
+      const start = new Date(startTime);
+      const end = new Date(endTime);
 
-    if (now < start)
+      // Check if dates are valid
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return {
+          status: "upcoming",
+          color: "bg-gray-100 text-gray-800 border-gray-200",
+        };
+      }
+
+      if (now < start)
+        return {
+          status: "upcoming",
+          color: "bg-blue-100 text-blue-800 border-blue-200",
+        };
+      if (now >= start && now <= end)
+        return {
+          status: "active",
+          color: "bg-green-100 text-green-800 border-green-200",
+        };
+      return {
+        status: "completed",
+        color: "bg-gray-100 text-gray-800 border-gray-200",
+      };
+    } catch (error) {
+      console.error("Error getting schedule status:", error);
       return {
         status: "upcoming",
-        color: "bg-blue-100 text-blue-800 border-blue-200",
+        color: "bg-gray-100 text-gray-800 border-gray-200",
       };
-    if (now >= start && now <= end)
-      return {
-        status: "active",
-        color: "bg-green-100 text-green-800 border-green-200",
-      };
-    return {
-      status: "completed",
-      color: "bg-gray-100 text-gray-800 border-gray-200",
-    };
+    }
   };
 
   // Memoized function to get schedules for a date
@@ -955,7 +1027,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
 
   // Memoized schedules for selected date
   const schedulesForSelectedDate = useMemo(
-    () => getSchedulesForDate(selectedDate || new Date()),
+    () => getSchedulesForDate(selectedDate),
     [getSchedulesForDate, selectedDate]
   );
 
@@ -1022,7 +1094,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             <DrawerContent className="max-h-[90vh] flex flex-col">
               <ScheduleFormContent
                 editingSchedule={editingSchedule}
-                selectedDate={selectedDate || new Date()}
+                selectedDate={selectedDate}
                 setSelectedDate={setSelectedDate}
                 isDatePickerOpen={isDatePickerOpen}
                 setIsDatePickerOpen={setIsDatePickerOpen}
@@ -1108,7 +1180,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                   isToday(day)
                     ? "bg-emerald-100 border-emerald-300 text-emerald-800 font-semibold"
                     : "bg-slate-50 border-slate-200",
-                  selectedDate && isSameDay(day, selectedDate)
+                  isSameDay(day, selectedDate)
                     ? "ring-2 ring-emerald-400 ring-opacity-50"
                     : ""
                 )}
@@ -1148,7 +1220,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={setSelectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
                   initialFocus
                 />
               </PopoverContent>
@@ -1159,10 +1231,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         {/* Shifts for Selected Date */}
         <div className="mb-6">
           <h3 className="text-2xl font-bold text-slate-800 mb-4">
-            Shifts for{" "}
-            {selectedDate
-              ? format(selectedDate, "MMMM d, yyyy")
-              : "selected date"}
+            Shifts for {format(selectedDate, "MMMM d, yyyy")}
           </h3>
 
           <Button

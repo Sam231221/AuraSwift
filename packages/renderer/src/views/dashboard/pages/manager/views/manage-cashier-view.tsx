@@ -61,7 +61,10 @@ import {
   AdaptiveFormField,
 } from "@/components/adaptive-keyboard";
 import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
-import type { CashierFormData, CashierUpdateData } from "./manage-cashier/schemas/cashier-schema";
+import type {
+  CashierFormData,
+  CashierUpdateData,
+} from "./manage-cashier/schemas/cashier-schema";
 
 interface StaffUser {
   id: string;
@@ -120,7 +123,7 @@ export default function CashierManagementView({
             role: u.role as "cashier",
             businessId: u.businessId,
             avatar: u.avatar,
-            address: u.address || "",
+            address: (u as { address?: string }).address || "",
             createdAt: u.createdAt || new Date().toISOString(),
             isActive: u.isActive !== undefined ? u.isActive : true,
           }));
@@ -301,7 +304,7 @@ export default function CashierManagementView({
                         Address
                       </Label>
                       <div className="flex items-start space-x-2 mt-1">
-                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                         <p className="text-sm">{selectedUser.address}</p>
                       </div>
                     </div>
@@ -776,7 +779,9 @@ function CreateCashierDialog({
                         placeholder="Confirm password"
                         disabled={isSubmitting}
                         readOnly
-                        onFocus={() => keyboard.handleFieldFocus("confirmPassword")}
+                        onFocus={() =>
+                          keyboard.handleFieldFocus("confirmPassword")
+                        }
                         error={form.formState.errors.confirmPassword?.message}
                       />
                     </FormControl>
@@ -788,10 +793,17 @@ function CreateCashierDialog({
             {/* Adaptive Keyboard */}
             <AdaptiveKeyboard
               visible={keyboard.showKeyboard}
-              mode={keyboard.activeFieldConfig?.keyboardMode || "qwerty"}
+              initialMode={
+                (
+                  keyboard.activeFieldConfig as {
+                    keyboardMode?: "qwerty" | "numeric" | "symbols";
+                  }
+                )?.keyboardMode || "qwerty"
+              }
               onInput={keyboard.handleInput}
               onBackspace={keyboard.handleBackspace}
               onClear={keyboard.handleClear}
+              onEnter={keyboard.handleCloseKeyboard}
               onClose={keyboard.handleCloseKeyboard}
             />
 
@@ -1031,10 +1043,17 @@ function EditCashierDialog({
             {/* Adaptive Keyboard */}
             <AdaptiveKeyboard
               visible={keyboard.showKeyboard}
-              mode={keyboard.activeFieldConfig?.keyboardMode || "qwerty"}
+              initialMode={
+                (
+                  keyboard.activeFieldConfig as {
+                    keyboardMode?: "qwerty" | "numeric" | "symbols";
+                  }
+                )?.keyboardMode || "qwerty"
+              }
               onInput={keyboard.handleInput}
               onBackspace={keyboard.handleBackspace}
               onClear={keyboard.handleClear}
+              onEnter={keyboard.handleCloseKeyboard}
               onClose={keyboard.handleCloseKeyboard}
             />
 

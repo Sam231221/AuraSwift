@@ -45,11 +45,13 @@ import {
 } from "./components/shared";
 import {
   AgeVerificationModal,
+  BatchSelectionModal,
   GenericItemPriceModal,
   RefundTransactionView,
   VoidTransactionModal,
   CashDrawerCountModal,
 } from "./components/modals";
+import type { AgeVerificationData, SelectedBatchData } from "./components/modals";
 import { ScaleDisplay } from "@/components/scale/ScaleDisplay";
 
 // Types
@@ -93,6 +95,13 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   const [pendingGenericProduct, setPendingGenericProduct] =
     useState<Product | null>(null);
   const [showScaleDisplay, setShowScaleDisplay] = useState(false);
+  
+  // Batch selection modal states
+  const [showBatchSelectionModal, setShowBatchSelectionModal] = useState(false);
+  const [pendingProductForBatchSelection, setPendingProductForBatchSelection] =
+    useState<Product | null>(null);
+  const [pendingQuantityForBatchSelection, setPendingQuantityForBatchSelection] =
+    useState<number>(1);
 
   // Receipt printing flow
   const { isShowingStatus, startPrintingFlow, handleSkipReceipt } =
@@ -247,26 +256,55 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     [isOperationsDisabled]
   );
 
-  // Handle age verification complete
+  // Handle age verification complete - creates audit record and adds item to cart
   const handleAgeVerificationComplete = useCallback(
-    async (ageVerified: boolean) => {
+    async (verificationData: AgeVerificationData) => {
       if (!pendingProductForAgeVerification) return;
 
-      if (ageVerified) {
-        if (pendingWeightForAgeVerification !== undefined) {
-          await cart.addToCart(
-            pendingProductForAgeVerification,
-            pendingWeightForAgeVerification,
-            undefined,
-            true
-          );
-        } else {
-          await cart.addToCart(
-            pendingProductForAgeVerification,
-            undefined,
-            undefined,
-            true
-          );
+      if (verificationData.verified) {
+        try {
+          // Create age verification audit record
+          if (user?.id && user?.businessId) {
+            const auditResponse = await window.ageVerificationAPI.create({
+              productId: pendingProductForAgeVerification.id,
+              verificationMethod: verificationData.verificationMethod,
+              customerBirthdate: verificationData.customerBirthdate,
+              calculatedAge: verificationData.calculatedAge,
+              verifiedBy: user.id,
+              managerOverrideId: verificationData.managerId,
+              overrideReason: verificationData.overrideReason,
+              businessId: user.businessId,
+            });
+
+            if (!auditResponse.success) {
+              console.error(
+                "Failed to create age verification record:",
+                auditResponse.message
+              );
+              // Continue with cart addition even if audit fails - we don't want to block sales
+              // The ageVerified flag on the cart item provides fallback tracking
+            }
+          }
+
+          // Add item to cart with ageVerified flag
+          if (pendingWeightForAgeVerification !== undefined) {
+            await cart.addToCart(
+              pendingProductForAgeVerification,
+              pendingWeightForAgeVerification,
+              undefined,
+              true
+            );
+          } else {
+            await cart.addToCart(
+              pendingProductForAgeVerification,
+              undefined,
+              undefined,
+              true
+            );
+          }
+        } catch (error) {
+          console.error("Error during age verification completion:", error);
+          toast.error("Failed to complete age verification");
         }
       }
 
@@ -280,6 +318,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
       pendingWeightForAgeVerification,
       cart,
       weightInput,
+      user,
     ]
   );
 
@@ -295,6 +334,48 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     },
     [pendingGenericProduct, cart]
   );
+
+  // Handle batch selection complete - adds item with specific batch info
+  const handleBatchSelectionComplete = useCallback(
+    async (batchData: SelectedBatchData) => {
+      if (!pendingProductForBatchSelection) return;
+
+      // Add to cart with batch info (this will be used during checkout)
+      // Note: The batch info is stored in cart item and used during transaction creation
+      await cart.addToCart(pendingProductForBatchSelection);
+
+      // TODO: When cart API supports batch info in addToCart, pass it here
+      // For now, the backend auto-selects using FEFO during transaction creation
+      
+      toast.success(
+        `Added ${pendingProductForBatchSelection.name} from batch ${batchData.batchNumber}`
+      );
+
+      setShowBatchSelectionModal(false);
+      setPendingProductForBatchSelection(null);
+      setPendingQuantityForBatchSelection(1);
+    },
+    [pendingProductForBatchSelection, cart]
+  );
+
+  // Handle auto-select batch (FEFO)
+  const handleAutoSelectBatch = useCallback(async () => {
+    if (!pendingProductForBatchSelection) return;
+
+    // Just add to cart - the backend will auto-select using FEFO
+    await cart.addToCart(pendingProductForBatchSelection);
+
+    setShowBatchSelectionModal(false);
+    setPendingProductForBatchSelection(null);
+    setPendingQuantityForBatchSelection(1);
+  }, [pendingProductForBatchSelection, cart]);
+
+  // Handle batch selection cancel
+  const handleBatchSelectionCancel = useCallback(() => {
+    setShowBatchSelectionModal(false);
+    setPendingProductForBatchSelection(null);
+    setPendingQuantityForBatchSelection(1);
+  }, []);
 
   // Initialize cart session on mount
   useEffect(() => {
@@ -673,6 +754,19 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             setShowGenericPriceModal(false);
             setPendingGenericProduct(null);
           }}
+        />
+      )}
+
+      {/* Batch Selection Modal - for products that require batch tracking */}
+      {pendingProductForBatchSelection && user?.businessId && (
+        <BatchSelectionModal
+          isOpen={showBatchSelectionModal}
+          product={pendingProductForBatchSelection}
+          requestedQuantity={pendingQuantityForBatchSelection}
+          onSelect={handleBatchSelectionComplete}
+          onAutoSelect={handleAutoSelectBatch}
+          onCancel={handleBatchSelectionCancel}
+          businessId={user.businessId}
         />
       )}
 

@@ -196,6 +196,28 @@ declare global {
         batch?: import("../features/products/types/batch.types").ProductBatch;
         error?: string;
       }>;
+      getActiveBatches: (
+        productId: string,
+        rotationMethod?: "FIFO" | "FEFO" | "NONE"
+      ) => Promise<{
+        success: boolean;
+        batches?: import("../features/products/types/batch.types").ProductBatch[];
+        error?: string;
+      }>;
+      selectForSale: (
+        productId: string,
+        quantity: number,
+        rotationMethod?: "FIFO" | "FEFO" | "NONE"
+      ) => Promise<{
+        success: boolean;
+        batches?: Array<{
+          batchId: string;
+          quantity: number;
+          batchNumber: string;
+          expiryDate: Date;
+        }>;
+        error?: string;
+      }>;
       adjustStock: (adjustmentData: {
         batchId: string;
         quantity: number;
