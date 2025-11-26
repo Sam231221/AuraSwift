@@ -8,9 +8,8 @@
 import { z } from "zod";
 import {
   optionalStringSchema,
-  uuidSchema,
-  nonNegativeIntegerSchema,
-  nonNegativeNumberSchema,
+  coercedNonNegativeInteger,
+  optionalCoercedNonNegativeNumber,
 } from "@/shared/validation/common";
 
 /**
@@ -54,15 +53,15 @@ const purchaseOrderNumberSchema = z
  */
 export const batchCreateSchema = z
   .object({
-    productId: uuidSchema,
+    productId: z.string().min(1, "Product ID is required"),
     batchNumber: batchNumberSchema,
     manufacturingDate: optionalDateStringSchema,
     expiryDate: dateStringSchema,
-    initialQuantity: nonNegativeIntegerSchema,
+    initialQuantity: coercedNonNegativeInteger,
     supplierId: z.string().optional().or(z.literal("none")),
     purchaseOrderNumber: purchaseOrderNumberSchema,
-    costPrice: nonNegativeNumberSchema.optional(),
-    businessId: uuidSchema,
+    costPrice: optionalCoercedNonNegativeNumber,
+    businessId: z.string().min(1, "Business ID is required"),
   })
   .superRefine((data, ctx) => {
     // Expiry date must be after manufacturing date (if both provided)
@@ -108,14 +107,14 @@ export const batchCreateSchema = z
  */
 export const batchUpdateSchema = z
   .object({
-    id: uuidSchema,
+    id: z.string().min(1, "Batch ID is required"),
     batchNumber: batchNumberSchema.optional(),
     manufacturingDate: optionalDateStringSchema,
     expiryDate: dateStringSchema.optional(),
-    currentQuantity: nonNegativeIntegerSchema.optional(),
+    currentQuantity: coercedNonNegativeInteger.optional(),
     supplierId: z.string().optional().or(z.literal("none")),
     purchaseOrderNumber: purchaseOrderNumberSchema,
-    costPrice: nonNegativeNumberSchema.optional(),
+    costPrice: optionalCoercedNonNegativeNumber,
     status: z.enum(["ACTIVE", "EXPIRED", "SOLD_OUT", "REMOVED"]).optional(),
   })
   .superRefine((data, ctx) => {

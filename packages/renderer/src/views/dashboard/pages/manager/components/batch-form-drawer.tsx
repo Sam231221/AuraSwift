@@ -100,7 +100,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
       };
 
       if (isEditMode && editingBatch) {
-        const response = await window.batchAPI?.update(
+        const response = await window.batchesAPI?.update(
           editingBatch.id,
           batchData
         );
@@ -110,7 +110,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
           throw new Error(response?.error || "Failed to update batch");
         }
       } else {
-        const response = await window.batchAPI?.create(batchData);
+        const response = await window.batchesAPI?.create(batchData);
         if (response?.success && response.batch) {
           onSave(response.batch);
         } else {

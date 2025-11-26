@@ -145,7 +145,7 @@ declare global {
         adjustments?: import("../types/product.types").StockAdjustment[];
       }>;
     };
-    batchAPI: {
+    batchesAPI: {
       create: (batchData: {
         productId: string;
         batchNumber?: string;

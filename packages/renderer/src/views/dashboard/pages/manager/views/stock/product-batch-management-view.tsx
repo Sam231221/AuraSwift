@@ -58,20 +58,36 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     productId: selectedProduct?.id || initialProductId,
   });
 
-  // Get expiry alerts
+  // Enrich batches with product data
+  const enrichedBatches = batches.map((batch) => {
+    const product = products.find((p) => p.id === batch.productId);
+    return {
+      ...batch,
+      product: product
+        ? {
+            id: product.id,
+            name: product.name,
+            sku: product.sku,
+            image: product.image,
+          }
+        : batch.product,
+    };
+  });
+
+  // Get expiry alerts (use enriched batches)
   const { criticalAlerts, warningAlerts, infoAlerts } = useExpiryAlerts({
-    batches,
+    batches: enrichedBatches,
     expirySettings,
     businessId: user?.businessId,
   });
 
   // Filter batches
-  const filteredBatches = batches.filter((batch) => {
+  const filteredBatches = enrichedBatches.filter((batch) => {
     const matchesSearch =
       !searchTerm ||
       batch.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      batch.product?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      batch.product?.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      batch.product?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      batch.product?.sku?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
       statusFilter === "all" || batch.status === statusFilter;
@@ -160,7 +176,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     <>
       {currentView === "dashboard" && (
         <ExpiryDashboard
-          batches={batches}
+          batches={enrichedBatches}
           expirySettings={expirySettings}
           businessId={user.businessId}
           onViewBatches={() => setCurrentView("list")}
@@ -340,6 +356,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           isOpen={isBatchFormOpen}
           editingBatch={editingBatch}
           product={
+            (editingBatch && products.find((p) => p.id === editingBatch.productId)) ||
             selectedProduct ||
             products.find((p) => p.id === initialProductId) ||
             null

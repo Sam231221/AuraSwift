@@ -99,6 +99,39 @@ export const nonNegativeNumberSchema = z
   .finite("Must be a valid number");
 
 /**
+ * Coerced non-negative number schema
+ * Converts string inputs (from keyboard) to numbers
+ * Can be zero or positive
+ */
+export const coercedNonNegativeNumber = z
+  .union([z.string(), z.number()])
+  .transform((val) => {
+    if (val === "" || val === undefined || val === null) return 0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  })
+  .pipe(
+    z.number({ message: "This field is required" })
+      .nonnegative("Cannot be negative")
+      .finite("Must be a valid number")
+  );
+
+/**
+ * Optional coerced non-negative number schema
+ * Handles empty strings and undefined properly
+ */
+export const optionalCoercedNonNegativeNumber = z
+  .union([z.string(), z.number(), z.undefined()])
+  .transform((val) => {
+    if (val === undefined || val === null || val === "") return undefined;
+    const num = Number(val);
+    return isNaN(num) ? undefined : num;
+  })
+  .pipe(
+    z.number().nonnegative("Cannot be negative").finite("Must be a valid number").optional()
+  );
+
+/**
  * Integer schema (positive)
  * Must be a whole number greater than zero
  */
@@ -117,6 +150,25 @@ export const nonNegativeIntegerSchema = z
   .int("Must be a whole number")
   .nonnegative("Cannot be negative")
   .finite("Must be a valid number");
+
+/**
+ * Coerced non-negative integer schema
+ * Converts string inputs (from keyboard) to integers
+ * Must be a whole number (zero or positive)
+ */
+export const coercedNonNegativeInteger = z
+  .union([z.string(), z.number()])
+  .transform((val) => {
+    if (val === "" || val === undefined || val === null) return 0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : Math.floor(num);
+  })
+  .pipe(
+    z.number({ message: "This field is required" })
+      .int("Must be a whole number")
+      .nonnegative("Cannot be negative")
+      .finite("Must be a valid number")
+  );
 
 /**
  * Percentage schema

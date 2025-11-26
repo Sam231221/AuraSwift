@@ -29,6 +29,12 @@ import type { ProductBatch, Supplier } from "../types/batch.types";
 import { generateBatchNumber } from "../utils/expiry-calculations";
 import type { Product } from "../types/product.types";
 import { useBatchForm } from "../hooks/use-batch-form";
+import {
+  AdaptiveKeyboard,
+  AdaptiveFormField,
+} from "@/components/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
+import type { BatchFormData, BatchUpdateData } from "../schemas/batch-schema";
 
 interface BatchFormDrawerProps {
   isOpen: boolean;
@@ -100,7 +106,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
       };
 
       if (isEditMode && editingBatch) {
-        const response = await window.batchAPI?.update(
+        const response = await window.batchesAPI?.update(
           editingBatch.id,
           batchData
         );
@@ -110,15 +116,31 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
           throw new Error(response?.error || "Failed to update batch");
         }
       } else {
-        const response = await window.batchAPI?.create(batchData);
+        console.log("Creating batch with data:", batchData);
+        const response = await window.batchesAPI?.create(batchData);
+        console.log("Batch API response:", response);
         if (response?.success && response.batch) {
           onSave(response.batch);
         } else {
-          throw new Error(response?.error || "Failed to create batch");
+          throw new Error(
+            response?.error || response?.message || "Failed to create batch"
+          );
         }
       }
     },
     onSuccess: onClose,
+  });
+
+  // Keyboard integration
+  const keyboard = useKeyboardWithRHF<BatchFormData | BatchUpdateData>({
+    setValue: form.setValue,
+    watch: form.watch,
+    fieldConfigs: {
+      batchNumber: { keyboardMode: "qwerty" },
+      initialQuantity: { keyboardMode: "numeric" },
+      purchaseOrderNumber: { keyboardMode: "qwerty" },
+      costPrice: { keyboardMode: "numeric" },
+    } as any, // Cast needed due to union type BatchFormData | BatchUpdateData
   });
 
   // Update form when product selection changes
@@ -129,7 +151,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
       return;
     }
 
-    if (initialProduct && !editingBatch) {
+    // When editing, set product from initialProduct (which should be looked up from editingBatch.productId)
+    if (editingBatch && initialProduct) {
+      setSelectedProduct(initialProduct);
+    } else if (initialProduct && !editingBatch) {
+      // When creating new batch
       setSelectedProduct(initialProduct);
       form.setValue("productId", initialProduct.id);
       if (initialProduct.costPrice) {
@@ -270,6 +296,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                         }}
                         value={field.value || ""}
                         disabled={isSubmitting}
+                        onOpenChange={() => keyboard.handleCloseKeyboard()}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -321,6 +348,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                           <Checkbox
                             checked={autoGenerateBatchNumber}
                             onCheckedChange={(checked) => {
+                              keyboard.handleCloseKeyboard();
                               setAutoGenerateBatchNumber(checked as boolean);
                               if (checked && selectedProduct) {
                                 const expiryDate = form.watch("expiryDate");
@@ -342,16 +370,20 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                       )}
                     </div>
                     <FormControl>
-                      <Input
-                        {...field}
+                      <AdaptiveFormField
+                        id="batchNumber"
+                        label=""
+                        value={field.value || ""}
                         placeholder="Enter batch number"
                         disabled={
                           (autoGenerateBatchNumber && !isEditMode) ||
                           isSubmitting
                         }
+                        readOnly
+                        onFocus={() => keyboard.handleFieldFocus("batchNumber")}
+                        error={form.formState.errors.batchNumber?.message}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -370,6 +402,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                           type="date"
                           disabled={isSubmitting}
                           value={field.value || ""}
+                          onFocus={() => keyboard.handleCloseKeyboard()}
                         />
                       </FormControl>
                       <FormMessage />
@@ -388,6 +421,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                           {...field}
                           type="date"
                           disabled={isSubmitting}
+                          onFocus={() => keyboard.handleCloseKeyboard()}
                           onChange={(e) => {
                             field.onChange(e.target.value);
                             // Auto-update batch number if auto-generate is enabled
@@ -432,19 +466,22 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     <FormItem>
                       <FormLabel>Initial Quantity *</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          min="1"
-                          step="1"
+                        <AdaptiveFormField
+                          id="initialQuantity"
+                          label=""
+                          value={String(field.value || "")}
+                          placeholder="Enter quantity"
                           disabled={isSubmitting}
-                          value={field.value || ""}
-                          onChange={(e) =>
-                            field.onChange(parseInt(e.target.value) || 0)
+                          readOnly
+                          onFocus={() =>
+                            keyboard.handleFieldFocus("initialQuantity")
+                          }
+                          error={
+                            (form.formState.errors as any).initialQuantity
+                              ?.message
                           }
                         />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -463,6 +500,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                       }
                       value={field.value || "none"}
                       disabled={isSubmitting}
+                      onOpenChange={() => keyboard.handleCloseKeyboard()}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -500,13 +538,21 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     <FormItem>
                       <FormLabel>Purchase Order # (Optional)</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
+                        <AdaptiveFormField
+                          id="purchaseOrderNumber"
+                          label=""
+                          value={field.value || ""}
                           placeholder="PO-12345"
                           disabled={isSubmitting}
+                          readOnly
+                          onFocus={() =>
+                            keyboard.handleFieldFocus("purchaseOrderNumber")
+                          }
+                          error={
+                            form.formState.errors.purchaseOrderNumber?.message
+                          }
                         />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -518,51 +564,55 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                     <FormItem>
                       <FormLabel>Cost Price (Optional)</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          step="0.01"
-                          min="0"
+                        <AdaptiveFormField
+                          id="costPrice"
+                          label=""
+                          value={String(field.value || "")}
                           placeholder="0.00"
                           disabled={isSubmitting}
-                          value={field.value || ""}
-                          onChange={(e) =>
-                            field.onChange(
-                              parseFloat(e.target.value) || undefined
-                            )
-                          }
+                          readOnly
+                          onFocus={() => keyboard.handleFieldFocus("costPrice")}
+                          error={form.formState.errors.costPrice?.message}
                         />
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+            </div>
 
-              <div className="flex space-x-2 pt-6 border-t">
+            {/* Adaptive Keyboard */}
+            <AdaptiveKeyboard
+              visible={keyboard.showKeyboard}
+              initialMode={
+                (keyboard.activeFieldConfig as any)?.keyboardMode || "qwerty"
+              }
+              onInput={keyboard.handleInput}
+              onBackspace={keyboard.handleBackspace}
+              onClear={keyboard.handleClear}
+              onEnter={keyboard.handleCloseKeyboard}
+              onClose={keyboard.handleCloseKeyboard}
+            />
+
+            <div className="flex space-x-2 pt-6 px-6 pb-6 border-t">
+              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                {isSubmitting
+                  ? "Saving..."
+                  : isEditMode
+                  ? "Update Batch"
+                  : "Create Batch"}
+              </Button>
+              <DrawerClose asChild>
                 <Button
-                  type="submit"
+                  type="button"
+                  variant="outline"
                   className="flex-1"
+                  onClick={handleClose}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting
-                    ? "Saving..."
-                    : isEditMode
-                    ? "Update Batch"
-                    : "Create Batch"}
+                  Cancel
                 </Button>
-                <DrawerClose asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleClose}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                </DrawerClose>
-              </div>
+              </DrawerClose>
             </div>
           </form>
         </Form>

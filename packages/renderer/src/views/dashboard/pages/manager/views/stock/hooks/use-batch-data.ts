@@ -21,7 +21,7 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const loadBatches = useCallback(async () => {
-    if (!businessId || !window.batchAPI) {
+    if (!businessId || !window.batchesAPI) {
       setBatches([]);
       return;
     }
@@ -30,7 +30,7 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
       setLoading(true);
       setError(null);
 
-      const response = await window.batchAPI.getByBusiness(
+      const response = await window.batchesAPI.getByBusiness(
         businessId,
         productId
       );
@@ -155,14 +155,14 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
       }
 
       try {
-        if (!window.batchAPI) {
+        if (!window.batchesAPI) {
           return {
             success: false,
             error: "Batch API not available",
           };
         }
 
-        const response = await window.batchAPI.create({
+        const response = await window.batchesAPI.create({
           ...batchData,
           businessId,
           currentQuantity: batchData.initialQuantity, // Set currentQuantity to initialQuantity for new batches
@@ -204,14 +204,14 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
       }
     ): Promise<BatchResponse> => {
       try {
-        if (!window.batchAPI) {
+        if (!window.batchesAPI) {
           return {
             success: false,
             error: "Batch API not available",
           };
         }
 
-        const response = await window.batchAPI.update(batchId, updates);
+        const response = await window.batchesAPI.update(batchId, updates);
 
         if (response.success && response.batch) {
           setBatches((prev) =>
@@ -241,14 +241,14 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
   const deleteBatch = useCallback(
     async (batchId: string): Promise<BatchResponse> => {
       try {
-        if (!window.batchAPI) {
+        if (!window.batchesAPI) {
           return {
             success: false,
             error: "Batch API not available",
           };
         }
 
-        const response = await window.batchAPI.delete(batchId);
+        const response = await window.batchesAPI.delete(batchId);
 
         if (response.success) {
           setBatches((prev) => prev.filter((batch) => batch.id !== batchId));

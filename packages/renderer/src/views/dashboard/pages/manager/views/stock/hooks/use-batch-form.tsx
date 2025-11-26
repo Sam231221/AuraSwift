@@ -120,30 +120,38 @@ export function useBatchForm({
     defaultValues: batch
       ? mapBatchToFormData(batch)
       : getDefaultValues(productId, businessId),
-    mode: "onBlur", // Validate on blur for better UX
+    mode: "onChange", // Validate on change for keyboard input
   });
 
   const { notifySuccess, notifyError } = useFormNotification({
     entityName: "Batch",
   });
 
-  const handleSubmit = form.handleSubmit(async (data) => {
-    try {
-      await onSubmit(data);
-      notifySuccess(isEditMode ? "update" : "create");
-      
-      // Reset form after successful creation (not on update)
-      if (!isEditMode && productId) {
-        form.reset(getDefaultValues(productId, businessId));
+  const handleSubmit = form.handleSubmit(
+    async (data) => {
+      try {
+        console.log("Batch form data:", data);
+        await onSubmit(data);
+        notifySuccess(isEditMode ? "update" : "create");
+        
+        // Reset form after successful creation (not on update)
+        if (!isEditMode && productId) {
+          form.reset(getDefaultValues(productId, businessId));
+        }
+        
+        onSuccess?.();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+        console.error("Batch form submission error:", error);
+        notifyError(errorMessage);
       }
-      
-      onSuccess?.();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "An error occurred";
-      notifyError(errorMessage);
+    },
+    (errors) => {
+      // Log validation errors for debugging
+      console.error("Batch form validation errors:", errors);
     }
-  });
+  );
 
   return {
     form,
