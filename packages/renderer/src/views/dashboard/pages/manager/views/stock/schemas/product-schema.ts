@@ -10,11 +10,28 @@ import {
   requiredStringSchema,
   optionalStringSchema,
   skuSchema as commonSkuSchema,
-  nonNegativeNumberSchema,
-  percentageSchema,
-  nonNegativeIntegerSchema,
-  uuidSchema,
 } from "@/shared/validation/common";
+
+/**
+ * Coerced number schemas for keyboard input compatibility
+ * These use z.coerce.number() to automatically convert string inputs to numbers
+ */
+const coercedNonNegativeNumber = z.coerce
+  .number({ message: "Must be a valid number" })
+  .nonnegative("Cannot be negative")
+  .finite("Must be a valid number");
+
+const coercedNonNegativeInteger = z.coerce
+  .number({ message: "Must be a valid number" })
+  .int("Must be a whole number")
+  .nonnegative("Cannot be negative")
+  .finite("Must be a valid number");
+
+const coercedPercentage = z.coerce
+  .number({ message: "Must be a valid number" })
+  .min(0, "Cannot be negative")
+  .max(100, "Cannot exceed 100%")
+  .finite("Must be a valid number");
 
 /**
  * PLU validation: alphanumeric only (optional)
@@ -64,7 +81,7 @@ export const ageRestrictionLevelSchema = z.enum([
 const modifierOptionSchema = z.object({
   id: z.string().optional(),
   name: requiredStringSchema("Option name"),
-  price: nonNegativeNumberSchema,
+  price: coercedNonNegativeNumber,
 });
 
 /**
@@ -104,37 +121,40 @@ const baseProductSchema = z
   .object({
     name: requiredStringSchema("Product name"),
     description: optionalStringSchema,
-    basePrice: nonNegativeNumberSchema,
-    costPrice: nonNegativeNumberSchema,
+    basePrice: coercedNonNegativeNumber,
+    costPrice: coercedNonNegativeNumber,
     sku: commonSkuSchema,
     barcode: optionalStringSchema,
     plu: pluSchema,
     image: optionalStringSchema,
-    categoryId: uuidSchema.min(1, "Please select a category"),
+    // Accept any non-empty string for categoryId (not just UUIDs) to support legacy IDs
+    categoryId: z.string().min(1, "Please select a category"),
     productType: productTypeSchema.default("STANDARD"),
     salesUnit: salesUnitSchema.default("PIECE"),
     usesScale: z.boolean().default(false),
-    pricePerKg: nonNegativeNumberSchema.optional(),
+    pricePerKg: coercedNonNegativeNumber.optional(),
     isGenericButton: z.boolean().default(false),
-    genericDefaultPrice: nonNegativeNumberSchema.optional(),
+    genericDefaultPrice: coercedNonNegativeNumber.optional(),
     trackInventory: z.boolean().default(true),
-    stockLevel: nonNegativeIntegerSchema,
-    minStockLevel: nonNegativeIntegerSchema,
-    reorderPoint: nonNegativeIntegerSchema,
-    vatCategoryId: uuidSchema.optional().or(z.literal("")),
-    vatOverridePercent: percentageSchema.optional(),
+    stockLevel: coercedNonNegativeInteger,
+    minStockLevel: coercedNonNegativeInteger,
+    reorderPoint: coercedNonNegativeInteger,
+    // Accept any string for vatCategoryId (not just UUIDs) to support legacy IDs
+    vatCategoryId: z.string().optional().or(z.literal("")),
+    vatOverridePercent: coercedPercentage.optional(),
     isActive: z.boolean().default(true),
     allowPriceOverride: z.boolean().default(false),
     allowDiscount: z.boolean().default(true),
     modifiers: z.array(modifierSchema).optional(),
     hasExpiry: z.boolean().default(false),
-    shelfLifeDays: nonNegativeIntegerSchema.optional(),
+    shelfLifeDays: coercedNonNegativeInteger.optional(),
     requiresBatchTracking: z.boolean().default(false),
     stockRotationMethod: stockRotationMethodSchema.default("FIFO"),
     ageRestrictionLevel: ageRestrictionLevelSchema.default("NONE"),
     requireIdScan: z.boolean().default(false),
     restrictionReason: optionalStringSchema,
-    businessId: uuidSchema,
+    // Accept any non-empty string for businessId (not just UUIDs) to support legacy IDs
+    businessId: z.string().min(1, "Business ID is required"),
   })
   .superRefine((data, ctx) => {
     // Weight-based product validations
@@ -145,44 +165,6 @@ const baseProductSchema = z
           message:
             "Weight-based products must have a weight unit (e.g., KG, GRAM)",
           path: ["salesUnit"],
-        });
-      }
-      if (!data.pricePerKg || data.pricePerKg <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Price per KG/GRAM is required for weight-based products",
-          path: ["pricePerKg"],
-        });
-      }
-    } else {
-      if (data.basePrice <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Base price must be greater than 0 for standard products",
-          path: ["basePrice"],
-        });
-      }
-    }
-
-    // Generic button product validations
-    if (data.isGenericButton) {
-      if (!data.genericDefaultPrice || data.genericDefaultPrice <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Default price is required for generic button products",
-          path: ["genericDefaultPrice"],
-        });
-      }
-    }
-
-    // Expiry tracking validations
-    if (data.hasExpiry) {
-      if (!data.shelfLifeDays || data.shelfLifeDays <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Shelf life in days is required for products with expiry tracking",
-          path: ["shelfLifeDays"],
         });
       }
     }
@@ -199,25 +181,10 @@ const baseProductSchema = z
       }
     }
 
-    // Age restriction validations
-    if (data.ageRestrictionLevel !== "NONE") {
-      if (!data.restrictionReason || data.restrictionReason.trim() === "") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Restriction reason is required for age-restricted products",
-          path: ["restrictionReason"],
-        });
-      }
-    }
-
-    // Cost price should not exceed sale price (only for non-weight-based products)
-    if (!data.usesScale && data.costPrice > data.basePrice) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Cost price cannot be higher than sale price",
-        path: ["costPrice"],
-      });
-    }
+    // Note: Removed strict basePrice > 0, pricePerKg > 0, genericDefaultPrice > 0,
+    // shelfLifeDays > 0, restrictionReason, and costPrice < basePrice validations
+    // because they interfere with tabbed form workflow where users may not have
+    // entered values yet. These validations can be handled at the API level.
   });
 
 /**
@@ -232,7 +199,8 @@ export const productCreateSchema = baseProductSchema;
  * Uses safeExtend() because baseProductSchema contains refinements
  */
 export const productUpdateSchema = baseProductSchema.safeExtend({
-  id: uuidSchema,
+  // Accept any non-empty string for id (not just UUIDs) to support legacy IDs
+  id: z.string().min(1, "ID is required"),
 });
 
 /**

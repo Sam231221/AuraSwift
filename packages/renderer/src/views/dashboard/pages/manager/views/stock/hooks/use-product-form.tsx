@@ -5,6 +5,7 @@
  * using React Hook Form with Zod validation.
  */
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { configuredZodResolver } from "@/shared/validation/resolvers";
 import {
@@ -236,30 +237,45 @@ export function useProductForm({
     defaultValues: product
       ? mapProductToFormData(product, categories, businessId)
       : getDefaultFormData(categories, businessId),
-    mode: "onBlur", // Validate on blur for better UX on complex forms
+    mode: "onChange", // Enable real-time validation for better UX with keyboard
   });
+
+  // Reset form when product changes (for edit mode)
+  useEffect(() => {
+    if (product) {
+      form.reset(mapProductToFormData(product, categories, businessId));
+    } else {
+      form.reset(getDefaultFormData(categories, businessId));
+    }
+  }, [product, categories, businessId, form]);
 
   const { notifySuccess, notifyError } = useFormNotification({
     entityName: "Product",
   });
 
-  const handleSubmit = form.handleSubmit(async (data) => {
-    try {
-      await onSubmit(data);
-      notifySuccess(isEditMode ? "update" : "create");
+  const handleSubmit = form.handleSubmit(
+    async (data) => {
+      try {
+        await onSubmit(data);
+        notifySuccess(isEditMode ? "update" : "create");
 
-      // Reset form after successful creation (not on update)
-      if (!isEditMode) {
-        form.reset(getDefaultFormData(categories, businessId));
+        // Reset form after successful creation (not on update)
+        if (!isEditMode) {
+          form.reset(getDefaultFormData(categories, businessId));
+        }
+
+        onSuccess?.();
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+        notifyError(errorMessage);
       }
-
-      onSuccess?.();
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "An error occurred";
-      notifyError(errorMessage);
+    },
+    (errors) => {
+      // Log validation errors for debugging
+      console.error("Product form validation errors:", errors);
     }
-  });
+  );
 
   return {
     form,

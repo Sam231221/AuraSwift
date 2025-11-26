@@ -1,8 +1,12 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { AdaptiveFormField } from "@/components/adaptive-keyboard/adaptive-form-field";
+import { AdaptiveTextarea } from "@/components/adaptive-keyboard/adaptive-textarea";
+import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/shared/hooks";
+import { cn } from "@/shared/utils/cn";
 import {
   Drawer,
   DrawerContent,
@@ -202,6 +206,38 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
     onSuccess: onClose,
   });
 
+  // Keyboard integration hook
+  const keyboard = useKeyboardWithRHF({
+    setValue: form.setValue,
+    watch: form.watch,
+    fieldConfigs: {
+      // Text fields
+      name: { keyboardMode: "qwerty" },
+      description: { keyboardMode: "qwerty" },
+      sku: { keyboardMode: "qwerty" },
+      plu: { keyboardMode: "qwerty" },
+      barcode: { keyboardMode: "qwerty" },
+      restrictionReason: { keyboardMode: "qwerty" },
+      // Numeric fields
+      basePrice: { keyboardMode: "numeric" },
+      costPrice: { keyboardMode: "numeric" },
+      pricePerKg: { keyboardMode: "numeric" },
+      genericDefaultPrice: { keyboardMode: "numeric" },
+      stockLevel: { keyboardMode: "numeric" },
+      minStockLevel: { keyboardMode: "numeric" },
+      reorderPoint: { keyboardMode: "numeric" },
+      vatOverridePercent: { keyboardMode: "numeric" },
+      shelfLifeDays: { keyboardMode: "numeric" },
+    },
+  });
+
+  // Close keyboard when drawer closes
+  useEffect(() => {
+    if (!isOpen) {
+      keyboard.handleCloseKeyboard();
+    }
+  }, [isOpen, keyboard]);
+
   const handleImageUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -217,6 +253,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
   );
 
   const handleClose = () => {
+    keyboard.handleCloseKeyboard();
     setActiveTab("basic");
     onClose();
   };
@@ -232,7 +269,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
       onOpenChange={(open) => !open && handleClose()}
       direction="right"
     >
-      <DrawerContent className="h-full w-[800px] mt-0 rounded-none fixed right-0 top-0">
+      <DrawerContent className="h-full w-[95%] sm:w-[900px] md:w-[1000px] lg:w-[1200px] xl:w-[1400px] sm:max-w-none mt-0 rounded-none fixed right-0 top-0">
         <DrawerHeader className="border-b">
           <DrawerTitle>
             {editingProduct ? "Edit Product" : "Add New Product"}
@@ -327,14 +364,22 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="name"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem className="col-span-2">
-                          <FormLabel>Product Name *</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
+                            <AdaptiveFormField
+                              {...form.register("name")}
+                              label="Product Name *"
+                              value={keyboard.formValues.name || ""}
+                              error={form.formState.errors.name?.message}
+                              onFocus={() => keyboard.handleFieldFocus("name")}
                               placeholder="Enter product name"
                               disabled={isSubmitting}
+                              className={cn(
+                                keyboard.activeField === "name" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -345,15 +390,24 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="description"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem className="col-span-2">
-                          <FormLabel>Description</FormLabel>
                           <FormControl>
-                            <Textarea
-                              {...field}
+                            <AdaptiveTextarea
+                              {...form.register("description")}
+                              label="Description"
+                              value={keyboard.formValues.description || ""}
+                              error={form.formState.errors.description?.message}
+                              onFocus={() =>
+                                keyboard.handleFieldFocus("description")
+                              }
                               placeholder="Enter product description"
-                              rows={3}
                               disabled={isSubmitting}
+                              className={cn(
+                                keyboard.activeField === "description" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -375,6 +429,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                               categories.length === 0 ||
                               isSubmitting
                             }
+                            onOpenChange={() => keyboard.handleCloseKeyboard()}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -413,14 +468,22 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="sku"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem>
-                          <FormLabel>SKU *</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
+                            <AdaptiveFormField
+                              {...form.register("sku")}
+                              label="SKU *"
+                              value={keyboard.formValues.sku || ""}
+                              error={form.formState.errors.sku?.message}
+                              onFocus={() => keyboard.handleFieldFocus("sku")}
                               placeholder="Enter SKU"
                               disabled={isSubmitting}
+                              className={cn(
+                                keyboard.activeField === "sku" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -431,14 +494,22 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="plu"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem className="col-span-2">
-                          <FormLabel>PLU Code (Optional)</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
+                            <AdaptiveFormField
+                              {...form.register("plu")}
+                              label="PLU Code (Optional)"
+                              value={keyboard.formValues.plu || ""}
+                              error={form.formState.errors.plu?.message}
+                              onFocus={() => keyboard.handleFieldFocus("plu")}
                               placeholder="Enter PLU code"
                               disabled={isSubmitting}
+                              className={cn(
+                                keyboard.activeField === "plu" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -453,20 +524,26 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="basePrice"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem>
-                          <FormLabel>Sale Price *</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
-                              step="0.01"
+                            <AdaptiveFormField
+                              {...form.register("basePrice")}
+                              label="Sale Price *"
+                              value={
+                                keyboard.formValues.basePrice?.toString() || ""
+                              }
+                              error={form.formState.errors.basePrice?.message}
+                              onFocus={() =>
+                                keyboard.handleFieldFocus("basePrice")
+                              }
                               placeholder="0.00"
                               disabled={isSubmitting}
-                              value={field.value || ""}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
+                              className={cn(
+                                keyboard.activeField === "basePrice" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -477,20 +554,26 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="costPrice"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem>
-                          <FormLabel>Cost Price *</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
-                              step="0.01"
+                            <AdaptiveFormField
+                              {...form.register("costPrice")}
+                              label="Cost Price *"
+                              value={
+                                keyboard.formValues.costPrice?.toString() || ""
+                              }
+                              error={form.formState.errors.costPrice?.message}
+                              onFocus={() =>
+                                keyboard.handleFieldFocus("costPrice")
+                              }
                               placeholder="0.00"
                               disabled={isSubmitting}
-                              value={field.value || ""}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
+                              className={cn(
+                                keyboard.activeField === "costPrice" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -501,14 +584,24 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="barcode"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem>
-                          <FormLabel>Barcode (Optional)</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
+                            <AdaptiveFormField
+                              {...form.register("barcode")}
+                              label="Barcode (Optional)"
+                              value={keyboard.formValues.barcode || ""}
+                              error={form.formState.errors.barcode?.message}
+                              onFocus={() =>
+                                keyboard.handleFieldFocus("barcode")
+                              }
                               placeholder="Enter barcode"
                               disabled={isSubmitting}
+                              className={cn(
+                                keyboard.activeField === "barcode" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -553,6 +646,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                             }}
                             value={field.value}
                             disabled={isSubmitting}
+                            onOpenChange={() => keyboard.handleCloseKeyboard()}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -585,6 +679,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                             <Switch
                               checked={field.value}
                               onCheckedChange={(checked) => {
+                                keyboard.handleCloseKeyboard();
                                 field.onChange(checked);
                                 form.setValue(
                                   "productType",
@@ -624,6 +719,9 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                                       onValueChange={salesUnitField.onChange}
                                       value={salesUnitField.value || "PIECE"}
                                       disabled={isSubmitting}
+                                      onOpenChange={() =>
+                                        keyboard.handleCloseKeyboard()
+                                      }
                                     >
                                       <FormControl>
                                         <SelectTrigger>
@@ -656,26 +754,35 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                               <FormField
                                 control={form.control}
                                 name="pricePerKg"
-                                render={({ field: priceField }) => (
+                                render={() => (
                                   <FormItem>
-                                    <FormLabel>
-                                      Price per{" "}
-                                      {form.watch("salesUnit") || "KG"}
-                                    </FormLabel>
                                     <FormControl>
-                                      <Input
-                                        {...priceField}
-                                        type="number"
-                                        step="0.01"
+                                      <AdaptiveFormField
+                                        {...form.register("pricePerKg")}
+                                        label={`Price per ${
+                                          form.watch("salesUnit") || "KG"
+                                        }`}
+                                        value={
+                                          keyboard.formValues.pricePerKg?.toString() ||
+                                          ""
+                                        }
+                                        error={
+                                          form.formState.errors.pricePerKg
+                                            ?.message
+                                        }
+                                        onFocus={() =>
+                                          keyboard.handleFieldFocus(
+                                            "pricePerKg"
+                                          )
+                                        }
                                         placeholder="0.00"
                                         disabled={isSubmitting}
-                                        value={priceField.value || ""}
-                                        onChange={(e) => {
-                                          const value =
-                                            parseFloat(e.target.value) || 0;
-                                          priceField.onChange(value);
-                                          form.setValue("basePrice", value);
-                                        }}
+                                        className={cn(
+                                          keyboard.activeField ===
+                                            "pricePerKg" &&
+                                            "ring-2 ring-primary border-primary"
+                                        )}
+                                        readOnly
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -696,23 +803,34 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                       <FormField
                         control={form.control}
                         name="genericDefaultPrice"
-                        render={({ field: priceField }) => (
+                        render={() => (
                           <FormItem>
                             <div className="p-4 bg-purple-50 rounded-lg">
-                              <FormLabel>Default Price</FormLabel>
                               <FormControl>
-                                <Input
-                                  {...priceField}
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="0.00"
-                                  disabled={isSubmitting}
-                                  value={priceField.value || ""}
-                                  onChange={(e) =>
-                                    priceField.onChange(
-                                      parseFloat(e.target.value) || 0
+                                <AdaptiveFormField
+                                  {...form.register("genericDefaultPrice")}
+                                  label="Default Price"
+                                  value={
+                                    keyboard.formValues.genericDefaultPrice?.toString() ||
+                                    ""
+                                  }
+                                  error={
+                                    form.formState.errors.genericDefaultPrice
+                                      ?.message
+                                  }
+                                  onFocus={() =>
+                                    keyboard.handleFieldFocus(
+                                      "genericDefaultPrice"
                                     )
                                   }
+                                  placeholder="0.00"
+                                  disabled={isSubmitting}
+                                  className={cn(
+                                    keyboard.activeField ===
+                                      "genericDefaultPrice" &&
+                                      "ring-2 ring-primary border-primary"
+                                  )}
+                                  readOnly
                                 />
                               </FormControl>
                               <FormMessage />
@@ -730,19 +848,26 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="stockLevel"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem>
-                          <FormLabel>Current Stock</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
+                            <AdaptiveFormField
+                              {...form.register("stockLevel")}
+                              label="Current Stock"
+                              value={
+                                keyboard.formValues.stockLevel?.toString() || ""
+                              }
+                              error={form.formState.errors.stockLevel?.message}
+                              onFocus={() =>
+                                keyboard.handleFieldFocus("stockLevel")
+                              }
                               placeholder="0"
                               disabled={isSubmitting}
-                              value={field.value || ""}
-                              onChange={(e) =>
-                                field.onChange(parseInt(e.target.value) || 0)
-                              }
+                              className={cn(
+                                keyboard.activeField === "stockLevel" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -753,19 +878,29 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="minStockLevel"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem>
-                          <FormLabel>Minimum Stock Level</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
+                            <AdaptiveFormField
+                              {...form.register("minStockLevel")}
+                              label="Minimum Stock Level"
+                              value={
+                                keyboard.formValues.minStockLevel?.toString() ||
+                                ""
+                              }
+                              error={
+                                form.formState.errors.minStockLevel?.message
+                              }
+                              onFocus={() =>
+                                keyboard.handleFieldFocus("minStockLevel")
+                              }
                               placeholder="5"
                               disabled={isSubmitting}
-                              value={field.value || ""}
-                              onChange={(e) =>
-                                field.onChange(parseInt(e.target.value) || 0)
-                              }
+                              className={cn(
+                                keyboard.activeField === "minStockLevel" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -776,19 +911,29 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                     <FormField
                       control={form.control}
                       name="reorderPoint"
-                      render={({ field }) => (
+                      render={() => (
                         <FormItem>
-                          <FormLabel>Reorder Point</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
+                            <AdaptiveFormField
+                              {...form.register("reorderPoint")}
+                              label="Reorder Point"
+                              value={
+                                keyboard.formValues.reorderPoint?.toString() ||
+                                ""
+                              }
+                              error={
+                                form.formState.errors.reorderPoint?.message
+                              }
+                              onFocus={() =>
+                                keyboard.handleFieldFocus("reorderPoint")
+                              }
                               placeholder="0"
                               disabled={isSubmitting}
-                              value={field.value || ""}
-                              onChange={(e) =>
-                                field.onChange(parseFloat(e.target.value) || 0)
-                              }
+                              className={cn(
+                                keyboard.activeField === "reorderPoint" &&
+                                  "ring-2 ring-primary border-primary"
+                              )}
+                              readOnly
                             />
                           </FormControl>
                           <FormMessage />
@@ -813,9 +958,14 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                           <FormItem>
                             <FormLabel>VAT Category</FormLabel>
                             <Select
-                              onValueChange={field.onChange}
-                              value={field.value || ""}
+                              onValueChange={(value) =>
+                                field.onChange(value === "none" ? "" : value)
+                              }
+                              value={field.value || "none"}
                               disabled={isSubmitting}
+                              onOpenChange={() =>
+                                keyboard.handleCloseKeyboard()
+                              }
                             >
                               <FormControl>
                                 <SelectTrigger>
@@ -823,7 +973,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="">
+                                <SelectItem value="none">
                                   None (Use Category Default)
                                 </SelectItem>
                                 {vatCategories && vatCategories.length > 0
@@ -842,22 +992,33 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                       <FormField
                         control={form.control}
                         name="vatOverridePercent"
-                        render={({ field }) => (
+                        render={() => (
                           <FormItem>
-                            <FormLabel>VAT Override (%)</FormLabel>
                             <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                step="0.01"
-                                placeholder="Override VAT percent"
-                                disabled={isSubmitting}
-                                value={field.value || ""}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    parseFloat(e.target.value) || undefined
+                              <AdaptiveFormField
+                                {...form.register("vatOverridePercent")}
+                                label="VAT Override (%)"
+                                value={
+                                  keyboard.formValues.vatOverridePercent?.toString() ||
+                                  ""
+                                }
+                                error={
+                                  form.formState.errors.vatOverridePercent
+                                    ?.message
+                                }
+                                onFocus={() =>
+                                  keyboard.handleFieldFocus(
+                                    "vatOverridePercent"
                                   )
                                 }
+                                placeholder="Override VAT percent"
+                                disabled={isSubmitting}
+                                className={cn(
+                                  keyboard.activeField ===
+                                    "vatOverridePercent" &&
+                                    "ring-2 ring-primary border-primary"
+                                )}
+                                readOnly
                               />
                             </FormControl>
                             <FormMessage />
@@ -889,7 +1050,10 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                             <FormControl>
                               <Switch
                                 checked={field.value}
-                                onCheckedChange={field.onChange}
+                                onCheckedChange={(checked) => {
+                                  keyboard.handleCloseKeyboard();
+                                  field.onChange(checked);
+                                }}
                                 disabled={isSubmitting}
                               />
                             </FormControl>
@@ -909,7 +1073,10 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                             <FormControl>
                               <Switch
                                 checked={field.value}
-                                onCheckedChange={field.onChange}
+                                onCheckedChange={(checked) => {
+                                  keyboard.handleCloseKeyboard();
+                                  field.onChange(checked);
+                                }}
                                 disabled={isSubmitting}
                               />
                             </FormControl>
@@ -929,7 +1096,10 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                             <FormControl>
                               <Switch
                                 checked={field.value}
-                                onCheckedChange={field.onChange}
+                                onCheckedChange={(checked) => {
+                                  keyboard.handleCloseKeyboard();
+                                  field.onChange(checked);
+                                }}
                                 disabled={isSubmitting}
                               />
                             </FormControl>
@@ -949,7 +1119,10 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                             <FormControl>
                               <Switch
                                 checked={field.value}
-                                onCheckedChange={field.onChange}
+                                onCheckedChange={(checked) => {
+                                  keyboard.handleCloseKeyboard();
+                                  field.onChange(checked);
+                                }}
                                 disabled={isSubmitting}
                               />
                             </FormControl>
@@ -986,6 +1159,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                             <Switch
                               checked={field.value}
                               onCheckedChange={(checked) => {
+                                keyboard.handleCloseKeyboard();
                                 field.onChange(checked);
                                 if (!checked) {
                                   form.setValue("requiresBatchTracking", false);
@@ -1003,22 +1177,29 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                         <FormField
                           control={form.control}
                           name="shelfLifeDays"
-                          render={({ field }) => (
+                          render={() => (
                             <FormItem>
-                              <FormLabel>Expected Shelf Life (Days)</FormLabel>
                               <FormControl>
-                                <Input
-                                  {...field}
-                                  type="number"
-                                  min="1"
+                                <AdaptiveFormField
+                                  {...form.register("shelfLifeDays")}
+                                  label="Expected Shelf Life (Days)"
+                                  value={
+                                    keyboard.formValues.shelfLifeDays?.toString() ||
+                                    ""
+                                  }
+                                  error={
+                                    form.formState.errors.shelfLifeDays?.message
+                                  }
+                                  onFocus={() =>
+                                    keyboard.handleFieldFocus("shelfLifeDays")
+                                  }
                                   placeholder="e.g., 30"
                                   disabled={isSubmitting}
-                                  value={field.value || ""}
-                                  onChange={(e) =>
-                                    field.onChange(
-                                      parseInt(e.target.value) || 0
-                                    )
-                                  }
+                                  className={cn(
+                                    keyboard.activeField === "shelfLifeDays" &&
+                                      "ring-2 ring-primary border-primary"
+                                  )}
+                                  readOnly
                                 />
                               </FormControl>
                               <FormMessage />
@@ -1046,7 +1227,10 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                               <FormControl>
                                 <Switch
                                   checked={field.value}
-                                  onCheckedChange={field.onChange}
+                                  onCheckedChange={(checked) => {
+                                    keyboard.handleCloseKeyboard();
+                                    field.onChange(checked);
+                                  }}
                                   disabled={isSubmitting}
                                 />
                               </FormControl>
@@ -1065,6 +1249,9 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                                   onValueChange={field.onChange}
                                   value={field.value || "FIFO"}
                                   disabled={isSubmitting}
+                                  onOpenChange={() =>
+                                    keyboard.handleCloseKeyboard()
+                                  }
                                 >
                                   <FormControl>
                                     <SelectTrigger>
@@ -1126,6 +1313,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                             }}
                             value={field.value || "NONE"}
                             disabled={isSubmitting}
+                            onOpenChange={() => keyboard.handleCloseKeyboard()}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -1161,14 +1349,32 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                         <FormField
                           control={form.control}
                           name="restrictionReason"
-                          render={({ field }) => (
+                          render={() => (
                             <FormItem>
-                              <FormLabel>Restriction Reason</FormLabel>
                               <FormControl>
-                                <Input
-                                  {...field}
+                                <AdaptiveFormField
+                                  {...form.register("restrictionReason")}
+                                  label="Restriction Reason"
+                                  value={
+                                    keyboard.formValues.restrictionReason || ""
+                                  }
+                                  error={
+                                    form.formState.errors.restrictionReason
+                                      ?.message
+                                  }
+                                  onFocus={() =>
+                                    keyboard.handleFieldFocus(
+                                      "restrictionReason"
+                                    )
+                                  }
                                   placeholder="e.g., Alcoholic beverage, Tobacco product..."
                                   disabled={isSubmitting}
+                                  className={cn(
+                                    keyboard.activeField ===
+                                      "restrictionReason" &&
+                                      "ring-2 ring-primary border-primary"
+                                  )}
+                                  readOnly
                                 />
                               </FormControl>
                               <FormMessage />
@@ -1198,7 +1404,10 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                               <FormControl>
                                 <Switch
                                   checked={field.value}
-                                  onCheckedChange={field.onChange}
+                                  onCheckedChange={(checked) => {
+                                    keyboard.handleCloseKeyboard();
+                                    field.onChange(checked);
+                                  }}
                                   disabled={isSubmitting}
                                 />
                               </FormControl>
@@ -1226,31 +1435,50 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                   </div>
                 </TabsContent>
               </Tabs>
+            </div>
 
-              <div className="flex space-x-2 pt-6 border-t mt-6">
+            {/* Adaptive Keyboard */}
+            {keyboard.showKeyboard && (
+              <div className="border-t bg-background px-2 py-2">
+                <div className="max-w-full overflow-hidden">
+                  <AdaptiveKeyboard
+                    onInput={keyboard.handleInput}
+                    onBackspace={keyboard.handleBackspace}
+                    onClear={keyboard.handleClear}
+                    onEnter={() => {
+                      // Just close keyboard on enter, don't submit
+                      keyboard.handleCloseKeyboard();
+                    }}
+                    initialMode={
+                      (keyboard.activeFieldConfig as any)?.keyboardMode ||
+                      "qwerty"
+                    }
+                    visible={keyboard.showKeyboard}
+                    onClose={keyboard.handleCloseKeyboard}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex space-x-2 p-4 border-t">
+              <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                {isSubmitting
+                  ? "Saving..."
+                  : isEditMode
+                  ? "Update Product"
+                  : "Add Product"}
+              </Button>
+              <DrawerClose asChild>
                 <Button
-                  type="submit"
+                  type="button"
+                  variant="outline"
                   className="flex-1"
+                  onClick={handleClose}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting
-                    ? "Saving..."
-                    : isEditMode
-                    ? "Update Product"
-                    : "Add Product"}
+                  Cancel
                 </Button>
-                <DrawerClose asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleClose}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                </DrawerClose>
-              </div>
+              </DrawerClose>
             </div>
           </form>
         </Form>
