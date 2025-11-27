@@ -685,6 +685,81 @@ declare global {
       ) => Promise<any>;
       onProgress: (callback: (progress: any) => void) => () => void;
     };
+    productAPI: {
+      create: (productData: Record<string, any>) => Promise<any>;
+      getByBusiness: (businessId: string) => Promise<any>;
+      getPaginated: (
+        businessId: string,
+        pagination: {
+          page: number;
+          pageSize: number;
+          sortBy?: string;
+          sortOrder?: "asc" | "desc";
+        },
+        filters?: {
+          categoryId?: string;
+          searchTerm?: string;
+          stockStatus?: "all" | "in_stock" | "low" | "out_of_stock";
+          isActive?: boolean;
+        }
+      ) => Promise<any>;
+      getById: (id: string) => Promise<any>;
+      update: (id: string, updates: Record<string, any>) => Promise<any>;
+      delete: (id: string) => Promise<any>;
+      adjustStock: (adjustmentData: Record<string, any>) => Promise<any>;
+      getStockAdjustments: (productId: string) => Promise<any>;
+      syncStock: (businessId: string) => Promise<any>;
+    };
+    batchesAPI: {
+      create: (batchData: Record<string, any>) => Promise<any>;
+      getByBusiness: (
+        businessId: string,
+        options?: Record<string, any>
+      ) => Promise<any>;
+      getActiveBatches: (
+        productId: string,
+        rotationMethod?: "FIFO" | "FEFO" | "NONE"
+      ) => Promise<any>;
+      getPaginated: (
+        businessId: string,
+        pagination: {
+          page: number;
+          pageSize: number;
+          sortBy?: string;
+          sortOrder?: "asc" | "desc";
+        },
+        filters?: {
+          productId?: string;
+          status?: "all" | "ACTIVE" | "EXPIRED" | "SOLD_OUT" | "REMOVED";
+          expiryStatus?: "all" | "expired" | "critical" | "warning" | "info";
+        }
+      ) => Promise<any>;
+      getById: (id: string) => Promise<any>;
+      update: (id: string, updates: Record<string, any>) => Promise<any>;
+      updateQuantity: (
+        batchId: string,
+        quantity: number,
+        movementType: string,
+        userId: string,
+        reason: string
+      ) => Promise<any>;
+      delete: (id: string) => Promise<any>;
+      remove: (id: string) => Promise<any>;
+    };
+    categoryAPI: {
+      create: (categoryData: Record<string, any>) => Promise<any>;
+      getByBusiness: (businessId: string) => Promise<any>;
+      getVatCategories: (businessId: string) => Promise<any>;
+      update: (id: string, updates: Record<string, any>) => Promise<any>;
+      delete: (id: string) => Promise<any>;
+      reorder: (businessId: string, categoryIds: string[]) => Promise<any>;
+    };
+    supplierAPI: {
+      getByBusiness: (businessId: string) => Promise<any>;
+    };
+    expirySettingsAPI: {
+      get: (businessId: string) => Promise<any>;
+    };
   }
 }
 

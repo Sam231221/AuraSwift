@@ -220,7 +220,7 @@ export default function CashierManagementView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
       {/* Back button */}
       <div className="flex items-center space-x-4">
         <Button
@@ -229,17 +229,20 @@ export default function CashierManagementView({
           className="flex items-center space-x-2"
         >
           <ChevronLeft className="w-4 h-4" />
-          <span>Back to Dashboard</span>
+          <span className="hidden sm:inline">Back to Dashboard</span>
+          <span className="sm:hidden">Back</span>
         </Button>
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Cashier Management
           </h1>
-          <p className="text-gray-600 mt-1">Manage cashiers</p>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
+            Manage cashiers
+          </p>
         </div>
 
         <CreateCashierDialog
@@ -387,16 +390,18 @@ export default function CashierManagementView({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-xs sm:text-sm font-medium">
               Total Cashiers
             </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cashiers.length}</div>
+            <div className="text-xl sm:text-2xl font-bold">
+              {cashiers.length}
+            </div>
             <p className="text-xs text-muted-foreground">Active cashiers</p>
           </CardContent>
         </Card>
@@ -404,8 +409,8 @@ export default function CashierManagementView({
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -424,12 +429,12 @@ export default function CashierManagementView({
       {/* Staff Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Cashiers</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-base sm:text-lg">Cashiers</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             Manage your cashiers and their access levels
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           {isLoadingUsers ? (
             <div className="flex items-center justify-center h-32">
               <div className="text-sm text-gray-500">Loading cashiers...</div>
@@ -453,95 +458,118 @@ export default function CashierManagementView({
               )}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cashier</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((staffUser) => (
-                  <TableRow key={staffUser.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <UserAvatar user={staffUser} className="w-8 h-8" />
-                        <div>
-                          <div className="font-medium">
-                            {getStaffDisplayName(staffUser)}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[150px]">Cashier</TableHead>
+                    <TableHead className="min-w-[200px] hidden sm:table-cell">
+                      Email
+                    </TableHead>
+                    <TableHead className="min-w-[80px] hidden md:table-cell">
+                      Role
+                    </TableHead>
+                    <TableHead className="min-w-[100px] hidden lg:table-cell">
+                      Created
+                    </TableHead>
+                    <TableHead className="min-w-[80px]">Status</TableHead>
+                    <TableHead className="text-right min-w-[120px]">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((staffUser) => (
+                    <TableRow key={staffUser.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <UserAvatar user={staffUser} className="w-8 h-8" />
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm sm:text-base truncate">
+                              {getStaffDisplayName(staffUser)}
+                            </div>
+                            <div className="text-xs text-gray-500 sm:hidden truncate">
+                              {staffUser.email}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span>{staffUser.email}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          staffUser.role === "manager" ? "default" : "secondary"
-                        }
-                      >
-                        {getRoleDisplayName(staffUser.role)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span>
-                          {new Date(staffUser.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={staffUser.isActive ? "default" : "destructive"}
-                      >
-                        {staffUser.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewUser(staffUser)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditUser(staffUser)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() =>
-                            handleDeleteUser(
-                              staffUser.id,
-                              getStaffDisplayName(staffUser)
-                            )
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <div className="flex items-center space-x-2">
+                          <Mail className="w-4 h-4 text-gray-400 shrink-0" />
+                          <span className="truncate text-sm">
+                            {staffUser.email}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Badge
+                          variant={
+                            staffUser.role === "manager"
+                              ? "default"
+                              : "secondary"
                           }
+                          className="text-xs"
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                          {getRoleDisplayName(staffUser.role)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                          <span className="text-sm whitespace-nowrap">
+                            {new Date(staffUser.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            staffUser.isActive ? "default" : "destructive"
+                          }
+                          className="text-xs"
+                        >
+                          {staffUser.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewUser(staffUser)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditUser(staffUser)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                            onClick={() =>
+                              handleDeleteUser(
+                                staffUser.id,
+                                getStaffDisplayName(staffUser)
+                              )
+                            }
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -619,16 +647,21 @@ function CreateCashierDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100vw-2rem)] mx-4 sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Cashier</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">
+            Add New Cashier
+          </DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Create a new staff account with role-based permissions.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={handleSubmit} className="space-y-4 py-4">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-3 sm:space-y-4 py-3 sm:py-4"
+          >
             {/* Avatar Upload */}
             <FormField
               control={form.control}
@@ -892,10 +925,10 @@ function EditCashierDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Cashier</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg sm:text-xl">Edit Cashier</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Update cashier information and permissions.
           </DialogDescription>
         </DialogHeader>

@@ -1051,14 +1051,14 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen  p-6">
+    <div className="min-h-screen p-3 sm:p-4 md:p-6">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-7xl mx-auto"
       >
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-center lg:space-y-0 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Button
               onClick={onBack}
               variant="ghost"
@@ -1066,13 +1066,13 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               className="p-2"
               aria-label="Go back to previous page"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
             <div>
-              <h1 className="text-4xl font-bold text-slate-900 mb-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">
                 Cashier Shifts
               </h1>
-              <p className="text-slate-600">
+              <p className="text-sm sm:text-base text-slate-600">
                 Manage POS cashier schedules and shifts
               </p>
             </div>
@@ -1082,12 +1082,15 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             <DrawerTrigger asChild>
               <Button
                 onClick={() => openDrawer()}
-                className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 w-full lg:w-auto"
                 size="lg"
                 aria-label="Open schedule shift form"
               >
-                <Plus className="w-5 h-5 mr-2" aria-hidden="true" />
-                Schedule Shift
+                <Plus
+                  className="w-4 h-4 sm:w-5 sm:h-5 mr-2"
+                  aria-hidden="true"
+                />
+                <span className="text-sm sm:text-base">Schedule Shift</span>
               </Button>
             </DrawerTrigger>
 
@@ -1120,18 +1123,18 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         </div>
 
         {/* Calendar View Toggle */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center space-x-4">
+        <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
+          <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-center lg:space-y-0 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
               <Button
                 variant="outline"
                 onClick={goToToday}
-                className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 w-full sm:w-auto"
                 aria-label="Go to today's date"
               >
                 Today
               </Button>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center justify-between sm:justify-start space-x-2">
                 <Button
                   variant="outline"
                   size="icon"
@@ -1140,6 +1143,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 >
                   <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                 </Button>
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 px-2">
+                  {format(weekStart, "MMM d")} -{" "}
+                  {format(weekEnd, "MMM d, yyyy")}
+                </h2>
                 <Button
                   variant="outline"
                   size="icon"
@@ -1149,21 +1156,19 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                   <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
-              <h2 className="text-xl font-semibold text-slate-800">
-                {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
-              </h2>
             </div>
             <div className="flex space-x-2">
               <Button
                 variant={viewMode === "week" ? "default" : "outline"}
                 onClick={() => setViewMode("week")}
-                className="bg-emerald-600 text-white hover:bg-emerald-700"
+                className="bg-emerald-600 text-white hover:bg-emerald-700 flex-1 sm:flex-none text-sm sm:text-base"
               >
                 Week View
               </Button>
               <Button
                 variant={viewMode === "day" ? "default" : "outline"}
                 onClick={() => setViewMode("day")}
+                className="flex-1 sm:flex-none text-sm sm:text-base"
               >
                 Day View
               </Button>
@@ -1171,12 +1176,12 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           </div>
 
           {/* Week Calendar */}
-          <div className="grid grid-cols-7 gap-2 mb-4">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
             {weekDays.map((day) => (
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "text-center p-2 rounded-lg border transition-colors cursor-pointer",
+                  "text-center p-1 sm:p-2 rounded-lg border transition-colors cursor-pointer",
                   isToday(day)
                     ? "bg-emerald-100 border-emerald-300 text-emerald-800 font-semibold"
                     : "bg-slate-50 border-slate-200",
@@ -1195,9 +1200,13 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                   }
                 }}
               >
-                <div className="text-sm font-medium">{format(day, "EEE")}</div>
-                <div className="text-lg font-semibold">{format(day, "d")}</div>
-                <div className="text-xs text-slate-500 mt-1">
+                <div className="text-xs sm:text-sm font-medium">
+                  {format(day, "EEE")}
+                </div>
+                <div className="text-base sm:text-lg font-semibold">
+                  {format(day, "d")}
+                </div>
+                <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1">
                   {getSchedulesForDate(day).length} schedules
                 </div>
               </div>
@@ -1229,15 +1238,15 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         </div>
 
         {/* Shifts for Selected Date */}
-        <div className="mb-6">
-          <h3 className="text-2xl font-bold text-slate-800 mb-4">
+        <div className="mb-4 sm:mb-6">
+          <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-3 sm:mb-4">
             Shifts for {format(selectedDate, "MMMM d, yyyy")}
           </h3>
 
           <Button
             onClick={() => openDrawer(undefined, selectedDate)}
             variant="outline"
-            className="mb-4 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+            className="mb-4 border-emerald-300 text-emerald-700 hover:bg-emerald-50 w-full sm:w-auto text-sm sm:text-base"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Shift for This Date
@@ -1255,7 +1264,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6"
             >
               <AnimatePresence>
                 {schedulesForSelectedDate.map((schedule) => {
@@ -1288,43 +1297,45 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                       className="transform transition-all duration-200"
                     >
                       <Card className="bg-white shadow-lg hover:shadow-xl border-0 overflow-hidden">
-                        <CardHeader className="pb-4">
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                              <CardTitle className="text-xl text-slate-900 flex items-center gap-2">
-                                <CreditCard className="w-5 h-5 text-emerald-600" />
-                                {staffName}
+                        <CardHeader className="pb-3 sm:pb-4">
+                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <CardTitle className="text-base sm:text-xl text-slate-900 flex items-center gap-2">
+                                <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0" />
+                                <span className="truncate">{staffName}</span>
                               </CardTitle>
-                              <p className="text-sm text-slate-600">
+                              <p className="text-xs sm:text-sm text-slate-600 truncate">
                                 {staffMember?.role || "Staff"} •{" "}
                                 {schedule.assignedRegister ||
                                   "No register assigned"}
                               </p>
                             </div>
-                            <Badge className={scheduleStatus.color}>
+                            <Badge
+                              className={`${scheduleStatus.color} text-xs whitespace-nowrap`}
+                            >
                               {scheduleStatus.status}
                             </Badge>
                           </div>
                         </CardHeader>
 
-                        <CardContent className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="flex items-center gap-2 text-sm text-slate-600">
-                              <CalendarIcon className="w-4 h-4 text-emerald-500" />
-                              <span>
+                        <CardContent className="space-y-3 sm:space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+                              <CalendarIcon className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-500 shrink-0" />
+                              <span className="truncate">
                                 {format(
                                   new Date(schedule.startTime),
                                   "MMM dd, yyyy"
                                 )}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-600">
-                              <Clock className="w-4 h-4 text-teal-500" />
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+                              <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-teal-500 shrink-0" />
                               <span>{duration}</span>
                             </div>
                           </div>
 
-                          <div className="bg-slate-50 rounded-lg p-3 text-sm">
+                          <div className="bg-slate-50 rounded-lg p-2 sm:p-3 text-xs sm:text-sm">
                             <div className="flex justify-between items-center">
                               <span className="font-medium">
                                 Schedule Time:
@@ -1337,13 +1348,13 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                           </div>
 
                           {schedule.notes && (
-                            <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg">
-                              <StickyNote className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                              <div>
-                                <p className="text-sm font-medium text-amber-800 mb-1">
+                            <div className="flex items-start gap-2 p-2 sm:p-3 bg-amber-50 rounded-lg">
+                              <StickyNote className="w-3 h-3 sm:w-4 sm:h-4 text-amber-600 mt-0.5 shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs sm:text-sm font-medium text-amber-800 mb-1">
                                   Notes:
                                 </p>
-                                <p className="text-sm text-amber-700">
+                                <p className="text-xs sm:text-sm text-amber-700 overflow-wrap-break-word">
                                   {schedule.notes}
                                 </p>
                               </div>
@@ -1356,11 +1367,11 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                                 onClick={() => openDrawer(schedule)}
                                 size="sm"
                                 variant="outline"
-                                className="flex-1 hover:bg-emerald-50 hover:border-emerald-300"
+                                className="flex-1 hover:bg-emerald-50 hover:border-emerald-300 text-xs sm:text-sm"
                                 aria-label={`Edit schedule for ${staffName}`}
                               >
                                 <Edit2
-                                  className="w-4 h-4 mr-1"
+                                  className="w-3 h-3 sm:w-4 sm:h-4 mr-1"
                                   aria-hidden="true"
                                 />
                                 Edit
@@ -1370,11 +1381,11 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                                 size="sm"
                                 variant="outline"
                                 disabled={isDeleting}
-                                className="flex-1 hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                                className="flex-1 hover:bg-red-50 hover:border-red-300 hover:text-red-600 text-xs sm:text-sm"
                                 aria-label={`Delete schedule for ${staffName}`}
                               >
                                 <Trash2
-                                  className="w-4 h-4 mr-1"
+                                  className="w-3 h-3 sm:w-4 sm:h-4 mr-1"
                                   aria-hidden="true"
                                 />
                                 Delete

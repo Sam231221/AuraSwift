@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
 import type { Product } from "./types/product.types";
@@ -11,12 +10,10 @@ import ProductDetailsView from "./product-details-view";
 import StockAdjustmentModal from "./components/stock-adjustment-modal";
 import ProductFormDrawer from "./components/product-form-drawer";
 import BatchManagementView from "./product-batch-management-view";
-import { useProductData } from "./hooks/use-product-data";
-import {
-  filterProducts,
-  getLowStockProducts,
-  paginateProducts,
-} from "./utils/product-filters";
+import type {
+  Category,
+  VatCategory,
+} from "../../../../../../../../../types/db";
 
 interface ProductManagementViewProps {
   onBack: () => void;
@@ -26,7 +23,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   onBack,
 }) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   // View state
   const [currentView, setCurrentView] = useState<
@@ -36,22 +32,28 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     | "batchManagement"
   >("productDashboard");
 
-  // Data loading
-  const {
-    products,
-    categories,
-    vatCategories,
-    loading,
-    setProducts,
-    loadProducts,
-    loadCategories,
-  } = useProductData({ businessId: user?.businessId });
+  // Track which product to filter batches by
+  const [batchFilterProductId, setBatchFilterProductId] = useState<
+    string | undefined
+  >(undefined);
 
-  // Filter and pagination state
+  // Data state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]); // For dashboard stats
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vatCategories, setVatCategories] = useState<VatCategory[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  // Filter state
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterStock, setFilterStock] = useState<string>("all");
-  const [currentPage, setCurrentPage] = useState(1);
   const [showFields, setShowFields] = useState({
     name: true,
     category: true,
@@ -74,25 +76,125 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const [stockAdjustmentQuantity, setStockAdjustmentQuantity] = useState("");
   const [stockAdjustmentReason, setStockAdjustmentReason] = useState("");
 
-  const productsPerPage = 10;
+  // Computed values for dashboard
+  const lowStockProducts = allProducts.filter(
+    (p) => p.isActive && p.stockLevel <= p.minStockLevel
+  );
 
-  // Computed values
-  const lowStockProducts = getLowStockProducts(products);
-  const filteredProducts = filterProducts(products, {
+  // Load paginated products
+  const loadProducts = useCallback(async () => {
+    if (!user?.businessId) return;
+
+    setLoading(true);
+    try {
+      const response = await window.productAPI.getPaginated(
+        user.businessId,
+        {
+          page: currentPage,
+          pageSize,
+          sortBy: "name",
+          sortOrder: "asc",
+        },
+        {
+          searchTerm: searchTerm || undefined,
+          categoryId: filterCategory !== "all" ? filterCategory : undefined,
+          stockStatus: filterStock as
+            | "all"
+            | "in_stock"
+            | "low"
+            | "out_of_stock",
+          isActive: true,
+        }
+      );
+
+      if (response.success && response.data) {
+        setProducts(response.data.items);
+        setTotalItems(response.data.pagination.totalItems);
+        setTotalPages(response.data.pagination.totalPages);
+      } else {
+        toast.error("Failed to load products");
+      }
+    } catch (error) {
+      console.error("Error loading products:", error);
+      toast.error("Failed to load products");
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    user?.businessId,
+    currentPage,
+    pageSize,
     searchTerm,
     filterCategory,
     filterStock,
-  });
-  const {
-    paginatedProducts: currentProducts,
-    startIndex,
-    totalPages,
-  } = paginateProducts(filteredProducts, currentPage, productsPerPage);
+  ]);
+
+  // Load all products for dashboard stats (without pagination)
+  const loadAllProducts = useCallback(async () => {
+    if (!user?.businessId) return;
+
+    try {
+      const response = await window.productAPI.getByBusiness(user.businessId);
+      if (response.success && response.products) {
+        setAllProducts(response.products);
+      }
+    } catch (error) {
+      console.error("Error loading all products:", error);
+    }
+  }, [user?.businessId]);
+
+  // Load categories
+  const loadCategories = useCallback(async () => {
+    if (!user?.businessId) return;
+
+    try {
+      const response = await window.categoryAPI.getByBusiness(user.businessId);
+      if (response.success && response.categories) {
+        setCategories(response.categories as any);
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  }, [user?.businessId]);
+
+  // Load VAT categories
+  const loadVatCategories = useCallback(async () => {
+    if (!user?.businessId) return;
+
+    try {
+      const response = await window.categoryAPI.getVatCategories(
+        user.businessId
+      );
+      if (response.success && response.vatCategories) {
+        setVatCategories(response.vatCategories as any);
+      }
+    } catch (error) {
+      console.error("Error loading VAT categories:", error);
+    }
+  }, [user?.businessId]);
+
+  // Load data on mount and when dependencies change
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  useEffect(() => {
+    loadAllProducts();
+    loadCategories();
+    loadVatCategories();
+  }, [loadAllProducts, loadCategories, loadVatCategories]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm, filterCategory, filterStock]);
 
   // Reload categories when returning from category management
   useEffect(() => {
     setIsDrawerOpen(false);
-    if (currentView === "productManagement" && user?.businessId) {
+    if (currentView === "categoryManagement" && user?.businessId) {
       loadCategories();
     }
   }, [currentView, user?.businessId, loadCategories]);
@@ -116,8 +218,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       try {
         const response = await window.productAPI.delete(id);
         if (response.success) {
-          setProducts(products.filter((p) => p.id !== id));
           toast.success("Product deleted successfully");
+          loadProducts();
+          loadAllProducts();
         } else {
           toast.error(response.message || "Failed to delete product");
         }
@@ -126,8 +229,14 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         toast.error("Failed to delete product");
       }
     },
-    [products, setProducts]
+    [loadProducts, loadAllProducts]
   );
+
+  const handleAdjustStockClick = useCallback((product: Product) => {
+    // Show quick adjustment modal for products
+    // TODO: Check if product requires batch tracking once the field is added to schema
+    setStockAdjustmentProduct(product);
+  }, []);
 
   const handleStockAdjustment = useCallback(
     async (
@@ -154,6 +263,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         const response = await window.productAPI.adjustStock(adjustmentData);
         if (response.success) {
           await loadProducts();
+          await loadAllProducts();
           toast.success("Stock adjustment completed successfully");
           setStockAdjustmentProduct(null);
         } else {
@@ -164,7 +274,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         toast.error("Failed to adjust stock");
       }
     },
-    [user, loadProducts]
+    [user, loadProducts, loadAllProducts]
   );
 
   const handleEditProduct = useCallback((product: Product) => {
@@ -178,38 +288,23 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   }, []);
 
   const handleSaveProduct = useCallback(
-    (product: Product) => {
-      setProducts([...products, product]);
+    (_product: Product) => {
       loadProducts(); // Reload to ensure consistency
+      loadAllProducts(); // Update dashboard stats
     },
-    [products, setProducts, loadProducts]
+    [loadProducts, loadAllProducts]
   );
 
   const handleUpdateProduct = useCallback(
-    (productId: string, updatedProduct: Product) => {
-      setProducts(
-        products.map((p) => (p.id === productId ? updatedProduct : p))
-      );
+    (_productId: string, _updatedProduct: Product) => {
       loadProducts(); // Reload to ensure consistency
+      loadAllProducts(); // Update dashboard stats
     },
-    [products, setProducts, loadProducts]
+    [loadProducts, loadAllProducts]
   );
 
   if (!user) {
-    navigate("/");
     return null;
-  }
-
-  // Show loading state while initial data is being fetched
-  if (loading && products.length === 0 && categories.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading product management...</p>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -232,16 +327,19 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         >
           {currentView === "productDashboard" ? (
             <ProductDashboardView
-              products={products}
+              products={allProducts}
               categories={categories as any}
               lowStockProducts={lowStockProducts}
               onBack={onBack}
               onManageProducts={() => setCurrentView("productManagement")}
               onManageCategories={() => setCurrentView("categoryManagement")}
               onAddProduct={openAddProductDrawer}
-              onRestockProduct={setStockAdjustmentProduct}
+              onRestockProduct={handleAdjustStockClick}
               onManageBatches={() => setCurrentView("batchManagement")}
-              onProductsImported={loadProducts}
+              onProductsImported={() => {
+                loadProducts();
+                loadAllProducts();
+              }}
             />
           ) : currentView === "categoryManagement" ? (
             <ManageCategoriesView
@@ -249,14 +347,16 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
             />
           ) : currentView === "batchManagement" ? (
             <BatchManagementView
-              onBack={() => setCurrentView("productDashboard")}
+              onBack={() => {
+                setBatchFilterProductId(undefined);
+                setCurrentView("productDashboard");
+              }}
+              initialProductId={batchFilterProductId}
             />
           ) : (
             <ProductDetailsView
               products={products}
               categories={categories as any}
-              filteredProducts={filteredProducts}
-              currentProducts={currentProducts}
               loading={loading}
               searchTerm={searchTerm}
               filterCategory={filterCategory}
@@ -264,18 +364,22 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               showFields={showFields}
               currentPage={currentPage}
               totalPages={totalPages}
-              startIndex={startIndex}
-              productsPerPage={productsPerPage}
+              pageSize={pageSize}
+              totalItems={totalItems}
               onBack={() => setCurrentView("productDashboard")}
               onAddProduct={openAddProductDrawer}
               onEditProduct={handleEditProduct}
               onDeleteProduct={handleDeleteProduct}
-              onAdjustStock={setStockAdjustmentProduct}
+              onAdjustStock={handleAdjustStockClick}
               onSearchChange={setSearchTerm}
               onCategoryFilterChange={setFilterCategory}
-              onStockFilterChange={setFilterStock}
+              onStockFilterChange={(value: string) => setFilterStock(value)}
               onShowFieldsChange={setShowFields}
               onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
             />
           )}
         </motion.div>
@@ -304,8 +408,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         <ProductFormDrawer
           isOpen={isDrawerOpen}
           editingProduct={editingProduct}
-          categories={categories}
-          vatCategories={vatCategories}
+          categories={categories as any}
+          vatCategories={vatCategories as any}
           businessId={user.businessId}
           onClose={() => setIsDrawerOpen(false)}
           onSave={handleSaveProduct}

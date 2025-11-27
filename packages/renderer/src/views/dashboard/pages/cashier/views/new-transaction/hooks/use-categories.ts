@@ -44,7 +44,7 @@ export function useCategories({
       if (response.success && response.categories) {
         // Filter to only active categories
         const activeCategories = response.categories.filter(
-          (cat) => cat.isActive
+          (cat: any) => cat.isActive
         );
         setCategories(activeCategories);
       } else {

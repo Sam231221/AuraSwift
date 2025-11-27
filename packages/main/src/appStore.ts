@@ -342,10 +342,15 @@ ipcMain.handle("products:create", async (event, productData) => {
   }
 });
 
-ipcMain.handle("products:getByBusiness", async (event, businessId) => {
+ipcMain.handle("products:getByBusiness", async (event, businessId, includeInactive = false) => {
   try {
     if (!db) db = await getDatabase();
-    return await db.products.getProductsByBusinessWithResponse(businessId);
+    const products = await db.products.getProductsByBusiness(businessId, includeInactive);
+    return {
+      success: true,
+      message: "Products retrieved successfully",
+      products,
+    };
   } catch (error: any) {
     console.error("Get products by business IPC error:", error);
     return {
@@ -390,6 +395,83 @@ ipcMain.handle("products:delete", async (event, id) => {
     return {
       success: false,
       message: error.message || "Failed to delete product",
+    };
+  }
+});
+
+// Get products with pagination
+ipcMain.handle(
+  "products:getPaginated",
+  async (event, businessId, pagination, filters) => {
+    try {
+      if (!db) db = await getDatabase();
+      const result = await db.products.getProductsByBusinessPaginated(
+        businessId,
+        pagination,
+        filters
+      );
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error: any) {
+      console.error("Get paginated products IPC error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get products",
+      };
+    }
+  }
+);
+
+// Sync product stock from batches
+ipcMain.handle("products:syncStock", async (event, businessId) => {
+  try {
+    if (!db) db = await getDatabase();
+
+    // Get all products for the business
+    const products = await db.products.getByBusiness(businessId);
+
+    let syncedCount = 0;
+    let fixedCount = 0;
+    const fixes: Array<{
+      productName: string;
+      oldStock: number;
+      newStock: number;
+    }> = [];
+
+    for (const product of products) {
+      const currentStock = product.stockLevel || 0;
+      const calculatedStock = await db.batches.calculateProductStock(
+        product.id
+      );
+
+      if (currentStock !== calculatedStock) {
+        await db.products.updateStock(product.id, calculatedStock);
+        fixes.push({
+          productName: product.name,
+          oldStock: currentStock,
+          newStock: calculatedStock,
+        });
+        fixedCount++;
+      }
+      syncedCount++;
+    }
+
+    return {
+      success: true,
+      message: `Synced ${syncedCount} products, fixed ${fixedCount} discrepancies`,
+      data: {
+        syncedCount,
+        fixedCount,
+        fixes,
+      },
+    };
+  } catch (error: any) {
+    console.error("Sync product stock IPC error:", error);
+    return {
+      success: false,
+      message: error.message || "Failed to sync product stock",
     };
   }
 });
@@ -2665,6 +2747,31 @@ ipcMain.handle("batches:getByBusiness", async (event, businessId, options) => {
   }
 });
 
+// Get batches with pagination
+ipcMain.handle(
+  "batches:getPaginated",
+  async (event, businessId, pagination, filters) => {
+    try {
+      if (!db) db = await getDatabase();
+      const result = await db.batches.getBatchesByBusinessPaginated(
+        businessId,
+        pagination,
+        filters
+      );
+      return {
+        success: true,
+        data: JSON.parse(JSON.stringify(result)),
+      };
+    } catch (error: any) {
+      console.error("Get paginated batches IPC error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get batches",
+      };
+    }
+  }
+);
+
 ipcMain.handle(
   "batches:getActiveBatches",
   async (event, productId, rotationMethod) => {
@@ -2717,18 +2824,53 @@ ipcMain.handle(
 
 ipcMain.handle(
   "batches:updateQuantity",
-  async (event, batchId, quantity, movementType) => {
+  async (event, batchId, quantity, movementType, userId, reason) => {
     try {
       if (!db) db = await getDatabase();
-      const batch = await db.batches.updateBatchQuantity(
+
+      // Get batch to find productId and businessId
+      const batch = await db.batches.getBatchById(batchId);
+
+      // Update batch quantity first
+      const updatedBatch = await db.batches.updateBatchQuantity(
         batchId,
         quantity,
         movementType
       );
 
+      // Record stock movement if userId is provided (for audit trail)
+      // NOTE: We pass null as batchManager to StockMovementManager to avoid double-updating
+      if (userId && batch) {
+        try {
+          // Create stock movement record directly (without triggering batch update again)
+          const movementId = db.uuid.v4();
+          const now = new Date();
+
+          await db.drizzle.insert(db.schema.stockMovements).values({
+            id: movementId,
+            productId: batch.productId,
+            batchId: batch.id,
+            movementType: movementType as "INBOUND" | "OUTBOUND" | "ADJUSTMENT",
+            quantity,
+            reason: reason || `Batch ${movementType.toLowerCase()} adjustment`,
+            reference: null,
+            fromBatchId: null,
+            toBatchId: null,
+            userId,
+            businessId: batch.businessId,
+            timestamp: now,
+            createdAt: now,
+            updatedAt: now,
+          });
+        } catch (movementError) {
+          console.error("Failed to record stock movement:", movementError);
+          // Don't fail the whole operation if stock movement fails
+        }
+      }
+
       return {
         success: true,
-        batch: JSON.parse(JSON.stringify(batch)),
+        batch: JSON.parse(JSON.stringify(updatedBatch)),
       };
     } catch (error) {
       console.error("Update batch quantity IPC error:", error);

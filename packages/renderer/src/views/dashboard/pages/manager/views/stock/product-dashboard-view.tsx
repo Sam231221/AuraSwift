@@ -53,21 +53,21 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
 }) => {
   const [importModalOpen, setImportModalOpen] = useState(false);
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Product & Menu Management
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
             Manage your inventory and menu items
           </p>
         </div>
-        <div className="flex items-center space-x-4">
-          <Button onClick={onBack}> Go to dashboard</Button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-4">
+          <Button onClick={onBack} className="w-full sm:w-auto">Go to dashboard</Button>
 
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="w-full sm:w-auto">
             <Settings className="w-4 h-4 mr-2" />
             Settings
           </Button>
@@ -86,59 +86,59 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Products</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xs sm:text-sm text-gray-600">Total Products</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {products.length}
               </p>
-              <p className="text-sm text-blue-600 mt-1">
+              <p className="text-xs sm:text-sm text-blue-600 mt-1">
                 {products.filter((p) => p.isActive).length} active
               </p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Package className="w-6 h-6 text-blue-600" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Categories</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xs sm:text-sm text-gray-600">Categories</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {categories.length}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Menu categories</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">Menu categories</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <MenuSquare className="w-6 h-6 text-green-600" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <MenuSquare className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Low Stock Items</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xs sm:text-sm text-gray-600">Low Stock Items</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {lowStockProducts.length}
               </p>
-              <p className="text-sm text-orange-600 mt-1">Need restocking</p>
+              <p className="text-xs sm:text-sm text-orange-600 mt-1">Need restocking</p>
             </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <TrendingDown className="w-6 h-6 text-orange-600" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Average Price</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xs sm:text-sm text-gray-600">Average Price</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 £
                 {products.length > 0
                   ? (
@@ -147,29 +147,29 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
                     ).toFixed(2)
                   : "0.00"}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Across all items</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">Across all items</p>
             </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-6 h-6 text-purple-600" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
             Quick Actions
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <Button
               variant="outline"
               className="w-full justify-start"
               onClick={onManageProducts}
             >
               <Package className="w-4 h-4 mr-3" />
-              Manage Products
+              <span className="text-sm sm:text-base">Manage Products</span>
             </Button>
 
             <Button
@@ -178,7 +178,7 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
               onClick={onManageCategories}
             >
               <Tag className="w-4 h-4 mr-3" />
-              Manage Categories
+              <span className="text-sm sm:text-base">Manage Categories</span>
             </Button>
 
             <Button
@@ -187,7 +187,7 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
               onClick={onManageBatches}
             >
               <PackageCheck className="w-4 h-4 mr-3" />
-              Batch & Expiry Management
+              <span className="text-sm sm:text-base">Batch & Expiry Management</span>
             </Button>
 
             <Button
@@ -196,17 +196,17 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
               onClick={() => setImportModalOpen(true)}
             >
               <FileSpreadsheet className="w-4 h-4 mr-3" />
-              Import from Booker
+              <span className="text-sm sm:text-base">Import from Booker</span>
             </Button>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
             Low Stock Alerts
           </h3>
           {lowStockProducts.length === 0 ? (
-            <p className="text-gray-500 text-sm">
+            <p className="text-gray-500 text-xs sm:text-sm">
               All products are well stocked!
             </p>
           ) : (
@@ -214,10 +214,10 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
               {lowStockProducts.slice(0, 3).map((product) => (
                 <div
                   key={product.id}
-                  className="flex items-center justify-between p-2 bg-orange-50 rounded"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2 sm:p-3 bg-orange-50 rounded"
                 >
-                  <div>
-                    <p className="font-medium text-sm">{product.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{product.name}</p>
                     <p className="text-xs text-gray-600">
                       {product.stockLevel} left (min: {product.minStockLevel})
                     </p>
@@ -226,13 +226,14 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
                     size="sm"
                     variant="outline"
                     onClick={() => onRestockProduct(product)}
+                    className="w-full sm:w-auto"
                   >
                     Restock
                   </Button>
                 </div>
               ))}
               {lowStockProducts.length > 3 && (
-                <p className="text-sm text-gray-500 text-center pt-2">
+                <p className="text-xs sm:text-sm text-gray-500 text-center pt-2">
                   +{lowStockProducts.length - 3} more items need attention
                 </p>
               )}

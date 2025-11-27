@@ -129,10 +129,21 @@ const BatchList: React.FC<BatchListProps> = ({
                     )}
                     <div>
                       <div className="font-medium">
-                        {batch.product?.name || "Unknown Product"}
+                        {batch.product?.name || (
+                          <span className="text-red-600 flex items-center gap-1">
+                            Deleted Product
+                            <span className="text-xs text-gray-500">
+                              (ID: {batch.productId.slice(0, 8)}...)
+                            </span>
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {batch.product?.sku || ""}
+                        {batch.product?.sku || (
+                          <span className="text-amber-600 text-xs">
+                            ⚠️ Orphaned batch - product no longer exists
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

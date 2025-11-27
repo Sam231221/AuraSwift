@@ -210,17 +210,17 @@ export const PERMISSION_DESCRIPTIONS: Record<string, {
  */
 export function getPermissionsForRole(
   role: "admin" | "owner" | "manager" | "supervisor" | "cashier"
-): string[] {
+): Permission[] {
   switch (role) {
     case "admin":
     case "owner":
-      return PERMISSION_GROUPS.ADMIN;
+      return PERMISSION_GROUPS.ADMIN as unknown as Permission[];
     case "manager":
-      return PERMISSION_GROUPS.MANAGER;
+      return PERMISSION_GROUPS.MANAGER as unknown as Permission[];
     case "supervisor":
-      return PERMISSION_GROUPS.SUPERVISOR;
+      return PERMISSION_GROUPS.SUPERVISOR as unknown as Permission[];
     case "cashier":
-      return PERMISSION_GROUPS.CASHIER;
+      return PERMISSION_GROUPS.CASHIER as unknown as Permission[];
     default:
       return [];
   }

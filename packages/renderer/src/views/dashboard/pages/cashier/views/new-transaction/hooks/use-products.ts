@@ -34,7 +34,7 @@ export function useProducts(businessId: string | undefined) {
       if (response.success && response.products) {
         // Filter to only active products
         const activeProducts = response.products.filter(
-          (product) => product.isActive
+          (product: any) => product.isActive
         );
         setProducts(activeProducts);
       } else {
@@ -103,4 +103,3 @@ export function useProducts(businessId: string | undefined) {
     getFilteredProducts,
   };
 }
-

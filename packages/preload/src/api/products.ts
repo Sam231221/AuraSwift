@@ -29,8 +29,8 @@ export const productAPI = {
     allowDiscount?: boolean;
   }) => ipcRenderer.invoke("products:create", productData),
 
-  getByBusiness: (businessId: string) =>
-    ipcRenderer.invoke("products:getByBusiness", businessId),
+  getByBusiness: (businessId: string, includeInactive?: boolean) =>
+    ipcRenderer.invoke("products:getByBusiness", businessId, includeInactive),
 
   getPaginated: (
     businessId: string,

@@ -128,16 +128,18 @@ export class ProductManager {
     return product;
   }
 
-  async getProductsByBusiness(businessId: string): Promise<Product[]> {
+  async getProductsByBusiness(businessId: string, includeInactive: boolean = false): Promise<Product[]> {
+    const conditions = includeInactive
+      ? [eq(schema.products.businessId, businessId)]
+      : [
+          eq(schema.products.businessId, businessId),
+          eq(schema.products.isActive, true),
+        ];
+
     const products = await this.drizzle
       .select()
       .from(schema.products)
-      .where(
-        and(
-          eq(schema.products.businessId, businessId),
-          eq(schema.products.isActive, true)
-        )
-      )
+      .where(and(...conditions))
       .orderBy(schema.products.name);
 
     return products;
@@ -259,6 +261,34 @@ export class ProductManager {
 
   async deleteProduct(id: string): Promise<boolean> {
     const now = new Date();
+
+    // Check if product has active batches
+    const activeBatches = await this.drizzle
+      .select()
+      .from(schema.productBatches)
+      .where(
+        and(
+          eq(schema.productBatches.productId, id),
+          eq(schema.productBatches.status, "ACTIVE")
+        )
+      )
+      .all();
+
+    if (activeBatches.length > 0) {
+      throw new Error(
+        `Cannot delete product: ${activeBatches.length} active batch${
+          activeBatches.length > 1 ? "es" : ""
+        } still exist. Please remove or mark batches as REMOVED first.`
+      );
+    }
+
+    // Check if product has any stock
+    const product = await this.getProductById(id);
+    if (product.stockLevel > 0) {
+      throw new Error(
+        `Cannot delete product: Product still has ${product.stockLevel} items in stock. Please adjust stock to 0 first.`
+      );
+    }
 
     const result = await this.drizzle
       .update(schema.products)

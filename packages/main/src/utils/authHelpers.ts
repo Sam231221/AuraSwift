@@ -134,23 +134,23 @@ export function hasPermission(
   }
 
   // Check for exact match
-  if (user.permissions.includes(requiredPermission)) {
+  if (user.permissions.includes(requiredPermission as any)) {
     return { granted: true };
   }
 
   // Check for wildcard permission (admin has all)
-  if (user.permissions.includes("*:*")) {
+  if (user.permissions.includes("*:*" as any)) {
     return { granted: true };
   }
 
   // Check for action wildcard (e.g., "manage:*" covers "manage:users")
   const [action, resource] = requiredPermission.split(":");
-  if (user.permissions.includes(`${action}:*`)) {
+  if (user.permissions.includes(`${action}:*` as any)) {
     return { granted: true };
   }
 
   // Check for resource wildcard (e.g., "*:users" covers "manage:users")
-  if (user.permissions.includes(`*:${resource}`)) {
+  if (user.permissions.includes(`*:${resource}` as any)) {
     return { granted: true };
   }
 
@@ -241,15 +241,16 @@ export async function validateSessionAndPermission(
   if (!permissionCheck.granted) {
     // Log unauthorized attempt
     try {
-      await db.audit.logAction({
+      await db.audit.createAuditLog({
         userId: user!.id,
         action: "permission_denied",
-        resource: requiredPermission,
-        resourceId: requiredPermission,
-        details: JSON.stringify({
+        entityType: "user",
+        entityId: user!.id,
+        details: {
+          permission: requiredPermission,
           reason: permissionCheck.reason,
           timestamp: new Date().toISOString(),
-        }),
+        },
       });
     } catch (error) {
       console.error("Failed to log permission denial:", error);
@@ -400,12 +401,12 @@ export async function logAction(
   details?: any
 ): Promise<void> {
   try {
-    await db.audit.logAction({
+    await db.audit.createAuditLog({
       userId: user.id,
       action,
-      resource,
-      resourceId: resourceId || "",
-      details: details ? JSON.stringify(details) : undefined,
+      entityType: "user",
+      entityId: resourceId || user.id,
+      details: details || {},
     });
   } catch (error) {
     console.error("Failed to log action:", error);
@@ -429,15 +430,16 @@ export async function logDeniedAction(
   reason: string
 ): Promise<void> {
   try {
-    await db.audit.logAction({
+    await db.audit.createAuditLog({
       userId,
       action: `denied_${action}`,
-      resource,
-      resourceId: "",
-      details: JSON.stringify({
+      entityType: "user",
+      entityId: userId,
+      details: {
+        resource,
         reason,
         timestamp: new Date().toISOString(),
-      }),
+      },
     });
   } catch (error) {
     console.error("Failed to log denied action:", error);

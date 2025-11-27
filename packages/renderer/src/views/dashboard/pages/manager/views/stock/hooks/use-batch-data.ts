@@ -30,9 +30,10 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
       setLoading(true);
       setError(null);
 
+      // Pass productId as part of options object for proper filtering
       const response = await window.batchesAPI.getByBusiness(
         businessId,
-        productId
+        productId ? { productId } : undefined
       );
 
       if (response.success && response.batches) {

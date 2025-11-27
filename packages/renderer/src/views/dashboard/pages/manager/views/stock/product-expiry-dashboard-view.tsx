@@ -63,25 +63,29 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
   }, 0);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Product Expiry Management
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
             Track and manage product batches and expiry dates
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {onViewBatches && (
-            <Button variant="outline" onClick={onViewBatches}>
+            <Button
+              variant="outline"
+              onClick={onViewBatches}
+              className="w-full sm:w-auto"
+            >
               View All Batches
             </Button>
           )}
           {onReceiveBatch && (
-            <Button onClick={onReceiveBatch}>
+            <Button onClick={onReceiveBatch} className="w-full sm:w-auto">
               <Package className="w-4 h-4 mr-2" />
               Receive New Batch
             </Button>
@@ -93,21 +97,21 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
       {(criticalAlerts.length > 0 || expiredBatches.length > 0) && (
         <Card className="border-red-200 bg-red-50">
           <CardHeader>
-            <CardTitle className="flex items-center text-red-900">
-              <AlertTriangle className="w-5 h-5 mr-2" />
+            <CardTitle className="flex items-center text-red-900 text-base sm:text-lg">
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
               Critical Alerts
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {expiredBatches.length > 0 && (
-                <div className="flex items-center justify-between p-3 bg-red-100 rounded">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 bg-red-100 rounded">
                   <div>
-                    <p className="font-semibold text-red-900">
+                    <p className="font-semibold text-red-900 text-sm sm:text-base">
                       {expiredBatches.length} Expired Batch
                       {expiredBatches.length !== 1 ? "es" : ""}
                     </p>
-                    <p className="text-sm text-red-700">
+                    <p className="text-xs sm:text-sm text-red-700">
                       {expiredBatches.reduce(
                         (sum, b) => sum + b.currentQuantity,
                         0
@@ -115,22 +119,26 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
                       units need immediate attention
                     </p>
                   </div>
-                  <Badge variant="destructive">Expired</Badge>
+                  <Badge variant="destructive" className="w-fit">
+                    Expired
+                  </Badge>
                 </div>
               )}
               {criticalAlerts.length > 0 && (
-                <div className="flex items-center justify-between p-3 bg-orange-100 rounded">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 bg-orange-100 rounded">
                   <div>
-                    <p className="font-semibold text-orange-900">
+                    <p className="font-semibold text-orange-900 text-sm sm:text-base">
                       {criticalAlerts.length} Critical Alert
                       {criticalAlerts.length !== 1 ? "s" : ""}
                     </p>
-                    <p className="text-sm text-orange-700">
+                    <p className="text-xs sm:text-sm text-orange-700">
                       Batches expiring within{" "}
                       {expirySettings?.criticalAlertDays || 3} days
                     </p>
                   </div>
-                  <Badge variant="destructive">Critical</Badge>
+                  <Badge variant="destructive" className="w-fit">
+                    Critical
+                  </Badge>
                 </div>
               )}
             </div>
@@ -139,14 +147,16 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Batches</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Total Batches
+            </CardTitle>
             <Package className="w-4 h-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalBatches}</div>
+            <div className="text-xl sm:text-2xl font-bold">{totalBatches}</div>
             <p className="text-xs text-gray-500 mt-1">
               {activeBatches} active, {expiredCount} expired
             </p>
@@ -155,13 +165,13 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-xs sm:text-sm font-medium">
               Expiring This Week
             </CardTitle>
             <Calendar className="w-4 h-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-xl sm:text-2xl font-bold text-orange-600">
               {expiringThisWeek.length}
             </div>
             <p className="text-xs text-gray-500 mt-1">
@@ -173,11 +183,13 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Value at Risk</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Value at Risk
+            </CardTitle>
             <DollarSign className="w-4 h-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-xl sm:text-2xl font-bold text-red-600">
               £{valueAtRisk.toFixed(2)}
             </div>
             <p className="text-xs text-gray-500 mt-1">
@@ -188,11 +200,13 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Waste Value</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Waste Value
+            </CardTitle>
             <TrendingDown className="w-4 h-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-600">
+            <div className="text-xl sm:text-2xl font-bold text-gray-600">
               £{wasteValue.toFixed(2)}
             </div>
             <p className="text-xs text-gray-500 mt-1">From expired batches</p>
@@ -201,16 +215,18 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle className="text-base sm:text-lg">
+              Quick Actions
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {onReceiveBatch && (
               <Button
                 variant="outline"
-                className="w-full justify-start"
+                className="w-full justify-start text-sm sm:text-base"
                 onClick={onReceiveBatch}
               >
                 <Package className="w-4 h-4 mr-2" />
@@ -220,7 +236,7 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
             {onViewBatches && (
               <Button
                 variant="outline"
-                className="w-full justify-start"
+                className="w-full justify-start text-sm sm:text-base"
                 onClick={onViewBatches}
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
@@ -230,7 +246,7 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
             {onGenerateReport && (
               <Button
                 variant="outline"
-                className="w-full justify-start"
+                className="w-full justify-start text-sm sm:text-base"
                 onClick={onGenerateReport}
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
@@ -240,7 +256,7 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
             {onCreatePromotion && criticalCount > 0 && (
               <Button
                 variant="outline"
-                className="w-full justify-start"
+                className="w-full justify-start text-sm sm:text-base"
                 onClick={onCreatePromotion}
               >
                 <AlertTriangle className="w-4 h-4 mr-2" />
@@ -252,11 +268,13 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
 
         <Card>
           <CardHeader>
-            <CardTitle>Upcoming Expiry</CardTitle>
+            <CardTitle className="text-base sm:text-lg">
+              Upcoming Expiry
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {expiringNext30Days.length === 0 ? (
-              <p className="text-gray-500 text-sm">
+              <p className="text-gray-500 text-xs sm:text-sm">
                 No batches expiring in the next 30 days
               </p>
             ) : (
@@ -264,10 +282,10 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
                 {expiringNext30Days.slice(0, 5).map((batch) => (
                   <div
                     key={batch.id}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2 bg-gray-50 rounded"
                   >
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium truncate">
                         {batch.product?.name || "Unknown"}
                       </p>
                       <p className="text-xs text-gray-500">
@@ -275,13 +293,13 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
                         {batch.currentQuantity} units
                       </p>
                     </div>
-                    <Badge variant="outline" className="ml-2">
+                    <Badge variant="outline" className="text-xs w-fit">
                       {batch.batchNumber}
                     </Badge>
                   </div>
                 ))}
                 {expiringNext30Days.length > 5 && (
-                  <p className="text-sm text-gray-500 text-center pt-2">
+                  <p className="text-xs sm:text-sm text-gray-500 text-center pt-2">
                     +{expiringNext30Days.length - 5} more batches
                   </p>
                 )}

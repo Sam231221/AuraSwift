@@ -381,34 +381,36 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
 
   return (
     <>
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={onBack}>
+        <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+          <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
+            <Button variant="outline" size="sm" onClick={onBack} className="w-fit">
               <ChevronLeft className="w-4 h-4 mr-2" />
               Back to Products
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                 Category Management
               </h1>
-              <p className="text-gray-600 mt-1">
+              <p className="text-sm sm:text-base text-gray-600 mt-1">
                 Organize your products with categories
               </p>
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setImportModalOpen(true)} className="w-full sm:w-auto">
               <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Import from Booker
+              <span className="hidden sm:inline">Import from Booker</span>
+              <span className="sm:hidden">Import</span>
             </Button>
             <Button
               onClick={() => {
                 setEditingCategory(null);
                 setIsDrawerOpen(true);
               }}
+              className="w-full sm:w-auto"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Category
@@ -428,29 +430,29 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Categories</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-xs sm:text-sm text-gray-600">Total Categories</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">
                   {categories.length}
                 </p>
-                <p className="text-sm text-green-600 mt-1">
+                <p className="text-xs sm:text-sm text-green-600 mt-1">
                   {categories.filter((c) => c.isActive).length} active
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Tag className="w-6 h-6 text-blue-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Tag className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Most Recent</p>
-                <p className="text-lg font-bold text-gray-900">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-gray-600">Most Recent</p>
+                <p className="text-base sm:text-lg font-bold text-gray-900 truncate">
                   {categories.length > 0
                     ? categories.sort(
                         (a, b) =>
@@ -459,7 +461,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                       )[0]?.name
                     : "None"}
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-xs sm:text-sm text-gray-500 mt-1">
                   {categories.length > 0
                     ? new Date(
                         categories.sort(
@@ -471,16 +473,16 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                     : ""}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Settings className="w-6 h-6 text-green-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-2">
+                <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border sm:col-span-2 lg:col-span-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Quick Actions</p>
+                <p className="text-xs sm:text-sm text-gray-600">Quick Actions</p>
                 <Button
                   variant="outline"
                   size="sm"
@@ -494,8 +496,8 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                   New Category
                 </Button>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Plus className="w-6 h-6 text-purple-600" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
               </div>
             </div>
           </div>
@@ -503,9 +505,9 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
 
         {/* Categories List */}
         <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-          <div className="p-4 border-b bg-gray-50">
-            <h3 className="text-lg font-semibold text-gray-900">Categories</h3>
-            <p className="text-sm text-gray-600 mt-1">
+          <div className="p-3 sm:p-4 border-b bg-gray-50">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Categories</h3>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1">
               Use ↑↓ buttons to reorder, click ▶ to expand/collapse
               subcategories
             </p>
