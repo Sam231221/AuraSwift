@@ -1,7 +1,14 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Product } from "@/features/products/types/product.types";
 import {
   AdaptiveKeyboard,
@@ -12,12 +19,14 @@ import type { KeyboardMode } from "@/components/adaptive-keyboard";
 interface StockAdjustmentModalProps {
   product: Product | null;
   adjustmentType: "add" | "remove";
-  quantity: string;
-  reason: string;
+  // We ignore these props for local state management to prevent render loops
+  quantity?: string;
+  reason?: string;
   onClose: () => void;
   onTypeChange: (type: "add" | "remove") => void;
-  onQuantityChange: (value: string) => void;
-  onReasonChange: (value: string) => void;
+  // These are kept for API compatibility but we won't use them for live updates
+  onQuantityChange?: (value: string) => void;
+  onReasonChange?: (value: string) => void;
   onConfirm: (
     productId: string,
     type: "add" | "remove",
@@ -26,75 +35,157 @@ interface StockAdjustmentModalProps {
   ) => void;
 }
 
+const ADD_REASONS = [
+  "Stock Received (Delivery)",
+  "Inventory Count Correction (Found)",
+  "Return from Customer",
+  "Transfer In",
+  "Other (Add Note)",
+];
+
+const REMOVE_REASONS = [
+  "Damaged / Broken",
+  "Expired",
+  "Theft / Loss",
+  "Inventory Count Correction (Lost)",
+  "Transfer Out",
+  "Waste / Spoilage",
+  "Internal Use",
+  "Other (Add Note)",
+];
+
 const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   product,
   adjustmentType,
-  quantity,
-  reason,
   onClose,
   onTypeChange,
-  onQuantityChange,
-  onReasonChange,
   onConfirm,
 }) => {
+  // Local state for form fields
+  const [localQuantity, setLocalQuantity] = useState("0");
+  const [selectedReason, setSelectedReason] = useState<string>("");
+  const [customNote, setCustomNote] = useState("");
+  
   // Keyboard state
-  const [activeField, setActiveField] = useState<"quantity" | "reason" | null>(null);
+  const [activeField, setActiveField] = useState<"quantity" | "note" | null>(
+    null
+  );
   const [showKeyboard, setShowKeyboard] = useState(false);
 
-  const handleFieldFocus = useCallback((field: "quantity" | "reason") => {
+  // Reset state when adjustment type changes
+  useEffect(() => {
+    setSelectedReason("");
+    setCustomNote("");
+    setLocalQuantity("0");
+  }, [adjustmentType]);
+
+  const handleFieldFocus = useCallback((field: "quantity" | "note") => {
     setActiveField(field);
     setShowKeyboard(true);
-  }, []);
+    
+    // Auto-clear "0" when focusing quantity
+    if (field === "quantity" && localQuantity === "0") {
+      setLocalQuantity("");
+    }
+  }, [localQuantity]);
 
   const handleCloseKeyboard = useCallback(() => {
     setShowKeyboard(false);
     setActiveField(null);
-  }, []);
-
-  const handleInput = useCallback((char: string) => {
-    if (activeField === "quantity") {
-      onQuantityChange(quantity + char);
-    } else if (activeField === "reason") {
-      onReasonChange(reason + char);
+    
+    // Restore "0" if empty on blur
+    if (localQuantity === "") {
+      setLocalQuantity("0");
     }
-  }, [activeField, quantity, reason, onQuantityChange, onReasonChange]);
+  }, [localQuantity]);
+
+  const handleInput = useCallback(
+    (char: string) => {
+      if (activeField === "quantity") {
+        setLocalQuantity((prev) => {
+          // If current value is "0", replace it unless adding a decimal (not supported here yet)
+          if (prev === "0") return char;
+          return prev + char;
+        });
+      } else if (activeField === "note") {
+        setCustomNote((prev) => prev + char);
+      }
+    },
+    [activeField]
+  );
 
   const handleBackspace = useCallback(() => {
     if (activeField === "quantity") {
-      onQuantityChange(quantity.slice(0, -1));
-    } else if (activeField === "reason") {
-      onReasonChange(reason.slice(0, -1));
+      setLocalQuantity((prev) => {
+        const newVal = prev.slice(0, -1);
+        return newVal === "" ? "" : newVal;
+      });
+    } else if (activeField === "note") {
+      setCustomNote((prev) => prev.slice(0, -1));
     }
-  }, [activeField, quantity, reason, onQuantityChange, onReasonChange]);
+  }, [activeField]);
 
   const handleClear = useCallback(() => {
     if (activeField === "quantity") {
-      onQuantityChange("");
-    } else if (activeField === "reason") {
-      onReasonChange("");
+      setLocalQuantity("");
+    } else if (activeField === "note") {
+      setCustomNote("");
     }
-  }, [activeField, onQuantityChange, onReasonChange]);
+  }, [activeField]);
 
   const getKeyboardMode = (): KeyboardMode => {
     return activeField === "quantity" ? "numeric" : "qwerty";
   };
 
+  const handleReasonSelect = (value: string) => {
+    setSelectedReason(value);
+    if (value.includes("Other")) {
+      // Focus note field if "Other" is selected
+      setTimeout(() => handleFieldFocus("note"), 100);
+    } else {
+      setCustomNote("");
+    }
+  };
+
   if (!product) return null;
 
   const handleConfirm = () => {
-    const quantityNum = parseInt(quantity);
-    const reasonText = reason.trim() || "Stock received";
-    if (quantityNum > 0 && reasonText) {
-      onConfirm(product.id, adjustmentType, quantityNum, reasonText);
-      onClose();
-    } else {
-      toast.error("Please enter a valid quantity and reason");
+    const quantityNum = parseInt(localQuantity);
+    
+    // Validation
+    if (isNaN(quantityNum) || quantityNum <= 0) {
+      toast.error("Quantity must be greater than 0");
+      return;
     }
+
+    // Prevent negative stock
+    if (adjustmentType === "remove" && quantityNum > product.stockLevel) {
+      toast.error(
+        `Cannot remove ${quantityNum} items. Only ${product.stockLevel} in stock.`
+      );
+      return;
+    }
+
+    if (!selectedReason) {
+      toast.error("Please select a reason");
+      return;
+    }
+
+    const finalReason =
+      selectedReason.includes("Other") && customNote
+        ? `${selectedReason}: ${customNote}`
+        : selectedReason;
+
+    onConfirm(product.id, adjustmentType, quantityNum, finalReason);
+    onClose();
   };
 
   const handleClose = () => {
     onClose();
   };
+
+  const currentReasons =
+    adjustmentType === "add" ? ADD_REASONS : REMOVE_REASONS;
 
   return (
     <div
@@ -167,7 +258,7 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
           </div>
 
           {/* Form Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             {/* Quantity Input */}
             <div>
               <Label htmlFor="stock-quantity" className="text-sm font-medium">
@@ -177,29 +268,52 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
                 id="stock-quantity"
                 label=""
                 placeholder="Enter quantity"
-                value={quantity}
+                value={localQuantity}
                 readOnly
                 onFocus={() => handleFieldFocus("quantity")}
                 className="mt-1.5"
               />
             </div>
 
-            {/* Reason Input */}
+            {/* Reason Select */}
             <div>
               <Label htmlFor="stock-reason" className="text-sm font-medium">
                 Reason
               </Label>
-              <AdaptiveFormField
-                id="stock-reason"
-                label=""
-                placeholder="Stock received"
-                value={reason}
-                readOnly
-                onFocus={() => handleFieldFocus("reason")}
-                className="mt-1.5"
-                autoComplete="off"
-              />
+              <Select
+                value={selectedReason}
+                onValueChange={handleReasonSelect}
+              >
+                <SelectTrigger className="w-full mt-1.5 h-10">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currentReasons.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Optional Note (shown if Other is selected) */}
+            {selectedReason.includes("Other") && (
+              <div className="animate-in fade-in slide-in-from-top-2">
+                <Label htmlFor="stock-note" className="text-sm font-medium">
+                  Note / Details
+                </Label>
+                <AdaptiveFormField
+                  id="stock-note"
+                  label=""
+                  placeholder="Enter details..."
+                  value={customNote}
+                  readOnly
+                  onFocus={() => handleFieldFocus("note")}
+                  className="mt-1.5"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -222,10 +336,10 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
         {/* Action Buttons */}
         <div className="p-6 border-t bg-gray-50/50 rounded-b-xl flex gap-3">
-          <Button 
-            type="button" 
+          <Button
+            type="button"
             size="lg"
-            className="flex-1 h-12" 
+            className="flex-1 h-12"
             onClick={handleConfirm}
           >
             Confirm Adjustment
