@@ -9,6 +9,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/shared/hooks/use-auth";
 import type {
   Category,
@@ -40,6 +50,8 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
 
   const [vatCategories, setVatCategories] = useState<VatCategory[]>([]);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
 
   // Build hierarchical category tree
   const categoryTree = useMemo(
@@ -278,20 +290,19 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     setEditingCategory(null);
   }, []);
 
-  const handleDeleteCategory = async (id: string) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this category? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
+  const handleDeleteCategory = (id: string) => {
+    setCategoryToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!categoryToDelete) return;
 
     try {
       setLoading(true);
-      const response = await window.categoryAPI.delete(id);
+      const response = await window.categoryAPI.delete(categoryToDelete);
       if (response.success) {
-        setCategories(categories.filter((c) => c.id !== id));
+        setCategories(categories.filter((c) => c.id !== categoryToDelete));
         toast.success("Category deleted successfully");
       } else {
         toast.error(response.message || "Failed to delete category");
@@ -301,6 +312,8 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       toast.error("Failed to delete category");
     } finally {
       setLoading(false);
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
     }
   };
 
@@ -574,13 +587,33 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
         onUpdate={handleUpdateCategory}
       />
 
-      {/* Import from Booker Modal */}
       <ImportBookerModal
         open={importModalOpen}
         onOpenChange={setImportModalOpen}
         importType="department"
         onSuccess={loadCategories}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              category.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

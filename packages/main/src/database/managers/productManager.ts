@@ -80,13 +80,20 @@ export class ProductManager {
     return this.getProductById(productId);
   }
 
-  async getProductById(id: string): Promise<Product> {
+  async getProductById(
+    id: string,
+    includeInactive: boolean = false
+  ): Promise<Product> {
+    const conditions = [eq(schema.products.id, id)];
+
+    if (!includeInactive) {
+      conditions.push(eq(schema.products.isActive, true));
+    }
+
     const [product] = await this.drizzle
       .select()
       .from(schema.products)
-      .where(
-        and(eq(schema.products.id, id), eq(schema.products.isActive, true))
-      )
+      .where(and(...conditions))
       .limit(1);
 
     if (!product) {
@@ -128,7 +135,10 @@ export class ProductManager {
     return product;
   }
 
-  async getProductsByBusiness(businessId: string, includeInactive: boolean = false): Promise<Product[]> {
+  async getProductsByBusiness(
+    businessId: string,
+    includeInactive: boolean = false
+  ): Promise<Product[]> {
     const conditions = includeInactive
       ? [eq(schema.products.businessId, businessId)]
       : [
@@ -240,12 +250,12 @@ export class ProductManager {
     updates: Partial<Omit<Product, "id" | "createdAt" | "modifiers">>
   ): Promise<Product> {
     if (Object.keys(updates).length === 0) {
-      return this.getProductById(id);
+      return this.getProductById(id, true);
     }
 
-    // First check if product exists
+    // First check if product exists (include inactive to allow reactivation)
     try {
-      await this.getProductById(id);
+      await this.getProductById(id, true);
     } catch (error) {
       throw new Error("Product not found");
     }
@@ -256,7 +266,7 @@ export class ProductManager {
       .set(updates)
       .where(eq(schema.products.id, id));
 
-    return this.getProductById(id);
+    return this.getProductById(id, true);
   }
 
   async deleteProduct(id: string): Promise<boolean> {
@@ -284,7 +294,7 @@ export class ProductManager {
 
     // Check if product has any stock
     const product = await this.getProductById(id);
-    if (product.stockLevel > 0) {
+    if ((product.stockLevel ?? 0) > 0) {
       throw new Error(
         `Cannot delete product: Product still has ${product.stockLevel} items in stock. Please adjust stock to 0 first.`
       );
@@ -520,7 +530,7 @@ export class ProductManager {
       const product = await this.updateProduct(id, updates);
 
       // Fetch the complete updated product
-      const updatedProduct = await this.getProductById(id);
+      const updatedProduct = await this.getProductById(id, true);
 
       return {
         success: true,

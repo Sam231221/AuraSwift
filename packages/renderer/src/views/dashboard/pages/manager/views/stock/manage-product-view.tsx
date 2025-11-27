@@ -51,9 +51,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const [totalPages, setTotalPages] = useState(0);
 
   // Filter state
+  // Filter state
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterStock, setFilterStock] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("active");
   const [showFields, setShowFields] = useState({
     name: true,
     category: true,
@@ -103,7 +105,12 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
             | "in_stock"
             | "low"
             | "out_of_stock",
-          isActive: true,
+          isActive:
+            filterStatus === "all"
+              ? undefined
+              : filterStatus === "active"
+              ? true
+              : false,
         }
       );
 
@@ -127,6 +134,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     searchTerm,
     filterCategory,
     filterStock,
+    filterStatus,
   ]);
 
   // Load all products for dashboard stats (without pagination)
@@ -189,7 +197,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     if (currentPage !== 1) {
       setCurrentPage(1);
     }
-  }, [searchTerm, filterCategory, filterStock]);
+  }, [searchTerm, filterCategory, filterStock, filterStatus]);
 
   // Reload categories when returning from category management
   useEffect(() => {
@@ -361,6 +369,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               searchTerm={searchTerm}
               filterCategory={filterCategory}
               filterStock={filterStock}
+              filterStatus={filterStatus}
               showFields={showFields}
               currentPage={currentPage}
               totalPages={totalPages}
@@ -374,6 +383,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               onSearchChange={setSearchTerm}
               onCategoryFilterChange={setFilterCategory}
               onStockFilterChange={(value: string) => setFilterStock(value)}
+              onStatusFilterChange={(value: string) => setFilterStatus(value)}
               onShowFieldsChange={setShowFields}
               onPageChange={setCurrentPage}
               onPageSizeChange={(size) => {

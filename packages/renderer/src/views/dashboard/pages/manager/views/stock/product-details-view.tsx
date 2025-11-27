@@ -40,6 +40,7 @@ interface ProductDetailsViewProps {
   searchTerm: string;
   filterCategory: string;
   filterStock: string;
+  filterStatus: string;
   showFields: {
     name: boolean;
     category: boolean;
@@ -60,6 +61,7 @@ interface ProductDetailsViewProps {
   onSearchChange: (value: string) => void;
   onCategoryFilterChange: (value: string) => void;
   onStockFilterChange: (value: string) => void;
+  onStatusFilterChange: (value: string) => void;
   onShowFieldsChange: (fields: {
     name: boolean;
     category: boolean;
@@ -79,6 +81,7 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
   searchTerm,
   filterCategory,
   filterStock,
+  filterStatus,
   showFields,
   currentPage,
   totalPages,
@@ -92,6 +95,7 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
   onSearchChange,
   onCategoryFilterChange,
   onStockFilterChange,
+  onStatusFilterChange,
   onShowFieldsChange,
   onPageChange,
   onPageSizeChange,
@@ -167,6 +171,17 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                 <SelectItem value="in_stock">In Stock</SelectItem>
                 <SelectItem value="low">Low Stock</SelectItem>
                 <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterStatus} onValueChange={onStatusFilterChange}>
+              <SelectTrigger className="w-full sm:w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="all">All Status</SelectItem>
               </SelectContent>
             </Select>
           </div>

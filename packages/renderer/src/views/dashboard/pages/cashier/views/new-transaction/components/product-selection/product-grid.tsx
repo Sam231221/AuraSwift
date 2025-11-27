@@ -1,7 +1,3 @@
-/**
- * Product grid component
- */
-
 import { Package, Search } from "lucide-react";
 import { ProductCard } from "./product-card";
 import type { Product } from "@/features/products/types/product.types";
@@ -61,4 +57,3 @@ export function ProductGrid({
     </div>
   );
 }
-
