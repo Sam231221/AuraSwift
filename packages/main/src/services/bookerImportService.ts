@@ -104,7 +104,7 @@ export class BookerImportService {
     const warnings: string[] = [];
     const data: BookerDepartment[] = [];
 
-    // Skip header lines (first 3 lines)
+    // Skip header lines (first 3 lines), Contains unnecessary information
     const dataLines = lines.slice(3);
 
     for (let i = 0; i < dataLines.length; i++) {

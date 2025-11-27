@@ -260,6 +260,25 @@ export class CategoryManager {
       );
     }
 
+    // Check if category has subcategories
+    const subcategories = await this.drizzle
+      .select({ count: drizzleSql<number>`COUNT(*)` })
+      .from(schema.categories)
+      .where(
+        and(
+          eq(schema.categories.parentId, id),
+          eq(schema.categories.isActive, true)
+        )
+      );
+
+    const subCount = subcategories[0]?.count || 0;
+
+    if (subCount > 0) {
+      throw new Error(
+        `Cannot delete category: ${subCount} active subcategory(s) exist`
+      );
+    }
+
     const result = await this.drizzle
       .update(schema.categories)
       .set({
