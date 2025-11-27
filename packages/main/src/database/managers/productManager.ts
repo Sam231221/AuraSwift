@@ -1,7 +1,16 @@
 import type { Product, NewProduct, StockAdjustment } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
-import { eq, and, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, sql as drizzleSql, desc, asc } from "drizzle-orm";
 import * as schema from "../schema.js";
+import type {
+  PaginationParams,
+  PaginatedResult,
+  ProductFilters,
+} from "../types/pagination.js";
+import {
+  calculatePagination,
+  calculateLimitOffset,
+} from "../types/pagination.js";
 
 export interface ProductResponse {
   success: boolean;
@@ -132,6 +141,96 @@ export class ProductManager {
       .orderBy(schema.products.name);
 
     return products;
+  }
+
+  /**
+   * Get products by business with pagination and filters
+   */
+  async getProductsByBusinessPaginated(
+    businessId: string,
+    pagination: PaginationParams,
+    filters?: ProductFilters
+  ): Promise<PaginatedResult<Product>> {
+    const { limit, offset } = calculateLimitOffset(
+      pagination.page,
+      pagination.pageSize
+    );
+
+    // Build WHERE conditions
+    const conditions = [eq(schema.products.businessId, businessId)];
+
+    // Filter by active status
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(schema.products.isActive, filters.isActive));
+    } else {
+      conditions.push(eq(schema.products.isActive, true)); // Default to active only
+    }
+
+    // Filter by category
+    if (filters?.categoryId) {
+      conditions.push(eq(schema.products.categoryId, filters.categoryId));
+    }
+
+    // Filter by search term (name or SKU)
+    if (filters?.searchTerm) {
+      const searchPattern = `%${filters.searchTerm}%`;
+      conditions.push(
+        drizzleSql`(
+          ${schema.products.name} LIKE ${searchPattern} OR 
+          ${schema.products.sku} LIKE ${searchPattern} OR
+          ${schema.products.barcode} LIKE ${searchPattern}
+        )`
+      );
+    }
+
+    // Filter by stock status
+    if (filters?.stockStatus && filters.stockStatus !== "all") {
+      if (filters.stockStatus === "out_of_stock") {
+        conditions.push(drizzleSql`${schema.products.stockLevel} = 0`);
+      } else if (filters.stockStatus === "low") {
+        conditions.push(
+          drizzleSql`${schema.products.stockLevel} > 0 AND ${schema.products.stockLevel} <= ${schema.products.minStockLevel}`
+        );
+      } else if (filters.stockStatus === "in_stock") {
+        conditions.push(
+          drizzleSql`${schema.products.stockLevel} > ${schema.products.minStockLevel}`
+        );
+      }
+    }
+
+    // Get total count for pagination
+    const [countResult] = await this.drizzle
+      .select({ count: drizzleSql<number>`count(*)` })
+      .from(schema.products)
+      .where(and(...conditions));
+
+    const totalItems = Number(countResult.count);
+
+    // Build sort order
+    const sortColumn = pagination.sortBy || "name";
+    const sortDirection = pagination.sortOrder || "asc";
+    const orderByClause =
+      sortDirection === "desc"
+        ? desc(schema.products[sortColumn as keyof typeof schema.products])
+        : asc(schema.products[sortColumn as keyof typeof schema.products]);
+
+    // Get paginated items
+    const items = await this.drizzle
+      .select()
+      .from(schema.products)
+      .where(and(...conditions))
+      .orderBy(orderByClause)
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items,
+      pagination: calculatePagination(
+        totalItems,
+        pagination.page,
+        pagination.pageSize
+      ),
+    };
   }
 
   async updateProduct(

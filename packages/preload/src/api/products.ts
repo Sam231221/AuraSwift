@@ -32,6 +32,28 @@ export const productAPI = {
   getByBusiness: (businessId: string) =>
     ipcRenderer.invoke("products:getByBusiness", businessId),
 
+  getPaginated: (
+    businessId: string,
+    pagination: {
+      page: number;
+      pageSize: number;
+      sortBy?: string;
+      sortOrder?: "asc" | "desc";
+    },
+    filters?: {
+      categoryId?: string;
+      searchTerm?: string;
+      stockStatus?: "all" | "in_stock" | "low" | "out_of_stock";
+      isActive?: boolean;
+    }
+  ) =>
+    ipcRenderer.invoke(
+      "products:getPaginated",
+      businessId,
+      pagination,
+      filters
+    ),
+
   getById: (id: string) => ipcRenderer.invoke("products:getById", id),
 
   update: (
@@ -85,4 +107,7 @@ export const productAPI = {
 
   getStockAdjustments: (productId: string) =>
     ipcRenderer.invoke("stock:getAdjustments", productId),
+
+  syncStock: (businessId: string) =>
+    ipcRenderer.invoke("products:syncStock", businessId),
 };

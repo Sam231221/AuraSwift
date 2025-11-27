@@ -2,6 +2,15 @@ import type { ProductBatch } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import * as schema from "../schema.js";
+import type {
+  PaginationParams,
+  PaginatedResult,
+  BatchFilters,
+} from "../types/pagination.js";
+import {
+  calculatePagination,
+  calculateLimitOffset,
+} from "../types/pagination.js";
 
 export interface BatchResponse {
   success: boolean;
@@ -101,7 +110,11 @@ export class BatchManager {
     // Determine initial status
     const expiryDate = new Date(batchData.expiryDate);
     const status =
-      expiryDate < now ? "EXPIRED" : currentQuantity <= 0 ? "SOLD_OUT" : "ACTIVE";
+      expiryDate < now
+        ? "EXPIRED"
+        : currentQuantity <= 0
+        ? "SOLD_OUT"
+        : "ACTIVE";
 
     await this.db.insert(schema.productBatches).values({
       id: batchId,
@@ -161,9 +174,7 @@ export class BatchManager {
       conditions.push(eq(schema.productBatches.status, options.status));
     } else if (!options?.includeExpired) {
       // Exclude expired by default unless explicitly included
-      conditions.push(
-        sql`${schema.productBatches.status} != 'EXPIRED'`
-      );
+      conditions.push(sql`${schema.productBatches.status} != 'EXPIRED'`);
     }
 
     const batches = await this.db
@@ -225,9 +236,7 @@ export class BatchManager {
     if (options?.expiringWithinDays !== undefined) {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + options.expiringWithinDays);
-      conditions.push(
-        lte(schema.productBatches.expiryDate, futureDate)
-      );
+      conditions.push(lte(schema.productBatches.expiryDate, futureDate));
     }
 
     const batches = await this.db
@@ -237,6 +246,122 @@ export class BatchManager {
       .orderBy(asc(schema.productBatches.expiryDate));
 
     return batches as ProductBatch[];
+  }
+
+  /**
+   * Get batches by business ID with pagination and filters
+   */
+  async getBatchesByBusinessPaginated(
+    businessId: string,
+    pagination: PaginationParams,
+    filters?: BatchFilters
+  ): Promise<PaginatedResult<ProductBatch>> {
+    const { limit, offset } = calculateLimitOffset(
+      pagination.page,
+      pagination.pageSize
+    );
+
+    // Build WHERE conditions
+    const conditions = [eq(schema.productBatches.businessId, businessId)];
+
+    // Filter by product
+    if (filters?.productId) {
+      conditions.push(eq(schema.productBatches.productId, filters.productId));
+    }
+
+    // Filter by status
+    if (filters?.status) {
+      conditions.push(eq(schema.productBatches.status, filters.status));
+    }
+
+    // Filter by expiry status
+    if (filters?.expiryStatus && filters.expiryStatus !== "all") {
+      const now = new Date();
+
+      if (filters.expiryStatus === "expired") {
+        conditions.push(lte(schema.productBatches.expiryDate, now));
+      } else if (filters.expiryStatus === "critical") {
+        const criticalDate = new Date();
+        criticalDate.setDate(criticalDate.getDate() + 3); // 3 days
+        conditions.push(
+          and(
+            gte(schema.productBatches.expiryDate, now),
+            lte(schema.productBatches.expiryDate, criticalDate)
+          )!
+        );
+      } else if (filters.expiryStatus === "warning") {
+        const warningStart = new Date();
+        warningStart.setDate(warningStart.getDate() + 3);
+        const warningEnd = new Date();
+        warningEnd.setDate(warningEnd.getDate() + 7); // 3-7 days
+        conditions.push(
+          and(
+            gte(schema.productBatches.expiryDate, warningStart),
+            lte(schema.productBatches.expiryDate, warningEnd)
+          )!
+        );
+      } else if (filters.expiryStatus === "info") {
+        const infoStart = new Date();
+        infoStart.setDate(infoStart.getDate() + 7);
+        const infoEnd = new Date();
+        infoEnd.setDate(infoEnd.getDate() + 30); // 7-30 days
+        conditions.push(
+          and(
+            gte(schema.productBatches.expiryDate, infoStart),
+            lte(schema.productBatches.expiryDate, infoEnd)
+          )!
+        );
+      }
+    }
+
+    // Filter by expiring within days
+    if (filters?.expiringWithinDays !== undefined) {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + filters.expiringWithinDays);
+      conditions.push(lte(schema.productBatches.expiryDate, futureDate));
+    }
+
+    // Get total count for pagination
+    const [countResult] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.productBatches)
+      .where(and(...conditions));
+
+    const totalItems = Number(countResult.count);
+
+    // Build sort order
+    const sortColumn = pagination.sortBy || "expiryDate";
+    const sortDirection = pagination.sortOrder || "asc";
+    const orderByClause =
+      sortDirection === "desc"
+        ? desc(
+            schema.productBatches[
+              sortColumn as keyof typeof schema.productBatches
+            ]
+          )
+        : asc(
+            schema.productBatches[
+              sortColumn as keyof typeof schema.productBatches
+            ]
+          );
+
+    // Get paginated items
+    const items = await this.db
+      .select()
+      .from(schema.productBatches)
+      .where(and(...conditions))
+      .orderBy(orderByClause)
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items: items as ProductBatch[],
+      pagination: calculatePagination(
+        totalItems,
+        pagination.page,
+        pagination.pageSize
+      ),
+    };
   }
 
   /**
@@ -304,7 +429,9 @@ export class BatchManager {
 
     if (remaining > 0) {
       throw new Error(
-        `Insufficient stock. Available: ${quantity - remaining}, Requested: ${quantity}`
+        `Insufficient stock. Available: ${
+          quantity - remaining
+        }, Requested: ${quantity}`
       );
     }
 
@@ -398,16 +525,15 @@ export class BatchManager {
       status: "ACTIVE",
     });
 
-    return batches.reduce(
-      (sum, batch) => sum + batch.currentQuantity,
-      0
-    );
+    return batches.reduce((sum, batch) => sum + batch.currentQuantity, 0);
   }
 
   /**
    * Update product stock level from batches
    */
-  private async updateProductStockFromBatches(productId: string): Promise<void> {
+  private async updateProductStockFromBatches(
+    productId: string
+  ): Promise<void> {
     const stock = await this.calculateProductStock(productId);
 
     await this.db
@@ -485,4 +611,3 @@ export class BatchManager {
     return (batch as ProductBatch) || null;
   }
 }
-

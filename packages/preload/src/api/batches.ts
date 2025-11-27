@@ -31,8 +31,7 @@ export const batchesAPI = {
   create: (batchData: CreateBatchData) =>
     ipcRenderer.invoke("batches:create", batchData),
 
-  getById: (batchId: string) =>
-    ipcRenderer.invoke("batches:getById", batchId),
+  getById: (batchId: string) => ipcRenderer.invoke("batches:getById", batchId),
 
   getByProduct: (productId: string, options?: GetBatchesOptions) =>
     ipcRenderer.invoke("batches:getByProduct", productId, options),
@@ -40,7 +39,27 @@ export const batchesAPI = {
   getByBusiness: (businessId: string, options?: GetBatchesOptions) =>
     ipcRenderer.invoke("batches:getByBusiness", businessId, options),
 
-  getActiveBatches: (productId: string, rotationMethod?: "FIFO" | "FEFO" | "NONE") =>
+  getPaginated: (
+    businessId: string,
+    pagination: {
+      page: number;
+      pageSize: number;
+      sortBy?: string;
+      sortOrder?: "asc" | "desc";
+    },
+    filters?: {
+      productId?: string;
+      status?: "ACTIVE" | "EXPIRED" | "SOLD_OUT" | "REMOVED";
+      expiryStatus?: "all" | "expired" | "critical" | "warning" | "info";
+      expiringWithinDays?: number;
+    }
+  ) =>
+    ipcRenderer.invoke("batches:getPaginated", businessId, pagination, filters),
+
+  getActiveBatches: (
+    productId: string,
+    rotationMethod?: "FIFO" | "FEFO" | "NONE"
+  ) =>
     ipcRenderer.invoke("batches:getActiveBatches", productId, rotationMethod),
 
   selectForSale: (
@@ -48,14 +67,28 @@ export const batchesAPI = {
     quantity: number,
     rotationMethod?: "FIFO" | "FEFO" | "NONE"
   ) =>
-    ipcRenderer.invoke("batches:selectForSale", productId, quantity, rotationMethod),
+    ipcRenderer.invoke(
+      "batches:selectForSale",
+      productId,
+      quantity,
+      rotationMethod
+    ),
 
   updateQuantity: (
     batchId: string,
     quantity: number,
-    movementType: "INBOUND" | "OUTBOUND" | "ADJUSTMENT"
+    movementType: "INBOUND" | "OUTBOUND" | "ADJUSTMENT",
+    userId?: string,
+    reason?: string
   ) =>
-    ipcRenderer.invoke("batches:updateQuantity", batchId, quantity, movementType),
+    ipcRenderer.invoke(
+      "batches:updateQuantity",
+      batchId,
+      quantity,
+      movementType,
+      userId,
+      reason
+    ),
 
   updateStatus: (
     batchId: string,
@@ -74,6 +107,10 @@ export const batchesAPI = {
   remove: (batchId: string) => ipcRenderer.invoke("batches:remove", batchId),
 
   getByNumber: (batchNumber: string, productId: string, businessId: string) =>
-    ipcRenderer.invoke("batches:getByNumber", batchNumber, productId, businessId),
+    ipcRenderer.invoke(
+      "batches:getByNumber",
+      batchNumber,
+      productId,
+      businessId
+    ),
 };
-
