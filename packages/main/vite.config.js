@@ -2,17 +2,24 @@ import { getNodeMajorVersion } from "@app/electron-versions";
 import { spawn } from "child_process";
 import electronPath from "electron";
 import { copyFileSync, mkdirSync, readdirSync, statSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default /**
  * @type {import('vite').UserConfig}
  * @see https://vitejs.dev/config/
  */
 ({
+  resolve: {
+    alias: {
+      "@app/shared": resolve(__dirname, "../shared/src"),
+    },
+  },
   build: {
     ssr: true,
-    sourcemap: process.env.NODE_ENV === 'production' ? false : 'inline',
+    sourcemap: process.env.NODE_ENV === "production" ? false : "inline",
     outDir: "dist",
     assetsDir: ".",
     target: `node${getNodeMajorVersion()}`,

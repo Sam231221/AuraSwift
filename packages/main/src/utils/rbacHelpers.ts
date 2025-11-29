@@ -6,7 +6,7 @@
  */
 
 import type { DatabaseManagers } from "../database/index.js";
-import type { Permission } from "../constants/permissions.js";
+import type { Permission } from "@app/shared/constants/permissions.js";
 
 import { getLogger } from "./logger.js";
 const logger = getLogger("rbacHelpers");

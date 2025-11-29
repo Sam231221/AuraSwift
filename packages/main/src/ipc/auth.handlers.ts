@@ -9,7 +9,7 @@ import {
   logAction,
 } from "../utils/authHelpers.js";
 import { invalidateUserPermissionCache } from "../utils/rbacHelpers.js";
-import { PERMISSIONS } from "../constants/permissions.js";
+import { PERMISSIONS } from "@app/shared/constants/permissions.js";
 
 const logger = getLogger("authHandlers");
 

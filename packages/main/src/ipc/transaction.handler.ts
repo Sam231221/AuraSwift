@@ -5,7 +5,7 @@ import {
   logAction,
   validateSessionAndPermission,
 } from "../utils/authHelpers.js";
-import { PERMISSIONS } from "../constants/permissions.js";
+import { PERMISSIONS } from "@app/shared/constants/permissions.js";
 const logger = getLogger("transactionHandlers");
 
 export function registerTransactionHandlers() {

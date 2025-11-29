@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { relations, sql } from "drizzle-orm";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
-import type { Permission } from "../constants/permissions.js";
+import type { Permission } from "@app/shared/constants/permissions.js";
 
 const createTable = sqliteTableCreator((name) => name);
 const index = drizzleIndex;

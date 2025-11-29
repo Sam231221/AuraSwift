@@ -7,10 +7,28 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
-import { PERMISSION_GROUPS } from "../constants/permissions.js";
+import { PERMISSIONS } from "@app/shared/constants/permissions";
 
 import { getLogger } from "../utils/logger.js";
 const logger = getLogger("seed");
+
+// Permission groups for seeding default roles
+const PERMISSION_GROUPS = {
+  /** All permissions - for admin/owner role */
+  ADMIN: [PERMISSIONS.ALL],
+  /** Manager permissions */
+  MANAGER: [
+    PERMISSIONS.SALES_READ,
+    PERMISSIONS.SALES_WRITE,
+    PERMISSIONS.REPORTS_READ,
+    PERMISSIONS.ANALYTICS_VIEW,
+    PERMISSIONS.INVENTORY_MANAGE,
+    PERMISSIONS.USERS_MANAGE,
+    PERMISSIONS.TRANSACTIONS_OVERRIDE,
+  ],
+  /** Cashier permissions */
+  CASHIER: [PERMISSIONS.SALES_READ, PERMISSIONS.SALES_WRITE],
+} as const;
 
 export async function seedDefaultData(
   db: BetterSQLite3Database,
@@ -101,7 +119,7 @@ export async function seedDefaultData(
           displayName: "Administrator",
           description: "Full system access with all permissions",
           businessId: businessId,
-          permissions: JSON.stringify(PERMISSION_GROUPS.ADMIN),
+          permissions: PERMISSION_GROUPS.ADMIN,
           isSystemRole: true,
           isActive: true,
           createdAt: now,
@@ -113,7 +131,7 @@ export async function seedDefaultData(
           displayName: "Store Manager",
           description: "Manage inventory, users, and view reports",
           businessId: businessId,
-          permissions: JSON.stringify(PERMISSION_GROUPS.MANAGER),
+          permissions: PERMISSION_GROUPS.MANAGER,
           isSystemRole: true,
           isActive: true,
           createdAt: now,
@@ -125,7 +143,7 @@ export async function seedDefaultData(
           displayName: "Cashier",
           description: "Process sales transactions",
           businessId: businessId,
-          permissions: JSON.stringify(PERMISSION_GROUPS.CASHIER),
+          permissions: PERMISSION_GROUPS.CASHIER,
           isSystemRole: true,
           isActive: true,
           createdAt: now,
@@ -155,8 +173,8 @@ export async function seedDefaultData(
       .values([
         {
           id: adminUserId,
-          username: "admin",
-          email: "admin@auraswift.com",
+          username: "MrAdmin",
+          email: "mradmin@auraswift.com",
           passwordHash: adminPasswordHash,
           pinHash: pinHash,
           salt: salt,
@@ -174,8 +192,8 @@ export async function seedDefaultData(
         },
         {
           id: managerUserId,
-          username: "manager",
-          email: "manager@auraswift.com",
+          username: "MrManager",
+          email: "mrmanager@auraswift.com",
           passwordHash: managerPasswordHash,
           pinHash: pinHash,
           salt: salt,
@@ -193,8 +211,8 @@ export async function seedDefaultData(
         },
         {
           id: cashierUserId,
-          username: "cashier",
-          email: "cashier@auraswift.com",
+          username: "MrCashier",
+          email: "mrcashier@auraswift.com",
           passwordHash: cashierPasswordHash,
           pinHash: pinHash,
           salt: salt,

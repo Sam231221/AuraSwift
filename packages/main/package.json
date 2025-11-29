@@ -19,6 +19,7 @@
   "dependencies": {
     "@app/preload": "*",
     "@app/renderer": "*",
+    "@app/shared": "*",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^12.4.1",
     "drizzle-orm": "^0.44.7",
