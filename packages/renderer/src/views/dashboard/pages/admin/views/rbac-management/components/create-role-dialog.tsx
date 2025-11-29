@@ -17,28 +17,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { roleCreateSchema, type RoleCreateFormData } from "../schemas";
 import { getLogger } from "@/shared/utils/logger";
+import { getAllAvailablePermissions } from "@app/shared/constants/permissions";
 
 const logger = getLogger("create-role-dialog");
 
-// Available permissions - you can expand this list
-const AVAILABLE_PERMISSIONS = [
-  "*:*", // All permissions (admin)
-  "read:sales",
-  "write:sales",
-  "manage:inventory",
-  "read:reports",
-  "write:reports",
-  "manage:users",
-  "manage:settings",
-  "override:transactions",
-  "view:analytics",
-  "manage:products",
-  "manage:categories",
-  "manage:suppliers",
-  "manage:customers",
-  "refund:transactions",
-  "discount:apply",
-];
+// Get all available permissions from constants (single source of truth)
+const AVAILABLE_PERMISSIONS = getAllAvailablePermissions();
 
 interface CreateRoleDialogProps {
   open: boolean;

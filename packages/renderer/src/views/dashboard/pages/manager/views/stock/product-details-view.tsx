@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Pagination } from "@/components/ui/pagination";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 interface Category {
   id: string;
@@ -277,26 +277,11 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {products.map((product) => {
-                    const dbProduct = product as unknown as Record<
-                      string,
-                      unknown
-                    >;
-                    const categoryId =
-                      (dbProduct.categoryId as string | undefined) ||
-                      product.category;
-                    const usesScale =
-                      (dbProduct.usesScale as boolean | undefined) ?? false;
-                    const pricePerKg =
-                      (dbProduct.pricePerKg as number | undefined) ||
-                      (dbProduct.basePrice as number | undefined) ||
-                      product.price ||
-                      0;
-                    const basePrice =
-                      (dbProduct.basePrice as number | undefined) ||
-                      product.price ||
-                      0;
-                    const salesUnit =
-                      (dbProduct.salesUnit as string | undefined) || "KG";
+                    const categoryId = product.categoryId;
+                    const usesScale = product.usesScale || false;
+                    const pricePerKg = product.pricePerKg || product.basePrice || 0;
+                    const basePrice = product.basePrice || 0;
+                    const salesUnit = product.salesUnit || "KG";
 
                     return (
                       <tr key={product.id} className="hover:bg-gray-50">
@@ -363,15 +348,15 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                             <div className="flex items-center space-x-2">
                               <span
                                 className={`font-medium ${
-                                  product.stockLevel <= product.minStockLevel
+                                  (product.stockLevel || 0) <= (product.minStockLevel || 0)
                                     ? "text-red-600"
-                                    : product.stockLevel <=
-                                      product.minStockLevel * 2
+                                    : (product.stockLevel || 0) <=
+                                      (product.minStockLevel || 0) * 2
                                     ? "text-orange-600"
                                     : "text-green-600"
                                 }`}
                               >
-                                {product.stockLevel}
+                                {product.stockLevel || 0}
                               </span>
                               <Button
                                 size="sm"
@@ -381,7 +366,7 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                                 Adjust
                               </Button>
                             </div>
-                            {product.stockLevel <= product.minStockLevel && (
+                            {(product.stockLevel || 0) <= (product.minStockLevel || 0) && (
                               <div className="text-xs text-red-600 mt-1">
                                 Low Stock!
                               </div>

@@ -6,11 +6,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
-import type { PaymentMethod } from "../types/transaction.types";
-import type { TransactionData } from "@/types/printer";
+import type { PaymentMethod } from "@/types/domain/payment";
+import type { TransactionData } from "@/types/domain/transaction";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('use-payment');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("use-payment");
 import type {
   CartSession,
   CartItemWithProduct,

@@ -9,8 +9,9 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Breadcrumb } from "./breadcrumb";
 import { CategoryNavigation } from "./category-navigation";
 import { ProductGrid } from "./product-grid";
-import type { Product } from "@/features/products/types/product.types";
-import type { Category, BreadcrumbItem } from "../../types/transaction.types";
+import type { Product } from "@/types/domain";
+import type { Category } from "@/types/domain/category";
+import type { BreadcrumbItem } from "@/types/ui";
 
 interface ProductSelectionPanelProps {
   products: Product[];

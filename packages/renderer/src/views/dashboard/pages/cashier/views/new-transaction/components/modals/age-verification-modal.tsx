@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 /**
  * Age verification data returned when verification is successful

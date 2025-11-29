@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImageIcon, Upload } from "lucide-react";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 import type { Category, VatCategory } from "../hooks/use-product-data";
 import { useProductForm } from "../hooks/use-product-form";
 

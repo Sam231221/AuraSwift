@@ -23,7 +23,7 @@ import {
   TrendingDown,
   AlertTriangle,
 } from "lucide-react";
-import type { ProductBatch } from "../views/stock/types/batch.types";
+import type { ProductBatch } from "@/types/features/batches";
 import {
   formatExpiryDate,
   getExpiryStatus,

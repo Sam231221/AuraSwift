@@ -30,7 +30,7 @@ import type {
   ExpirySettings,
   Supplier,
 } from "./types/batch.types";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 import { toast } from "sonner";
 
 import { getLogger } from '@/shared/utils/logger';

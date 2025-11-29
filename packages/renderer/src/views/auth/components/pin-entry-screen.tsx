@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { User, ArrowLeft, Delete } from "lucide-react";
-import type { UserForLogin } from "../types/auth.types";
+import type { UserForLogin } from "@/types/domain";
 import { getDemoPin } from "./utils";
 import { ClockInOutButtons } from "./clock-in-out-buttons";
 
@@ -48,7 +48,7 @@ export function PinEntryScreen({
           </h2>
 
           <p className="text-orange-600 text-[10px] sm:text-xs font-medium mt-1 tracking-wide">
-            Demo Pin: {getDemoPin(user.role)}
+            Demo Pin: {getDemoPin(user.roleName)}
           </p>
         </div>
 

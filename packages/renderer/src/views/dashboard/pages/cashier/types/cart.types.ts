@@ -1,11 +1,20 @@
 /**
  * Cart and Cart Item Types
  * 
+ * @deprecated Use @/types/features/cart instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/features/cart/index.ts
+ * 
+ * Migration: Replace imports with:
+ * ```typescript
+ * import { CartSession, CartItem, AgeVerificationData } from '@/types/features/cart';
+ * import { AgeRestrictionLevel, VerificationMethod } from '@/types/enums';
+ * ```
+ * 
  * These types correspond to the database schema for cart_sessions and cart_items tables.
  * They support both UNIT and WEIGHT item types, batch tracking, age restrictions, and scale integration.
  */
 
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 /**
  * Cart Session Status

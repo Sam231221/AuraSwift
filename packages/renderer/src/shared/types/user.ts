@@ -1,8 +1,20 @@
 /**
  * User Type Definitions for RBAC System
  *
+ * @deprecated This file is deprecated. Use @/types/domain/user instead.
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/domain/user.ts
+ * 
  * This file defines the modern User type with RBAC support.
  * Deprecated fields (role, permissions) are removed.
+ * 
+ * Migration: Replace imports with:
+ * ```typescript
+ * // Old
+ * import { User } from '@/shared/types/user';
+ * 
+ * // New
+ * import { User } from '@/types/domain';
+ * ```
  */
 
 export interface Permission {

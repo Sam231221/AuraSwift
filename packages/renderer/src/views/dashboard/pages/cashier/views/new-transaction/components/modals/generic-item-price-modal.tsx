@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Calculator } from "lucide-react";
 import { NumericKeypad } from "../shared/numeric-keypad";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 interface GenericItemPriceModalProps {
   isOpen: boolean;

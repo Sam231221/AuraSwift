@@ -5,12 +5,12 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import type { Category } from "../types/transaction.types";
-import type { Product } from "@/features/products/types/product.types";
-import type { BreadcrumbItem } from "../types/transaction.types";
+import type { Category } from "@/types/domain/category";
+import type { Product } from "@/types/domain";
+import type { BreadcrumbItem } from "@/types/ui";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('use-categories');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("use-categories");
 
 interface UseCategoriesProps {
   businessId: string | undefined;

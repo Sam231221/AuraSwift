@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Scale } from "lucide-react";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 interface ProductCardProps {
   product: Product;
@@ -61,7 +61,7 @@ export function ProductCard({
           {product.name}
         </span>
 
-        {product.requiresWeight && (
+        {product.usesScale && (
           <Badge
             variant="outline"
             className="mt-1 text-[10px] sm:text-xs bg-blue-50"

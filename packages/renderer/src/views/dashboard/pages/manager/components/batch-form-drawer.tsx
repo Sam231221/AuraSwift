@@ -25,9 +25,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { ProductBatch, Supplier } from "../views/stock/types/batch.types";
+import type { ProductBatch, Supplier } from "@/types/features/batches";
 import { generateBatchNumber } from "../views/stock/utils/expiry-calculations";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 import { useBatchForm } from "../views/stock/hooks/use-batch-form";
 
 interface BatchFormDrawerProps {

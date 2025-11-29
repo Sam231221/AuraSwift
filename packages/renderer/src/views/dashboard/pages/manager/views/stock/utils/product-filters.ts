@@ -1,4 +1,4 @@
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 interface FilterOptions {
   searchTerm: string;

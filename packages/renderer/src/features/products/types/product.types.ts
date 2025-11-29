@@ -1,3 +1,12 @@
+/**
+ * @deprecated Use @/types/domain/product instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/domain/product.ts
+ * 
+ * Migration: Replace imports with:
+ * ```typescript
+ * import { Product } from '@/types/domain';
+ * ```
+ */
 export interface Product {
   id: string;
   name: string;

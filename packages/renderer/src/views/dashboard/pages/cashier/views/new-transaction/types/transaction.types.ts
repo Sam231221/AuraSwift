@@ -1,5 +1,14 @@
 /**
  * Transaction-related type definitions
+ * 
+ * @deprecated Use @/types/domain instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/domain
+ * 
+ * Migration: Replace imports with:
+ * ```typescript
+ * import { PaymentMethod } from '@/types/domain/payment';
+ * import { Category } from '@/types/domain/category';
+ * ```
  */
 
 export interface PaymentMethod {

@@ -3,7 +3,7 @@
  */
 
 import { DollarSign } from "lucide-react";
-import type { Category } from "../../types/transaction.types";
+import type { Category } from "@/types/domain/category";
 
 interface CategoryPriceInputDisplayProps {
   pendingCategory: Category | null;
@@ -33,4 +33,3 @@ export function CategoryPriceInputDisplay({
     </div>
   );
 }
-

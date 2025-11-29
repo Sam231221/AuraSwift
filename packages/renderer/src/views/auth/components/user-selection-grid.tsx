@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { User } from "lucide-react";
-import type { UserForLogin } from "../types/auth.types";
+import type { UserForLogin } from "@/types/domain";
 
 interface UserSelectionGridProps {
   users: UserForLogin[];

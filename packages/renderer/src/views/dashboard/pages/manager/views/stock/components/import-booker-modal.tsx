@@ -25,7 +25,7 @@ import type {
   ImportProgress,
   ImportResult,
   ImportOptions,
-} from "../types/import.types";
+} from "@/types/features/import";
 
 interface ImportBookerModalProps {
   open: boolean;

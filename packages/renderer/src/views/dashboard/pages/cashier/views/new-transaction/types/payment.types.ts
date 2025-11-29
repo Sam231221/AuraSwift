@@ -1,8 +1,13 @@
 /**
  * Payment-related type definitions
- * 
- * Note: PaymentMethod is defined in transaction.types.ts
+ *
+ * @deprecated Use @/types/domain/payment instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/domain/payment.ts
+ *
+ * Migration: Replace imports with:
+ * ```typescript
+ * import { PaymentMethod } from '@/types/domain/payment';
+ * ```
+ *
+ * Note: PaymentMethod is now defined in @/types/domain/payment.ts
  */
-
-// Additional payment types can be added here if needed
-

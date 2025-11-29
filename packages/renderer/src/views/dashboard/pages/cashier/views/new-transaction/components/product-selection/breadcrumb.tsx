@@ -4,17 +4,14 @@
 
 import React from "react";
 import { ChevronRight, Home } from "lucide-react";
-import type { BreadcrumbItem } from "../../types/transaction.types";
+import type { BreadcrumbItem } from "@/types/ui";
 
 interface BreadcrumbProps {
   breadcrumb: BreadcrumbItem[];
   onBreadcrumbClick: (index: number) => void;
 }
 
-export function Breadcrumb({
-  breadcrumb,
-  onBreadcrumbClick,
-}: BreadcrumbProps) {
+export function Breadcrumb({ breadcrumb, onBreadcrumbClick }: BreadcrumbProps) {
   return (
     <div className="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto">
       {breadcrumb.map((item, index) => (
@@ -30,11 +27,14 @@ export function Breadcrumb({
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            {index === 0 ? <Home className="h-3 w-3 sm:h-4 sm:w-4" /> : <span className="line-clamp-1">{item.name}</span>}
+            {index === 0 ? (
+              <Home className="h-3 w-3 sm:h-4 sm:w-4" />
+            ) : (
+              <span className="line-clamp-1">{item.name}</span>
+            )}
           </button>
         </React.Fragment>
       ))}
     </div>
   );
 }
-

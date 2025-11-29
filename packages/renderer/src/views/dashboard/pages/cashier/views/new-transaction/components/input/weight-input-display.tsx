@@ -4,7 +4,7 @@
 
 import { Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 interface WeightInputDisplayProps {
   selectedProduct: Product | null;

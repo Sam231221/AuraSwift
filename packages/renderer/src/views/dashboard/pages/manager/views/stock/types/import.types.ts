@@ -1,3 +1,12 @@
+/**
+ * @deprecated Use @/types/features/import instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/features/import/index.ts
+ * 
+ * Migration: Replace imports with:
+ * ```typescript
+ * import { ImportProgress, ImportResult, ImportOptions } from '@/types/features/import';
+ * ```
+ */
 export interface ImportProgress {
   stage: 'categories' | 'suppliers' | 'products' | 'complete';
   total: number;

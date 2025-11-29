@@ -9,11 +9,11 @@ import type {
   CartSession,
   CartItemWithProduct,
 } from "../../../types/cart.types";
-import type { Product } from "@/features/products/types/product.types";
-import type { Category } from "../types/transaction.types";
+import type { Product } from "@/types/domain";
+import type { Category } from "@/types/domain/category";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('use-cart');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("use-cart");
 import {
   calculateItemPrice,
   calculateCategoryPrice,
@@ -544,7 +544,7 @@ export function useCart({
           totalAmount: total,
           taxAmount: tax,
         })
-        .catch((error) => logger.error('Failed to update cart session', error));
+        .catch((error) => logger.error("Failed to update cart session", error));
     }
   }, [total, tax, cartSession]);
 

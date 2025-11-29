@@ -2,7 +2,7 @@
  * Product helper utilities
  */
 
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 /**
  * Extended product type that supports both old and new schema fields

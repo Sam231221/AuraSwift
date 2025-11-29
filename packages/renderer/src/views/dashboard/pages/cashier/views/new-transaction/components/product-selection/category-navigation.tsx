@@ -4,8 +4,8 @@
 
 import { motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
-import type { Category } from "../../types/transaction.types";
-import type { Product } from "@/features/products/types/product.types";
+import type { Category } from "@/types/domain/category";
+import type { Product } from "@/types/domain";
 
 interface CategoryNavigationProps {
   categories: Category[];
@@ -14,7 +14,9 @@ interface CategoryNavigationProps {
   searchQuery: string;
   lastClickTime: { productId: string; timestamp: number } | null;
   onCategoryClick: (category: Category, addToCart: boolean) => void;
-  onSetLastClickTime: (time: { productId: string; timestamp: number } | null) => void;
+  onSetLastClickTime: (
+    time: { productId: string; timestamp: number } | null
+  ) => void;
   DOUBLE_CLICK_DELAY: number;
 }
 
@@ -38,7 +40,7 @@ export function CategoryNavigation({
             (c) => c.parentId === category.id
           ).length;
           const productCount = products.filter(
-            (p) => p.category === category.id
+            (p) => p.categoryId === category.id
           ).length;
 
           return (
@@ -116,4 +118,3 @@ export function CategoryNavigation({
     </div>
   );
 }
-

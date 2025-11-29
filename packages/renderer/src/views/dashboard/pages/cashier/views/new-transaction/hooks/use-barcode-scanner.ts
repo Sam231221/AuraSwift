@@ -7,7 +7,7 @@ import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { useProductionScanner } from "@/features/barcode-scanner/use-production-scanner";
 import { ScannerAudio } from "@/shared/services/scanner-audio";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 import { getLogger } from '@/shared/utils/logger';
 const logger = getLogger('use-barcode-scanner');

@@ -2,7 +2,7 @@
  * Price calculation utilities
  */
 
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 import type { CartItemWithProduct } from "../../../types/cart.types";
 import {
   isWeightedProduct,

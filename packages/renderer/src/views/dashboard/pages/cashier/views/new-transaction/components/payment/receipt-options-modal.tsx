@@ -13,7 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { TransactionData } from "@/types/printer";
+import type { TransactionData } from "@/types/domain/transaction";
 
 interface ReceiptOptionsModalProps {
   isOpen: boolean;

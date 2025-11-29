@@ -3,7 +3,7 @@
  * Abstraction layer for product-related API calls
  */
 
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 export interface CreateProductData {
   name: string;

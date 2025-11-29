@@ -6,13 +6,13 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import type { Shift, Schedule } from "../types/shift.types";
+import type { Shift, Schedule } from "@/types/domain/shift";
 import { retryWithBackoff, isNetworkError } from "@/shared/utils/retry";
 import { getDeviceId } from "@/shared/utils/device-id";
 import { TimeChangeDetector } from "@/shared/utils/time-change-detector";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('use-shift');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("use-shift");
 import {
   queueOperation,
   processQueue,
@@ -277,50 +277,57 @@ export function useShift({
   /**
    * Validate schedule times
    */
-  const validateSchedule = useCallback((schedule: Schedule): { valid: boolean; error?: string } => {
-    try {
-      const startTime = new Date(schedule.startTime);
-      const endTime = new Date(schedule.endTime);
+  const validateSchedule = useCallback(
+    (schedule: Schedule): { valid: boolean; error?: string } => {
+      try {
+        const startTime = new Date(schedule.startTime);
+        const endTime = new Date(schedule.endTime);
 
-      // Validate time format
-      if (isNaN(startTime.getTime())) {
-        return { valid: false, error: "Invalid schedule start time format" };
-      }
-      if (isNaN(endTime.getTime())) {
-        return { valid: false, error: "Invalid schedule end time format" };
-      }
+        // Validate time format
+        if (isNaN(startTime.getTime())) {
+          return { valid: false, error: "Invalid schedule start time format" };
+        }
+        if (isNaN(endTime.getTime())) {
+          return { valid: false, error: "Invalid schedule end time format" };
+        }
 
-      // Validate start time < end time
-      if (startTime >= endTime) {
+        // Validate start time < end time
+        if (startTime >= endTime) {
+          return {
+            valid: false,
+            error: "Schedule end time must be after start time",
+          };
+        }
+
+        // Validate schedule is for today (or within reasonable window - 24 hours before/after)
+        const now = new Date();
+        const scheduleDate = new Date(startTime);
+        scheduleDate.setHours(0, 0, 0, 0);
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+        const daysDiff = Math.abs(
+          (scheduleDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        if (daysDiff > 1) {
+          return {
+            valid: false,
+            error: `Schedule is not for today (${daysDiff} days difference)`,
+          };
+        }
+
+        return { valid: true };
+      } catch (error) {
         return {
           valid: false,
-          error: "Schedule end time must be after start time",
+          error: `Error validating schedule: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
         };
       }
-
-      // Validate schedule is for today (or within reasonable window - 24 hours before/after)
-      const now = new Date();
-      const scheduleDate = new Date(startTime);
-      scheduleDate.setHours(0, 0, 0, 0);
-      const today = new Date(now);
-      today.setHours(0, 0, 0, 0);
-      const daysDiff = Math.abs((scheduleDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (daysDiff > 1) {
-        return {
-          valid: false,
-          error: `Schedule is not for today (${daysDiff} days difference)`,
-        };
-      }
-
-      return { valid: true };
-    } catch (error) {
-      return {
-        valid: false,
-        error: `Error validating schedule: ${error instanceof Error ? error.message : "Unknown error"}`,
-      };
-    }
-  }, []);
+    },
+    []
+  );
 
   /**
    * Handle start shift click
@@ -415,7 +422,7 @@ export function useShift({
     }
 
     const cashAmount = Number(startingCash);
-    
+
     // Validate negative values
     if (cashAmount < 0) {
       toast.error("Starting cash cannot be negative", {
@@ -513,7 +520,7 @@ export function useShift({
 
         // Always refresh shift state after API call to ensure consistency
         await loadShiftData(false);
-        
+
         // Initialize cart session now that shift is active
         if (onCartSessionInit) {
           await onCartSessionInit();

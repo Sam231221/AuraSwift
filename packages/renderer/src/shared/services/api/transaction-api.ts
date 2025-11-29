@@ -3,7 +3,7 @@
  * Abstraction layer for transaction-related API calls
  */
 
-import type { APIResponse } from "@/shared/types/global";
+import type { APIResponse } from "@/types/api/common";
 
 export interface TransactionItem {
   productId: string;

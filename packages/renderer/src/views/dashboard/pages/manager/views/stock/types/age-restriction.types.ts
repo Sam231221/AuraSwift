@@ -1,5 +1,14 @@
 /**
  * Age Restriction Types
+ * 
+ * @deprecated Use @/types/enums instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/enums
+ * 
+ * Migration: Replace imports with:
+ * ```typescript
+ * import { AgeRestrictionLevel, VerificationMethod } from '@/types/enums';
+ * import { AGE_RESTRICTIONS } from '@/types/enums/age-restriction';
+ * ```
  */
 
 export type AgeRestrictionLevel = "NONE" | "AGE_16" | "AGE_18" | "AGE_21";

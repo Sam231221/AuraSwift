@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from "react";
-import type { Category } from "../types/transaction.types";
+import type { Category } from "@/types/domain/category";
 
 /**
  * Hook for managing category price input

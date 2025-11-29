@@ -5,7 +5,7 @@
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle } from "lucide-react";
-import type { PaymentMethod } from "../../types/transaction.types";
+import type { PaymentMethod } from "@/types/domain/payment";
 
 interface PaymentActionsProps {
   paymentMethod: PaymentMethod;

@@ -1,5 +1,14 @@
 /**
  * Product Batch/Lot Tracking Types
+ * 
+ * @deprecated Use @/types/features/batches instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/features/batches/index.ts
+ * 
+ * Migration: Replace imports with:
+ * ```typescript
+ * import { ProductBatch, Supplier, ExpirySettings } from '@/types/features/batches';
+ * ```
+ * 
  * Based on the database schema for product expiry tracking
  */
 

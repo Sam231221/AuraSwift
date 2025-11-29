@@ -1,5 +1,13 @@
 /**
  * Shift-related type definitions
+ *
+ * @deprecated Use @/types/domain instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/domain
+ *
+ * Migration: Replace imports with:
+ * ```typescript
+ * import { Shift, Schedule } from '@/types/domain';
+ * ```
  */
 
 export interface Shift {
@@ -35,4 +43,3 @@ export interface Schedule {
   createdAt: string;
   updatedAt: string; // Changes when manager modifies scheduled times
 }
-

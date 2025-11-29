@@ -1,5 +1,6 @@
 import { createContext, useState, useEffect, type ReactNode } from "react";
-import type { User, AuthContextType } from "../types/auth.types";
+import type { User } from "@/types/domain";
+import type { AuthContextType } from "../types/auth.types";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("auth-context");

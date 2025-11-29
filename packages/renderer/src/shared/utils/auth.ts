@@ -1,4 +1,4 @@
-import type { User } from "@/views/auth/types/auth.types";
+import type { User } from "@/types/domain";
 import { getUserRoleName } from "./rbac-helpers";
 
 import { getLogger } from '@/shared/utils/logger';

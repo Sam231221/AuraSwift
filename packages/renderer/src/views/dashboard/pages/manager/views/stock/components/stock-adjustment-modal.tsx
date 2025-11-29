@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 import {
   AdaptiveKeyboard,
   AdaptiveFormField,

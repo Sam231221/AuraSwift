@@ -12,7 +12,7 @@ import {
   PackageCheck,
   FileSpreadsheet,
 } from "lucide-react";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 import { ImportBookerModal } from "./components/import-booker-modal";
 
 interface Category {
@@ -142,7 +142,7 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
                 £
                 {products.length > 0
                   ? (
-                      products.reduce((sum, p) => sum + (p.price || 0), 0) /
+                      products.reduce((sum, p) => sum + (p.basePrice || 0), 0) /
                       products.length
                     ).toFixed(2)
                   : "0.00"}

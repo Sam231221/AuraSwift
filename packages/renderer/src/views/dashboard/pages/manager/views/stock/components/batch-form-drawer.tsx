@@ -27,7 +27,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ProductBatch, Supplier } from "../types/batch.types";
 import { generateBatchNumber } from "../utils/expiry-calculations";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 import { useBatchForm } from "../hooks/use-batch-form";
 import {
   AdaptiveKeyboard,

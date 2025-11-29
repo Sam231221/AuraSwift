@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Clock, Timer } from "lucide-react";
-import type { UserForLogin } from "../types/auth.types";
+import type { UserForLogin } from "@/types/domain";
 
 interface ClockInOutButtonsProps {
   user: UserForLogin;
@@ -22,7 +22,7 @@ export function ClockInOutButtons({
   onClockOut,
 }: ClockInOutButtonsProps) {
   // Only show for cashiers and managers
-  if (user.role !== "cashier" && user.role !== "manager") {
+  if (user.roleName !== "cashier" && user.roleName !== "manager") {
     return null;
   }
 

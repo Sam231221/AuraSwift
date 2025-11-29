@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 import ManageCategoriesView from "@/views/dashboard/pages/manager/views/stock/manage-categories-view";
 import ProductDashboardView from "./product-dashboard-view";

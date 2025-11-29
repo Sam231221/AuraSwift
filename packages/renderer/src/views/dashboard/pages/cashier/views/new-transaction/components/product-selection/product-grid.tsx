@@ -1,6 +1,6 @@
 import { Package, Search } from "lucide-react";
 import { ProductCard } from "./product-card";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 interface ProductGridProps {
   products: Product[];

@@ -4,7 +4,7 @@
 
 import { AlertCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Schedule } from "../../types/shift.types";
+import type { Schedule } from "@/types/domain/shift";
 
 interface ShiftTimingInfo {
   canStart: boolean;
@@ -33,7 +33,8 @@ export function ShiftBanner({
         <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
         <div>
           <p className="font-semibold text-amber-900 text-sm sm:text-base">
-            {shiftTimingInfo.buttonText === "Shift Ended" || shiftTimingInfo.buttonText === "No Schedule"
+            {shiftTimingInfo.buttonText === "Shift Ended" ||
+            shiftTimingInfo.buttonText === "No Schedule"
               ? "Shift Not Available"
               : "Start Your Shift to Begin Transactions"}
           </p>

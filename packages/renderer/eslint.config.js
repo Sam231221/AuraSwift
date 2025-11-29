@@ -19,5 +19,26 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/views/**/types/*', '**/features/**/types/*'],
+              message: 'Import from @/types instead. Old type locations are deprecated.',
+            },
+            {
+              group: ['@/shared/types/*'],
+              message: 'Import from @/types instead. Use @/types/domain, @/types/api, or @/types/features as appropriate.',
+            },
+            {
+              group: ['@/types/printer', '@/types/officePrinter'],
+              message: 'Import from @/types/features/printer instead.',
+            },
+          ],
+        },
+      ],
+    },
   },
 ])

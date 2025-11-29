@@ -28,7 +28,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 import { getLogger } from '@/shared/utils/logger';
 const logger = getLogger('batch-selection-modal');
@@ -131,7 +131,7 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
     try {
       // Get active batches for this product sorted by FEFO
       // Note: stockRotationMethod may not exist on all Product types, default to FEFO
-      const rotationMethod = ((product as any).stockRotationMethod as "FIFO" | "FEFO" | "NONE") || "FEFO";
+      const rotationMethod = product.stockRotationMethod || "FEFO";
       const response = await window.batchesAPI?.getActiveBatches(
         product.id,
         rotationMethod

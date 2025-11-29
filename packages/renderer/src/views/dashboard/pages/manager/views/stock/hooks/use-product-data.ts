@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 import { getLogger } from '@/shared/utils/logger';
 const logger = getLogger('use-product-data');

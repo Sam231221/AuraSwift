@@ -58,8 +58,8 @@ import type {
 import { ScaleDisplay } from "@/views/dashboard/pages/cashier/views/new-transaction/components/input/ScaleDisplay";
 
 // Types
-import type { Product } from "@/features/products/types/product.types";
-import type { PrinterConfig } from "@/types/printer";
+import type { Product } from "@/types/domain";
+import type { PrinterConfig } from "@/types/features/printer";
 
 // Utils
 import { isWeightedProduct } from "./utils/product-helpers";

@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, AlertCircle, Info, CheckCircle2 } from "lucide-react";
-import type { ExpiryAlert } from "../views/stock/types/batch.types";
+import type { ExpiryAlert } from "@/types/features/batches";
 import { formatExpiryDate } from "../views/stock/utils/expiry-calculations";
 import { cn } from "@/shared/utils/cn";
 

@@ -3,7 +3,7 @@
  */
 
 import { Button } from "@/components/ui/button";
-import type { PaymentMethod } from "../../types/transaction.types";
+import type { PaymentMethod } from "@/types/domain/payment";
 
 interface PaymentMethodSelectorProps {
   cardReaderReady: boolean;

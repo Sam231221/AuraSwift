@@ -3,7 +3,7 @@
  * Abstraction layer for authentication-related API calls
  */
 
-import type { APIResponse } from "@/shared/types/global";
+import type { APIResponse } from "@/types/api/common";
 
 export interface RegisterData {
   email: string;

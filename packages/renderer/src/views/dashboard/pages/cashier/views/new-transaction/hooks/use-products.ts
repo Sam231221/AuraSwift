@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 import { getLogger } from '@/shared/utils/logger';
 const logger = getLogger('use-products');

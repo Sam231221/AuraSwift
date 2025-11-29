@@ -4,7 +4,7 @@ import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 import { UserSelectionGrid } from "./user-selection-grid";
 import { PinEntryScreen } from "./pin-entry-screen";
 import { getUserColor } from "./utils";
-import type { UserForLogin } from "../types/auth.types";
+import type { UserForLogin } from "@/types/domain";
 
 import { getLogger } from '@/shared/utils/logger';
 const logger = getLogger('auth-user-selection');
@@ -39,7 +39,7 @@ export function AuthUserSelection() {
               username: user.username,
               firstName: user.firstName,
               lastName: user.lastName,
-              role: roleName as "admin" | "manager" | "cashier",
+              roleName: roleName,
               color,
             };
           });

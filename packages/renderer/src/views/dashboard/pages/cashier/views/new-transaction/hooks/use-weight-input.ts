@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from "react";
-import type { Product } from "@/features/products/types/product.types";
+import type { Product } from "@/types/domain";
 
 /**
  * Hook for managing weight input

@@ -1,3 +1,10 @@
+/**
+ * @deprecated Use @/types/domain/user instead
+ * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/domain/user.ts
+ * 
+ * This User interface contains deprecated fields (role).
+ * Use the modern RBAC-based User type from @/types/domain
+ */
 export interface User {
   id: string;
   username: string;
