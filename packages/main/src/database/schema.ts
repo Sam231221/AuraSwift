@@ -179,6 +179,7 @@ export const roles = createTable(
       .notNull(),
     isSystemRole: integer("is_system_role", { mode: "boolean" }).default(false), // 1 for built-in roles
     isActive: integer("is_active", { mode: "boolean" }).default(true),
+    shiftRequired: integer("shift_required", { mode: "boolean" }).default(true), // NEW: Whether this role requires shifts for sales
     ...timestampColumns,
   },
   (table) => [
@@ -965,9 +966,9 @@ export const cartItems = createTable(
 // @ts-ignore - Circular reference in self-referencing table (for refunds)
 export const transactions = createTable("transactions", {
   id: text("id").primaryKey(),
-  shiftId: text("shiftId")
-    .notNull()
-    .references(() => shifts.id),
+  shiftId: text("shiftId").references(() => shifts.id, {
+    onDelete: "set null",
+  }), // Nullable for admin/owner mode
   businessId: text("businessId")
     .notNull()
     .references(() => businesses.id),

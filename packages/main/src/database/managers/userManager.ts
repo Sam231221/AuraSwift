@@ -3,8 +3,8 @@ import { eq, and, like, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 import type { User } from "../schema.js";
 
-import { getLogger } from '../../utils/logger.js';
-const logger = getLogger('userManager');
+import { getLogger } from "../../utils/logger.js";
+const logger = getLogger("userManager");
 
 import {
   registerSchema,
@@ -24,6 +24,8 @@ export interface AuthResponse {
   requiresClockIn?: boolean; // Flag if clock-in is required
   isClockedIn?: boolean; // Flag if user is clocked in (on logout)
   activeShift?: any; // Active shift (on logout)
+  mode?: "admin" | "cashier"; // NEW: Sales mode (admin or cashier)
+  requiresShift?: boolean; // NEW: Whether shift is required for this user
 }
 
 export class UserManager {
@@ -601,52 +603,100 @@ export class UserManager {
       let clockEvent = null;
       let shift = null;
       let requiresClockIn = false;
+      let mode: "admin" | "cashier" = "admin";
 
       if (this.timeTrackingManager) {
-        // Check if user requires shift based on shiftRequired field
-        // If shiftRequired is null (auto-detect), check if user has non-admin roles
-        const shouldClockIn =
-          data.autoClockIn !== false &&
-          (user.shiftRequired === true ||
-            (user.shiftRequired === null && !this.isAdminUser(user)));
+        // Resolve shift requirement using RBAC-based resolver
+        const { shiftRequirementResolver } = await import(
+          "../../utils/shiftRequirementResolver.js"
+        );
+        const { scheduleValidator } = await import(
+          "../../utils/scheduleValidator.js"
+        );
 
-        if (shouldClockIn) {
+        // Get database managers for resolver
+        const { getDatabase } = await import("../index.js");
+        const db = await getDatabase();
+
+        const shiftRequirement = await shiftRequirementResolver.resolve(
+          user,
+          db
+        );
+        mode = shiftRequirement.mode;
+
+        logger.info(
+          `[login] Shift requirement resolved: requiresShift=${shiftRequirement.requiresShift}, mode=${shiftRequirement.mode}`
+        );
+
+        // Only auto clock-in if shift is required (cashier/manager mode)
+        if (shiftRequirement.requiresShift && data.autoClockIn !== false) {
           // Check for existing active shift
           const activeShift = this.timeTrackingManager.getActiveShift(user.id);
 
           if (!activeShift) {
             try {
-              // Create clock-in event
-              clockEvent = await this.timeTrackingManager.createClockEvent({
-                userId: user.id,
-                terminalId: data.terminalId || "unknown",
-                locationId: data.locationId,
-                type: "in",
-                method: "login",
-                ipAddress: data.ipAddress,
-              });
-
-              // Validate clock event
-              const validation =
-                await this.timeTrackingManager.validateClockEvent(clockEvent);
-
-              if (!validation.valid) {
-                // Log warnings but don't fail login
-                logger.warn(
-                  "Clock-in validation warnings:",
-                  validation.warnings
-                );
-              }
-
-              // Get business ID
+              // Validate schedule before clock-in
               const userWithBusiness = this.getUserWithBusiness(user.id);
               if (userWithBusiness?.businessId) {
-                // Create time shift
-                shift = await this.timeTrackingManager.createShift({
-                  userId: user.id,
-                  businessId: userWithBusiness.businessId,
-                  clockInId: clockEvent.id,
-                });
+                const scheduleValidation =
+                  await scheduleValidator.validateClockIn(
+                    user.id,
+                    userWithBusiness.businessId,
+                    db
+                  );
+
+                if (!scheduleValidation.canClockIn) {
+                  if (!scheduleValidation.requiresApproval) {
+                    // No schedule or critical issue - require manual clock-in
+                    logger.warn(
+                      `[login] Cannot auto clock-in: ${scheduleValidation.reason}`
+                    );
+                    requiresClockIn = true;
+                  } else {
+                    // Schedule validation failed but can proceed with approval
+                    logger.warn(
+                      `[login] Schedule validation warnings: ${scheduleValidation.warnings.join(
+                        ", "
+                      )}`
+                    );
+                    // Continue with clock-in but log the warnings
+                  }
+                }
+
+                // Proceed with clock-in (even if schedule validation has warnings)
+                if (!requiresClockIn) {
+                  // Create clock-in event
+                  clockEvent = await this.timeTrackingManager.createClockEvent({
+                    userId: user.id,
+                    terminalId: data.terminalId || "unknown",
+                    locationId: data.locationId,
+                    type: "in",
+                    method: "login",
+                    ipAddress: data.ipAddress,
+                  });
+
+                  // Validate clock event
+                  const validation =
+                    await this.timeTrackingManager.validateClockEvent(
+                      clockEvent
+                    );
+
+                  if (!validation.valid) {
+                    // Log warnings but don't fail login
+                    logger.warn(
+                      "Clock-in validation warnings:",
+                      validation.warnings
+                    );
+                  }
+
+                  // Create time shift
+                  shift = await this.timeTrackingManager.createShift({
+                    userId: user.id,
+                    businessId: userWithBusiness.businessId,
+                    clockInId: clockEvent.id,
+                    scheduleId: scheduleValidation.schedule?.id,
+                  });
+                }
               }
             } catch (error) {
               // Don't fail login if clock-in fails, but log it
@@ -657,6 +707,11 @@ export class UserManager {
             // User already has active shift
             shift = activeShift;
           }
+        } else {
+          // Admin/Owner mode - no clock-in needed
+          logger.info(
+            `[login] Admin/Owner mode - skipping auto clock-in for user ${user.id}`
+          );
         }
       }
 
@@ -668,6 +723,8 @@ export class UserManager {
         clockEvent: clockEvent as any,
         shift: shift as any,
         requiresClockIn,
+        mode, // NEW: Indicate mode (admin or cashier)
+        requiresShift: mode === "cashier", // NEW: Explicit shift requirement flag
       };
     } catch (error) {
       logger.error("Login error:", error);

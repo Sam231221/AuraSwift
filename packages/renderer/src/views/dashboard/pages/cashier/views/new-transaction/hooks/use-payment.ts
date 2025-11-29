@@ -37,6 +37,8 @@ interface UsePaymentProps {
   isShowingStatus: boolean;
   onResetPrintStatus?: () => void;
   onCartSessionInit?: () => Promise<void>;
+  activeShift?: any; // NEW: Active shift (optional for admin mode)
+  requiresShift?: boolean; // NEW: Whether shift is required
 }
 
 /**
@@ -186,6 +188,8 @@ export function usePayment({
   isShowingStatus: _isShowingStatus, // Unused - kept for interface compatibility, will be used in future
   onResetPrintStatus,
   onCartSessionInit,
+  activeShift,
+  requiresShift = true, // Default to true for backward compatibility
 }: UsePaymentProps) {
   const [paymentStep, setPaymentStep] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(
@@ -573,10 +577,12 @@ export function usePayment({
           }
 
           // Create transaction
+          // shiftId is optional - null for admin/owner mode, required for cashier/manager
+          const shiftId = requiresShift && activeShift ? activeShift.id : null;
           const transactionResponse =
             await window.transactionAPI.createFromCart({
               cartSessionId: cartSession.id,
-              shiftId: activeShift?.id || "", // Optional for admin/manager
+              shiftId: shiftId || undefined, // Pass undefined instead of empty string for admin mode
               businessId: businessId!,
               paymentMethod: backendPaymentMethod,
               cashAmount: finalCashAmount,

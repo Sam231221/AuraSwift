@@ -122,6 +122,7 @@ export async function seedDefaultData(
           permissions: PERMISSION_GROUPS.ADMIN,
           isSystemRole: true,
           isActive: true,
+          shiftRequired: false, // Admin doesn't require shifts
           createdAt: now,
           updatedAt: now,
         },
@@ -134,6 +135,7 @@ export async function seedDefaultData(
           permissions: PERMISSION_GROUPS.MANAGER,
           isSystemRole: true,
           isActive: true,
+          shiftRequired: true, // Manager requires shifts
           createdAt: now,
           updatedAt: now,
         },
@@ -146,6 +148,7 @@ export async function seedDefaultData(
           permissions: PERMISSION_GROUPS.CASHIER,
           isSystemRole: true,
           isActive: true,
+          shiftRequired: true, // Cashier requires shifts
           createdAt: now,
           updatedAt: now,
         },

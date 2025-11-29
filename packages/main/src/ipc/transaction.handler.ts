@@ -6,6 +6,7 @@ import {
   validateSessionAndPermission,
 } from "../utils/authHelpers.js";
 import { PERMISSIONS } from "@app/shared/constants/permissions.js";
+import { transactionValidator } from "../utils/transactionValidator.js";
 const logger = getLogger("transactionHandlers");
 
 export function registerTransactionHandlers() {
@@ -29,51 +30,19 @@ export function registerTransactionHandlers() {
 
         const user = auth.user!;
 
-        // Check if shift is required for this user role
-        const shiftRequired = db.transactions.isShiftRequired(user);
+        // Validate transaction requirements using TransactionValidator
+        const validation = await transactionValidator.validateTransaction(
+          user,
+          transactionData.shiftId || null,
+          db
+        );
 
-        if (shiftRequired) {
-          // Cashiers/supervisors must have a shift
-          if (!transactionData.shiftId) {
-            return {
-              success: false,
-              message: "Shift is required for your role to create transactions",
-              code: "SHIFT_REQUIRED",
-            };
-          }
-
-          // Validate shift ownership - cashiers can only use their own shifts
-          if (
-            !db.shifts.validateShiftOwnership(transactionData.shiftId, user.id)
-          ) {
-            return {
-              success: false,
-              message: "You can only create transactions on your own shift",
-              code: "SHIFT_OWNERSHIP_VIOLATION",
-            };
-          }
-
-          // Validate shift is active
-          const shift = db.shifts.getShiftById(transactionData.shiftId);
-          if (shift.status !== "active") {
-            return {
-              success: false,
-              message: "Cannot create transaction on inactive shift",
-              code: "SHIFT_INACTIVE",
-            };
-          }
-        } else {
-          // Admin/Manager/Owner - shift is optional but if provided, must be valid
-          if (transactionData.shiftId) {
-            const shift = db.shifts.getShiftById(transactionData.shiftId);
-            if (shift.status !== "active") {
-              return {
-                success: false,
-                message: "Cannot create transaction on inactive shift",
-                code: "SHIFT_INACTIVE",
-              };
-            }
-          }
+        if (!validation.valid) {
+          return {
+            success: false,
+            message: validation.errors.join(", "),
+            code: validation.code || "VALIDATION_ERROR",
+          };
         }
 
         const transaction = await db.transactions.createTransaction(
@@ -83,7 +52,7 @@ export function registerTransactionHandlers() {
         // Audit log the transaction creation
         await logAction(db, user, "create", "transaction", transaction.id, {
           shiftId: transactionData.shiftId || "none",
-          shiftRequired,
+          shiftRequired: validation.requiresShift,
           total: transactionData.total,
           paymentMethod: transactionData.paymentMethod,
         });
@@ -154,54 +123,19 @@ export function registerTransactionHandlers() {
 
         const user = auth.user!;
 
-        // Check if shift is required for this user role
-        const shiftRequired = db.transactions.isShiftRequired(user);
+        // Validate transaction requirements using TransactionValidator
+        const validation = await transactionValidator.validateTransaction(
+          user,
+          data.shiftId || null,
+          db
+        );
 
-        if (shiftRequired) {
-          // Cashiers/supervisors must have a shift
-          if (!data.shiftId) {
-            return {
-              success: false,
-              message: "Shift is required for your role to create transactions",
-              code: "SHIFT_REQUIRED",
-            };
-          }
-
-          // Validate shift ownership - cashiers can only use their own shifts
-          if (!db.shifts.validateShiftOwnership(data.shiftId, user.id)) {
-            return {
-              success: false,
-              message: "You can only create transactions on your own shift",
-              code: "SHIFT_OWNERSHIP_VIOLATION",
-            };
-          }
-
-          // Validate shift is active
-          const shift = db.shifts.getShiftById(data.shiftId);
-          if (shift.status !== "active") {
-            return {
-              success: false,
-              message: "Cannot create transaction on inactive shift",
-              code: "SHIFT_INACTIVE",
-            };
-          }
-        } else {
-          // Admin/Manager/Owner - shift is optional but if provided, must be valid
-          if (data.shiftId) {
-            try {
-              const shift = db.shifts.getShiftById(data.shiftId);
-              if (shift.status !== "active") {
-                return {
-                  success: false,
-                  message: "Cannot create transaction on inactive shift",
-                  code: "SHIFT_INACTIVE",
-                };
-              }
-            } catch (error) {
-              // Shift doesn't exist - for admin/manager this is OK, they can operate without shift
-              logger.info("Admin/Manager creating transaction without shift");
-            }
-          }
+        if (!validation.valid) {
+          return {
+            success: false,
+            message: validation.errors.join(", "),
+            code: validation.code || "VALIDATION_ERROR",
+          };
         }
 
         // Get cart session

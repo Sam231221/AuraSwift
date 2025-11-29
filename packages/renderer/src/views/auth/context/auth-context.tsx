@@ -44,6 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await window.authStore.set("user", JSON.stringify(response.user));
         await window.authStore.set("token", response.token);
 
+        // Store mode and shift requirement (NEW: for dual-mode sales)
+        if ((response as any).mode) {
+          await window.authStore.set("salesMode", (response as any).mode);
+        }
+        if ((response as any).requiresShift !== undefined) {
+          await window.authStore.set(
+            "requiresShift",
+            String((response as any).requiresShift)
+          );
+        }
+
         // Store clock-in info if available
         if (response.clockEvent) {
           await window.authStore.set(

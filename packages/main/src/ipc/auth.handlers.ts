@@ -10,6 +10,7 @@ import {
 } from "../utils/authHelpers.js";
 import { invalidateUserPermissionCache } from "../utils/rbacHelpers.js";
 import { PERMISSIONS } from "@app/shared/constants/permissions.js";
+import { shiftRequirementResolver } from "../utils/shiftRequirementResolver.js";
 
 const logger = getLogger("authHandlers");
 
@@ -277,12 +278,17 @@ export function registerAuthHandlers() {
         const user = db.users.getUserById(userSession.userId);
 
         // Check for active POS shifts before allowing clock-out
-        // Use shiftRequired field (null = auto-detect, true = required, false = not required)
-        const requiresShift =
-          user &&
-          (user.shiftRequired === true ||
-            (user.shiftRequired === null && (await isNonAdminUser(db, user))));
-        if (requiresShift) {
+        // Use RBAC-based shift requirement resolver
+        let requiresShift = false;
+        if (user) {
+          const shiftRequirement = await shiftRequirementResolver.resolve(
+            user,
+            db
+          );
+          requiresShift = shiftRequirement.requiresShift;
+        }
+
+        if (requiresShift && user) {
           const activeTimeShift = db.timeTracking.getActiveShift(user.id);
 
           if (activeTimeShift) {
@@ -291,7 +297,11 @@ export function registerAuthHandlers() {
               activeTimeShift.id
             );
 
-            if (activePosShifts.length > 0 && options?.autoClockOut !== false) {
+            if (
+              activePosShifts.length > 0 &&
+              options?.autoClockOut !== false &&
+              user
+            ) {
               // User has active POS shifts - auto-end them before clock-out
               logger.info(
                 `Auto-ending ${activePosShifts.length} active POS shift(s) before clock-out for user ${user.id}`
@@ -345,7 +355,7 @@ export function registerAuthHandlers() {
 
                     const clockOutEvent =
                       await db.timeTracking.createClockEvent({
-                        userId: user.id,
+                        userId: user!.id,
                         terminalId: options?.terminalId || "unknown",
                         type: "out",
                         method: "auto",

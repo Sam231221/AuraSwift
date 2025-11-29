@@ -21,6 +21,7 @@ import {
   useShift,
   usePayment,
 } from "./hooks";
+import { useSalesMode } from "../../hooks/use-sales-mode";
 
 // Components
 import {
@@ -65,8 +66,8 @@ import type { PrinterConfig } from "@/types/features/printer";
 import { isWeightedProduct } from "./utils/product-helpers";
 import { userHasAnyRole, getUserRoleName } from "@/shared/utils/rbac-helpers";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('index');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("index");
 
 // Constants
 const DOUBLE_CLICK_DELAY = 300;
@@ -140,7 +141,10 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   // Category price input hook
   const categoryPriceInput = useCategoryPriceInput();
 
-  // Shift hook
+  // Sales mode detection
+  const salesMode = useSalesMode();
+
+  // Shift hook (only used for cashier mode)
   const shift = useShift({
     userId: user?.id,
     userRole: user?.role,
@@ -156,7 +160,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     userId: user?.id,
     businessId: user?.businessId,
     userRole: user?.role,
-    activeShift: shift.activeShift,
+    activeShift: salesMode.activeShift || shift.activeShift, // Use salesMode activeShift if available
     todaySchedule: shift.todaySchedule,
   });
 
@@ -189,12 +193,14 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
       await cart.initializeCartSession();
       return;
     },
+    activeShift: salesMode.activeShift || shift.activeShift, // Use salesMode activeShift
+    requiresShift: salesMode.requiresShift, // Pass shift requirement
   });
 
-  // Check if operations should be disabled
+  // Check if operations should be disabled (only for cashier mode)
   const isOperationsDisabled =
-    (user?.role === "cashier" || user?.role === "manager") &&
-    !shift.activeShift &&
+    salesMode.requiresShift &&
+    !salesMode.activeShift &&
     shift.todaySchedule !== null;
 
   // Check if shift has ended and no future shift is available
@@ -212,7 +218,10 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   const handleProductClick = useCallback(
     async (product: Product, weight?: number) => {
       if (isOperationsDisabled) {
-        toast.error("Please start your shift before adding items to cart");
+        const errorMessage = salesMode.requiresShift
+          ? "Please start your shift before adding items to cart"
+          : "Unable to add items to cart";
+        toast.error(errorMessage);
         return;
       }
 
@@ -255,7 +264,10 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   const handleGenericItemClick = useCallback(
     async (product: Product) => {
       if (isOperationsDisabled) {
-        toast.error("Please start your shift before adding items to cart");
+        const errorMessage = salesMode.requiresShift
+          ? "Please start your shift before adding items to cart"
+          : "Unable to add items to cart";
+        toast.error(errorMessage);
         return;
       }
 
@@ -389,7 +401,11 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   // Initialize cart session on mount
   useEffect(() => {
     if (user && shift.activeShift) {
-      cart.initializeCartSession().catch((error) => logger.error('Failed to initialize cart session', error));
+      cart
+        .initializeCartSession()
+        .catch((error) =>
+          logger.error("Failed to initialize cart session", error)
+        );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, shift.activeShift]);
@@ -427,16 +443,17 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     return null;
   }
 
-  // Show loading state while checking shift
-  if (shift.isLoadingShift && userHasAnyRole(user, ["cashier", "manager"])) {
+  // Show loading state while checking shift (only for cashier mode)
+  if (shift.isLoadingShift && salesMode.requiresShift && salesMode.isLoading) {
     return <LoadingState message="Loading shift data..." />;
   }
 
-  // Show blocking UI if no scheduled shift OR if shift has ended with no future shift
+  // Show blocking UI if no scheduled shift OR if shift has ended with no future shift (only for cashier mode)
   if (
-    userHasAnyRole(user, ["cashier", "manager"]) &&
+    salesMode.requiresShift &&
     !shift.isLoadingShift &&
-    !shift.activeShift &&
+    !salesMode.isLoading &&
+    !salesMode.activeShift &&
     (!shift.todaySchedule || shiftHasEnded)
   ) {
     return (
@@ -451,17 +468,30 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
 
   return (
     <>
-      {/* Shift Banners */}
-      <OvertimeWarning
-        show={shift.showOvertimeWarning}
-        minutes={shift.overtimeMinutes}
-      />
-      <ShiftBanner
-        isOperationsDisabled={isOperationsDisabled}
-        todaySchedule={shift.todaySchedule}
-        shiftTimingInfo={shift.shiftTimingInfo}
-        onStartShift={shift.handleStartShiftClick}
-      />
+      {/* Shift Banners (only shown for cashier mode) */}
+      {salesMode.requiresShift && (
+        <>
+          <OvertimeWarning
+            show={shift.showOvertimeWarning}
+            minutes={shift.overtimeMinutes}
+          />
+          <ShiftBanner
+            isOperationsDisabled={isOperationsDisabled}
+            todaySchedule={shift.todaySchedule}
+            shiftTimingInfo={shift.shiftTimingInfo}
+            onStartShift={shift.handleStartShiftClick}
+          />
+        </>
+      )}
+
+      {/* Admin Mode Indicator (optional - can be removed if not needed) */}
+      {!salesMode.requiresShift && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-800">
+          <div className="flex items-center justify-between">
+            <span>Admin Mode: Direct sales access (no shift required)</span>
+          </div>
+        </div>
+      )}
 
       {/* Main Layout */}
       <div className="flex p-2 sm:p-3 lg:p-4 flex-col lg:flex-row gap-2 sm:gap-3 min-h-screen">
@@ -747,7 +777,9 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             setPendingWeightForAgeVerification(undefined);
             weightInput.resetWeightInput();
           }}
-          currentUser={user ? { id: user.id, role: getUserRoleName(user) } : null}
+          currentUser={
+            user ? { id: user.id, role: getUserRoleName(user) } : null
+          }
         />
       )}
 

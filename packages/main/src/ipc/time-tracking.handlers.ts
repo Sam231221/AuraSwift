@@ -1,6 +1,8 @@
 import { ipcMain } from "electron";
 import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
+import { scheduleValidator } from "../utils/scheduleValidator.js";
+import { shiftRequirementResolver } from "../utils/shiftRequirementResolver.js";
 
 const logger = getLogger("timeTrackingHandlers");
 let db: any = null;
@@ -10,6 +12,50 @@ export function registerTimeTrackingHandlers() {
   ipcMain.handle("timeTracking:clockIn", async (event, data) => {
     try {
       if (!db) db = await getDatabase();
+
+      // Validate schedule if user requires shift (cashier/manager)
+      const user = db.users.getUserById(data.userId);
+      if (user && data.businessId) {
+        const shiftRequirement = await shiftRequirementResolver.resolve(
+          user,
+          db
+        );
+
+        if (shiftRequirement.requiresShift) {
+          // Validate schedule before clock-in
+          const scheduleValidation = await scheduleValidator.validateClockIn(
+            data.userId,
+            data.businessId,
+            db
+          );
+
+          if (!scheduleValidation.canClockIn) {
+            if (!scheduleValidation.requiresApproval) {
+              // No schedule or critical issue - block clock-in
+              return {
+                success: false,
+                message:
+                  scheduleValidation.reason ||
+                  "Cannot clock in: Schedule validation failed",
+                code: "SCHEDULE_VALIDATION_FAILED",
+                scheduleValidation: {
+                  warnings: scheduleValidation.warnings,
+                  requiresApproval: scheduleValidation.requiresApproval,
+                },
+              };
+            } else {
+              // Schedule validation failed but can proceed with approval
+              logger.warn(
+                `Schedule validation warnings for clock-in: ${scheduleValidation.warnings.join(
+                  ", "
+                )}`
+              );
+              // Continue but return warnings
+            }
+          }
+        }
+      }
+
       const clockEvent = await db.timeTracking.createClockEvent({
         ...data,
         type: "in",
@@ -18,10 +64,22 @@ export function registerTimeTrackingHandlers() {
       // Check if shift should be created
       const activeShift = db.timeTracking.getActiveShift(data.userId);
       if (!activeShift && data.businessId) {
+        // Get schedule for linking
+        let scheduleId: string | undefined;
+        if (user) {
+          const scheduleValidation = await scheduleValidator.validateClockIn(
+            data.userId,
+            data.businessId,
+            db
+          );
+          scheduleId = scheduleValidation.schedule?.id;
+        }
+
         const shift = await db.timeTracking.createShift({
           userId: data.userId,
           businessId: data.businessId,
           clockInId: clockEvent.id,
+          scheduleId,
         });
         return {
           success: true,

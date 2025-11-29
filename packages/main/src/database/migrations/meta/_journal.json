@@ -15,6 +15,13 @@
       "when": 1764348408840,
       "tag": "0001_spicy_sir_ram",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1764450865467,
+      "tag": "0002_friendly_orphan",
+      "breakpoints": true
     }
   ]
 }

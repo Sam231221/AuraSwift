@@ -2,6 +2,8 @@ import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc } from "drizzle-orm";
 import * as schema from "../schema.js";
 import type { Transaction, TransactionItem, User } from "../schema.js";
+import type { DatabaseManagers } from "../index.js";
+import { shiftRequirementResolver } from "../../utils/shiftRequirementResolver.js";
 
 // Utility types for transaction operations
 export interface RefundItem {
@@ -28,24 +30,28 @@ export class TransactionManager {
   }
 
   /**
-   * Determine if shift is required for a user based on their role
-   * - Cashiers MUST have an active shift to make sales (preserves existing logic)
-   * - Admins/Managers/Owners can make sales without shifts (solo operator support)
-   * - Supports activeRole for multi-role users (e.g., admin acting as cashier)
+   * Determine if shift is required for a user based on their role (RBAC-based)
+   * - Uses ShiftRequirementResolver for RBAC-based detection
+   * - Cashiers/Managers MUST have an active shift to make sales
+   * - Admins/Owners can make sales without shifts (solo operator support)
    *
-   * @param user - User object with role property
-   * @returns true if shift is required, false if shift can be bypassed
+   * @param user - User object
+   * @param db - Database managers (for RBAC resolution)
+   * @returns Promise<boolean> - true if shift is required, false if shift can be bypassed
    */
-  isShiftRequired(user: User): boolean {
-    // Check shiftRequired field:
-    // - true: shift is required
-    // - false: shift is not required (admin/owner)
-    // - null: auto-detect (default behavior for legacy users)
+  async isShiftRequired(user: User, db: DatabaseManagers): Promise<boolean> {
+    const result = await shiftRequirementResolver.resolve(user, db);
+    return result.requiresShift;
+  }
+
+  /**
+   * Synchronous fallback for legacy code (uses user field only)
+   * @deprecated Use isShiftRequired(user, db) instead for RBAC-based detection
+   */
+  isShiftRequiredSync(user: User): boolean {
+    // Legacy fallback: check user's shiftRequired field
     if (user.shiftRequired === true) return true;
     if (user.shiftRequired === false) return false;
-
-    // Auto-detect mode (null): assume shift required unless proven otherwise
-    // In a proper implementation, check user's roles via RBAC
     return true; // Conservative default
   }
   /**
@@ -58,7 +64,7 @@ export class TransactionManager {
 
     await this.db.insert(schema.transactions).values({
       id: transactionId,
-      shiftId: transactionData.shiftId,
+      shiftId: transactionData.shiftId ?? null, // Allow null for admin/owner mode
       businessId: transactionData.businessId,
       type: transactionData.type,
       subtotal: transactionData.subtotal,

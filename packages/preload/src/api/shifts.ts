@@ -37,6 +37,9 @@ export const scheduleAPI = {
 
   getCashierUsers: (businessId: string) =>
     ipcRenderer.invoke("schedules:getCashierUsers", businessId),
+
+  validateClockIn: (userId: string, businessId: string) =>
+    ipcRenderer.invoke("schedules:validateClockIn", userId, businessId),
 };
 
 export const shiftAPI = {

@@ -10,6 +10,7 @@ export * from "./shift/overtime-warning";
 export * from "./shift/shift-banner";
 export * from "./shift/start-shift-dialog";
 export * from "./shift/no-active-shift-modal";
+export * from "./shift/schedule-validation-warning";
 
 // Product Selection
 export * from "./product-selection/breadcrumb";

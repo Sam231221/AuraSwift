@@ -1,6 +1,8 @@
 import { ipcMain } from "electron";
 import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
+import { scheduleValidator } from "../utils/scheduleValidator.js";
+import { shiftRequirementResolver } from "../utils/shiftRequirementResolver.js";
 
 const logger = getLogger("shiftHandlers");
 let db: any = null;
@@ -298,6 +300,55 @@ export function registerShiftHandlers() {
         };
       }
 
+      // Validate schedule before starting shift (for cashier/manager)
+      const user = db.users.getUserById(shiftData.cashierId);
+      let validatedScheduleId = shiftData.scheduleId ?? null;
+      let scheduleValidation = null;
+
+      if (user) {
+        const shiftRequirement = await shiftRequirementResolver.resolve(
+          user,
+          db
+        );
+
+        if (shiftRequirement.requiresShift) {
+          // Validate schedule for cashier/manager
+          scheduleValidation = await scheduleValidator.validateClockIn(
+            shiftData.cashierId,
+            shiftData.businessId,
+            db
+          );
+
+          if (!scheduleValidation.canClockIn) {
+            if (!scheduleValidation.requiresApproval) {
+              // No schedule or critical issue
+              return {
+                success: false,
+                message: scheduleValidation.reason || "Cannot start shift",
+                code: "SCHEDULE_VALIDATION_FAILED",
+                scheduleValidation: {
+                  warnings: scheduleValidation.warnings,
+                  requiresApproval: scheduleValidation.requiresApproval,
+                },
+              };
+            } else {
+              // Schedule validation failed but can proceed with approval
+              logger.warn(
+                `Schedule validation warnings for shift start: ${scheduleValidation.warnings.join(
+                  ", "
+                )}`
+              );
+              // Continue but return warnings
+            }
+          }
+
+          // Use validated schedule if available
+          if (scheduleValidation.schedule?.id) {
+            validatedScheduleId = scheduleValidation.schedule.id;
+          }
+        }
+      }
+
       // Validate starting cash before creating shift
       if (shiftData.startingCash < 0) {
         return {
@@ -318,7 +369,7 @@ export function registerShiftHandlers() {
       let shift;
       try {
         shift = db.shifts.createShift({
-          scheduleId: shiftData.scheduleId ?? null,
+          scheduleId: validatedScheduleId,
           timeShiftId: activeTimeShift.id, // Link to time shift
           cashierId: shiftData.cashierId,
           businessId: shiftData.businessId,
@@ -348,9 +399,9 @@ export function registerShiftHandlers() {
       }
 
       // Update schedule status if linked (non-critical, so we don't fail if this errors)
-      if (shiftData.scheduleId) {
+      if (validatedScheduleId) {
         try {
-          db.schedules.updateScheduleStatus(shiftData.scheduleId, "active");
+          db.schedules.updateScheduleStatus(validatedScheduleId, "active");
         } catch (error) {
           logger.warn("Could not update schedule status:", error);
           // Don't fail shift creation if schedule update fails
@@ -498,6 +549,42 @@ export function registerShiftHandlers() {
       };
     }
   });
+
+  // Schedule validation endpoint
+  ipcMain.handle(
+    "schedules:validateClockIn",
+    async (event, userId, businessId) => {
+      try {
+        if (!db) db = await getDatabase();
+
+        const validation = await scheduleValidator.validateClockIn(
+          userId,
+          businessId,
+          db
+        );
+
+        return {
+          success: true,
+          data: {
+            valid: validation.valid,
+            canClockIn: validation.canClockIn,
+            requiresApproval: validation.requiresApproval,
+            warnings: validation.warnings,
+            reason: validation.reason,
+            schedule: validation.schedule
+              ? JSON.parse(JSON.stringify(validation.schedule))
+              : null,
+          },
+        };
+      } catch (error) {
+        logger.error("Schedule validation IPC error:", error);
+        return {
+          success: false,
+          message: "Failed to validate schedule",
+        };
+      }
+    }
+  );
 
   ipcMain.handle("shift:getTodaySchedule", async (event, cashierId) => {
     try {

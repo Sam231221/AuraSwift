@@ -91,50 +91,29 @@ export function useCart({
           return session;
         } else {
           // Create new session
-          if (userRole === "cashier" || userRole === "manager") {
-            if (!activeShift) {
-              setLoadingCart(false);
-              return null;
-            }
+          // For admin/owner mode, shiftId can be null/undefined
+          // For cashier/manager mode, activeShift is required
+          const requiresShift =
+            userRole === "cashier" || userRole === "manager";
+          if (requiresShift && !activeShift) {
+            setLoadingCart(false);
+            return null;
+          }
 
-            const newSessionResponse = await window.cartAPI.createSession({
-              cashierId: userId,
-              shiftId: activeShift.id,
-              businessId,
-            });
+          const newSessionResponse = await window.cartAPI.createSession({
+            cashierId: userId,
+            shiftId: activeShift?.id, // Can be undefined for admin mode
+            businessId,
+          });
 
-            if (newSessionResponse.success && newSessionResponse.data) {
-              const session = newSessionResponse.data as CartSession;
-              setCartSession(session);
-              setCartItems([]);
-              return session;
-            } else {
-              logger.error(
-                "Failed to create cart session:",
-                newSessionResponse
-              );
-              return null;
-            }
+          if (newSessionResponse.success && newSessionResponse.data) {
+            const session = newSessionResponse.data as CartSession;
+            setCartSession(session);
+            setCartItems([]);
+            return session;
           } else {
-            // Admin users can create sessions without shift
-            const newSessionResponse = await window.cartAPI.createSession({
-              cashierId: userId,
-              shiftId: "", // Admin doesn't need shift
-              businessId,
-            });
-
-            if (newSessionResponse.success && newSessionResponse.data) {
-              const session = newSessionResponse.data as CartSession;
-              setCartSession(session);
-              setCartItems([]);
-              return session;
-            } else {
-              logger.error(
-                "Failed to create cart session:",
-                newSessionResponse
-              );
-              return null;
-            }
+            logger.error("Failed to create cart session:", newSessionResponse);
+            return null;
           }
         }
       } catch (error) {
@@ -519,7 +498,7 @@ export function useCart({
         } else {
           toast.error("Failed to remove item from cart");
         }
-      } catch (error) {
+      } catch (error: unknown) {
         logger.error("Error removing from cart:", error);
         toast.error("Failed to remove item from cart");
       }
@@ -544,7 +523,9 @@ export function useCart({
           totalAmount: total,
           taxAmount: tax,
         })
-        .catch((error) => logger.error("Failed to update cart session", error));
+        .catch((error: unknown) =>
+          logger.error("Failed to update cart session", error)
+        );
     }
   }, [total, tax, cartSession]);
 
