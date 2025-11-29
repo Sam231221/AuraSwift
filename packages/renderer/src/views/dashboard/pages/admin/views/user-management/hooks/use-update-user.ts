@@ -25,7 +25,17 @@ export function useUpdateUser() {
         updates.avatar = data.avatar;
       }
 
-      const response = await window.authAPI.updateUser(data.id, updates);
+      // Get session token for authentication
+      const sessionToken = await window.authStore.get("token");
+      if (!sessionToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await window.authAPI.updateUser(
+        sessionToken,
+        data.id,
+        updates
+      );
 
       if (response.success) {
         toast.success("Staff member updated successfully");

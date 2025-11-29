@@ -10,14 +10,14 @@ import { terminateAppOnLastWindowClose } from "./modules/ApplicationTerminatorOn
 import { autoUpdater } from "./modules/AutoUpdater.js";
 import { allowInternalOrigins } from "./modules/BlockNotAllowdOrigins.js";
 import { allowExternalUrls } from "./modules/ExternalUrls.js";
-import "./appStore.js"; // Initialize auth handlers
 import { getDatabase } from "./database/index.js";
 import { registerVatCategoryIpc } from "./services/vatCategoryService.js";
 import { registerBookerImportHandlers } from "./ipc/bookerImportHandlers.js";
 import { registerLoggerHandlers } from "./ipc/loggerHandlers.js";
+import { registerAllIpcHandlers } from "./ipc/index.js";
 import { getLogger } from "./utils/logger.js";
 
-const logger = getLogger('app-init');
+const logger = getLogger("app-init");
 
 // ============================================================================
 // ADMIN FALLBACK SECURITY CHECK
@@ -27,34 +27,40 @@ const logger = getLogger('app-init');
  * Check if admin fallback is enabled and warn on startup
  * This must match the constant in authHelpers.ts exactly
  */
-const ENABLE_ADMIN_FALLBACK = 
-  process.env.NODE_ENV === "development" || 
+const ENABLE_ADMIN_FALLBACK =
+  process.env.NODE_ENV === "development" ||
   process.env.RBAC_ADMIN_FALLBACK === "true";
 
 if (ENABLE_ADMIN_FALLBACK) {
   const env = process.env.NODE_ENV || "unknown";
   logger.warn(
     "\n" +
-    "⚠️  ═══════════════════════════════════════════════════════════════\n" +
-    "⚠️  SECURITY WARNING: ADMIN PERMISSION FALLBACK IS ENABLED\n" +
-    "⚠️  \n" +
-    "⚠️  This is a temporary migration feature that allows admin users\n" +
-    "⚠️  to bypass RBAC permission checks.\n" +
-    "⚠️  \n" +
-    "⚠️  Current Environment: " + env + "\n" +
-    "⚠️  \n" +
-    "⚠️  ⚠️  DO NOT USE IN PRODUCTION! ⚠️\n" +
-    "⚠️  \n" +
-    "⚠️  To disable:\n" +
-    "⚠️    - Set NODE_ENV=production\n" +
-    "⚠️    - Remove RBAC_ADMIN_FALLBACK environment variable\n" +
-    "⚠️    - Or remove the fallback code entirely\n" +
-    "⚠️  \n" +
-    "⚠️  ═══════════════════════════════════════════════════════════════\n"
+      "⚠️  ═══════════════════════════════════════════════════════════════\n" +
+      "⚠️  SECURITY WARNING: ADMIN PERMISSION FALLBACK IS ENABLED\n" +
+      "⚠️  \n" +
+      "⚠️  This is a temporary migration feature that allows admin users\n" +
+      "⚠️  to bypass RBAC permission checks.\n" +
+      "⚠️  \n" +
+      "⚠️  Current Environment: " +
+      env +
+      "\n" +
+      "⚠️  \n" +
+      "⚠️  ⚠️  DO NOT USE IN PRODUCTION! ⚠️\n" +
+      "⚠️  \n" +
+      "⚠️  To disable:\n" +
+      "⚠️    - Set NODE_ENV=production\n" +
+      "⚠️    - Remove RBAC_ADMIN_FALLBACK environment variable\n" +
+      "⚠️    - Or remove the fallback code entirely\n" +
+      "⚠️  \n" +
+      "⚠️  ═══════════════════════════════════════════════════════════════\n"
   );
 
   // Also log to console for visibility
-  console.warn("⚠️  SECURITY: Admin fallback is ENABLED in", env, "environment!");
+  console.warn(
+    "⚠️  SECURITY: Admin fallback is ENABLED in",
+    env,
+    "environment!"
+  );
 }
 
 // Global reference to autoUpdater instance for menu access
@@ -65,11 +71,14 @@ export function getAutoUpdaterInstance() {
 }
 
 export async function initApp(initConfig: AppInitConfig) {
-  // Register IPC handlers
+  // Register all IPC handlers (must be done before database operations)
+  registerAllIpcHandlers();
+  
+  // Register additional service-specific handlers
   registerLoggerHandlers();
   registerVatCategoryIpc();
   registerBookerImportHandlers();
-  
+
   // Initialize database
   const db = await getDatabase();
 
@@ -98,13 +107,19 @@ export async function initApp(initConfig: AppInitConfig) {
   const handleAutoCloseShifts = async () => {
     try {
       const closedShifts = db.shifts.autoCloseOldActiveShifts();
-      
+
       if (closedShifts.length > 0) {
         // Group closed shifts by timeShiftId to check if we need to clock out
-        const timeShiftGroups = new Map<string, Array<{ id: string; cashierId: string }>>();
-        
+        const timeShiftGroups = new Map<
+          string,
+          Array<{ id: string; cashierId: string }>
+        >();
+
         for (const closedShift of closedShifts) {
-          if (closedShift.timeShiftId && closedShift.timeShiftId.trim() !== "") {
+          if (
+            closedShift.timeShiftId &&
+            closedShift.timeShiftId.trim() !== ""
+          ) {
             if (!timeShiftGroups.has(closedShift.timeShiftId)) {
               timeShiftGroups.set(closedShift.timeShiftId, []);
             }
@@ -114,11 +129,15 @@ export async function initApp(initConfig: AppInitConfig) {
             });
           }
         }
-        
+
         // For each TimeShift, check if all POS shifts are now closed
-        for (const [timeShiftId, closedPosShifts] of timeShiftGroups.entries()) {
-          const remainingActiveShifts = db.shifts.getActiveShiftsByTimeShift(timeShiftId);
-          
+        for (const [
+          timeShiftId,
+          closedPosShifts,
+        ] of timeShiftGroups.entries()) {
+          const remainingActiveShifts =
+            db.shifts.getActiveShiftsByTimeShift(timeShiftId);
+
           if (remainingActiveShifts.length === 0) {
             // All POS shifts for this TimeShift are closed, clock out TimeShift
             const timeShift = db.timeTracking.getShiftById(timeShiftId);
@@ -132,7 +151,8 @@ export async function initApp(initConfig: AppInitConfig) {
               } else {
                 try {
                   // End any active breaks
-                  const activeBreak = db.timeTracking.getActiveBreak(timeShiftId);
+                  const activeBreak =
+                    db.timeTracking.getActiveBreak(timeShiftId);
                   if (activeBreak) {
                     await db.timeTracking.endBreak(activeBreak.id);
                   }
@@ -147,7 +167,10 @@ export async function initApp(initConfig: AppInitConfig) {
                   });
 
                   // Complete the TimeShift
-                  await db.timeTracking.completeShift(timeShiftId, clockOutEvent.id);
+                  await db.timeTracking.completeShift(
+                    timeShiftId,
+                    clockOutEvent.id
+                  );
 
                   logger.info(
                     `Auto clocked out TimeShift ${timeShiftId} after all POS shifts were auto-closed`

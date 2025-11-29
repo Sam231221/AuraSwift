@@ -6,12 +6,12 @@
  */
 
 import type { DrizzleDB } from "../drizzle.js";
-import type { UserRole, NewUserRole, Role } from "../schema.js";
+import type { UserRole, NewUserRole, Role, User } from "../schema.js";
 import { eq, and, desc, sql, or } from "drizzle-orm";
 import * as schema from "../schema.js";
 
-import { getLogger } from '../../utils/logger.js';
-const logger = getLogger('userRoleManager');
+import { getLogger } from "../../utils/logger.js";
+const logger = getLogger("userRoleManager");
 
 export class UserRoleManager {
   private db: DrizzleDB;
@@ -145,6 +145,34 @@ export class UserRoleManager {
       includeExpired
     );
 
+    // First, let's check ALL user_roles entries for this user (for debugging)
+    const allUserRoles = this.db
+      .select()
+      .from(schema.userRoles)
+      .where(eq(schema.userRoles.userId, userId))
+      .all();
+
+    logger.info(
+      "[getActiveRolesByUser] All user_roles entries (including inactive):",
+      allUserRoles.length
+    );
+    if (allUserRoles.length > 0) {
+      logger.info(
+        "[getActiveRolesByUser] All entries details:",
+        JSON.stringify(
+          allUserRoles.map((r) => ({
+            id: r.id,
+            userId: r.userId,
+            roleId: r.roleId,
+            isActive: r.isActive,
+            expiresAt: r.expiresAt,
+          })),
+          null,
+          2
+        )
+      );
+    }
+
     const conditions = [
       eq(schema.userRoles.userId, userId),
       eq(schema.userRoles.isActive, true),
@@ -166,9 +194,9 @@ export class UserRoleManager {
       .orderBy(desc(schema.userRoles.assignedAt))
       .all();
 
-    logger.info("[getActiveRolesByUser] Found", results.length, "roles");
+    logger.info("[getActiveRolesByUser] Found", results.length, "active roles");
     logger.info(
-      "[getActiveRolesByUser] Results:",
+      "[getActiveRolesByUser] Active roles results:",
       JSON.stringify(results, null, 2)
     );
 
@@ -214,6 +242,33 @@ export class UserRoleManager {
       .from(schema.userRoles)
       .where(and(...conditions))
       .all();
+  }
+
+  /**
+   * Get all users with a specific role, including user details
+   */
+  getUsersWithDetailsByRole(
+    roleId: string,
+    activeOnly = true
+  ): Array<UserRole & { user: User }> {
+    const userRoles = this.getUsersByRole(roleId, activeOnly);
+
+    return userRoles
+      .map((userRole) => {
+        const user = this.db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.id, userRole.userId))
+          .get();
+
+        if (!user) return null;
+
+        return {
+          ...userRole,
+          user,
+        };
+      })
+      .filter((r): r is UserRole & { user: User } => r !== null);
   }
 
   /**

@@ -17,8 +17,12 @@ import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { roleUpdateSchema, type RoleUpdateFormData } from "../schemas";
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("edit-role-dialog");
 
 const AVAILABLE_PERMISSIONS = [
+  "*:*", // All permissions (admin)
   "read:sales",
   "write:sales",
   "manage:inventory",
@@ -43,6 +47,7 @@ interface Role {
   description: string | null;
   permissions: string[];
   isActive: boolean;
+  isSystemRole?: boolean;
 }
 
 interface EditRoleDialogProps {
@@ -75,22 +80,35 @@ export function EditRoleDialog({
   });
 
   useEffect(() => {
-    if (role) {
+    if (role && open) {
+      logger.info("[EditRoleDialog] Setting role data:", role);
       setValue("displayName", role.displayName);
       setValue("description", role.description || "");
-      setSelectedPermissions(role.permissions);
+      setSelectedPermissions(role.permissions || []);
       setIsActive(role.isActive);
+      setPermissionSearch("");
+    } else if (!open) {
+      // Reset form when dialog closes
+      reset();
+      setSelectedPermissions([]);
+      setPermissionSearch("");
+      setIsActive(true);
     }
-  }, [role, setValue]);
+  }, [role, open, setValue, reset]);
 
   const handleFormSubmit = (data: RoleUpdateFormData) => {
     if (!role) return;
+
+    // Validate that at least one permission is selected
+    if (selectedPermissions.length === 0) {
+      return;
+    }
+
     onSubmit(role.id, {
       ...data,
       permissions: selectedPermissions,
       isActive,
     });
-    reset();
   };
 
   const togglePermission = (permission: string) => {
@@ -105,7 +123,9 @@ export function EditRoleDialog({
     p.toLowerCase().includes(permissionSearch.toLowerCase())
   );
 
-  if (!role) return null;
+  if (!role) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,7 +133,9 @@ export function EditRoleDialog({
         <DialogHeader>
           <DialogTitle>Edit Role: {role.displayName}</DialogTitle>
           <DialogDescription>
-            Update role details and permissions
+            {role.isSystemRole
+              ? "System roles have limited editing. You can update display name, description, and permissions, but the role name cannot be changed."
+              : "Update role details and permissions"}
           </DialogDescription>
         </DialogHeader>
 

@@ -20,17 +20,20 @@ export const authAPI = {
     businessAvatar?: string;
   }) => ipcRenderer.invoke("auth:registerBusiness", userData),
 
-  createUser: (userData: {
-    businessId: string;
-    username: string;
-    pin: string;
-    email?: string;
-    password?: string;
-    firstName: string;
-    lastName: string;
-    role: "cashier" | "manager";
-    avatar?: string;
-  }) => ipcRenderer.invoke("auth:createUser", userData),
+  createUser: (
+    sessionToken: string,
+    userData: {
+      businessId: string;
+      username: string;
+      pin: string;
+      email?: string;
+      password?: string;
+      firstName: string;
+      lastName: string;
+      role: "cashier" | "manager";
+      avatar?: string;
+    }
+  ) => ipcRenderer.invoke("auth:createUser", sessionToken, userData),
 
   login: (credentials: {
     username: string;
@@ -54,21 +57,23 @@ export const authAPI = {
     }
   ) => ipcRenderer.invoke("auth:logout", token, options),
 
-  getUserById: (userId: string) =>
-    ipcRenderer.invoke("auth:getUserById", userId),
+  getUserById: (sessionTokenOrUserId: string, userId?: string) =>
+    ipcRenderer.invoke("auth:getUserById", sessionTokenOrUserId, userId),
 
-  updateUser: (userId: string, updates: any) =>
-    ipcRenderer.invoke("auth:updateUser", userId, updates),
+  updateUser: (sessionToken: string, userId: string, updates: any) =>
+    ipcRenderer.invoke("auth:updateUser", sessionToken, userId, updates),
 
-  getAllActiveUsers: () => ipcRenderer.invoke("auth:getAllActiveUsers"),
+  getAllActiveUsers: (sessionToken?: string) =>
+    ipcRenderer.invoke("auth:getAllActiveUsers", sessionToken),
 
-  getUsersByBusiness: (businessId: string) =>
-    ipcRenderer.invoke("auth:getUsersByBusiness", businessId),
+  getUsersByBusiness: (sessionToken: string, businessId: string) =>
+    ipcRenderer.invoke("auth:getUsersByBusiness", sessionToken, businessId),
 
-  deleteUser: (userId: string) => ipcRenderer.invoke("auth:deleteUser", userId),
+  deleteUser: (sessionToken: string, userId: string) =>
+    ipcRenderer.invoke("auth:deleteUser", sessionToken, userId),
 
-  getBusinessById: (businessId: string) =>
-    ipcRenderer.invoke("auth:getBusinessById", businessId),
+  getBusinessById: (sessionToken: string, businessId: string) =>
+    ipcRenderer.invoke("auth:getBusinessById", sessionToken, businessId),
 };
 
 export const authStore = {

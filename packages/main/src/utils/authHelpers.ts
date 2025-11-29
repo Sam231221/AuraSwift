@@ -29,8 +29,8 @@ import type { DatabaseManagers } from "../database/index.js";
 import type { User } from "../database/schema.js";
 import { getUserPermissions } from "./rbacHelpers.js";
 
-import { getLogger } from './logger.js';
-const logger = getLogger('authHelpers');
+import { getLogger } from "./logger.js";
+const logger = getLogger("authHelpers");
 
 // ============================================================================
 // ADMIN FALLBACK CONFIGURATION
@@ -48,13 +48,13 @@ const logger = getLogger('authHelpers');
  *
  * RECOMMENDED: Use option 1 (development only) for safety
  */
-const ENABLE_ADMIN_FALLBACK = 
-  process.env.NODE_ENV === "development" || 
+const ENABLE_ADMIN_FALLBACK =
+  process.env.NODE_ENV === "development" ||
   process.env.RBAC_ADMIN_FALLBACK === "true";
 
 // Alternative: Hard deadline approach (uncomment to use)
 // const FALLBACK_DEADLINE = new Date("2025-12-31");
-// const ENABLE_ADMIN_FALLBACK = Date.now() < FALLBACK_DEADLINE.getTime() && 
+// const ENABLE_ADMIN_FALLBACK = Date.now() < FALLBACK_DEADLINE.getTime() &&
 //                                process.env.NODE_ENV !== "production";
 
 // ============================================================================
@@ -216,9 +216,9 @@ export async function hasPermission(
           // ⚠️ SECURITY WARNING LOG
           logger.warn(
             `⚠️ [SECURITY] Admin fallback used for user ${user.id} to grant ${requiredPermission}. ` +
-            `This is a temporary migration feature. ` +
-            `Please assign proper permissions to admin role. ` +
-            `Fallback enabled: ${ENABLE_ADMIN_FALLBACK}, Environment: ${process.env.NODE_ENV}`
+              `This is a temporary migration feature. ` +
+              `Please assign proper permissions to admin role. ` +
+              `Fallback enabled: ${ENABLE_ADMIN_FALLBACK}, Environment: ${process.env.NODE_ENV}`
           );
 
           // 🔥 CRITICAL: Log to audit trail for security monitoring
@@ -234,19 +234,26 @@ export async function hasPermission(
                 permission: requiredPermission,
                 timestamp: Date.now(),
                 environment: process.env.NODE_ENV,
-                WARNING: "SECURITY: Admin fallback bypass used - ensure admin role has proper permissions",
+                WARNING:
+                  "SECURITY: Admin fallback bypass used - ensure admin role has proper permissions",
               },
             });
           } catch (auditError) {
             // Don't fail permission check if audit logging fails, but log it
-            logger.error("[hasPermission] Failed to log admin fallback to audit:", auditError);
+            logger.error(
+              "[hasPermission] Failed to log admin fallback to audit:",
+              auditError
+            );
           }
 
           return { granted: true };
         }
       }
     } catch (error) {
-      logger.error("[hasPermission] Error checking admin role fallback:", error);
+      logger.error(
+        "[hasPermission] Error checking admin role fallback:",
+        error
+      );
       // Don't grant permission if there's an error checking roles
     }
   }
@@ -429,11 +436,35 @@ export async function hasRole(
   user: User,
   roleName: string
 ): Promise<boolean> {
-  const userPermissions = await getUserPermissions(db, user.id);
+  try {
+    // Get all roles for the user with role details
+    const userRolesWithDetails = db.userRoles.getRolesWithDetailsForUser(
+      user.id
+    );
 
-  // Get all roles for user and check if any match
-  const roles = await db.userRoles.getUserRole(user.id, undefined, true);
-  return roles.some((ur: any) => ur.role?.name === roleName);
+    // If no roles found, check primaryRoleId as fallback
+    if (userRolesWithDetails.length === 0 && user.primaryRoleId) {
+      const primaryRole = db.roles.getRoleById(user.primaryRoleId);
+      if (primaryRole && primaryRole.name === roleName) {
+        return true;
+      }
+    }
+
+    // Check if any of the user's roles match the required role name
+    for (const userRoleWithDetails of userRolesWithDetails) {
+      if (
+        userRoleWithDetails.role &&
+        userRoleWithDetails.role.name === roleName
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    logger.error("[hasRole] Error checking role:", error);
+    return false;
+  }
 }
 
 /**
@@ -450,8 +481,35 @@ export async function hasAnyRole(
   user: User,
   roleNames: string[]
 ): Promise<boolean> {
-  const roles = await db.userRoles.getUserRole(user.id, undefined, true);
-  return roles.some((ur: any) => roleNames.includes(ur.role?.name));
+  try {
+    // Get all roles for the user with role details
+    const userRolesWithDetails = db.userRoles.getRolesWithDetailsForUser(
+      user.id
+    );
+
+    // If no roles found, check primaryRoleId as fallback
+    if (userRolesWithDetails.length === 0 && user.primaryRoleId) {
+      const primaryRole = db.roles.getRoleById(user.primaryRoleId);
+      if (primaryRole && roleNames.includes(primaryRole.name)) {
+        return true;
+      }
+    }
+
+    // Check if any of the user's roles match the required role names
+    for (const userRoleWithDetails of userRolesWithDetails) {
+      if (
+        userRoleWithDetails.role &&
+        roleNames.includes(userRoleWithDetails.role.name)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    logger.error("[hasAnyRole] Error checking roles:", error);
+    return false;
+  }
 }
 
 // ============================================================================
@@ -524,7 +582,7 @@ export function validateBusinessAccess(
   if (user.businessId !== resourceBusinessId) {
     logger.warn(
       `[Security] Business access violation: User ${user.id} (business ${user.businessId}) ` +
-      `attempted to access resource from business ${resourceBusinessId}`
+        `attempted to access resource from business ${resourceBusinessId}`
     );
 
     return {
@@ -554,7 +612,11 @@ export async function validateSessionPermissionAndBusiness(
   resourceBusinessId?: string
 ): Promise<AuthValidationResult> {
   // First validate session and permission
-  const auth = await validateSessionAndPermission(db, sessionToken, requiredPermission);
+  const auth = await validateSessionAndPermission(
+    db,
+    sessionToken,
+    requiredPermission
+  );
 
   if (!auth.success) {
     return auth;
@@ -562,7 +624,10 @@ export async function validateSessionPermissionAndBusiness(
 
   // Then validate business access if businessId provided
   if (resourceBusinessId) {
-    const businessCheck = validateBusinessAccess(auth.user!, resourceBusinessId);
+    const businessCheck = validateBusinessAccess(
+      auth.user!,
+      resourceBusinessId
+    );
 
     if (!businessCheck.success) {
       // Log security event to audit trail
@@ -581,7 +646,10 @@ export async function validateSessionPermissionAndBusiness(
         });
       } catch (auditError) {
         // Don't fail validation if audit logging fails, but log it
-        logger.error("[validateSessionPermissionAndBusiness] Failed to log business access denial:", auditError);
+        logger.error(
+          "[validateSessionPermissionAndBusiness] Failed to log business access denial:",
+          auditError
+        );
       }
 
       return businessCheck;

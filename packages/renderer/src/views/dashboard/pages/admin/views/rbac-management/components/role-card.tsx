@@ -29,6 +29,7 @@ interface RoleCardProps {
   onEdit: (role: Role) => void;
   onDelete: (role: Role) => void;
   onViewUsers: (role: Role) => void;
+  canEdit?: boolean;
 }
 
 export function RoleCard({
@@ -37,6 +38,7 @@ export function RoleCard({
   onEdit,
   onDelete,
   onViewUsers,
+  canEdit = false,
 }: RoleCardProps) {
   return (
     <Card className="hover:shadow-lg transition-shadow">
@@ -100,7 +102,10 @@ export function RoleCard({
           variant="outline"
           size="sm"
           className="flex-1"
-          onClick={() => onViewUsers(role)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewUsers(role);
+          }}
         >
           <Users className="h-4 w-4 mr-1" />
           Users
@@ -108,17 +113,33 @@ export function RoleCard({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onEdit(role)}
-          disabled={role.isSystemRole}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(role);
+          }}
+          disabled={!canEdit}
+          title={
+            !canEdit
+              ? "Only administrators can edit roles"
+              : role.isSystemRole
+              ? "System roles have limited editing"
+              : "Edit role"
+          }
         >
           <Edit className="h-4 w-4" />
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => onDelete(role)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(role);
+          }}
           disabled={role.isSystemRole}
           className="text-destructive hover:text-destructive"
+          title={
+            role.isSystemRole ? "Cannot delete system roles" : "Delete role"
+          }
         >
           <Trash2 className="h-4 w-4" />
         </Button>

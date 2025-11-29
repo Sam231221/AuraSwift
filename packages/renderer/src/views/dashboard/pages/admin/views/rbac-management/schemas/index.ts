@@ -13,9 +13,15 @@ export const roleCreateSchema = z.object({
     .max(100, "Display name must be less than 100 characters"),
   description: z
     .string()
-    .min(10, "Description must be at least 10 characters")
     .max(500, "Description must be less than 500 characters")
-    .optional(),
+    .refine(
+      (val) => !val || val.trim().length === 0 || val.trim().length >= 10,
+      {
+        message: "Description must be at least 10 characters if provided",
+      }
+    )
+    .optional()
+    .or(z.literal("")),
   permissions: z
     .array(z.string())
     .min(1, "At least one permission is required"),

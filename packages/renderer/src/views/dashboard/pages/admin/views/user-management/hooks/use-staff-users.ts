@@ -20,7 +20,16 @@ export function useStaffUsers() {
     setError(null);
 
     try {
-      const response = await window.authAPI.getUsersByBusiness(user.businessId);
+      // Get session token for authentication
+      const sessionToken = await window.authStore.get("token");
+      if (!sessionToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await window.authAPI.getUsersByBusiness(
+        sessionToken,
+        user.businessId
+      );
 
       if (response.success && response.users) {
         // Filter out admin users and convert to StaffUser format

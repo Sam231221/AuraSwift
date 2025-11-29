@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,9 +16,13 @@ import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { roleCreateSchema, type RoleCreateFormData } from "../schemas";
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("create-role-dialog");
 
 // Available permissions - you can expand this list
 const AVAILABLE_PERMISSIONS = [
+  "*:*", // All permissions (admin)
   "read:sales",
   "write:sales",
   "manage:inventory",
@@ -57,17 +61,69 @@ export function CreateRoleDialog({
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
   } = useForm<RoleCreateFormData>({
     resolver: zodResolver(roleCreateSchema),
+    defaultValues: {
+      name: "",
+      displayName: "",
+      description: "",
+      permissions: [],
+    },
+    mode: "onChange", // Validate on change for better UX
   });
 
+  // Sync selectedPermissions with form's permissions field
+  useEffect(() => {
+    setValue("permissions", selectedPermissions, { shouldValidate: true });
+  }, [selectedPermissions, setValue]);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      reset();
+      setSelectedPermissions([]);
+      setPermissionSearch("");
+    }
+  }, [open, reset]);
+
   const handleFormSubmit = (data: RoleCreateFormData) => {
-    onSubmit({
-      ...data,
-      permissions: selectedPermissions,
-    });
-    reset();
-    setSelectedPermissions([]);
+    logger.info("[handleFormSubmit] Form data received:", data);
+    logger.info(
+      "[handleFormSubmit] Selected permissions:",
+      selectedPermissions
+    );
+
+    // Use permissions from form data (which should match selectedPermissions)
+    const permissions = data.permissions || selectedPermissions;
+
+    // Validate permissions
+    if (!permissions || permissions.length === 0) {
+      logger.error("[handleFormSubmit] No permissions selected - aborting");
+      return;
+    }
+
+    // Only include description if it's provided and meets minimum length
+    const submitData: RoleCreateFormData = {
+      name: data.name.trim(),
+      displayName: data.displayName.trim(),
+      permissions: permissions,
+    };
+
+    // Only add description if it's provided and has at least 10 characters
+    if (data.description && data.description.trim().length >= 10) {
+      submitData.description = data.description.trim();
+    }
+
+    logger.info("[handleFormSubmit] Final submit data:", submitData);
+    logger.info("[handleFormSubmit] Calling onSubmit callback");
+
+    try {
+      onSubmit(submitData);
+      logger.info("[handleFormSubmit] onSubmit callback completed");
+    } catch (error) {
+      logger.error("[handleFormSubmit] Error in onSubmit callback:", error);
+    }
   };
 
   const togglePermission = (permission: string) => {
@@ -92,7 +148,23 @@ export function CreateRoleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+        <form
+          onSubmit={handleSubmit(
+            (data) => {
+              logger.info(
+                "[CreateRoleDialog] Form validation passed, submitting"
+              );
+              handleFormSubmit(data);
+            },
+            (errors) => {
+              logger.error(
+                "[CreateRoleDialog] Form validation failed:",
+                errors
+              );
+            }
+          )}
+          className="space-y-4"
+        >
           <div className="space-y-2">
             <Label htmlFor="name">Role Name</Label>
             <Input
@@ -126,7 +198,7 @@ export function CreateRoleDialog({
             <Label htmlFor="description">Description (Optional)</Label>
             <Textarea
               id="description"
-              placeholder="Describe the purpose of this role..."
+              placeholder="Describe the purpose of this role... (min 10 characters if provided)"
               {...register("description")}
               rows={3}
             />
@@ -135,6 +207,9 @@ export function CreateRoleDialog({
                 {errors.description.message}
               </p>
             )}
+            <p className="text-xs text-muted-foreground">
+              Optional. If provided, must be at least 10 characters.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -180,6 +255,11 @@ export function CreateRoleDialog({
             {selectedPermissions.length === 0 && (
               <p className="text-sm text-destructive">
                 At least one permission is required
+              </p>
+            )}
+            {errors.permissions && (
+              <p className="text-sm text-destructive">
+                {errors.permissions.message}
               </p>
             )}
           </div>

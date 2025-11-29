@@ -8,8 +8,8 @@
 import type { DatabaseManagers } from "../database/index.js";
 import type { Permission } from "../constants/permissions.js";
 
-import { getLogger } from './logger.js';
-const logger = getLogger('rbacHelpers');
+import { getLogger } from "./logger.js";
+const logger = getLogger("rbacHelpers");
 
 /**
  * Permission cache - stores aggregated permissions per user
@@ -67,59 +67,111 @@ export async function getUserPermissions(
       "active roles for user"
     );
 
-    for (const userRole of userRoles) {
-      try {
-        const role = db.roles.getRoleById(userRole.roleId);
+    // If no roles in user_roles table, fall back to primaryRoleId
+    if (userRoles.length === 0) {
+      logger.info(
+        "[getUserPermissions] No roles in user_roles table, checking primaryRoleId fallback"
+      );
+      const user = db.users.getUserById(userId);
+      if (user?.primaryRoleId) {
         logger.info(
-          "[getUserPermissions] Processing role:",
-          role?.name,
-          "isActive:",
-          role?.isActive
+          "[getUserPermissions] Found primaryRoleId:",
+          user.primaryRoleId
         );
-        logger.info(
-          "[getUserPermissions] Role permissions type:",
-          typeof role?.permissions,
-          "value:",
-          role?.permissions
-        );
-
-        if (role && role.isActive && role.permissions) {
-          // Handle permissions - could be array or JSON string
-          let rolePermissions: string[] = [];
-          if (typeof role.permissions === "string") {
-            try {
-              rolePermissions = JSON.parse(role.permissions);
-            } catch (e) {
-              logger.error(
-                "[getUserPermissions] Failed to parse role permissions:",
-                e
-              );
-              rolePermissions = [role.permissions];
-            }
-          } else if (Array.isArray(role.permissions)) {
-            rolePermissions = role.permissions as string[];
-          }
-
+        const primaryRole = db.roles.getRoleById(user.primaryRoleId);
+        if (primaryRole) {
           logger.info(
-            "[getUserPermissions] Parsed permissions:",
-            rolePermissions
+            "[getUserPermissions] Using primary role:",
+            primaryRole.name
           );
+          // Process primary role permissions
+          if (primaryRole.isActive && primaryRole.permissions) {
+            let rolePermissions: string[] = [];
+            if (typeof primaryRole.permissions === "string") {
+              try {
+                rolePermissions = JSON.parse(primaryRole.permissions);
+              } catch (e) {
+                logger.error(
+                  "[getUserPermissions] Failed to parse primary role permissions:",
+                  e
+                );
+                rolePermissions = [primaryRole.permissions];
+              }
+            } else if (Array.isArray(primaryRole.permissions)) {
+              rolePermissions = primaryRole.permissions as string[];
+            }
 
-          // Add all role permissions
-          for (const permission of rolePermissions) {
             logger.info(
-              "[getUserPermissions] Adding permission from role:",
-              permission
+              "[getUserPermissions] Primary role permissions:",
+              rolePermissions
             );
-            permissions.add(permission);
+
+            for (const permission of rolePermissions) {
+              logger.info(
+                "[getUserPermissions] Adding permission from primary role:",
+                permission
+              );
+              permissions.add(permission);
+            }
           }
         }
-      } catch (error) {
-        logger.error(
-          "[getUserPermissions] Error processing role:",
-          userRole.roleId,
-          error
-        );
+      }
+    } else {
+      // Process roles from user_roles table
+      for (const userRole of userRoles) {
+        try {
+          const role = db.roles.getRoleById(userRole.roleId);
+          logger.info(
+            "[getUserPermissions] Processing role:",
+            role?.name,
+            "isActive:",
+            role?.isActive
+          );
+          logger.info(
+            "[getUserPermissions] Role permissions type:",
+            typeof role?.permissions,
+            "value:",
+            role?.permissions
+          );
+
+          if (role && role.isActive && role.permissions) {
+            // Handle permissions - could be array or JSON string
+            let rolePermissions: string[] = [];
+            if (typeof role.permissions === "string") {
+              try {
+                rolePermissions = JSON.parse(role.permissions);
+              } catch (e) {
+                logger.error(
+                  "[getUserPermissions] Failed to parse role permissions:",
+                  e
+                );
+                rolePermissions = [role.permissions];
+              }
+            } else if (Array.isArray(role.permissions)) {
+              rolePermissions = role.permissions as string[];
+            }
+
+            logger.info(
+              "[getUserPermissions] Parsed permissions:",
+              rolePermissions
+            );
+
+            // Add all role permissions
+            for (const permission of rolePermissions) {
+              logger.info(
+                "[getUserPermissions] Adding permission from role:",
+                permission
+              );
+              permissions.add(permission);
+            }
+          }
+        } catch (error) {
+          logger.error(
+            "[getUserPermissions] Error processing role:",
+            userRole.roleId,
+            error
+          );
+        }
       }
     }
 

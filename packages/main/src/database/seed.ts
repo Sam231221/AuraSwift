@@ -4,12 +4,13 @@
  */
 
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { PERMISSION_GROUPS } from "../constants/permissions.js";
 
-import { getLogger } from '../utils/logger.js';
-const logger = getLogger('seed');
+import { getLogger } from "../utils/logger.js";
+const logger = getLogger("seed");
 
 export async function seedDefaultData(
   db: BetterSQLite3Database,
@@ -214,10 +215,14 @@ export async function seedDefaultData(
 
     // 5. Assign roles to users
     logger.info("   🔗 Assigning roles to users...");
+    const adminUserRoleId = uuidv4();
+    const managerUserRoleId = uuidv4();
+    const cashierUserRoleId = uuidv4();
+
     db.insert(schema.userRoles)
       .values([
         {
-          id: uuidv4(),
+          id: adminUserRoleId,
           userId: adminUserId,
           roleId: adminRoleId,
           assignedBy: adminUserId,
@@ -226,7 +231,7 @@ export async function seedDefaultData(
           isActive: true,
         },
         {
-          id: uuidv4(),
+          id: managerUserRoleId,
           userId: managerUserId,
           roleId: managerRoleId,
           assignedBy: adminUserId,
@@ -235,7 +240,7 @@ export async function seedDefaultData(
           isActive: true,
         },
         {
-          id: uuidv4(),
+          id: cashierUserRoleId,
           userId: cashierUserId,
           roleId: cashierRoleId,
           assignedBy: adminUserId,
@@ -245,6 +250,32 @@ export async function seedDefaultData(
         },
       ])
       .run();
+
+    // Verify user_roles were created
+    logger.info("   ✅ Verifying user_roles creation...");
+    const verifyUserRoles = db
+      .select()
+      .from(schema.userRoles)
+      .where(eq(schema.userRoles.userId, adminUserId))
+      .all();
+    logger.info(
+      `   📊 Found ${verifyUserRoles.length} user_roles entries for admin user (${adminUserId})`
+    );
+    if (verifyUserRoles.length > 0) {
+      logger.info(
+        "   📋 Admin user_roles details:",
+        JSON.stringify(
+          verifyUserRoles.map((r) => ({
+            id: r.id,
+            userId: r.userId,
+            roleId: r.roleId,
+            isActive: r.isActive,
+          })),
+          null,
+          2
+        )
+      );
+    }
 
     logger.info("✅ Database seeding completed successfully!");
     logger.info("\n📋 Default Accounts Created:");

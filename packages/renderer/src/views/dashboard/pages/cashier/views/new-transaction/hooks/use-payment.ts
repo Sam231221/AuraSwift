@@ -727,7 +727,14 @@ export function usePayment({
 
       if (businessId) {
         try {
+          // Get session token for authentication
+          const sessionToken = await window.authStore.get("token");
+          if (!sessionToken) {
+            throw new Error("Not authenticated");
+          }
+
           const businessResponse = await window.authAPI.getBusinessById(
+            sessionToken,
             businessId
           );
           if (businessResponse.success && businessResponse.business) {

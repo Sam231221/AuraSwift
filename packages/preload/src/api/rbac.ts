@@ -42,6 +42,9 @@ export const rbacAPI = {
 
     getById: (sessionToken: string, roleId: string) =>
       ipcRenderer.invoke("roles:getById", sessionToken, roleId),
+
+    getUsersByRole: (sessionToken: string, roleId: string) =>
+      ipcRenderer.invoke("roles:getUsersByRole", sessionToken, roleId),
   },
 
   // ============================================================================

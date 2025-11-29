@@ -72,11 +72,14 @@ export const authAPI = {
   /**
    * Create a new user (admin/manager only)
    */
-  createUser: async (userData: CreateUserData): Promise<APIResponse> => {
+  createUser: async (
+    sessionToken: string,
+    userData: CreateUserData
+  ): Promise<APIResponse> => {
     if (!window.authAPI) {
       throw new Error("Auth API not available");
     }
-    return window.authAPI.createUser(userData);
+    return window.authAPI.createUser(sessionToken, userData);
   },
 
   /**
@@ -111,64 +114,75 @@ export const authAPI = {
 
   /**
    * Get user by ID
+   * @param sessionToken - Optional session token (if provided, requires authentication)
+   * @param userId - User ID to fetch
    */
-  getUserById: async (userId: string): Promise<APIResponse> => {
+  getUserById: async (
+    sessionTokenOrUserId: string,
+    userId?: string
+  ): Promise<APIResponse> => {
     if (!window.authAPI) {
       throw new Error("Auth API not available");
     }
-    return window.authAPI.getUserById(userId);
+    // Support both patterns: (userId) for public access, (sessionToken, userId) for authenticated
+    return window.authAPI.getUserById(sessionTokenOrUserId, userId);
   },
 
   /**
    * Update user
    */
   updateUser: async (
+    sessionToken: string,
     userId: string,
     updates: Record<string, string | number | boolean>
   ): Promise<APIResponse> => {
     if (!window.authAPI) {
       throw new Error("Auth API not available");
     }
-    return window.authAPI.updateUser(userId, updates);
+    return window.authAPI.updateUser(sessionToken, userId, updates);
   },
 
   /**
    * Get all active users
+   * @param sessionToken - Optional session token (if not provided, returns all users for login page)
    */
-  getAllActiveUsers: async (): Promise<APIResponse> => {
+  getAllActiveUsers: async (sessionToken?: string): Promise<APIResponse> => {
     if (!window.authAPI) {
       throw new Error("Auth API not available");
     }
-    return window.authAPI.getAllActiveUsers();
+    return window.authAPI.getAllActiveUsers(sessionToken);
   },
 
   /**
    * Get users by business ID
    */
-  getUsersByBusiness: async (businessId: string): Promise<APIResponse> => {
+  getUsersByBusiness: async (
+    sessionToken: string,
+    businessId: string
+  ): Promise<APIResponse> => {
     if (!window.authAPI) {
       throw new Error("Auth API not available");
     }
-    return window.authAPI.getUsersByBusiness(businessId);
+    return window.authAPI.getUsersByBusiness(sessionToken, businessId);
   },
 
   /**
    * Delete user
    */
-  deleteUser: async (userId: string): Promise<APIResponse> => {
+  deleteUser: async (sessionToken: string, userId: string): Promise<APIResponse> => {
     if (!window.authAPI) {
       throw new Error("Auth API not available");
     }
-    return window.authAPI.deleteUser(userId);
+    return window.authAPI.deleteUser(sessionToken, userId);
   },
 
   /**
    * Get business by ID
    */
-  getBusinessById: async (businessId: string) => {
+  getBusinessById: async (sessionToken: string, businessId: string) => {
     if (!window.authAPI) {
       throw new Error("Auth API not available");
     }
-    return window.authAPI.getBusinessById(businessId);
+    return window.authAPI.getBusinessById(sessionToken, businessId);
   },
 };

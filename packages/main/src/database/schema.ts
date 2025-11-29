@@ -120,6 +120,47 @@ export const businesses = createTable("businesses", {
 });
 
 /**
+ * Terminals/Devices authorized to access the system
+ */
+export const terminals = createTable(
+  "terminals",
+  {
+    id: text("id").primaryKey(),
+    business_id: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+
+    name: text("name").notNull(), // e.g., "Front Counter 1"
+    type: text("type", {
+      enum: ["pos", "kiosk", "handheld", "kitchen_display", "server"],
+    })
+      .notNull()
+      .default("pos"),
+
+    status: text("status", {
+      enum: ["active", "inactive", "maintenance", "decommissioned"],
+    })
+      .notNull()
+      .default("active"),
+
+    device_token: text("device_token").unique(), // For API authentication
+    ip_address: text("ip_address"),
+    mac_address: text("mac_address"),
+
+    // Hardware configuration
+    settings: text("settings", { mode: "json" }), // Printer, scanner, card reader config
+
+    last_active_at: integer("last_active_at", { mode: "timestamp_ms" }),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("terminals_business_idx").on(table.business_id),
+    index("terminals_status_idx").on(table.status),
+    index("terminals_token_idx").on(table.device_token),
+  ]
+);
+
+/**
  * Roles - Define sets of permissions that can be assigned to users
  * Supports both system roles and custom business-specific roles
  */
@@ -228,47 +269,6 @@ export const userPermissions = createTable(
   (table) => [
     unique("idx_user_permissions_unique").on(table.userId, table.permission),
     index("idx_user_permissions_user").on(table.userId),
-  ]
-);
-
-/**
- * Terminals/Devices authorized to access the system
- */
-export const terminals = createTable(
-  "terminals",
-  {
-    id: text("id").primaryKey(),
-    business_id: text("business_id")
-      .notNull()
-      .references(() => businesses.id, { onDelete: "cascade" }),
-
-    name: text("name").notNull(), // e.g., "Front Counter 1"
-    type: text("type", {
-      enum: ["pos", "kiosk", "handheld", "kitchen_display", "server"],
-    })
-      .notNull()
-      .default("pos"),
-
-    status: text("status", {
-      enum: ["active", "inactive", "maintenance", "decommissioned"],
-    })
-      .notNull()
-      .default("active"),
-
-    device_token: text("device_token").unique(), // For API authentication
-    ip_address: text("ip_address"),
-    mac_address: text("mac_address"),
-
-    // Hardware configuration
-    settings: text("settings", { mode: "json" }), // Printer, scanner, card reader config
-
-    last_active_at: integer("last_active_at", { mode: "timestamp_ms" }),
-    ...timestampColumns,
-  },
-  (table) => [
-    index("terminals_business_idx").on(table.business_id),
-    index("terminals_status_idx").on(table.status),
-    index("terminals_token_idx").on(table.device_token),
   ]
 );
 

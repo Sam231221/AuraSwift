@@ -12,7 +12,14 @@ export function useDeleteUser() {
 
     try {
       logger.info(`Deleting user: ${userName} (${userId})`);
-      const response = await window.authAPI.deleteUser(userId);
+
+      // Get session token for authentication
+      const sessionToken = await window.authStore.get("token");
+      if (!sessionToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await window.authAPI.deleteUser(sessionToken, userId);
 
       if (response.success) {
         toast.success("Staff member deleted successfully");

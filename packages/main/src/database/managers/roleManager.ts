@@ -49,6 +49,23 @@ export class RoleManager {
   }
 
   /**
+   * Parse permissions field - handles both JSON string and array
+   */
+  private parsePermissions(permissions: any): string[] {
+    if (!permissions) return [];
+    if (Array.isArray(permissions)) return permissions;
+    if (typeof permissions === "string") {
+      try {
+        return JSON.parse(permissions);
+      } catch (e) {
+        // If parsing fails, return as single-item array
+        return [permissions];
+      }
+    }
+    return [];
+  }
+
+  /**
    * Get role by ID
    */
   getRoleById(roleId: string): Role | null {
@@ -58,7 +75,13 @@ export class RoleManager {
       .where(eq(schema.roles.id, roleId))
       .get();
 
-    return role || null;
+    if (!role) return null;
+
+    // Ensure permissions are parsed correctly
+    return {
+      ...role,
+      permissions: this.parsePermissions(role.permissions) as any,
+    };
   }
 
   /**
@@ -76,7 +99,13 @@ export class RoleManager {
       )
       .get();
 
-    return role || null;
+    if (!role) return null;
+
+    // Ensure permissions are parsed correctly
+    return {
+      ...role,
+      permissions: this.parsePermissions(role.permissions) as any,
+    };
   }
 
   /**
@@ -89,19 +118,25 @@ export class RoleManager {
       conditions.push(eq(schema.roles.isActive, true));
     }
 
-    return this.db
+    const roles = this.db
       .select()
       .from(schema.roles)
       .where(and(...conditions))
       .orderBy(desc(schema.roles.isSystemRole), schema.roles.name)
       .all();
+
+    // Ensure permissions are parsed correctly for all roles
+    return roles.map((role) => ({
+      ...role,
+      permissions: this.parsePermissions(role.permissions) as any,
+    }));
   }
 
   /**
    * Get all system roles for a business
    */
   getSystemRoles(businessId: string): Role[] {
-    return this.db
+    const roles = this.db
       .select()
       .from(schema.roles)
       .where(
@@ -112,13 +147,19 @@ export class RoleManager {
         )
       )
       .all();
+
+    // Ensure permissions are parsed correctly for all roles
+    return roles.map((role) => ({
+      ...role,
+      permissions: this.parsePermissions(role.permissions) as any,
+    }));
   }
 
   /**
    * Get all custom (non-system) roles for a business
    */
   getCustomRoles(businessId: string): Role[] {
-    return this.db
+    const roles = this.db
       .select()
       .from(schema.roles)
       .where(
@@ -129,6 +170,12 @@ export class RoleManager {
         )
       )
       .all();
+
+    // Ensure permissions are parsed correctly for all roles
+    return roles.map((role) => ({
+      ...role,
+      permissions: this.parsePermissions(role.permissions) as any,
+    }));
   }
 
   /**
@@ -152,7 +199,11 @@ export class RoleManager {
       throw new Error("Role not found");
     }
 
-    return updatedRole;
+    // Ensure permissions are parsed correctly
+    return {
+      ...updatedRole,
+      permissions: this.parsePermissions(updatedRole.permissions) as any,
+    };
   }
 
   /**

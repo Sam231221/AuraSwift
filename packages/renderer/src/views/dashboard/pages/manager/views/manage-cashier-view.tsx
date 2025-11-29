@@ -119,7 +119,16 @@ export default function CashierManagementView({
 
     setIsLoadingUsers(true);
     try {
-      const response = await window.authAPI.getUsersByBusiness(user.businessId);
+      // Get session token for authentication
+      const sessionToken = await window.authStore.get("token");
+      if (!sessionToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await window.authAPI.getUsersByBusiness(
+        sessionToken,
+        user.businessId
+      );
 
       if (response.success && response.users) {
         // Filter out admin users and convert to StaffUser format
@@ -163,7 +172,13 @@ export default function CashierManagementView({
     }
 
     try {
-      const response = await window.authAPI.deleteUser(userId);
+      // Get session token for authentication
+      const sessionToken = await window.authStore.get("token");
+      if (!sessionToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await window.authAPI.deleteUser(sessionToken, userId);
 
       if (response.success) {
         toast.success("Cashier deleted successfully");
@@ -913,7 +928,17 @@ function EditCashierDialog({
         updates.address = data.address;
       }
 
-      const response = await window.authAPI.updateUser(cashier.id, updates);
+      // Get session token for authentication
+      const sessionToken = await window.authStore.get("token");
+      if (!sessionToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await window.authAPI.updateUser(
+        sessionToken,
+        cashier.id,
+        updates
+      );
 
       if (!response.success) {
         throw new Error(response.message || "Failed to update cashier");

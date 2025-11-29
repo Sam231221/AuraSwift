@@ -214,3 +214,44 @@ export function useDeleteRole() {
 
   return { mutate: deleteRole, isPending };
 }
+
+export function useUsersByRole() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const getUsersByRole = useCallback(
+    async (
+      roleId: string
+    ): Promise<Array<{ user: any; userRole: any }> | null> => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const sessionToken = await window.authStore.get("token");
+        if (!sessionToken) throw new Error("Not authenticated");
+
+        const response = await window.rbacAPI.roles.getUsersByRole(
+          sessionToken,
+          roleId
+        );
+
+        if (!response.success) {
+          throw new Error(response.message || "Failed to get users with role");
+        }
+
+        return response.data as Array<{ user: any; userRole: any }>;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error";
+        logger.error(`[useUsersByRole] Error: ${errorMessage}`, err);
+        setError(errorMessage);
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  return { getUsersByRole, isLoading, error };
+}

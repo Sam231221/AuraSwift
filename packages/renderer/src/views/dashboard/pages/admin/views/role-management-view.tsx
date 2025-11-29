@@ -1,21 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, Plus, Search, Shield } from "lucide-react";
+import { useAuth } from "@/shared/hooks/use-auth";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('role-management-view');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("role-management-view");
 import {
   RoleCard,
   CreateRoleDialog,
   EditRoleDialog,
   DeleteRoleDialog,
+  ViewRoleUsersDialog,
 } from "./rbac-management/components";
 import {
   useRoles,
   useCreateRole,
   useUpdateRole,
   useDeleteRole,
+  useUsersByRole,
 } from "./rbac-management/hooks";
 import type {
   RoleCreateFormData,
@@ -36,6 +40,8 @@ interface Role {
 }
 
 export default function RoleManagementView({ onBack }: { onBack: () => void }) {
+  const { user } = useAuth();
+  const isAdmin = getUserRoleName(user) === "admin";
   const { data: roles, isLoading, refetch } = useRoles();
   const { mutate: createRole, isPending: isCreating } = useCreateRole();
   const { mutate: updateRole, isPending: isUpdating } = useUpdateRole();
@@ -45,7 +51,12 @@ export default function RoleManagementView({ onBack }: { onBack: () => void }) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isViewUsersDialogOpen, setIsViewUsersDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [roleUserCounts, setRoleUserCounts] = useState<Record<string, number>>(
+    {}
+  );
+  const { getUsersByRole } = useUsersByRole();
 
   const filteredRoles = roles?.filter((role) => {
     const searchLower = searchTerm.toLowerCase();
@@ -89,6 +100,7 @@ export default function RoleManagementView({ onBack }: { onBack: () => void }) {
   };
 
   const openEditDialog = (role: Role) => {
+    logger.info("[openEditDialog] Opening edit dialog for role:", role);
     setSelectedRole(role);
     setIsEditDialogOpen(true);
   };
@@ -97,6 +109,33 @@ export default function RoleManagementView({ onBack }: { onBack: () => void }) {
     setSelectedRole(role);
     setIsDeleteDialogOpen(true);
   };
+
+  const openViewUsersDialog = (role: Role) => {
+    setSelectedRole(role);
+    setIsViewUsersDialogOpen(true);
+  };
+
+  // Load user counts for all roles
+  useEffect(() => {
+    if (!roles || roles.length === 0) return;
+
+    const loadUserCounts = async () => {
+      const counts: Record<string, number> = {};
+      for (const role of roles) {
+        try {
+          const users = await getUsersByRole(role.id);
+          counts[role.id] = users?.length || 0;
+        } catch (error) {
+          logger.error(`Failed to load user count for role ${role.id}:`, error);
+          counts[role.id] = 0;
+        }
+      }
+      setRoleUserCounts(counts);
+    };
+
+    loadUserCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roles]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-[1600px] space-y-6">
@@ -166,12 +205,11 @@ export default function RoleManagementView({ onBack }: { onBack: () => void }) {
             <RoleCard
               key={role.id}
               role={role}
+              userCount={roleUserCounts[role.id] ?? 0}
               onEdit={openEditDialog}
               onDelete={openDeleteDialog}
-              onViewUsers={(role) => {
-                // TODO: Navigate to user list filtered by this role
-                logger.info("View users for role:", role);
-              }}
+              onViewUsers={openViewUsersDialog}
+              canEdit={isAdmin}
             />
           ))}
         </div>
@@ -196,7 +234,13 @@ export default function RoleManagementView({ onBack }: { onBack: () => void }) {
       {/* Dialogs */}
       <CreateRoleDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            // Reset state when dialog closes
+            setSelectedRole(null);
+          }
+        }}
         onSubmit={handleCreateRole}
         isLoading={isCreating}
       />
@@ -215,6 +259,12 @@ export default function RoleManagementView({ onBack }: { onBack: () => void }) {
         onOpenChange={setIsDeleteDialogOpen}
         onConfirm={handleDeleteRole}
         isLoading={isDeleting}
+      />
+
+      <ViewRoleUsersDialog
+        role={selectedRole}
+        open={isViewUsersDialogOpen}
+        onOpenChange={setIsViewUsersDialogOpen}
       />
     </div>
   );

@@ -1,8 +1,8 @@
 import { createContext, useState, useEffect, type ReactNode } from "react";
 import type { User, AuthContextType } from "../types/auth.types";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('auth-context');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("auth-context");
 
 /* eslint-disable react-refresh/only-export-components */
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -184,7 +184,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const response = await window.authAPI.createUser(userData);
+      // Get session token for authentication
+      const sessionToken = await window.authStore.get("token");
+      if (!sessionToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await window.authAPI.createUser(sessionToken, userData);
 
       if (response.success) {
         return { success: true, message: response.message };
@@ -243,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { needsClockOutWarning: false };
   };
 
-  // Validate session on app start
+  // Validate session on app start (but not immediately after login)
   useEffect(() => {
     const validateSession = async () => {
       setIsInitializing(true);
@@ -252,6 +258,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const storedUser = await window.authStore.get("user");
 
         if (token && storedUser) {
+          // Basic token format validation
+          if (typeof token !== "string" || token.length < 10) {
+            logger.warn("Invalid token format, clearing session");
+            await window.authStore.delete("user");
+            await window.authStore.delete("token");
+            setIsInitializing(false);
+            return;
+          }
+
           const response = await window.authAPI.validateSession(token);
 
           if (response.success && response.user) {
@@ -260,8 +275,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await window.authStore.set("user", JSON.stringify(response.user));
           } else {
             // Session is invalid, clear stored data
+            // Don't show error toast on initial validation - only if user was already logged in
+            // This prevents false errors right after login
+            const errorCode = (response as { code?: string }).code;
+            logger.warn(
+              "Session validation failed:",
+              response.message || errorCode
+            );
             await window.authStore.delete("user");
             await window.authStore.delete("token");
+            // Only clear user state if it was set (not on initial mount)
+            // We intentionally don't include 'user' in deps - this only runs on mount
+            const currentUser = user;
+            if (currentUser) {
+              setUser(null);
+            }
           }
         }
       } catch (error) {
@@ -269,13 +297,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Clear stored data on error
         await window.authStore.delete("user");
         await window.authStore.delete("token");
+        if (user) {
+          setUser(null);
+        }
       } finally {
         setIsInitializing(false);
       }
     };
 
-    validateSession();
-  }, []);
+    // Small delay to avoid race condition with login
+    const timeoutId = setTimeout(() => {
+      validateSession();
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount, not when user changes
 
   const clockIn = async (
     userId: string,
@@ -341,7 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const getActiveShift = async (userId: string): Promise<any> => {
+  const getActiveShift = async (userId: string): Promise<unknown> => {
     try {
       const response = await window.timeTrackingAPI.getActiveShift(userId);
       return response.shift || null;

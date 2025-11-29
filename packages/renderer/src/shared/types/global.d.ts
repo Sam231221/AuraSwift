@@ -36,18 +36,21 @@ declare global {
         avatar?: string;
         businessAvatar?: string;
       }) => Promise<APIResponse>;
-      createUser: (userData: {
-        businessId: string;
-        username: string;
-        pin: string;
-        email?: string;
-        password?: string;
-        firstName: string;
-        lastName: string;
-        role: "cashier" | "manager";
-        avatar?: string;
-        address?: string;
-      }) => Promise<APIResponse>;
+      createUser: (
+        sessionToken: string,
+        userData: {
+          businessId: string;
+          username: string;
+          pin: string;
+          email?: string;
+          password?: string;
+          firstName: string;
+          lastName: string;
+          role: "cashier" | "manager";
+          avatar?: string;
+          address?: string;
+        }
+      ) => Promise<APIResponse>;
       login: (credentials: {
         username: string;
         pin: string;
@@ -77,15 +80,25 @@ declare global {
           activeShift?: any;
         }
       >;
-      getUserById: (userId: string) => Promise<APIResponse>;
+      getUserById: (
+        sessionTokenOrUserId: string,
+        userId?: string
+      ) => Promise<APIResponse>;
       updateUser: (
+        sessionToken: string,
         userId: string,
         updates: Record<string, string | number | boolean>
       ) => Promise<APIResponse>;
-      getAllActiveUsers: () => Promise<APIResponse>;
-      getUsersByBusiness: (businessId: string) => Promise<APIResponse>;
-      deleteUser: (userId: string) => Promise<APIResponse>;
-      getBusinessById: (businessId: string) => Promise<{
+      getAllActiveUsers: (sessionToken?: string) => Promise<APIResponse>;
+      getUsersByBusiness: (
+        sessionToken: string,
+        businessId: string
+      ) => Promise<APIResponse>;
+      deleteUser: (sessionToken: string, userId: string) => Promise<APIResponse>;
+      getBusinessById: (
+        sessionToken: string,
+        businessId: string
+      ) => Promise<{
         success: boolean;
         business?: {
           id: string;
