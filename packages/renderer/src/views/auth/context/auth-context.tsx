@@ -86,8 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (userData: {
-    email: string;
-    password: string;
+    email?: string;
+    username: string;
+    pin: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -124,8 +125,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const registerBusiness = async (userData: {
-    email: string;
-    password: string;
+    email?: string;
+    username: string;
+    pin: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -174,7 +176,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     username: string;
     pin: string;
     email?: string;
-    password?: string;
     firstName: string;
     lastName: string;
     role: "cashier" | "manager";

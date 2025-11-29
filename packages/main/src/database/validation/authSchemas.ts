@@ -92,24 +92,16 @@ export const pinSchema = z
 
 // Registration schema
 export const registerSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
+  email: emailSchema.optional(),
   firstName: nameSchema,
   lastName: nameSchema,
   businessName: businessNameSchema,
   role: z.enum(["cashier", "manager", "admin"]),
-  pin: pinSchema.optional(),
+  pin: pinSchema,
   username: z
     .string()
     .min(3, "Username must be at least 3 characters")
     .optional(),
-});
-
-// Login schema (email + password - for admin/initial setup)
-export const loginSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(1, "Password is required"),
-  rememberMe: z.boolean().optional(),
 });
 
 // PIN-based login schema (username + PIN - for POS terminal)
@@ -132,8 +124,7 @@ export const updateUserSchema = z.object({
 
 // Create staff user schema (for business owners creating staff)
 export const createStaffUserSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
+  email: emailSchema.optional(),
   pin: pinSchema,
   firstName: nameSchema,
   lastName: nameSchema,
@@ -158,7 +149,6 @@ export const userIdSchema = z.string().uuid("Invalid user ID");
 // ============================================
 
 export type RegisterInput = z.infer<typeof registerSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
 export type PinLoginInput = z.infer<typeof pinLoginSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CreateStaffUserInput = z.infer<typeof createStaffUserSchema>;

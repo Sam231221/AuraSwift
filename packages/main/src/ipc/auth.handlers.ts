@@ -195,7 +195,7 @@ export function registerAuthHandlers() {
           "session",
           loginResponse.token || "unknown",
           {
-            method: credentials.username ? "pin" : "password",
+            method: "pin",
             rememberMe: credentials.rememberMe || false,
           }
         );

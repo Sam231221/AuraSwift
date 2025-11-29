@@ -8,7 +8,6 @@ const logger = getLogger('userManager');
 
 import {
   registerSchema,
-  loginSchema,
   pinLoginSchema,
   validateInput,
 } from "../validation/authSchemas.js";
@@ -122,23 +121,6 @@ export class UserManager {
     return user as User;
   }
 
-  async authenticateUser(
-    email: string,
-    password: string
-  ): Promise<User | null> {
-    const user = this.getUserByEmail(email);
-    if (!user) return null;
-
-    const isValidPassword = await this.bcrypt.compare(
-      password,
-      user.passwordHash
-    );
-    if (!isValidPassword) return null;
-
-    // Return user without passwordHash and salt
-    const { passwordHash: _, salt: __, ...userWithoutSecrets } = user;
-    return userWithoutSecrets as User;
-  }
   getUserWithBusiness(userId: string) {
     const result = this.db
       .select({
@@ -256,8 +238,7 @@ export class UserManager {
   //CRUD
   async createUser(userData: {
     username: string;
-    email: string;
-    password: string;
+    email?: string;
     pin: string;
     firstName: string;
     lastName: string;
@@ -268,7 +249,6 @@ export class UserManager {
     const userId = this.uuid.v4();
     const businessId = userData.businessId || this.uuid.v4();
     const salt = await this.bcrypt.genSalt(10);
-    const hashedPassword = await this.bcrypt.hash(userData.password, salt);
     const hashedPin = await this.bcrypt.hash(userData.pin, salt);
     const now = new Date();
 
@@ -324,8 +304,8 @@ export class UserManager {
         .values({
           id: userId,
           username: userData.username,
-          email: userData.email,
-          passwordHash: hashedPassword,
+          email: userData.email || null,
+          passwordHash: null,
           pinHash: hashedPin,
           salt: salt,
           firstName: userData.firstName,
@@ -472,8 +452,7 @@ export class UserManager {
   // Business Logic Methods (moved from appApi.ts)
 
   async register(data: {
-    email: string;
-    password: string;
+    email?: string;
     pin: string;
     firstName: string;
     lastName: string;
@@ -495,20 +474,37 @@ export class UserManager {
 
       const validatedData = validation.data;
 
-      // Check if user already exists
-      const existingUser = this.getUserByEmail(validatedData.email);
+      // Check if username already exists
+      if (!validatedData.username) {
+        return {
+          success: false,
+          message: "Username is required",
+        };
+      }
+      const existingUser = this.getUserByUsername(validatedData.username);
       if (existingUser) {
         return {
           success: false,
-          message: "User with this email already exists",
+          message: "Username already exists",
         };
       }
 
-      // Ensure required fields are present (defaults if optional)
+      // Check if email already exists (if provided)
+      if (validatedData.email) {
+        const existingEmailUser = this.getUserByEmail(validatedData.email);
+        if (existingEmailUser) {
+          return {
+            success: false,
+            message: "User with this email already exists",
+          };
+        }
+      }
+
+      // Ensure required fields are present
       const userData = {
         ...validatedData,
-        username: validatedData.username || validatedData.email.split("@")[0],
-        pin: validatedData.pin || "0000",
+        username: validatedData.username || `user_${Date.now()}`,
+        pin: validatedData.pin,
       };
 
       // Create user with validated data
@@ -544,10 +540,8 @@ export class UserManager {
   }
 
   async login(data: {
-    email?: string;
-    password?: string;
-    username?: string;
-    pin?: string;
+    username: string;
+    pin: string;
     rememberMe?: boolean;
     terminalId?: string;
     ipAddress?: string;
@@ -558,7 +552,7 @@ export class UserManager {
       let user: User | null = null;
       let rememberMe = data.rememberMe || false;
 
-      // Check if this is PIN-based login (username + PIN)
+      // PIN-based login (username + PIN)
       if (data.username && data.pin) {
         // Validate PIN login
         const validation = validateInput(pinLoginSchema, {
@@ -587,37 +581,10 @@ export class UserManager {
             message: "Invalid username or PIN",
           };
         }
-      }
-      // Email/password login (legacy/admin login)
-      else if (data.email && data.password) {
-        // Validate email/password login
-        const validation = validateInput(loginSchema, {
-          email: data.email,
-          password: data.password,
-          rememberMe: data.rememberMe,
-        });
-
-        if (!validation.success) {
-          return {
-            success: false,
-            message: "Validation failed",
-            errors: validation.errors,
-          };
-        }
-
-        // Authenticate with email and password
-        user = await this.authenticateUser(data.email, data.password);
-
-        if (!user) {
-          return {
-            success: false,
-            message: "Invalid email or password",
-          };
-        }
       } else {
         return {
           success: false,
-          message: "Please provide either username/PIN or email/password",
+          message: "Please provide username and PIN",
         };
       }
 
@@ -976,8 +943,7 @@ export class UserManager {
 
   async createUserForBusiness(userData: {
     businessId: string;
-    email: string;
-    password: string;
+    email?: string;
     pin: string;
     username: string;
     firstName: string;

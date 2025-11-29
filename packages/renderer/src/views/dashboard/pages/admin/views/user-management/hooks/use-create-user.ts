@@ -24,15 +24,14 @@ export function useCreateUser() {
 
       const userData = {
         businessId: data.businessId,
-        email: data.email,
-        password: data.password,
+        email: data.email || undefined,
+        username: data.username,
+        pin: data.pin,
         firstName: data.firstName,
         lastName: data.lastName,
         role: data.role,
         avatar: data.avatar || undefined,
         address: data.address || undefined,
-        username: data.email, // Use email as username
-        pin: "1234", // Default PIN, should be changed by admin/user later
       };
 
       const response = await createUser(userData);

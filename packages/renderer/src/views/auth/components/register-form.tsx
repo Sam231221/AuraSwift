@@ -18,8 +18,9 @@ import { useRegisterForm } from "../hooks/use-register-form";
 
 interface RegisterFormProps {
   onSubmit: (userData: {
-    email: string;
-    password: string;
+    email?: string;
+    username: string;
+    pin: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -37,14 +38,15 @@ export function RegisterForm({
   success,
   isLoading,
 }: RegisterFormProps) {
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const [businessAvatar, setBusinessAvatar] = useState<string | null>(null);
 
   const { form, handleSubmit, isSubmitting } = useRegisterForm({
     onSubmit: async (data) => {
       await onSubmit({
-        email: data.email,
-        password: data.password,
+        email: data.email || undefined,
+        username: data.username,
+        pin: data.pin,
         firstName: data.firstName,
         lastName: data.lastName,
         businessName: data.businessName,
@@ -154,7 +156,7 @@ export function RegisterForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-sm sm:text-base">
-                  Email Address
+                  Email Address (Optional)
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -172,18 +174,38 @@ export function RegisterForm({
 
           <FormField
             control={form.control}
-            name="password"
+            name="username"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-sm sm:text-base">Password</FormLabel>
+                <FormLabel className="text-sm sm:text-base">Username</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder="Choose a username"
+                    className="h-10 sm:h-11 text-sm sm:text-base"
+                    disabled={isSubmitting || isLoading}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="pin"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm sm:text-base">PIN</FormLabel>
                 <div className="relative">
                   <FormControl>
                     <Input
                       {...field}
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Create a strong password"
+                      type={showPin ? "text" : "password"}
+                      placeholder="Enter 6-digit PIN"
                       className="h-10 sm:h-11 pr-10 text-sm sm:text-base"
                       disabled={isSubmitting || isLoading}
+                      maxLength={6}
                     />
                   </FormControl>
                   <Button
@@ -191,9 +213,9 @@ export function RegisterForm({
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowPin(!showPin)}
                   >
-                    {showPassword ? (
+                    {showPin ? (
                       <EyeOff className="h-4 w-4 text-muted-foreground" />
                     ) : (
                       <Eye className="h-4 w-4 text-muted-foreground" />
@@ -201,8 +223,7 @@ export function RegisterForm({
                   </Button>
                 </div>
                 <FormDescription className="text-[10px] sm:text-xs">
-                  Password must be at least 8 characters with uppercase,
-                  lowercase, number, and special character.
+                  Enter a 6-digit PIN for login.
                 </FormDescription>
                 <FormMessage />
               </FormItem>

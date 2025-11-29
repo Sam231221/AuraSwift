@@ -6,8 +6,9 @@
 import type { APIResponse } from "@/types/api/common";
 
 export interface RegisterData {
-  email: string;
-  password: string;
+  email?: string;
+  username: string;
+  pin: string;
   firstName: string;
   lastName: string;
   businessName: string;
@@ -15,8 +16,9 @@ export interface RegisterData {
 }
 
 export interface RegisterBusinessData {
-  email: string;
-  password: string;
+  email?: string;
+  username: string;
+  pin: string;
   firstName: string;
   lastName: string;
   businessName: string;
@@ -29,7 +31,6 @@ export interface CreateUserData {
   username: string;
   pin: string;
   email?: string;
-  password?: string;
   firstName: string;
   lastName: string;
   role: "cashier" | "manager";

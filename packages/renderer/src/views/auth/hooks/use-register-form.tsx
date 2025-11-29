@@ -1,6 +1,6 @@
 /**
  * Register Form Hook
- * 
+ *
  * Custom hook for managing registration form state, validation, and submission
  * using React Hook Form with Zod validation.
  */
@@ -30,7 +30,8 @@ interface UseRegisterFormOptions {
  */
 const getDefaultValues = (): RegisterFormData => ({
   email: "",
-  password: "",
+  username: "",
+  pin: "",
   firstName: "",
   lastName: "",
   businessName: "",
@@ -40,7 +41,7 @@ const getDefaultValues = (): RegisterFormData => ({
 
 /**
  * Hook for managing register form
- * 
+ *
  * @example
  * ```tsx
  * const { form, handleSubmit, isSubmitting } = useRegisterForm({
@@ -79,4 +80,3 @@ export function useRegisterForm({
     errors: form.formState.errors,
   };
 }
-

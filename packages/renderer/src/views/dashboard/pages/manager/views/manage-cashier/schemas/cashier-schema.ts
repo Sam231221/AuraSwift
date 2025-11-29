@@ -10,7 +10,7 @@ import {
   requiredStringSchema,
   optionalStringSchema,
   emailSchema,
-  passwordSchema,
+  pinSchema,
 } from "@/shared/validation/common";
 
 /**
@@ -25,14 +25,16 @@ const nameSchema = requiredStringSchema("Name")
   );
 
 /**
- * Cashier create schema (with password)
+ * Cashier create schema (with username and PIN)
  * Used for creating new cashier/staff accounts
  */
 export const cashierCreateSchema = z
   .object({
-    email: emailSchema,
-    password: passwordSchema.min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your password"),
+    email: emailSchema.optional(),
+    username: requiredStringSchema("Username")
+      .min(3, "Username must be at least 3 characters")
+      .max(50, "Username must not exceed 50 characters"),
+    pin: pinSchema(6),
     firstName: nameSchema,
     lastName: nameSchema,
     role: z.enum(["cashier", "manager"]).default("cashier"),
@@ -45,16 +47,6 @@ export const cashierCreateSchema = z
       .or(z.literal(""))
       .transform((val) => val || ""),
     businessId: z.string().min(1, "Business ID is required"),
-  })
-  .superRefine((data, ctx) => {
-    // Password confirmation must match password
-    if (data.password !== data.confirmPassword) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Passwords do not match",
-        path: ["confirmPassword"],
-      });
-    }
   });
 
 /**
@@ -63,7 +55,7 @@ export const cashierCreateSchema = z
  */
 export const cashierUpdateSchema = z.object({
   id: z.string().min(1, "Cashier ID is required"),
-  email: emailSchema,
+  email: emailSchema.optional(),
   firstName: nameSchema,
   lastName: nameSchema,
   avatar: optionalStringSchema,

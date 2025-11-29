@@ -10,8 +10,9 @@ import type { APIResponse } from './common';
 
 export interface AuthAPI {
   register: (userData: {
-    email: string;
-    password: string;
+    email?: string;
+    username: string;
+    pin: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -19,8 +20,9 @@ export interface AuthAPI {
   }) => Promise<APIResponse>;
 
   registerBusiness: (userData: {
-    email: string;
-    password: string;
+    email?: string;
+    username: string;
+    pin: string;
     firstName: string;
     lastName: string;
     businessName: string;
@@ -35,7 +37,6 @@ export interface AuthAPI {
       username: string;
       pin: string;
       email?: string;
-      password?: string;
       firstName: string;
       lastName: string;
       role: 'cashier' | 'manager';

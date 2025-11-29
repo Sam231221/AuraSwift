@@ -628,23 +628,16 @@ function CreateCashierDialog({
         throw new Error("Business ID not found");
       }
 
-      // Type guard: create form has password field
-      if (!("password" in data)) {
-        throw new Error("Invalid form data");
-      }
-
       const userData = {
         businessId,
-        email: data.email,
-        password: data.password,
+        email: data.email || undefined,
+        username: data.username,
+        pin: data.pin,
         firstName: data.firstName,
         lastName: data.lastName,
         role: "cashier" as "cashier" | "manager",
         avatar: data.avatar || undefined,
         address: data.address || undefined,
-        // Required for PIN-based system
-        username: data.email, // Use email as username for now
-        pin: "1234", // Default PIN, should be set by admin or user later
       };
 
       const response = await createUser(userData);
@@ -667,8 +660,8 @@ function CreateCashierDialog({
       firstName: { keyboardMode: "qwerty" },
       lastName: { keyboardMode: "qwerty" },
       email: { keyboardMode: "qwerty" },
-      password: { keyboardMode: "qwerty" },
-      confirmPassword: { keyboardMode: "qwerty" },
+      username: { keyboardMode: "qwerty" },
+      pin: { keyboardMode: "numeric" },
       address: { keyboardMode: "qwerty" },
     },
   });
@@ -761,7 +754,7 @@ function CreateCashierDialog({
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email *</FormLabel>
+                  <FormLabel>Email (Optional)</FormLabel>
                   <FormControl>
                     <AdaptiveFormField
                       id="email"
@@ -772,6 +765,29 @@ function CreateCashierDialog({
                       readOnly
                       onFocus={() => keyboard.handleFieldFocus("email")}
                       error={form.formState.errors.email?.message}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            {/* Username */}
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Username *</FormLabel>
+                  <FormControl>
+                    <AdaptiveFormField
+                      id="username"
+                      label=""
+                      value={field.value || ""}
+                      placeholder="Choose a username"
+                      disabled={isSubmitting}
+                      readOnly
+                      onFocus={() => keyboard.handleFieldFocus("username")}
+                      error={form.formState.errors.username?.message}
                     />
                   </FormControl>
                 </FormItem>
@@ -801,55 +817,30 @@ function CreateCashierDialog({
               )}
             />
 
-            {/* Password Fields */}
-            <div className="space-y-3">
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password *</FormLabel>
-                    <FormControl>
-                      <AdaptiveFormField
-                        id="password"
-                        label=""
-                        type="password"
-                        value={field.value || ""}
-                        placeholder="Minimum 8 characters"
-                        disabled={isSubmitting}
-                        readOnly
-                        onFocus={() => keyboard.handleFieldFocus("password")}
-                        error={form.formState.errors.password?.message}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password *</FormLabel>
-                    <FormControl>
-                      <AdaptiveFormField
-                        id="confirmPassword"
-                        label=""
-                        type="password"
-                        value={field.value || ""}
-                        placeholder="Confirm password"
-                        disabled={isSubmitting}
-                        readOnly
-                        onFocus={() =>
-                          keyboard.handleFieldFocus("confirmPassword")
-                        }
-                        error={form.formState.errors.confirmPassword?.message}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* PIN */}
+            <FormField
+              control={form.control}
+              name="pin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>PIN *</FormLabel>
+                  <FormControl>
+                    <AdaptiveFormField
+                      id="pin"
+                      label=""
+                      type="password"
+                      value={field.value || ""}
+                      placeholder="Enter 6-digit PIN"
+                      disabled={isSubmitting}
+                      readOnly
+                      onFocus={() => keyboard.handleFieldFocus("pin")}
+                      error={form.formState.errors.pin?.message}
+                      maxLength={6}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
 
             {/* Adaptive Keyboard */}
             <AdaptiveKeyboard

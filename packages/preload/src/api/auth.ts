@@ -2,20 +2,22 @@ import { ipcRenderer } from "electron";
 
 export const authAPI = {
   register: (userData: {
-    email: string;
-    password: string;
+    email?: string;
     firstName: string;
     lastName: string;
     businessName: string;
     role: "cashier" | "manager" | "admin";
+    username: string;
+    pin: string;
   }) => ipcRenderer.invoke("auth:register", userData),
 
   registerBusiness: (userData: {
-    email: string;
-    password: string;
+    email?: string;
     firstName: string;
     lastName: string;
     businessName: string;
+    username: string;
+    pin: string;
     avatar?: string;
     businessAvatar?: string;
   }) => ipcRenderer.invoke("auth:registerBusiness", userData),
@@ -27,7 +29,6 @@ export const authAPI = {
       username: string;
       pin: string;
       email?: string;
-      password?: string;
       firstName: string;
       lastName: string;
       role: "cashier" | "manager";

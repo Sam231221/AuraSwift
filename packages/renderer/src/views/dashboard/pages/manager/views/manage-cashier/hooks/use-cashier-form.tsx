@@ -58,8 +58,8 @@ interface UseCashierFormOptions {
  */
 const getDefaultValues = (businessId: string): CashierFormData => ({
   email: "",
-  password: "",
-  confirmPassword: "",
+  username: "",
+  pin: "",
   firstName: "",
   lastName: "",
   role: "cashier",

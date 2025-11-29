@@ -51,8 +51,8 @@ export function AddUserForm({
     mode: "onChange", // Enable real-time validation for better UX with keyboard
     defaultValues: {
       email: "",
-      password: "",
-      confirmPassword: "",
+      username: "",
+      pin: "",
       firstName: "",
       lastName: "",
       role: "cashier",
@@ -71,8 +71,8 @@ export function AddUserForm({
       lastName: { keyboardMode: "qwerty" },
       email: { keyboardMode: "qwerty" },
       address: { keyboardMode: "qwerty" },
-      password: { keyboardMode: "qwerty" },
-      confirmPassword: { keyboardMode: "qwerty" },
+      username: { keyboardMode: "qwerty" },
+      pin: { keyboardMode: "numeric" },
     },
   });
 
@@ -206,7 +206,7 @@ export function AddUserForm({
               <FormControl>
                 <AdaptiveFormField
                   {...form.register("email")}
-                  label="Email *"
+                  label="Email (Optional)"
                   value={keyboard.formValues.email || ""}
                   error={form.formState.errors.email?.message}
                   onFocus={() => keyboard.handleFieldFocus("email")}
@@ -214,6 +214,33 @@ export function AddUserForm({
                   className={cn(
                     "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
                     keyboard.activeField === "email" &&
+                      "ring-2 ring-primary border-primary"
+                  )}
+                  readOnly
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Username */}
+        <FormField
+          control={form.control}
+          name="username"
+          render={() => (
+            <FormItem>
+              <FormControl>
+                <AdaptiveFormField
+                  {...form.register("username")}
+                  label="Username *"
+                  value={keyboard.formValues.username || ""}
+                  error={form.formState.errors.username?.message}
+                  onFocus={() => keyboard.handleFieldFocus("username")}
+                  placeholder="Choose a username"
+                  className={cn(
+                    "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                    keyboard.activeField === "username" &&
                       "ring-2 ring-primary border-primary"
                   )}
                   readOnly
@@ -294,62 +321,34 @@ export function AddUserForm({
           )}
         />
 
-        {/* Password Fields */}
-        <div className="space-y-3">
-          <FormField
-            control={form.control}
-            name="password"
-            render={() => (
-              <FormItem>
-                <FormControl>
-                  <AdaptiveFormField
-                    {...form.register("password")}
-                    label="Password *"
-                    type="password"
-                    value={keyboard.formValues.password || ""}
-                    error={form.formState.errors.password?.message}
-                    onFocus={() => keyboard.handleFieldFocus("password")}
-                    placeholder="Minimum 8 characters"
-                    className={cn(
-                      "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                      keyboard.activeField === "password" &&
-                        "ring-2 ring-primary border-primary"
-                    )}
-                    readOnly
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={() => (
-              <FormItem>
-                <FormControl>
-                  <AdaptiveFormField
-                    {...form.register("confirmPassword")}
-                    label="Confirm Password *"
-                    type="password"
-                    value={keyboard.formValues.confirmPassword || ""}
-                    error={form.formState.errors.confirmPassword?.message}
-                    onFocus={() => keyboard.handleFieldFocus("confirmPassword")}
-                    placeholder="Confirm password"
-                    className={cn(
-                      "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                      keyboard.activeField === "confirmPassword" &&
-                        "ring-2 ring-primary border-primary"
-                    )}
-                    readOnly
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        {/* PIN */}
+        <FormField
+          control={form.control}
+          name="pin"
+          render={() => (
+            <FormItem>
+              <FormControl>
+                <AdaptiveFormField
+                  {...form.register("pin")}
+                  label="PIN *"
+                  type="password"
+                  value={keyboard.formValues.pin || ""}
+                  error={form.formState.errors.pin?.message}
+                  onFocus={() => keyboard.handleFieldFocus("pin")}
+                  placeholder="Enter 6-digit PIN"
+                  className={cn(
+                    "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                    keyboard.activeField === "pin" &&
+                      "ring-2 ring-primary border-primary"
+                  )}
+                  readOnly
+                  maxLength={6}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Actions */}
         <div
@@ -387,7 +386,7 @@ export function AddUserForm({
               onClear={keyboard.handleClear}
               onEnter={() => {
                 // Move to next field or submit if last field
-                if (keyboard.activeField === "confirmPassword") {
+                if (keyboard.activeField === "pin") {
                   form.handleSubmit(handleSubmit)();
                 }
               }}

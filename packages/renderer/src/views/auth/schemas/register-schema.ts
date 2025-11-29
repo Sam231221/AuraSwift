@@ -9,8 +9,8 @@ import { z } from "zod";
 import {
   requiredStringSchema,
   emailSchema,
-  passwordSchema,
   optionalStringSchema,
+  pinSchema,
 } from "@/shared/validation/common";
 
 /**
@@ -37,25 +37,11 @@ const businessNameSchema = requiredStringSchema("Business name")
  */
 export const registerSchema = z
   .object({
-    email: emailSchema,
-    password: passwordSchema
-      .min(8, "Password must be at least 8 characters")
-      .refine(
-        (val) => /[A-Z]/.test(val),
-        "Password must contain at least one uppercase letter"
-      )
-      .refine(
-        (val) => /[a-z]/.test(val),
-        "Password must contain at least one lowercase letter"
-      )
-      .refine(
-        (val) => /[0-9]/.test(val),
-        "Password must contain at least one number"
-      )
-      .refine(
-        (val) => /[^A-Za-z0-9]/.test(val),
-        "Password must contain at least one special character"
-      ),
+    email: emailSchema.optional(),
+    username: requiredStringSchema("Username")
+      .min(3, "Username must be at least 3 characters")
+      .max(50, "Username must not exceed 50 characters"),
+    pin: pinSchema(6),
     firstName: nameSchema,
     lastName: nameSchema,
     businessName: businessNameSchema,
