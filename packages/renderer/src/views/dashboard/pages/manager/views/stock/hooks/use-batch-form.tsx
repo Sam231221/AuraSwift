@@ -16,6 +16,9 @@ import {
 import { useFormNotification } from "@/shared/hooks/use-form-notification";
 import type { ProductBatch } from "../types/batch.types";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-batch-form');
+
 interface UseBatchFormOptions {
   /**
    * Batch to edit (if in edit mode)
@@ -130,7 +133,7 @@ export function useBatchForm({
   const handleSubmit = form.handleSubmit(
     async (data) => {
       try {
-        console.log("Batch form data:", data);
+        logger.info("Batch form data:", data);
         await onSubmit(data);
         notifySuccess(isEditMode ? "update" : "create");
         
@@ -143,13 +146,13 @@ export function useBatchForm({
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "An error occurred";
-        console.error("Batch form submission error:", error);
+        logger.error("Batch form submission error:", error);
         notifyError(errorMessage);
       }
     },
     (errors) => {
       // Log validation errors for debugging
-      console.error("Batch form validation errors:", errors);
+      logger.error("Batch form validation errors:", errors);
     }
   );
 

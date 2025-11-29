@@ -9,6 +9,9 @@ import { dialog, app } from "electron";
 import path from "path";
 import fs from "fs";
 
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('db-recovery-dialog');
+
 export type RecoveryAction =
   | "backup-and-fresh"
   | "repair"
@@ -49,9 +52,9 @@ export async function showRecoveryDialog(
     process.env.NODE_ENV === "test";
 
   if (isTestMode) {
-    console.warn(`[TEST MODE] ${title}: ${message}`);
+    logger.warn(`[TEST MODE] ${title}: ${message}`);
     if (detail) {
-      console.warn(`[TEST MODE] Detail: ${detail}`);
+      logger.warn(`[TEST MODE] Detail: ${detail}`);
     }
     // In test mode, automatically use the recommended action
     return "backup-and-fresh";
@@ -59,11 +62,11 @@ export async function showRecoveryDialog(
 
   // Only show dialog if app is ready
   if (!app.isReady()) {
-    console.warn(`${title}: ${message}`);
+    logger.warn(`${title}: ${message}`);
     if (detail) {
-      console.warn(`Detail: ${detail}`);
+      logger.warn(`Detail: ${detail}`);
     }
-    console.warn(
+    logger.warn(
       "⚠️  App not ready, using default recovery action: backup-and-fresh"
     );
     return "backup-and-fresh";
@@ -121,7 +124,7 @@ export async function showRecoveryDialog(
       return "cancel";
     }
   } catch (error) {
-    console.error("Error showing recovery dialog:", error);
+    logger.error("Error showing recovery dialog:", error);
     return "cancel";
   }
 }
@@ -224,20 +227,20 @@ export async function showDatabaseErrorDialog(
     process.env.NODE_ENV === "test";
 
   if (isTestMode) {
-    console.error(`[TEST MODE] ${title}: ${message}`);
+    logger.error(`[TEST MODE] ${title}: ${message}`);
     if (detail) {
-      console.error(`[TEST MODE] Detail: ${detail}`);
+      logger.error(`[TEST MODE] Detail: ${detail}`);
     }
     return;
   }
 
   // Only show dialog if app is ready
   if (!app.isReady()) {
-    console.error(`${title}: ${message}`);
+    logger.error(`${title}: ${message}`);
     if (detail) {
-      console.error(`Detail: ${detail}`);
+      logger.error(`Detail: ${detail}`);
     }
-    console.warn(
+    logger.warn(
       "⚠️  App not ready, skipping dialog. Directory will be created automatically."
     );
     return;

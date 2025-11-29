@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import type { StaffUser } from "../schemas/types";
 import { useAuth } from "@/shared/hooks/use-auth";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 
 export function useStaffUsers() {
   const { user } = useAuth();
@@ -24,13 +25,15 @@ export function useStaffUsers() {
       if (response.success && response.users) {
         // Filter out admin users and convert to StaffUser format
         const staffUsers: StaffUser[] = response.users
-          .filter((u) => u.role !== "admin")
+          .filter((u) => getUserRoleName(u) !== "admin")
           .map((u) => ({
             id: u.id,
+            username: u.username || "",
             email: u.email || "",
             firstName: u.firstName,
             lastName: u.lastName,
-            role: u.role as "cashier" | "manager",
+            role: getUserRoleName(u) as "cashier" | "manager",
+            businessName: u.businessName,
             businessId: u.businessId,
             avatar: u.avatar,
             address: (u as any).address || "",

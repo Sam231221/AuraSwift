@@ -1,17 +1,17 @@
 /**
  * Permission Constants
- * 
+ *
  * Central definition of all permissions in the system.
  * Use these constants instead of hardcoding permission strings.
- * 
+ *
  * Format: "action:resource"
  * - action: read, write, manage, view, override, delete
  * - resource: sales, reports, inventory, users, settings, analytics, transactions
- * 
+ *
  * Usage:
  * ```typescript
  * import { PERMISSIONS } from "@/constants/permissions";
- * 
+ *
  * if (!user.permissions.includes(PERMISSIONS.USERS_MANAGE)) {
  *   return { success: false, message: "Unauthorized" };
  * }
@@ -26,70 +26,69 @@ export const PERMISSIONS = {
   // ---------------------------------------------------------------------------
   // Sales Permissions
   // ---------------------------------------------------------------------------
-  
+
   /** View sales transactions and data */
   SALES_READ: "read:sales",
-  
+
   /** Create new sales transactions */
   SALES_WRITE: "write:sales",
-  
+
   // ---------------------------------------------------------------------------
   // Inventory Permissions
   // ---------------------------------------------------------------------------
-  
-  /** 
-   * Manage inventory: create, update, delete products, categories, 
+
+  /**
+   * Manage inventory: create, update, delete products, categories,
    * adjust stock levels, manage suppliers
    */
   INVENTORY_MANAGE: "manage:inventory",
-  
+
   // ---------------------------------------------------------------------------
   // User Management Permissions
   // ---------------------------------------------------------------------------
-  
-  /** 
-   * Manage users: create, update, delete users, 
+
+  /**
+   * Manage users: create, update, delete users,
    * assign roles and permissions
    */
   USERS_MANAGE: "manage:users",
-  
+
   // ---------------------------------------------------------------------------
   // Reports & Analytics Permissions
   // ---------------------------------------------------------------------------
-  
+
   /** View reports (sales reports, inventory reports, etc.) */
   REPORTS_READ: "read:reports",
-  
+
   /** View analytics dashboard and insights */
   ANALYTICS_VIEW: "view:analytics",
-  
+
   // ---------------------------------------------------------------------------
   // Transaction Override Permissions
   // ---------------------------------------------------------------------------
-  
-  /** 
+
+  /**
    * Override transactions: void transactions, issue refunds,
    * apply special discounts
    */
   TRANSACTIONS_OVERRIDE: "override:transactions",
-  
+
   // ---------------------------------------------------------------------------
   // Settings Permissions
   // ---------------------------------------------------------------------------
-  
-  /** 
+
+  /**
    * Manage system settings: business settings, tax rates,
    * receipt templates, integrations
    */
   SETTINGS_MANAGE: "manage:settings",
-  
+
   // ---------------------------------------------------------------------------
   // Special Permissions
   // ---------------------------------------------------------------------------
-  
+
   /** Wildcard: grants all permissions (typically for admin/owner) */
   ALL: "*:*",
-  
 } as const;
 
 // ============================================================================
@@ -104,7 +103,7 @@ export const PERMISSION_GROUPS = {
   ADMIN: [
     PERMISSIONS.ALL, // Covers everything
   ],
-  
+
   /** Manager permissions */
   MANAGER: [
     PERMISSIONS.SALES_READ,
@@ -115,7 +114,7 @@ export const PERMISSION_GROUPS = {
     PERMISSIONS.USERS_MANAGE,
     PERMISSIONS.TRANSACTIONS_OVERRIDE,
   ],
-  
+
   /** Supervisor permissions (future role) */
   SUPERVISOR: [
     PERMISSIONS.SALES_READ,
@@ -123,20 +122,16 @@ export const PERMISSION_GROUPS = {
     PERMISSIONS.REPORTS_READ,
     PERMISSIONS.TRANSACTIONS_OVERRIDE,
   ],
-  
+
   /** Cashier permissions */
-  CASHIER: [
-    PERMISSIONS.SALES_READ,
-    PERMISSIONS.SALES_WRITE,
-  ],
-  
+  CASHIER: [PERMISSIONS.SALES_READ, PERMISSIONS.SALES_WRITE],
+
   /** Read-only analyst (future role) */
   ANALYST: [
     PERMISSIONS.SALES_READ,
     PERMISSIONS.REPORTS_READ,
     PERMISSIONS.ANALYTICS_VIEW,
   ],
-  
 } as const;
 
 // ============================================================================
@@ -146,11 +141,14 @@ export const PERMISSION_GROUPS = {
 /**
  * Permission descriptions for UI and documentation
  */
-export const PERMISSION_DESCRIPTIONS: Record<string, {
-  name: string;
-  description: string;
-  riskLevel: "low" | "medium" | "high" | "critical";
-}> = {
+export const PERMISSION_DESCRIPTIONS: Record<
+  string,
+  {
+    name: string;
+    description: string;
+    riskLevel: "low" | "medium" | "high" | "critical";
+  }
+> = {
   [PERMISSIONS.SALES_READ]: {
     name: "View Sales",
     description: "View sales transactions and history",
@@ -183,7 +181,8 @@ export const PERMISSION_DESCRIPTIONS: Record<string, {
   },
   [PERMISSIONS.TRANSACTIONS_OVERRIDE]: {
     name: "Override Transactions",
-    description: "Void transactions, issue refunds, and apply special discounts",
+    description:
+      "Void transactions, issue refunds, and apply special discounts",
     riskLevel: "high",
   },
   [PERMISSIONS.SETTINGS_MANAGE]: {
@@ -204,7 +203,7 @@ export const PERMISSION_DESCRIPTIONS: Record<string, {
 
 /**
  * Get all permissions for a role
- * 
+ *
  * @param role - Role name (admin, manager, supervisor, cashier)
  * @returns Array of permissions for the role
  */
@@ -228,7 +227,7 @@ export function getPermissionsForRole(
 
 /**
  * Check if a permission string is valid
- * 
+ *
  * @param permission - Permission string to validate
  * @returns Whether the permission is valid
  */
@@ -239,7 +238,7 @@ export function isValidPermission(permission: string): boolean {
 
 /**
  * Get permission details
- * 
+ *
  * @param permission - Permission string
  * @returns Permission metadata or null if not found
  */
@@ -249,7 +248,7 @@ export function getPermissionInfo(permission: string) {
 
 /**
  * Get all available permissions
- * 
+ *
  * @returns Array of all permission strings
  */
 export function getAllPermissions(): string[] {
@@ -258,7 +257,7 @@ export function getAllPermissions(): string[] {
 
 /**
  * Group permissions by risk level
- * 
+ *
  * @returns Permissions grouped by risk level
  */
 export function getPermissionsByRiskLevel() {
@@ -269,7 +268,9 @@ export function getPermissionsByRiskLevel() {
     critical: [],
   };
 
-  for (const [permission, metadata] of Object.entries(PERMISSION_DESCRIPTIONS)) {
+  for (const [permission, metadata] of Object.entries(
+    PERMISSION_DESCRIPTIONS
+  )) {
     grouped[metadata.riskLevel].push(permission);
   }
 
@@ -281,7 +282,18 @@ export function getPermissionsByRiskLevel() {
 // ============================================================================
 
 /** Type-safe permission string */
-export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+/** Legacy hardcoded permission strings (deprecated - use PERMISSIONS constants instead) */
+export type LegacyPermission =
+  | "read:sales"
+  | "write:sales"
+  | "read:reports"
+  | "manage:inventory"
+  | "manage:users"
+  | "view:analytics"
+  | "override:transactions"
+  | "manage:settings";
 
 /** Type-safe role string */
 export type Role = "admin" | "owner" | "manager" | "supervisor" | "cashier";
@@ -341,4 +353,3 @@ export const FUTURE_PERMISSIONS = {
   AUDIT_EXPORT: "export:audit",
 };
 */
-

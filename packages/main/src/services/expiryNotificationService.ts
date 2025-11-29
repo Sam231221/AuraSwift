@@ -1,5 +1,8 @@
 import type { DatabaseManagers } from "../database/index.js";
 import type { ProductBatch, ExpirySetting } from "../database/schema.js";
+import { getLogger } from "../utils/logger.js";
+
+const logger = getLogger('expiry-notification-service');
 
 export interface ExpiryCheckResult {
   batch: ProductBatch;
@@ -165,8 +168,8 @@ export class ExpiryNotificationService {
 
         sentCount++;
       } catch (error) {
-        console.error(
-          `Failed to send notification ${notification.id}:`,
+        logger.error(
+          `Failed to send notification ${notification.id}`,
           error
         );
         // Mark as failed

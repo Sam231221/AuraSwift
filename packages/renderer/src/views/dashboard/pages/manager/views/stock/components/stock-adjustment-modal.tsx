@@ -13,8 +13,8 @@ import type { Product } from "@/features/products/types/product.types";
 import {
   AdaptiveKeyboard,
   AdaptiveFormField,
-} from "@/components/adaptive-keyboard";
-import type { KeyboardMode } from "@/components/adaptive-keyboard";
+} from "@/features/adaptive-keyboard";
+import type { KeyboardMode } from "@/features/adaptive-keyboard";
 
 interface StockAdjustmentModalProps {
   product: Product | null;
@@ -65,7 +65,7 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   const [localQuantity, setLocalQuantity] = useState("0");
   const [selectedReason, setSelectedReason] = useState<string>("");
   const [customNote, setCustomNote] = useState("");
-  
+
   // Keyboard state
   const [activeField, setActiveField] = useState<"quantity" | "note" | null>(
     null
@@ -79,20 +79,23 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
     setLocalQuantity("0");
   }, [adjustmentType]);
 
-  const handleFieldFocus = useCallback((field: "quantity" | "note") => {
-    setActiveField(field);
-    setShowKeyboard(true);
-    
-    // Auto-clear "0" when focusing quantity
-    if (field === "quantity" && localQuantity === "0") {
-      setLocalQuantity("");
-    }
-  }, [localQuantity]);
+  const handleFieldFocus = useCallback(
+    (field: "quantity" | "note") => {
+      setActiveField(field);
+      setShowKeyboard(true);
+
+      // Auto-clear "0" when focusing quantity
+      if (field === "quantity" && localQuantity === "0") {
+        setLocalQuantity("");
+      }
+    },
+    [localQuantity]
+  );
 
   const handleCloseKeyboard = useCallback(() => {
     setShowKeyboard(false);
     setActiveField(null);
-    
+
     // Restore "0" if empty on blur
     if (localQuantity === "") {
       setLocalQuantity("0");
@@ -151,7 +154,7 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
   const handleConfirm = () => {
     const quantityNum = parseInt(localQuantity);
-    
+
     // Validation
     if (isNaN(quantityNum) || quantityNum <= 0) {
       toast.error("Quantity must be greater than 0");
@@ -280,10 +283,7 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
               <Label htmlFor="stock-reason" className="text-sm font-medium">
                 Reason
               </Label>
-              <Select
-                value={selectedReason}
-                onValueChange={handleReasonSelect}
-              >
+              <Select value={selectedReason} onValueChange={handleReasonSelect}>
                 <SelectTrigger className="w-full mt-1.5 h-10">
                   <SelectValue placeholder="Select a reason" />
                 </SelectTrigger>
@@ -360,4 +360,3 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 };
 
 export default StockAdjustmentModal;
-

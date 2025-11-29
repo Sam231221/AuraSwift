@@ -53,22 +53,22 @@ export class TimeTrackingReportManager {
     // Get all shifts in date range
     const shifts = this.db
       .select({
-        shift: schema.timeShifts,
+        shift: schema.shifts,
         clockInTime: schema.clockEvents.timestamp,
         clockOutTime: drizzleSql<string>`ce_out.timestamp`,
       })
-      .from(schema.timeShifts)
+      .from(schema.shifts)
       .innerJoin(
         schema.clockEvents,
-        eq(schema.timeShifts.clockInId, schema.clockEvents.id)
+        eq(schema.shifts.clock_in_id, schema.clockEvents.id)
       )
       .leftJoin(
         drizzleSql`clock_events ce_out`,
-        drizzleSql`${schema.timeShifts.clockOutId} = ce_out.id`
+        drizzleSql`${schema.shifts.clock_out_id} = ce_out.id`
       )
       .where(
         and(
-          eq(schema.timeShifts.userId, userId),
+          eq(schema.shifts.user_id, userId),
           gte(schema.clockEvents.timestamp, startDate),
           lte(schema.clockEvents.timestamp, endDate)
         )

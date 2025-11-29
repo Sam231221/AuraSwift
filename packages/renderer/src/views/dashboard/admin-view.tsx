@@ -2,12 +2,13 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { DashboardLayout } from "@/layouts/dashboard-layout";
-import { ViewTransitionContainer } from "@/shared/components";
+import { ViewTransitionContainer } from "@/components";
 import { useViewNavigation, useViewMap } from "@/shared/hooks";
 
 import { useAuth } from "@/shared/hooks";
 
 import { getRoleDisplayName, getUserDisplayName } from "@/shared/utils/auth";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 
 import {
   ADMIN_VIEWS,
@@ -35,7 +36,7 @@ export const AdminDashboard = () => {
 
   return (
     <DashboardLayout
-      title={`${getRoleDisplayName(user.role)} Dashboard`}
+      title={`${getRoleDisplayName(getUserRoleName(user))} Dashboard`}
       subtitle={`Welcome, ${getUserDisplayName(user)}`}
     >
       <ViewTransitionContainer currentView={currentView} views={views} />

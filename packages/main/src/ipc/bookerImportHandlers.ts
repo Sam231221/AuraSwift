@@ -6,6 +6,9 @@ import { ImportManager } from "../database/managers/importManager.js";
 import type { ImportOptions } from "../database/managers/importManager.js";
 import { v4 as uuidv4 } from "uuid";
 
+import { getLogger } from '../utils/logger.js';
+const logger = getLogger('bookerImportHandlers');
+
 const bookerImportService = new BookerImportService();
 
 /**
@@ -276,7 +279,7 @@ export function registerBookerImportHandlers() {
           totalPotentialProfit: 0,
         }));
 
-        console.log(
+        logger.info(
           `📁 Auto-creating ${departmentData.length} categories from product data`
         );
 

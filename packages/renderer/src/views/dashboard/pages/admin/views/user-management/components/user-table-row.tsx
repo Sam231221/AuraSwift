@@ -1,9 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { UserAvatar } from "@/shared/components/user-avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { Mail, Calendar, Eye, Edit, Trash2 } from "lucide-react";
-import { getRoleDisplayName } from "@/shared/utils/auth";
+
+import {
+  getUserRoleName,
+  getUserRoleDisplayName,
+} from "@/shared/utils/rbac-helpers";
 import { getStaffDisplayName } from "../utils/user-helpers";
 import type { StaffUser } from "../schemas/types";
 
@@ -50,10 +54,12 @@ export function UserTableRow({
       </TableCell>
       <TableCell className="whitespace-nowrap">
         <Badge
-          variant={staffUser.role === "manager" ? "default" : "secondary"}
+          variant={
+            getUserRoleName(staffUser) === "manager" ? "default" : "secondary"
+          }
           className="text-[10px] sm:text-xs md:text-sm lg:text-base"
         >
-          {getRoleDisplayName(staffUser.role)}
+          {getUserRoleDisplayName(staffUser)}
         </Badge>
       </TableCell>
       <TableCell className="hidden md:table-cell whitespace-nowrap">

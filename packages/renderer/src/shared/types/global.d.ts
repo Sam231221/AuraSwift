@@ -1,56 +1,13 @@
+import type { User, Business } from "./user";
+
 export interface APIResponse {
   success: boolean;
   message: string;
   data?: unknown;
   token?: string;
-  user?: {
-    id: string;
-    username: string;
-    pin: string;
-    email?: string;
-    firstName: string;
-    lastName: string;
-    businessName: string;
-    role: "cashier" | "manager" | "admin";
-    businessId: string;
-    permissions: Array<{
-      id: string;
-      name: string;
-      description: string;
-      module: string;
-      action: string;
-      resource: string;
-    }>;
-    avatar?: string;
-    createdAt: string;
-    updatedAt: string;
-    isActive: boolean;
-  };
-  users?: Array<{
-    id: string;
-    username: string;
-    pin: string;
-    email?: string;
-    firstName: string;
-    lastName: string;
-    businessName: string;
-    role: "cashier" | "manager" | "admin";
-    businessId: string;
-    avatar?: string;
-    createdAt: string;
-    isActive: boolean;
-  }>;
-  business?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    businessName: string;
-    avatar?: string;
-    ownerId?: string;
-    address?: string;
-    phone?: string;
-    vatNumber?: string;
-  };
+  user?: User;
+  users?: User[];
+  business?: Business;
   errors?: string[];
 }
 
@@ -759,6 +716,97 @@ declare global {
     };
     expirySettingsAPI: {
       get: (businessId: string) => Promise<any>;
+    };
+    stockMovementAPI: {
+      create: (movementData: {
+        productId: string;
+        batchId?: string;
+        movementType:
+          | "INBOUND"
+          | "OUTBOUND"
+          | "ADJUSTMENT"
+          | "TRANSFER"
+          | "WASTE";
+        quantity: number;
+        reason?: string;
+        reference?: string;
+        userId: string;
+        businessId: string;
+      }) => Promise<any>;
+      getByProduct: (productId: string) => Promise<any>;
+      getByBatch: (batchId: string) => Promise<any>;
+      getByBusiness: (businessId: string) => Promise<any>;
+    };
+    rbacAPI: {
+      roles: {
+        list: (
+          sessionToken: string,
+          businessId: string
+        ) => Promise<APIResponse>;
+        create: (
+          sessionToken: string,
+          roleData: {
+            name: string;
+            displayName: string;
+            description?: string;
+            permissions: string[];
+            businessId: string;
+            isSystemRole: boolean;
+            isActive: boolean;
+          }
+        ) => Promise<APIResponse>;
+        update: (
+          sessionToken: string,
+          roleId: string,
+          updates: {
+            displayName?: string;
+            description?: string;
+            permissions?: string[];
+            isActive?: boolean;
+          }
+        ) => Promise<APIResponse>;
+        delete: (sessionToken: string, roleId: string) => Promise<APIResponse>;
+        getById: (sessionToken: string, roleId: string) => Promise<APIResponse>;
+      };
+      userRoles: {
+        assign: (
+          sessionToken: string,
+          userId: string,
+          roleId: string
+        ) => Promise<APIResponse>;
+        revoke: (
+          sessionToken: string,
+          userId: string,
+          roleId: string
+        ) => Promise<APIResponse>;
+        getUserRoles: (
+          sessionToken: string,
+          userId: string
+        ) => Promise<APIResponse>;
+        setPrimaryRole: (
+          sessionToken: string,
+          userId: string,
+          roleId: string
+        ) => Promise<APIResponse>;
+      };
+      userPermissions: {
+        grant: (
+          sessionToken: string,
+          userId: string,
+          permission: string,
+          reason?: string,
+          expiresAt?: number
+        ) => Promise<APIResponse>;
+        revoke: (
+          sessionToken: string,
+          userId: string,
+          permission: string
+        ) => Promise<APIResponse>;
+        getUserPermissions: (
+          sessionToken: string,
+          userId: string
+        ) => Promise<APIResponse>;
+      };
     };
   }
 }

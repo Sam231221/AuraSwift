@@ -1,22 +1,25 @@
 /**
  * Authentication and Authorization Helpers
- * 
+ *
  * These utilities provide consistent session validation and permission checking
  * across all IPC handlers.
- * 
+ *
+ * Updated for RBAC: Permission checking now aggregates permissions from
+ * multiple roles + direct grants instead of just checking user.permissions
+ *
  * Usage:
  * ```typescript
  * ipcMain.handle("users:delete", async (event, sessionToken, targetUserId) => {
  *   const auth = await validateSessionAndPermission(
- *     db, 
- *     sessionToken, 
+ *     db,
+ *     sessionToken,
  *     PERMISSIONS.USERS_MANAGE
  *   );
- *   
+ *
  *   if (!auth.success) {
  *     return { success: false, message: auth.message };
  *   }
- *   
+ *
  *   // Proceed with operation using auth.user
  * });
  * ```
@@ -24,6 +27,35 @@
 
 import type { DatabaseManagers } from "../database/index.js";
 import type { User } from "../database/schema.js";
+import { getUserPermissions } from "./rbacHelpers.js";
+
+import { getLogger } from './logger.js';
+const logger = getLogger('authHelpers');
+
+// ============================================================================
+// ADMIN FALLBACK CONFIGURATION
+// ============================================================================
+
+/**
+ * Admin fallback bypass - TEMPORARY MIGRATION FEATURE
+ *
+ * ⚠️ SECURITY WARNING: This allows admin users to bypass RBAC permission checks.
+ *
+ * Options:
+ * 1. Development only: Only enable in development environment
+ * 2. Feature flag: Use environment variable to control
+ * 3. Hard deadline: Set a date when this MUST be removed
+ *
+ * RECOMMENDED: Use option 1 (development only) for safety
+ */
+const ENABLE_ADMIN_FALLBACK = 
+  process.env.NODE_ENV === "development" || 
+  process.env.RBAC_ADMIN_FALLBACK === "true";
+
+// Alternative: Hard deadline approach (uncomment to use)
+// const FALLBACK_DEADLINE = new Date("2025-12-31");
+// const ENABLE_ADMIN_FALLBACK = Date.now() < FALLBACK_DEADLINE.getTime() && 
+//                                process.env.NODE_ENV !== "production";
 
 // ============================================================================
 // TYPES
@@ -47,7 +79,7 @@ export interface PermissionCheckResult {
 
 /**
  * Validate a session token and return the associated user
- * 
+ *
  * @param db - Database instance
  * @param sessionToken - Session token to validate
  * @returns Validation result with user if successful
@@ -67,7 +99,7 @@ export async function validateSession(
 
   // Get session from database
   const session = await db.sessions.getSessionByToken(sessionToken);
-  
+
   if (!session) {
     return {
       success: false,
@@ -87,7 +119,7 @@ export async function validateSession(
 
   // Get user from session
   const user = await db.users.getUserById(session.userId);
-  
+
   if (!user) {
     return {
       success: false,
@@ -112,48 +144,116 @@ export async function validateSession(
 }
 
 // ============================================================================
-// PERMISSION CHECKING
+// PERMISSION CHECKING (RBAC-enabled)
 // ============================================================================
 
 /**
  * Check if a user has a specific permission
- * 
+ * RBAC: Aggregates permissions from all roles + direct grants
+ *
+ * @param db - Database managers (needed for RBAC permission resolution)
  * @param user - User object
  * @param requiredPermission - Permission to check (e.g., "manage:users")
  * @returns Whether user has the permission
  */
-export function hasPermission(
+export async function hasPermission(
+  db: DatabaseManagers,
   user: User,
   requiredPermission: string
-): PermissionCheckResult {
-  if (!user || !user.permissions) {
+): Promise<PermissionCheckResult> {
+  logger.info(
+    `[hasPermission] Checking permission "${requiredPermission}" for user ${user.id}`
+  );
+
+  if (!user) {
     return {
       granted: false,
-      reason: "User has no permissions defined",
+      reason: "User not provided",
     };
   }
 
+  // Get aggregated permissions from RBAC system
+  const userPermissions = await getUserPermissions(db, user.id);
+  logger.info(
+    `[hasPermission] User ${user.id} has ${userPermissions.length} permissions:`,
+    userPermissions
+  );
+
   // Check for exact match
-  if (user.permissions.includes(requiredPermission as any)) {
+  if (userPermissions.includes(requiredPermission)) {
+    logger.info(`[hasPermission] ✅ Exact match found: ${requiredPermission}`);
     return { granted: true };
   }
 
   // Check for wildcard permission (admin has all)
-  if (user.permissions.includes("*:*" as any)) {
+  if (userPermissions.includes("*:*")) {
+    logger.info(`[hasPermission] ✅ Wildcard *:* found - granting access`);
     return { granted: true };
   }
 
   // Check for action wildcard (e.g., "manage:*" covers "manage:users")
   const [action, resource] = requiredPermission.split(":");
-  if (user.permissions.includes(`${action}:*` as any)) {
+  if (userPermissions.includes(`${action}:*`)) {
+    logger.info(`[hasPermission] ✅ Action wildcard ${action}:* found`);
     return { granted: true };
   }
 
   // Check for resource wildcard (e.g., "*:users" covers "manage:users")
-  if (user.permissions.includes(`*:${resource}` as any)) {
+  if (userPermissions.includes(`*:${resource}`)) {
+    logger.info(`[hasPermission] ✅ Resource wildcard *:${resource} found`);
     return { granted: true };
   }
 
+  // 🔥 CHANGED: Admin fallback ONLY if enabled (development or feature flag)
+  if (ENABLE_ADMIN_FALLBACK) {
+    try {
+      const userRoles = db.userRoles.getActiveRolesByUser(user.id);
+
+      for (const userRole of userRoles) {
+        const role = db.roles.getRoleById(userRole.roleId);
+
+        if (role && (role.name === "admin" || role.name === "owner")) {
+          // ⚠️ SECURITY WARNING LOG
+          logger.warn(
+            `⚠️ [SECURITY] Admin fallback used for user ${user.id} to grant ${requiredPermission}. ` +
+            `This is a temporary migration feature. ` +
+            `Please assign proper permissions to admin role. ` +
+            `Fallback enabled: ${ENABLE_ADMIN_FALLBACK}, Environment: ${process.env.NODE_ENV}`
+          );
+
+          // 🔥 CRITICAL: Log to audit trail for security monitoring
+          try {
+            await db.audit.createAuditLog({
+              userId: user.id,
+              action: "admin_fallback_used",
+              entityType: "permission",
+              entityId: requiredPermission,
+              details: {
+                roleName: role.name,
+                roleId: role.id,
+                permission: requiredPermission,
+                timestamp: Date.now(),
+                environment: process.env.NODE_ENV,
+                WARNING: "SECURITY: Admin fallback bypass used - ensure admin role has proper permissions",
+              },
+            });
+          } catch (auditError) {
+            // Don't fail permission check if audit logging fails, but log it
+            logger.error("[hasPermission] Failed to log admin fallback to audit:", auditError);
+          }
+
+          return { granted: true };
+        }
+      }
+    } catch (error) {
+      logger.error("[hasPermission] Error checking admin role fallback:", error);
+      // Don't grant permission if there's an error checking roles
+    }
+  }
+
+  logger.info(
+    `[hasPermission] ❌ Permission denied: ${requiredPermission} for user ${user.id}`
+  );
   return {
     granted: false,
     reason: `User lacks required permission: ${requiredPermission}`,
@@ -162,17 +262,20 @@ export function hasPermission(
 
 /**
  * Check if user has ANY of the specified permissions
- * 
+ * RBAC-enabled
+ *
+ * @param db - Database managers
  * @param user - User object
  * @param permissions - Array of permissions to check
  * @returns Whether user has at least one permission
  */
-export function hasAnyPermission(
+export async function hasAnyPermission(
+  db: DatabaseManagers,
   user: User,
   permissions: string[]
-): PermissionCheckResult {
+): Promise<PermissionCheckResult> {
   for (const permission of permissions) {
-    const result = hasPermission(user, permission);
+    const result = await hasPermission(db, user, permission);
     if (result.granted) {
       return { granted: true };
     }
@@ -186,17 +289,20 @@ export function hasAnyPermission(
 
 /**
  * Check if user has ALL of the specified permissions
- * 
+ * RBAC-enabled
+ *
+ * @param db - Database managers
  * @param user - User object
  * @param permissions - Array of permissions to check
  * @returns Whether user has all permissions
  */
-export function hasAllPermissions(
+export async function hasAllPermissions(
+  db: DatabaseManagers,
   user: User,
   permissions: string[]
-): PermissionCheckResult {
+): Promise<PermissionCheckResult> {
   for (const permission of permissions) {
-    const result = hasPermission(user, permission);
+    const result = await hasPermission(db, user, permission);
     if (!result.granted) {
       return {
         granted: false,
@@ -215,7 +321,7 @@ export function hasAllPermissions(
 /**
  * Validate session AND check permission in one call
  * Most common use case for IPC handlers
- * 
+ *
  * @param db - Database instance
  * @param sessionToken - Session token to validate
  * @param requiredPermission - Permission to check
@@ -228,16 +334,16 @@ export async function validateSessionAndPermission(
 ): Promise<AuthValidationResult> {
   // First validate session
   const sessionValidation = await validateSession(db, sessionToken);
-  
+
   if (!sessionValidation.success) {
     return sessionValidation;
   }
 
   const { user } = sessionValidation;
 
-  // Then check permission
-  const permissionCheck = hasPermission(user!, requiredPermission);
-  
+  // Then check permission (RBAC-enabled)
+  const permissionCheck = await hasPermission(db, user!, requiredPermission);
+
   if (!permissionCheck.granted) {
     // Log unauthorized attempt
     try {
@@ -249,11 +355,11 @@ export async function validateSessionAndPermission(
         details: {
           permission: requiredPermission,
           reason: permissionCheck.reason,
-          timestamp: new Date().toISOString(),
+          timestamp: Date.now(),
         },
       });
     } catch (error) {
-      console.error("Failed to log permission denial:", error);
+      logger.error("Failed to log permission denial:", error);
     }
 
     return {
@@ -271,7 +377,7 @@ export async function validateSessionAndPermission(
 
 /**
  * Validate session AND check if user has ANY of the permissions
- * 
+ *
  * @param db - Database instance
  * @param sessionToken - Session token to validate
  * @param permissions - Array of permissions (user needs at least one)
@@ -283,14 +389,14 @@ export async function validateSessionAndAnyPermission(
   permissions: string[]
 ): Promise<AuthValidationResult> {
   const sessionValidation = await validateSession(db, sessionToken);
-  
+
   if (!sessionValidation.success) {
     return sessionValidation;
   }
 
   const { user } = sessionValidation;
-  const permissionCheck = hasAnyPermission(user!, permissions);
-  
+  const permissionCheck = await hasAnyPermission(db, user!, permissions);
+
   if (!permissionCheck.granted) {
     return {
       success: false,
@@ -306,32 +412,46 @@ export async function validateSessionAndAnyPermission(
 }
 
 // ============================================================================
-// ROLE CHECKING (For backward compatibility)
+// ROLE CHECKING (DEPRECATED - Use RBAC instead)
 // ============================================================================
 
 /**
- * Check if user has a specific role
- * 
- * NOTE: Prefer permission-based checks over role-based checks!
- * Roles should determine permissions, but code should check permissions.
- * 
+ * Check if user has a specific role via RBAC
+ *
+ * @deprecated Use permission-based checks via hasPermission() instead!
+ * @param db - Database managers
  * @param user - User object
- * @param role - Role to check
+ * @param roleName - Role name to check
  * @returns Whether user has the role
  */
-export function hasRole(user: User, role: string): boolean {
-  return user.role === role;
+export async function hasRole(
+  db: DatabaseManagers,
+  user: User,
+  roleName: string
+): Promise<boolean> {
+  const userPermissions = await getUserPermissions(db, user.id);
+
+  // Get all roles for user and check if any match
+  const roles = await db.userRoles.getUserRole(user.id, undefined, true);
+  return roles.some((ur: any) => ur.role?.name === roleName);
 }
 
 /**
- * Check if user has any of the specified roles
- * 
+ * Check if user has any of the specified roles via RBAC
+ *
+ * @deprecated Use permission-based checks via hasPermission() instead!
+ * @param db - Database managers
  * @param user - User object
- * @param roles - Array of roles to check
+ * @param roleNames - Array of role names to check
  * @returns Whether user has any of the roles
  */
-export function hasAnyRole(user: User, roles: string[]): boolean {
-  return roles.includes(user.role);
+export async function hasAnyRole(
+  db: DatabaseManagers,
+  user: User,
+  roleNames: string[]
+): Promise<boolean> {
+  const roles = await db.userRoles.getUserRole(user.id, undefined, true);
+  return roles.some((ur: any) => roleNames.includes(ur.role?.name));
 }
 
 // ============================================================================
@@ -340,25 +460,31 @@ export function hasAnyRole(user: User, roles: string[]): boolean {
 
 /**
  * Check if user owns a resource or has permission to access it
- * 
+ * RBAC-enabled
+ *
+ * @param db - Database managers
  * @param user - User object
  * @param resourceOwnerId - ID of the resource owner
  * @param overridePermission - Permission that allows access regardless of ownership
  * @returns Whether user can access the resource
  */
-export function canAccessResource(
+export async function canAccessResource(
+  db: DatabaseManagers,
   user: User,
   resourceOwnerId: string,
   overridePermission?: string
-): boolean {
+): Promise<boolean> {
   // User owns the resource
   if (user.id === resourceOwnerId) {
     return true;
   }
 
-  // User has override permission
-  if (overridePermission && hasPermission(user, overridePermission).granted) {
-    return true;
+  // User has override permission (check via RBAC)
+  if (overridePermission) {
+    const result = await hasPermission(db, user, overridePermission);
+    if (result.granted) {
+      return true;
+    }
   }
 
   return false;
@@ -366,7 +492,7 @@ export function canAccessResource(
 
 /**
  * Check if user can access resources within their business
- * 
+ *
  * @param user - User object
  * @param resourceBusinessId - Business ID of the resource
  * @returns Whether user can access the resource
@@ -378,13 +504,100 @@ export function canAccessBusinessResource(
   return user.businessId === resourceBusinessId;
 }
 
+/**
+ * Validate that user can access a business resource
+ * Returns validation result with specific error codes
+ *
+ * @param user - User object
+ * @param resourceBusinessId - Business ID of the resource (null/undefined for system resources)
+ * @returns Validation result with success status and error code if denied
+ */
+export function validateBusinessAccess(
+  user: User,
+  resourceBusinessId: string | null | undefined
+): AuthValidationResult {
+  // Allow null businessId (system resources)
+  if (!resourceBusinessId) {
+    return { success: true };
+  }
+
+  if (user.businessId !== resourceBusinessId) {
+    logger.warn(
+      `[Security] Business access violation: User ${user.id} (business ${user.businessId}) ` +
+      `attempted to access resource from business ${resourceBusinessId}`
+    );
+
+    return {
+      success: false,
+      message: "Access denied: Resource belongs to a different business",
+      code: "BUSINESS_MISMATCH",
+    };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Combined validation: session + permission + business access
+ * Most comprehensive validation for resource access
+ *
+ * @param db - Database managers
+ * @param sessionToken - Session token to validate
+ * @param requiredPermission - Permission required to access resource
+ * @param resourceBusinessId - Business ID of the resource (optional)
+ * @returns Validation result with user if successful
+ */
+export async function validateSessionPermissionAndBusiness(
+  db: DatabaseManagers,
+  sessionToken: string | null | undefined,
+  requiredPermission: string,
+  resourceBusinessId?: string
+): Promise<AuthValidationResult> {
+  // First validate session and permission
+  const auth = await validateSessionAndPermission(db, sessionToken, requiredPermission);
+
+  if (!auth.success) {
+    return auth;
+  }
+
+  // Then validate business access if businessId provided
+  if (resourceBusinessId) {
+    const businessCheck = validateBusinessAccess(auth.user!, resourceBusinessId);
+
+    if (!businessCheck.success) {
+      // Log security event to audit trail
+      try {
+        await db.audit.createAuditLog({
+          userId: auth.user!.id,
+          action: "business_access_denied",
+          entityType: "security",
+          entityId: resourceBusinessId,
+          details: {
+            userBusinessId: auth.user!.businessId,
+            attemptedBusinessId: resourceBusinessId,
+            permission: requiredPermission,
+            timestamp: Date.now(),
+          },
+        });
+      } catch (auditError) {
+        // Don't fail validation if audit logging fails, but log it
+        logger.error("[validateSessionPermissionAndBusiness] Failed to log business access denial:", auditError);
+      }
+
+      return businessCheck;
+    }
+  }
+
+  return auth;
+}
+
 // ============================================================================
 // AUDIT LOGGING
 // ============================================================================
 
 /**
  * Log a successful action
- * 
+ *
  * @param db - Database instance
  * @param user - User who performed the action
  * @param action - Action performed
@@ -409,13 +622,13 @@ export async function logAction(
       details: details || {},
     });
   } catch (error) {
-    console.error("Failed to log action:", error);
+    logger.error("Failed to log action:", error);
   }
 }
 
 /**
  * Log a denied action attempt
- * 
+ *
  * @param db - Database instance
  * @param userId - User ID who attempted the action
  * @param action - Action attempted
@@ -438,11 +651,11 @@ export async function logDeniedAction(
       details: {
         resource,
         reason,
-        timestamp: new Date().toISOString(),
+        timestamp: Date.now(), // Use numeric timestamp
       },
     });
   } catch (error) {
-    console.error("Failed to log denied action:", error);
+    logger.error("Failed to log denied action:", error);
   }
 }
 
@@ -577,4 +790,3 @@ ipcMain.handle("admin:systemSettings", async (event, sessionToken) => {
 });
 
 */
-

@@ -1,24 +1,30 @@
 import type { User } from "@/views/auth/types/auth.types";
+import { getUserRoleName } from "./rbac-helpers";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('auth');
 
 /**
  * Check if a user has a specific permission
+ * Note: This is deprecated. Use the backend RBAC system instead.
  */
 export function hasPermission(
   user: User,
   action: string,
   resource: string
 ): boolean {
-  return user.permissions.some(
-    (p) =>
-      (p.action === "*" || p.action === action) &&
-      (p.resource === "*" || p.resource === resource)
-  );
+  // Temporary: Admin has all permissions
+  if (getUserRoleName(user) === "admin") return true;
+
+  // For now, return false - permissions should be checked via backend
+  logger.warn("hasPermission is deprecated. Use backend RBAC checks instead.");
+  return false;
 }
 
 /**
  * Get the display name for a role
  */
-export function getRoleDisplayName(role: string): string {
+export function getRoleDisplayName(role?: string): string {
   switch (role) {
     case "cashier":
       return "Cashier";
@@ -34,7 +40,7 @@ export function getRoleDisplayName(role: string): string {
 /**
  * Get the description for a role
  */
-export function getRoleDescription(role: string): string {
+export function getRoleDescription(role?: string): string {
   switch (role) {
     case "cashier":
       return "Process sales and view basic reports";

@@ -30,8 +30,11 @@ import type {
   ExpirySettings,
   Supplier,
 } from "./types/batch.types";
-import type { Product } from "./types/product.types";
+import type { Product } from "@/features/products/types/product.types";
 import { toast } from "sonner";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('product-batch-management-view');
 
 interface BatchManagementViewProps {
   onBack: () => void;
@@ -88,12 +91,12 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
       if (!user?.businessId) return;
       try {
         // Pass true to include inactive/deleted products so we can display their names for orphaned batches
-        const response = await window.productAPI.getByBusiness(user.businessId, true);
+        const response = await window.productAPI.getByBusiness(user.businessId);
         if (response.success && response.products) {
           setProducts(response.products);
         }
       } catch (error) {
-        console.error("Error loading products:", error);
+        logger.error("Error loading products:", error);
       }
     };
     loadProducts();
@@ -155,7 +158,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
         toast.error("Failed to load batches");
       }
     } catch (error) {
-      console.error("Error loading batches:", error);
+      logger.error("Error loading batches:", error);
       toast.error("Failed to load batches");
     } finally {
       setLoading(false);
@@ -199,7 +202,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
         setAllBatches(enriched);
       }
     } catch (error) {
-      console.error("Error loading all batches:", error);
+      logger.error("Error loading all batches:", error);
     }
   }, [user?.businessId, selectedProduct, initialProductId, products]);
 
@@ -215,7 +218,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           setSuppliers(response.suppliers);
         }
       } catch (error) {
-        console.error("Error loading suppliers:", error);
+        logger.error("Error loading suppliers:", error);
       }
     };
     loadSuppliers();
@@ -250,7 +253,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           setExpirySettings(defaultSettings);
         }
       } catch (error) {
-        console.error("Error loading expiry settings:", error);
+        logger.error("Error loading expiry settings:", error);
         // Set default settings on error
         const defaultSettings: ExpirySettings = {
           id: "",
@@ -335,7 +338,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           toast.error(response.error || "Failed to delete batch");
         }
       } catch (error) {
-        console.error("Error deleting batch:", error);
+        logger.error("Error deleting batch:", error);
         toast.error("Failed to delete batch");
       }
     },
@@ -349,7 +352,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
         loadBatches();
         loadAllBatches();
       } catch (error) {
-        console.error("Error updating batch:", error);
+        logger.error("Error updating batch:", error);
       }
     },
     [loadBatches, loadAllBatches]
@@ -426,7 +429,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           toast.error(response.error || "Failed to adjust batch quantity");
         }
       } catch (error) {
-        console.error("Error adjusting batch:", error);
+        logger.error("Error adjusting batch:", error);
         toast.error("Failed to adjust batch quantity");
       }
     },

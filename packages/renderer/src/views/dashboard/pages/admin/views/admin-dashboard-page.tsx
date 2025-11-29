@@ -8,6 +8,9 @@ import {
 } from "@/components/ui/card";
 import { useState } from "react";
 import { toast } from "sonner";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('admin-dashboard-page');
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,9 +34,20 @@ import {
   Upload,
   Download,
   Trash2,
+  ShoppingCart,
 } from "lucide-react";
 
-const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
+const AdminDashboardPage = ({
+  onFront,
+  onNewTransaction,
+  onNavigateToRoles,
+  onNavigateToUserRoles,
+}: {
+  onFront: () => void;
+  onNewTransaction?: () => void;
+  onNavigateToRoles?: () => void;
+  onNavigateToUserRoles?: () => void;
+}) => {
   const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
   const [isEmptyDialogOpen, setIsEmptyDialogOpen] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -79,7 +93,7 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
         duration: 6000,
       });
     } catch (error) {
-      console.error("Backup error:", error);
+      logger.error("Backup error:", error);
       toast.error("Failed to backup database", {
         id: "backup",
         description:
@@ -138,13 +152,13 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
         try {
           await window.appAPI.restart();
         } catch (restartError) {
-          console.error("Restart error:", restartError);
+          logger.error("Restart error:", restartError);
           // Fallback to window reload if restart fails
           window.location.reload();
         }
       }, 1500);
     } catch (error) {
-      console.error("Import error:", error);
+      logger.error("Import error:", error);
       toast.error("Failed to import database", {
         id: "import",
         description:
@@ -195,13 +209,13 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
         try {
           await window.appAPI.restart();
         } catch (restartError) {
-          console.error("Restart error:", restartError);
+          logger.error("Restart error:", restartError);
           // Fallback to window reload if restart fails
           window.location.reload();
         }
       }, 1500);
     } catch (error) {
-      console.error("Empty database error:", error);
+      logger.error("Empty database error:", error);
       toast.error("Failed to empty database", {
         id: "empty-db",
         description:
@@ -226,9 +240,9 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
                 Backup Database
               </AlertDialogTitle>
               <AlertDialogDescription className="text-sm sm:text-base">
-                You will be prompted to choose where to save your database backup
-                file. The backup will include all your business data, products,
-                transactions, and settings.
+                You will be prompted to choose where to save your database
+                backup file. The backup will include all your business data,
+                products, transactions, and settings.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
@@ -246,7 +260,10 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
         </AlertDialog>
 
         {/* Empty Database Confirmation Dialog */}
-        <AlertDialog open={isEmptyDialogOpen} onOpenChange={setIsEmptyDialogOpen}>
+        <AlertDialog
+          open={isEmptyDialogOpen}
+          onOpenChange={setIsEmptyDialogOpen}
+        >
           <AlertDialogContent className="max-w-[90vw] sm:max-w-lg mx-auto">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-lg sm:text-xl text-red-600">
@@ -305,9 +322,7 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                3 online now
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">3 online now</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm hover:shadow-md transition-shadow">
@@ -345,11 +360,37 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
           <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
             <CardHeader>
               <CardTitle className="text-lg sm:text-xl">
+                Quick Actions
+              </CardTitle>
+              <CardDescription>Common admin tasks</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 flex-1">
+              {onNewTransaction && (
+                <Button
+                  className="w-full justify-start bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={onNewTransaction}
+                >
+                  <ShoppingCart className="w-4 h-4 mr-2 shrink-0" />
+                  New Sale
+                </Button>
+              )}
+              <Button
+                className="w-full justify-start"
+                variant="outline"
+                onClick={onFront}
+              >
+                <Users className="w-4 h-4 mr-2 shrink-0" />
+                Manage Users
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl">
                 User Management
               </CardTitle>
-              <CardDescription>
-                Manage staff and permissions
-              </CardDescription>
+              <CardDescription>Manage staff and permissions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 flex-1">
               <Button
@@ -363,6 +404,7 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
               <Button
                 className="w-full justify-start"
                 variant="outline"
+                onClick={onNavigateToRoles}
               >
                 <Shield className="w-4 h-4 mr-2 shrink-0" />
                 Role Permissions
@@ -370,9 +412,10 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
               <Button
                 className="w-full justify-start"
                 variant="outline"
+                onClick={onNavigateToUserRoles}
               >
                 <Settings className="w-4 h-4 mr-2 shrink-0" />
-                Access Control
+                User Role Assignment
               </Button>
             </CardContent>
           </Card>
@@ -382,29 +425,18 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
               <CardTitle className="text-lg sm:text-xl">
                 System Settings
               </CardTitle>
-              <CardDescription>
-                Configure system preferences
-              </CardDescription>
+              <CardDescription>Configure system preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 flex-1">
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-              >
+              <Button className="w-full justify-start" variant="outline">
                 <Settings className="w-4 h-4 mr-2 shrink-0" />
                 General Settings
               </Button>
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-              >
+              <Button className="w-full justify-start" variant="outline">
                 <Store className="w-4 h-4 mr-2 shrink-0" />
                 Store Configuration
               </Button>
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-              >
+              <Button className="w-full justify-start" variant="outline">
                 <Shield className="w-4 h-4 mr-2 shrink-0" />
                 Security Settings
               </Button>
@@ -416,29 +448,18 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
               <CardTitle className="text-lg sm:text-xl">
                 Advanced Reports
               </CardTitle>
-              <CardDescription>
-                Comprehensive analytics
-              </CardDescription>
+              <CardDescription>Comprehensive analytics</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 flex-1">
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-              >
+              <Button className="w-full justify-start" variant="outline">
                 <BarChart3 className="w-4 h-4 mr-2 shrink-0" />
                 Financial Reports
               </Button>
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-              >
+              <Button className="w-full justify-start" variant="outline">
                 <TrendingUp className="w-4 h-4 mr-2 shrink-0" />
                 Business Intelligence
               </Button>
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-              >
+              <Button className="w-full justify-start" variant="outline">
                 <Users className="w-4 h-4 mr-2 shrink-0" />
                 User Activity Logs
               </Button>
@@ -450,9 +471,7 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
               <CardTitle className="text-lg sm:text-xl">
                 DB Management
               </CardTitle>
-              <CardDescription>
-                Database backup and maintenance
-              </CardDescription>
+              <CardDescription>Database backup and maintenance</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 flex-1">
               <Button
@@ -496,7 +515,6 @@ const AdminDashboardPage = ({ onFront }: { onFront: () => void }) => {
           </Card>
         </div>
       </div>
-     
     </>
   );
 };

@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Store, LogOut, User, Bell, Settings, Clock } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { ClockOutWarningDialog } from "@/views/auth/components/clock-out-warning-dialog";
+import { userHasAnyRole } from "@/shared/utils/rbac-helpers";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('dashboard-layout');
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -44,7 +48,7 @@ export function DashboardLayout({
           setClockInTime(undefined);
         }
       } catch (error) {
-        console.error("Failed to check active shift:", error);
+        logger.error("Failed to check active shift:", error);
       }
     };
 
@@ -64,7 +68,7 @@ export function DashboardLayout({
       if (
         response.success &&
         response.shift &&
-        (user.role === "cashier" || user.role === "manager")
+        userHasAnyRole(user, ["cashier", "manager"])
       ) {
         setActiveShift(response.shift);
         // Get clock-in timestamp
@@ -78,7 +82,7 @@ export function DashboardLayout({
         return;
       }
     } catch (error) {
-      console.error("Failed to check shift:", error);
+      logger.error("Failed to check shift:", error);
     }
     setIsCheckingShift(false);
 
@@ -133,7 +137,7 @@ export function DashboardLayout({
                   <User className="w-4 h-4" />
                 </div>
                 {activeShift &&
-                  (user.role === "cashier" || user.role === "manager") && (
+                  userHasAnyRole(user, ["cashier", "manager"]) && (
                     <div className="flex items-center gap-1 px-2 py-1 bg-green-100 rounded-full">
                       <Clock className="w-3 h-3 text-green-700" />
                       <span className="text-xs font-medium text-green-700">

@@ -3,6 +3,9 @@ import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('shiftManager');
+
 export class ShiftManager {
   private db: DrizzleDB;
   private uuid: any;
@@ -10,6 +13,24 @@ export class ShiftManager {
   constructor(drizzle: DrizzleDB, uuid: any) {
     this.db = drizzle;
     this.uuid = uuid;
+  }
+
+  /**
+   * Validate that a shift belongs to a specific user (cashier)
+   * Prevents cashiers from creating transactions on other users' shifts
+   *
+   * @param shiftId - ID of the shift to validate
+   * @param userId - ID of the user (should be shift owner)
+   * @returns true if shift belongs to user, false otherwise
+   */
+  validateShiftOwnership(shiftId: string, userId: string): boolean {
+    try {
+      const shift = this.getShiftById(shiftId);
+      return shift.cashierId === userId;
+    } catch (error) {
+      logger.error("Error validating shift ownership:", error);
+      return false;
+    }
   }
 
   /**
@@ -305,7 +326,7 @@ export class ShiftManager {
           cashierId: shift.cashierId,
         });
 
-        console.log(`Auto-closed shift ${shift.id}: ${closeReason}`);
+        logger.info(`Auto-closed shift ${shift.id}: ${closeReason}`);
       }
     }
 
@@ -400,7 +421,7 @@ export class ShiftManager {
           cashierId: shift.cashierId,
         });
 
-        console.log(`Auto-ended overdue shift ${shift.id}: ${closeReason}`);
+        logger.info(`Auto-ended overdue shift ${shift.id}: ${closeReason}`);
       }
     }
 

@@ -9,14 +9,23 @@ import ProductManagementView from "./pages/manager/views/stock/manage-product-vi
 import UserManagementView from "@/views/dashboard/pages/admin/views/user-management-view";
 import StaffSchedulesView from "@/views/dashboard/pages/manager/views/staff-schedules-view";
 import CashierManagementView from "@/views/dashboard/pages/manager/views/manage-cashier-view";
+import RoleManagementView from "@/views/dashboard/pages/admin/views/role-management-view";
+import UserRoleAssignmentView from "@/views/dashboard/pages/admin/views/user-role-assignment-view";
 
-export const ADMIN_VIEWS = ["dashboard", "userManagement"] as const;
+export const ADMIN_VIEWS = [
+  "dashboard",
+  "userManagement",
+  "roleManagement",
+  "userRoleAssignment",
+  "newTransaction",
+] as const;
 export const CASHIER_VIEWS = ["dashboard", "newTransaction"] as const;
 export const MANAGER_VIEWS = [
   "dashboard",
   "cashierManagement",
   "productDashboard",
   "staffSchedules",
+  "newTransaction", // Allow managers to make sales
 ] as const;
 export type AdminView = (typeof ADMIN_VIEWS)[number];
 export type CashierView = (typeof CASHIER_VIEWS)[number];
@@ -27,10 +36,24 @@ export function createAdminViewDefinitions(
 ): Record<AdminView, ReactNode> {
   return {
     dashboard: (
-      <AdminDashboardPage onFront={() => navigateTo("userManagement")} />
+      <AdminDashboardPage
+        onFront={() => navigateTo("userManagement")}
+        onNewTransaction={() => navigateTo("newTransaction")}
+        onNavigateToRoles={() => navigateTo("roleManagement")}
+        onNavigateToUserRoles={() => navigateTo("userRoleAssignment")}
+      />
     ),
     userManagement: (
       <UserManagementView onBack={() => navigateTo("dashboard")} />
+    ),
+    roleManagement: (
+      <RoleManagementView onBack={() => navigateTo("dashboard")} />
+    ),
+    userRoleAssignment: (
+      <UserRoleAssignmentView onBack={() => navigateTo("dashboard")} />
+    ),
+    newTransaction: (
+      <NewTransactionView onBack={() => navigateTo("dashboard")} />
     ),
   };
 }
@@ -59,6 +82,7 @@ export function createManagerViewDefinitions(
         onStaffSchedules={() => navigateTo("staffSchedules")}
         onManageCashiers={() => navigateTo("cashierManagement")}
         onManageProducts={() => navigateTo("productDashboard")}
+        onNewTransaction={() => navigateTo("newTransaction")}
       />
     ),
     productDashboard: (
@@ -69,6 +93,9 @@ export function createManagerViewDefinitions(
     ),
     staffSchedules: (
       <StaffSchedulesView onBack={() => navigateTo("dashboard")} />
+    ),
+    newTransaction: (
+      <NewTransactionView onBack={() => navigateTo("dashboard")} />
     ),
   };
 }

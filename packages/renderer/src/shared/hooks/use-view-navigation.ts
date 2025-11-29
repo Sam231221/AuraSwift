@@ -1,5 +1,8 @@
 import { useState, useCallback } from "react";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-view-navigation');
+
 /**
  * Custom hook for managing view navigation state with type safety
  * 
@@ -31,7 +34,7 @@ export function useViewNavigation<T extends string>(
       if (views.includes(view)) {
         setCurrentView(view);
       } else {
-        console.warn(
+        logger.warn(
           `Invalid view: "${view}". Valid views are: ${views.join(", ")}`
         );
       }

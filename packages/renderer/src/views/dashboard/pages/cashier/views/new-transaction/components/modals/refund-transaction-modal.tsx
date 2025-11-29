@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { toast } from "sonner";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('refund-transaction-modal');
+
 // Types
 interface Transaction {
   id: string;
@@ -113,7 +116,7 @@ const RefundTransactionModal: React.FC<RefundModalProps> = ({
         setRecentTransactions(transactionsResponse.transactions || []);
       }
     } catch (error: unknown) {
-      console.error("Failed to load recent transactions:", error);
+      logger.error("Failed to load recent transactions:", error);
       toast.error("Failed to load recent transactions");
     } finally {
       setIsSearching(false);
@@ -145,7 +148,7 @@ const RefundTransactionModal: React.FC<RefundModalProps> = ({
         toast.error("Transaction not found");
       }
     } catch (error: unknown) {
-      console.error("Search failed:", error);
+      logger.error("Search failed:", error);
       toast.error("Search failed");
     } finally {
       setIsSearching(false);
@@ -276,7 +279,7 @@ const RefundTransactionModal: React.FC<RefundModalProps> = ({
         toast.error(response.message || "Failed to process refund");
       }
     } catch (error: unknown) {
-      console.error("Failed to process refund:", error);
+      logger.error("Failed to process refund:", error);
       toast.error("Failed to process refund");
     } finally {
       setIsProcessing(false);

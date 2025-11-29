@@ -1,41 +1,47 @@
 import { ipcRenderer } from "electron";
 
 export const transactionAPI = {
-  create: (transactionData: {
-    shiftId: string;
-    businessId: string;
-    type: "sale" | "refund" | "void";
-    subtotal: number;
-    tax: number;
-    total: number;
-    paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
-    cashAmount?: number;
-    cardAmount?: number;
-    items: Array<{
-      productId: string;
-      productName: string;
-      quantity: number;
-      unitPrice: number;
-      totalPrice: number;
-    }>;
-    status: "completed" | "voided" | "pending";
-    customerId?: string;
-    receiptNumber: string;
-    timestamp: string;
-  }) => ipcRenderer.invoke("transactions:create", transactionData),
+  create: (
+    sessionToken: string,
+    transactionData: {
+      shiftId: string;
+      businessId: string;
+      type: "sale" | "refund" | "void";
+      subtotal: number;
+      tax: number;
+      total: number;
+      paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
+      cashAmount?: number;
+      cardAmount?: number;
+      items: Array<{
+        productId: string;
+        productName: string;
+        quantity: number;
+        unitPrice: number;
+        totalPrice: number;
+      }>;
+      status: "completed" | "voided" | "pending";
+      customerId?: string;
+      receiptNumber: string;
+      timestamp: string;
+    }
+  ) => ipcRenderer.invoke("transactions:create", sessionToken, transactionData),
 
   getByShift: (shiftId: string) =>
     ipcRenderer.invoke("transactions:getByShift", shiftId),
 
-  createFromCart: (data: {
-    cartSessionId: string;
-    shiftId: string;
-    businessId: string;
-    paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
-    cashAmount?: number;
-    cardAmount?: number;
-    receiptNumber: string;
-  }) => ipcRenderer.invoke("transactions:createFromCart", data),
+  createFromCart: (
+    sessionToken: string,
+    data: {
+      cartSessionId: string;
+      shiftId?: string; // Made optional for admin/manager
+      businessId: string;
+      paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
+      cashAmount?: number;
+      cardAmount?: number;
+      receiptNumber: string;
+    }
+  ) => ipcRenderer.invoke("transactions:createFromCart", sessionToken, data),
 };
 
 export const refundAPI = {
@@ -71,38 +77,44 @@ export const refundAPI = {
       refundItems
     ),
 
-  createRefundTransaction: (refundData: {
-    originalTransactionId: string;
-    shiftId: string;
-    businessId: string;
-    refundItems: Array<{
-      originalItemId: string;
-      productId: string;
-      productName: string;
-      originalQuantity: number;
-      refundQuantity: number;
-      unitPrice: number;
-      refundAmount: number;
-      reason: string;
-      restockable: boolean;
-    }>;
-    refundReason: string;
-    refundMethod: "original" | "store_credit" | "cash" | "card";
-    managerApprovalId?: string;
-    cashierId: string;
-  }) => ipcRenderer.invoke("refunds:create", refundData),
+  createRefundTransaction: (
+    sessionToken: string,
+    refundData: {
+      originalTransactionId: string;
+      shiftId: string;
+      businessId: string;
+      refundItems: Array<{
+        originalItemId: string;
+        productId: string;
+        productName: string;
+        originalQuantity: number;
+        refundQuantity: number;
+        unitPrice: number;
+        refundAmount: number;
+        reason: string;
+        restockable: boolean;
+      }>;
+      refundReason: string;
+      refundMethod: "original" | "store_credit" | "cash" | "card";
+      managerApprovalId?: string;
+      cashierId: string;
+    }
+  ) => ipcRenderer.invoke("refunds:create", sessionToken, refundData),
 };
 
 export const voidAPI = {
   validateEligibility: (transactionId: string) =>
     ipcRenderer.invoke("voids:validateEligibility", transactionId),
 
-  voidTransaction: (voidData: {
-    transactionId: string;
-    cashierId: string;
-    reason: string;
-    managerApprovalId?: string;
-  }) => ipcRenderer.invoke("voids:create", voidData),
+  voidTransaction: (
+    sessionToken: string,
+    voidData: {
+      transactionId: string;
+      cashierId: string;
+      reason: string;
+      managerApprovalId?: string;
+    }
+  ) => ipcRenderer.invoke("voids:create", sessionToken, voidData),
 
   getTransactionById: (transactionId: string) =>
     ipcRenderer.invoke("voids:getTransactionById", transactionId),

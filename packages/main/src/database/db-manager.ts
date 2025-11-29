@@ -21,6 +21,9 @@ import {
 } from "./utils/db-compatibility.js";
 // Layer 3: Repair mechanisms
 import { repairDatabase, createFreshDatabase } from "./utils/db-repair.js";
+
+import { getLogger } from '../utils/logger.js';
+const logger = getLogger('db-manager');
 // Layer 4: User dialogs
 import {
   showRecoveryDialog,
@@ -99,33 +102,33 @@ export class DBManager {
         // Check if database exists at old incorrect path (double-nested)
         if (shouldMigrateDatabasePath()) {
           const oldPath = getOldDatabasePath();
-          console.log("📦 Detected old database at incorrect path:", oldPath);
-          console.log("🔧 Attempting to migrate to correct location...");
+          logger.info("📦 Detected old database at incorrect path:", oldPath);
+          logger.info("🔧 Attempting to migrate to correct location...");
 
           const migrationResult = migrateDatabaseFromOldPath(false); // Don't remove old yet
 
           if (migrationResult.migrated) {
-            console.log("✅ Database migrated successfully!");
-            console.log(`   Old location: ${migrationResult.oldPath}`);
-            console.log(`   New location: ${migrationResult.newPath}`);
+            logger.info("✅ Database migrated successfully!");
+            logger.info(`   Old location: ${migrationResult.oldPath}`);
+            logger.info(`   New location: ${migrationResult.newPath}`);
             if (migrationResult.backupPath) {
-              console.log(`   Backup created: ${migrationResult.backupPath}`);
+              logger.info(`   Backup created: ${migrationResult.backupPath}`);
             }
           } else {
-            console.warn(
+            logger.warn(
               "⚠️  Database migration failed:",
               migrationResult.reason
             );
-            console.warn(
+            logger.warn(
               "   Old database preserved at:",
               migrationResult.oldPath
             );
-            console.warn("   App will continue with new database location");
+            logger.warn("   App will continue with new database location");
           }
         }
 
         const dbPath = this.getDatabasePath();
-        console.log("Database path:", dbPath);
+        logger.info("Database path:", dbPath);
 
         // ========================================
         // LAYER 1: Pre-Connection Health Assessment
@@ -136,13 +139,13 @@ export class DBManager {
         if (!fs.existsSync(dbDir)) {
           try {
             fs.mkdirSync(dbDir, { recursive: true });
-            console.log(`✅ Created database directory: ${dbDir}`);
+            logger.info(`✅ Created database directory: ${dbDir}`);
           } catch (mkdirError) {
             const errorMessage =
               mkdirError instanceof Error
                 ? mkdirError.message
                 : String(mkdirError);
-            console.error(`❌ Failed to create database directory: ${errorMessage}`);
+            logger.error(`❌ Failed to create database directory: ${errorMessage}`);
             await showDatabaseErrorDialog(
               "Database Directory Error",
               `Failed to create database directory: ${dbDir}`,
@@ -157,7 +160,7 @@ export class DBManager {
         if (!dirValidation.valid) {
           const errorMessage =
             dirValidation.reason || "Invalid database directory";
-          console.error(`❌ ${errorMessage}`);
+          logger.error(`❌ ${errorMessage}`);
           await showDatabaseErrorDialog(
             "Database Directory Error",
             errorMessage,
@@ -171,7 +174,7 @@ export class DBManager {
 
         // If database file doesn't exist, it's fine - will be created
         if (fileValidation.isEmpty === false && !fileValidation.valid) {
-          console.warn(
+          logger.warn(
             "⚠️  Database file validation issues:",
             fileValidation.reason
           );
@@ -203,7 +206,7 @@ export class DBManager {
           const errorMessage =
             openError instanceof Error ? openError.message : String(openError);
 
-          console.error(`❌ Failed to open database: ${errorMessage}`);
+          logger.error(`❌ Failed to open database: ${errorMessage}`);
 
           // If database exists but couldn't open, offer recovery options
           if (dbExists) {
@@ -239,7 +242,7 @@ export class DBManager {
           const compatibility = checkDatabaseCompatibility(this.db, dbPath);
 
           if (!compatibility.compatible) {
-            console.error(
+            logger.error(
               "❌ Database compatibility check failed:",
               compatibility.reason
             );
@@ -276,7 +279,7 @@ export class DBManager {
           );
 
           if (!migrationPathExists) {
-            console.error("❌ Migration path does not exist");
+            logger.error("❌ Migration path does not exist");
             this.db.close();
             this.db = null;
 
@@ -295,7 +298,7 @@ export class DBManager {
         // will be closed immediately if a downgrade is detected
         const isDowngradeAttempt = this.checkForDowngrade(this.db, dbPath);
         if (isDowngradeAttempt) {
-          console.error(
+          logger.error(
             "❌ Database downgrade detected - app version is older than database schema"
           );
           // Close database connection before quitting
@@ -322,11 +325,11 @@ export class DBManager {
           fileValidation.valid === false &&
           fileValidation.canRecover
         ) {
-          console.log("🔧 Attempting database repair...");
+          logger.info("🔧 Attempting database repair...");
           const repairResult = await repairDatabase(this.db, dbPath);
 
           if (!repairResult.success) {
-            console.warn("⚠️  Database repair failed:", repairResult.reason);
+            logger.warn("⚠️  Database repair failed:", repairResult.reason);
 
             // Close database before showing dialog
             this.db.close();
@@ -341,7 +344,7 @@ export class DBManager {
             this.initializationPromise = null;
             return this.initialize();
           } else if (repairResult.repaired) {
-            console.log("✅ Database repair successful");
+            logger.info("✅ Database repair successful");
           }
         }
 
@@ -359,7 +362,7 @@ export class DBManager {
 
         if (!migrationSuccess) {
           const errorMessage = `Database migration failed. Check the migration logs above for details. Database path: ${dbPath}`;
-          console.error(`❌ ${errorMessage}`);
+          logger.error(`❌ ${errorMessage}`);
 
           // Find latest backup
           const backupDir = path.join(path.dirname(dbPath), "backups");
@@ -393,7 +396,7 @@ export class DBManager {
         }
 
         this.initialized = true;
-        console.log("✅ Database initialized successfully\n");
+        logger.info("✅ Database initialized successfully\n");
       } catch (error) {
         // Reset state on error to allow retry
         this.initialized = false;
@@ -409,11 +412,11 @@ export class DBManager {
         const errorStack = error instanceof Error ? error.stack : undefined;
         const dbPath = this.getDatabasePath();
 
-        console.error("❌ Database initialization error:");
-        console.error(`   Path: ${dbPath}`);
-        console.error(`   Error: ${errorMessage}`);
+        logger.error("❌ Database initialization error:");
+        logger.error(`   Path: ${dbPath}`);
+        logger.error(`   Error: ${errorMessage}`);
         if (errorStack) {
-          console.error(`   Stack: ${errorStack}`);
+          logger.error(`   Stack: ${errorStack}`);
         }
 
         throw new Error(
@@ -513,7 +516,7 @@ export class DBManager {
 
       return isDowngrade;
     } catch (error) {
-      console.error("Error checking for downgrade:", error);
+      logger.error("Error checking for downgrade:", error);
       // On error, allow to proceed (don't block legitimate updates)
       return false;
     }
@@ -531,7 +534,7 @@ export class DBManager {
     try {
       // Validate versions are valid semver
       if (!semver.valid(storedVersion) || !semver.valid(newVersion)) {
-        console.warn(
+        logger.warn(
           `Invalid semver format - stored: ${storedVersion}, current: ${newVersion}. Falling back to simple comparison.`
         );
         // Fallback to simple comparison for non-semver versions
@@ -552,7 +555,7 @@ export class DBManager {
       // Use semver for proper comparison (handles pre-release, build metadata, etc.)
       return semver.lt(newVersion, storedVersion);
     } catch (error) {
-      console.error(
+      logger.error(
         `Version comparison error - stored: ${storedVersion}, current: ${newVersion}:`,
         error
       );
@@ -568,7 +571,7 @@ export class DBManager {
     // Allow override via environment variable for testing
     const customDbPath = process.env.POS_DB_PATH;
     if (customDbPath) {
-      console.log("Using custom database path:", customDbPath);
+      logger.info("Using custom database path:", customDbPath);
       // Validate custom path doesn't contain invalid characters
       if (customDbPath.includes("\0") || customDbPath.includes("\x00")) {
         throw new Error(`Invalid database path: ${customDbPath}`);
@@ -595,15 +598,15 @@ export class DBManager {
         );
       }
       
-      console.log("Development mode: Using project directory for database");
-      console.log(`Project root: ${projectRoot}`);
-      console.log(`Database path: ${finalPath}`);
+      logger.info("Development mode: Using project directory for database");
+      logger.info(`Project root: ${projectRoot}`);
+      logger.info(`Database path: ${finalPath}`);
     } else {
       // Production: Use proper user data directory based on platform
       // Note: app.getPath("userData") already includes the app name (e.g., "AuraSwift")
       const userDataPath = app.getPath("userData");
       finalPath = path.join(userDataPath, "pos_system.db");
-      console.log("Production mode: Using user data directory for database");
+      logger.info("Production mode: Using user data directory for database");
     }
 
     // Validate path doesn't contain invalid characters
@@ -611,7 +614,7 @@ export class DBManager {
       throw new Error(`Invalid database path: ${finalPath}`);
     }
 
-    console.log("Database at:", finalPath);
+    logger.info("Database at:", finalPath);
     return finalPath;
   }
 
@@ -690,7 +693,7 @@ export class DBManager {
       case "repair":
         // Repair will be attempted on next initialization
         // For now, just inform user we'll retry
-        console.log("🔧 User requested repair - will retry initialization");
+        logger.info("🔧 User requested repair - will retry initialization");
         break;
 
       case "restore-backup":
@@ -718,10 +721,10 @@ export class DBManager {
    * Handle creating a fresh database
    */
   private async handleCreateFreshDatabase(dbPath: string): Promise<void> {
-    console.log("🔄 Creating fresh database...");
+    logger.info("🔄 Creating fresh database...");
     const migrationsFolder = this.getMigrationsFolder();
     await createFreshDatabase(dbPath, migrationsFolder);
-    console.log("✅ Fresh database prepared");
+    logger.info("✅ Fresh database prepared");
   }
 
   /**
@@ -731,7 +734,7 @@ export class DBManager {
     dbPath: string,
     backupPath: string
   ): Promise<void> {
-    console.log(`🔄 Restoring database from backup: ${backupPath}`);
+    logger.info(`🔄 Restoring database from backup: ${backupPath}`);
 
     try {
       // Close database if open
@@ -744,12 +747,12 @@ export class DBManager {
       if (fs.existsSync(dbPath)) {
         const oldBackupPath = `${dbPath}.old.${Date.now()}`;
         fs.renameSync(dbPath, oldBackupPath);
-        console.log(`📦 Old database backed up to: ${oldBackupPath}`);
+        logger.info(`📦 Old database backed up to: ${oldBackupPath}`);
       }
 
       // Copy backup to database location
       fs.copyFileSync(backupPath, dbPath);
-      console.log("✅ Database restored from backup");
+      logger.info("✅ Database restored from backup");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

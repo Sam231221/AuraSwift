@@ -1,25 +1,27 @@
 export interface User {
   id: string;
   username: string;
-  pin: string;
+  pin?: string;
   email?: string;
   firstName: string;
   lastName: string;
   businessName: string;
-  role: "cashier" | "manager" | "admin";
   businessId: string;
-  permissions: Permission[];
+  // Note: role and permissions are managed via RBAC tables (userRoles, roles)
+  // The role field is populated from the backend for UI display purposes only
+  role?: "admin" | "manager" | "cashier";
   avatar?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   isActive: boolean;
 }
+
 export interface UserForLogin {
   id: string;
   username: string;
   firstName: string;
   lastName: string;
-  role: "admin" | "manager" | "cashier";
+  role: "admin" | "manager" | "cashier"; // For UI display only
   color: string;
 }
 
@@ -35,11 +37,6 @@ export interface Business {
   vatNumber?: string;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Permission {
-  action: string;
-  resource: string;
 }
 
 export interface AuthContextType {

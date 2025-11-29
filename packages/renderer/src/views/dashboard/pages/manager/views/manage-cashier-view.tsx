@@ -34,10 +34,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UserAvatar } from "@/shared/components/user-avatar";
-import { AvatarUpload } from "@/shared/components/avatar-upload";
+import { UserAvatar } from "@/components/user-avatar";
+import { AvatarUpload } from "@/components/avatar-upload";
 import { useAuth } from "@/shared/hooks/use-auth";
-import { getRoleDisplayName } from "@/shared/utils/auth";
+
+import {
+  getUserRoleName,
+  getUserRoleDisplayName,
+  userHasAnyRole,
+} from "@/shared/utils/rbac-helpers";
 import {
   Plus,
   Search,
@@ -59,8 +64,11 @@ import {
 import {
   AdaptiveKeyboard,
   AdaptiveFormField,
-} from "@/components/adaptive-keyboard";
-import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
+} from "@/features/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/features/adaptive-keyboard/hooks/use-keyboard-with-react-hook-form";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('manage-cashier-view');
 import type {
   CashierFormData,
   CashierUpdateData,
@@ -68,9 +76,11 @@ import type {
 
 interface StaffUser {
   id: string;
+  username: string;
   email: string;
   firstName: string;
   lastName: string;
+  businessName: string;
   role: "cashier" | "manager";
   businessId: string;
   avatar?: string;
@@ -114,13 +124,15 @@ export default function CashierManagementView({
       if (response.success && response.users) {
         // Filter out admin users and convert to StaffUser format
         const cashiers: StaffUser[] = response.users
-          .filter((u) => u.role === "cashier")
+          .filter((u) => getUserRoleName(u) === "cashier")
           .map((u) => ({
             id: u.id,
+            username: u.username || u.email || "",
             email: u.email ?? "", // Ensure email is always a string
             firstName: u.firstName,
             lastName: u.lastName,
-            role: u.role as "cashier",
+            businessName: u.businessName || "Unknown Business",
+            role: getUserRoleName(u) as "cashier",
             businessId: u.businessId,
             avatar: u.avatar,
             address: (u as { address?: string }).address || "",
@@ -130,11 +142,11 @@ export default function CashierManagementView({
 
         setCashiers(cashiers);
       } else {
-        console.error("Failed to load staff users:", response.message);
+        logger.error("Failed to load staff users:", response.message);
         toast.error(response.message || "Failed to load staff users");
       }
     } catch (error) {
-      console.error("Failed to load staff users:", error);
+      logger.error("Failed to load staff users:", error);
       toast.error("Failed to load staff users");
     } finally {
       setIsLoadingUsers(false);
@@ -161,7 +173,7 @@ export default function CashierManagementView({
         toast.error(response.message || "Failed to delete cashier");
       }
     } catch (error) {
-      console.error("Error deleting user:", error);
+      logger.error("Error deleting user:", error);
       toast.error("Failed to delete cashier");
     }
   };
@@ -183,13 +195,14 @@ export default function CashierManagementView({
       staffUser.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       staffUser.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesRole = filterRole === "all" || staffUser.role === filterRole;
+    const matchesRole =
+      filterRole === "all" || getUserRoleName(staffUser) === filterRole;
 
     return matchesSearch && matchesRole;
   });
 
-  // Check if current user is admin
-  const isAdminORManager = user?.role === "admin" || user?.role === "manager";
+  // Check if current user is admin or manager
+  const isAdminORManager = userHasAnyRole(user, ["admin", "manager"]);
 
   // Handle loading state
   if (!user) {
@@ -320,12 +333,12 @@ export default function CashierManagementView({
                     <div className="mt-1">
                       <Badge
                         variant={
-                          selectedUser.role === "manager"
+                          getUserRoleName(selectedUser) === "manager"
                             ? "default"
                             : "secondary"
                         }
                       >
-                        {getRoleDisplayName(selectedUser.role)}
+                        {getUserRoleDisplayName(selectedUser)}
                       </Badge>
                     </div>
                   </div>
@@ -505,13 +518,13 @@ export default function CashierManagementView({
                       <TableCell className="hidden md:table-cell">
                         <Badge
                           variant={
-                            staffUser.role === "manager"
+                            getUserRoleName(staffUser) === "manager"
                               ? "default"
                               : "secondary"
                           }
                           className="text-xs"
                         >
-                          {getRoleDisplayName(staffUser.role)}
+                          {getUserRoleDisplayName(staffUser)}
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">

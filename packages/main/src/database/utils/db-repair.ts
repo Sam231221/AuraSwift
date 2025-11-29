@@ -10,6 +10,9 @@ import fs from "fs";
 import path from "path";
 import { copyFileSync } from "fs";
 
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('db-repair');
+
 export interface RepairResult {
   success: boolean;
   repaired: boolean;
@@ -51,7 +54,7 @@ export async function repairDatabase(
     try {
       db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").run();
     } catch (error) {
-      console.warn("WAL checkpoint before backup failed:", error);
+      logger.warn("WAL checkpoint before backup failed:", error);
     }
 
     // Create backup
@@ -66,30 +69,30 @@ export async function repairDatabase(
       };
     }
 
-    console.log(`📦 Backup created before repair: ${backupPath}`);
+    logger.info(`📦 Backup created before repair: ${backupPath}`);
 
     // Strategy 1: WAL Checkpoint (non-destructive)
     try {
-      console.log("🔧 Attempting WAL checkpoint...");
+      logger.info("🔧 Attempting WAL checkpoint...");
       db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").run();
-      console.log("✅ WAL checkpoint completed");
+      logger.info("✅ WAL checkpoint completed");
     } catch (error) {
-      console.warn("⚠️  WAL checkpoint failed:", error);
+      logger.warn("⚠️  WAL checkpoint failed:", error);
     }
 
     // Strategy 2: Integrity check
     try {
-      console.log("🔍 Running integrity check...");
+      logger.info("🔍 Running integrity check...");
       const integrityCheck = db.prepare("PRAGMA integrity_check").get() as {
         integrity_check: string;
       };
 
       if (integrityCheck.integrity_check !== "ok") {
-        console.warn(
+        logger.warn(
           `⚠️  Integrity check found issues: ${integrityCheck.integrity_check}`
         );
       } else {
-        console.log("✅ Integrity check passed");
+        logger.info("✅ Integrity check passed");
         return {
           success: true,
           repaired: true,
@@ -97,27 +100,27 @@ export async function repairDatabase(
         };
       }
     } catch (error) {
-      console.warn("⚠️  Integrity check failed:", error);
+      logger.warn("⚠️  Integrity check failed:", error);
     }
 
     // Strategy 3: REINDEX (rebuild all indexes)
     try {
-      console.log("🔧 Rebuilding indexes...");
+      logger.info("🔧 Rebuilding indexes...");
       db.exec("REINDEX");
-      console.log("✅ Indexes rebuilt");
+      logger.info("✅ Indexes rebuilt");
     } catch (error) {
-      console.warn("⚠️  REINDEX failed:", error);
+      logger.warn("⚠️  REINDEX failed:", error);
       // Continue to next strategy
     }
 
     // Strategy 4: VACUUM (rebuild entire database)
     // WARNING: This can take a long time for large databases
     try {
-      console.log("🔧 Running VACUUM (this may take a while)...");
+      logger.info("🔧 Running VACUUM (this may take a while)...");
       db.exec("VACUUM");
-      console.log("✅ VACUUM completed");
+      logger.info("✅ VACUUM completed");
     } catch (error) {
-      console.warn("⚠️  VACUUM failed:", error);
+      logger.warn("⚠️  VACUUM failed:", error);
       // This is non-fatal - database might still be usable
     }
 
@@ -177,7 +180,7 @@ export function quickRepair(db: Database.Database): boolean {
 
     return check.quick_check === "ok";
   } catch (error) {
-    console.error("Quick repair failed:", error);
+    logger.error("Quick repair failed:", error);
     return false;
   }
 }
@@ -210,14 +213,14 @@ export async function createFreshDatabase(
 
   if (fs.existsSync(oldDbPath)) {
     copyFileSync(oldDbPath, backupPath);
-    console.log(`📦 Old database backed up to: ${backupPath}`);
+    logger.info(`📦 Old database backed up to: ${backupPath}`);
   }
 
   // Rename old database (add .old extension)
   const oldBackupPath = `${oldDbPath}.old.${timestamp}`;
   if (fs.existsSync(oldDbPath)) {
     fs.renameSync(oldDbPath, oldBackupPath);
-    console.log(`📦 Old database renamed to: ${oldBackupPath}`);
+    logger.info(`📦 Old database renamed to: ${oldBackupPath}`);
   }
 
   // New database will be created by DBManager on next initialization

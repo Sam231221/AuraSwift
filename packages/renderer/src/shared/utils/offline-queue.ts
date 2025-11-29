@@ -11,6 +11,9 @@ export interface QueuedOperation {
   retries: number;
 }
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('offline-queue');
+
 const QUEUE_KEY = "aura_swift_offline_queue";
 const MAX_RETRIES = 3;
 
@@ -33,7 +36,7 @@ function saveQueue(queue: QueuedOperation[]): void {
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   } catch (error) {
-    console.error("Failed to save offline queue:", error);
+    logger.error("Failed to save offline queue:", error);
   }
 }
 
@@ -121,13 +124,13 @@ export async function processQueue(
           remaining.push(operation);
         } else {
           failed++;
-          console.warn(
+          logger.warn(
             `Operation ${operation.id} failed after ${MAX_RETRIES} retries`
           );
         }
       }
     } catch (error) {
-      console.error(`Error processing operation ${operation.id}:`, error);
+      logger.error(`Error processing operation ${operation.id}:`, error);
       operation.retries++;
       if (operation.retries < MAX_RETRIES) {
         remaining.push(operation);

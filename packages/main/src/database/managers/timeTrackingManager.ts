@@ -1,9 +1,4 @@
-import type {
-  ClockEvent,
-  TimeShift,
-  Break,
-  TimeCorrection,
-} from "../schema.js";
+import type { ClockEvent, Shift, Break, TimeCorrection } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import {
   eq,
@@ -101,14 +96,14 @@ export class TimeTrackingManager {
       })
       .from(schema.clockEvents)
       .leftJoin(
-        schema.timeShifts,
-        eq(schema.timeShifts.clockInId, schema.clockEvents.id)
+        schema.shifts,
+        eq(schema.shifts.clock_in_id, schema.clockEvents.id)
       )
       .where(
         and(
           eq(schema.clockEvents.userId, userId),
           eq(schema.clockEvents.type, "in"),
-          drizzleSql`(${schema.timeShifts.clockOutId} IS NULL OR ${schema.timeShifts.status} = 'active')`
+          drizzleSql`(${schema.shifts.clock_out_id} IS NULL OR ${schema.shifts.status} = 'active')`
         )
       )
       .orderBy(desc(schema.clockEvents.timestamp))
@@ -133,19 +128,19 @@ export class TimeTrackingManager {
     const shiftId = this.uuid.v4();
 
     this.db
-      .insert(schema.timeShifts)
+      .insert(schema.shifts)
       .values({
         id: shiftId,
-        userId: data.userId,
-        businessId: data.businessId,
-        clockInId: data.clockInId,
-        clockOutId: null,
-        scheduleId: data.scheduleId || null,
+        user_id: data.userId,
+        business_id: data.businessId,
+        clock_in_id: data.clockInId,
+        clock_out_id: null,
+        schedule_id: data.scheduleId || null,
         status: "active",
-        totalHours: null,
-        regularHours: null,
-        overtimeHours: null,
-        breakDuration: null,
+        total_hours: null,
+        regular_hours: null,
+        overtime_hours: null,
+        break_duration: null,
         notes: data.notes || null,
       })
       .run();
@@ -202,16 +197,16 @@ export class TimeTrackingManager {
     const overtimeHours = Math.max(0, totalHours - 8);
 
     this.db
-      .update(schema.timeShifts)
+      .update(schema.shifts)
       .set({
-        clockOutId,
+        clock_out_id: clockOutId,
         status: "completed",
-        totalHours,
-        regularHours,
-        overtimeHours,
-        breakDuration: breakMinutes,
+        total_hours: totalHours,
+        regular_hours: regularHours,
+        overtime_hours: overtimeHours,
+        break_duration: breakMinutes,
       })
-      .where(eq(schema.timeShifts.id, shiftId))
+      .where(eq(schema.shifts.id, shiftId))
       .run();
 
     return this.getShiftById(shiftId)!;
@@ -223,8 +218,8 @@ export class TimeTrackingManager {
   getShiftById(shiftId: string): TimeShift | undefined {
     const [shift] = this.db
       .select()
-      .from(schema.timeShifts)
-      .where(eq(schema.timeShifts.id, shiftId))
+      .from(schema.shifts)
+      .where(eq(schema.shifts.id, shiftId))
       .limit(1)
       .all();
 
@@ -237,14 +232,14 @@ export class TimeTrackingManager {
   getActiveShift(userId: string): TimeShift | undefined {
     const [shift] = this.db
       .select()
-      .from(schema.timeShifts)
+      .from(schema.shifts)
       .where(
         and(
-          eq(schema.timeShifts.userId, userId),
-          eq(schema.timeShifts.status, "active")
+          eq(schema.shifts.user_id, userId),
+          eq(schema.shifts.status, "active")
         )
       )
-      .orderBy(desc(schema.timeShifts.createdAt))
+      .orderBy(desc(schema.shifts.created_at))
       .limit(1)
       .all();
 
@@ -257,9 +252,9 @@ export class TimeTrackingManager {
   getShiftsByUser(userId: string, limit: number = 50): TimeShift[] {
     return this.db
       .select()
-      .from(schema.timeShifts)
-      .where(eq(schema.timeShifts.userId, userId))
-      .orderBy(desc(schema.timeShifts.createdAt))
+      .from(schema.shifts)
+      .where(eq(schema.shifts.user_id, userId))
+      .orderBy(desc(schema.shifts.created_at))
       .limit(limit)
       .all() as TimeShift[];
   }
@@ -274,16 +269,16 @@ export class TimeTrackingManager {
   ): TimeShift[] {
     const results = this.db
       .select({
-        shift: schema.timeShifts,
+        shift: schema.shifts,
       })
-      .from(schema.timeShifts)
+      .from(schema.shifts)
       .innerJoin(
         schema.clockEvents,
-        eq(schema.timeShifts.clockInId, schema.clockEvents.id)
+        eq(schema.shifts.clock_in_id, schema.clockEvents.id)
       )
       .where(
         and(
-          eq(schema.timeShifts.businessId, businessId),
+          eq(schema.shifts.business_id, businessId),
           gte(schema.clockEvents.timestamp, startDate),
           lte(schema.clockEvents.timestamp, endDate)
         )

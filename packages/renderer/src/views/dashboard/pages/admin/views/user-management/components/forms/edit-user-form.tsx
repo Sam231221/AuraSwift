@@ -19,9 +19,10 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { AvatarUpload } from "@/shared/components/avatar-upload";
-import { AdaptiveFormField } from "@/components/adaptive-keyboard/adaptive-form-field";
-import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
+import { AvatarUpload } from "@/components/avatar-upload";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
+import { AdaptiveFormField } from "@/features/adaptive-keyboard/adaptive-form-field";
+import { AdaptiveKeyboard } from "@/features/adaptive-keyboard/adaptive-keyboard";
 import { useKeyboardWithRHF } from "@/shared/hooks";
 import { cn } from "@/shared/utils/cn";
 import {
@@ -29,6 +30,9 @@ import {
   type UserUpdateFormData,
 } from "../../schemas/user-schema";
 import type { StaffUser } from "../../schemas/types";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('edit-user-form');
 
 interface EditUserFormProps {
   user: StaffUser;
@@ -53,7 +57,7 @@ export function EditUserForm({
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role,
+      role: getUserRoleName(user) as "cashier" | "manager",
       avatar: user.avatar || "",
       address: user.address || "",
       isActive: user.isActive,
@@ -81,7 +85,7 @@ export function EditUserForm({
 
   // Update form when user changes
   useEffect(() => {
-    console.log("Setting form values for user:", {
+    logger.info("Setting form values for user:", {
       id: user.id,
       businessId: user.businessId,
       firstName: user.firstName,
@@ -91,7 +95,7 @@ export function EditUserForm({
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role,
+      role: getUserRoleName(user) as "cashier" | "manager",
       avatar: user.avatar || "",
       address: user.address || "",
       isActive: user.isActive,
@@ -100,23 +104,20 @@ export function EditUserForm({
   }, [user, form]);
 
   const handleSubmit = async (data: UserUpdateFormData) => {
-    console.log("Edit form submitted with data:", data);
-    console.log("ID value:", data.id, "Type:", typeof data.id);
-    console.log(
-      "BusinessId value:",
-      data.businessId,
-      "Type:",
-      typeof data.businessId
+    logger.info("Edit form submitted with data:", data);
+    logger.info(`ID value: ${data.id} Type: ${typeof data.id}`);
+    logger.info(
+      `BusinessId value: ${data.businessId} Type: ${typeof data.businessId}`
     );
 
     // Ensure id and businessId are strings and not empty
     if (!data.id || typeof data.id !== "string") {
-      console.error("Invalid id value:", data.id);
+      logger.error("Invalid id value:", data.id);
       form.setError("id", { message: "Invalid user ID" });
       return;
     }
     if (!data.businessId || typeof data.businessId !== "string") {
-      console.error("Invalid businessId value:", data.businessId);
+      logger.error("Invalid businessId value:", data.businessId);
       form.setError("businessId", { message: "Invalid business ID" });
       return;
     }
@@ -126,7 +127,7 @@ export function EditUserForm({
       // Close keyboard on successful submit
       keyboard.handleCloseKeyboard();
     } catch (error) {
-      console.error("Error submitting form:", error);
+      logger.error("Error submitting form:", error);
       form.setError("root", {
         message: "Failed to update staff member. Please try again.",
       });
@@ -137,7 +138,7 @@ export function EditUserForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(handleSubmit, (errors) => {
-          console.error("Form validation errors:", errors);
+          logger.error("Form validation errors:", errors);
           // Show first error message
           const firstError = Object.values(errors)[0];
           if (firstError?.message) {
@@ -192,7 +193,6 @@ export function EditUserForm({
             name="firstName"
             render={() => (
               <FormItem>
-
                 <FormControl>
                   <AdaptiveFormField
                     {...form.register("firstName")}

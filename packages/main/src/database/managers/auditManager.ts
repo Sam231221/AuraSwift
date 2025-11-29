@@ -48,7 +48,7 @@ export class AuditManager {
             : JSON.stringify(data.details),
         ipAddress: data.ipAddress ?? null,
         terminalId: data.terminalId ?? null,
-        timestamp: now.toISOString(),
+        timestamp: now, // Use Date object for timestamp_ms mode
         createdAt: now,
       })
       .run();
@@ -233,7 +233,7 @@ export class AuditManager {
         user: {
           id: user.id,
           email: user.email,
-          role: user.role,
+          // Note: role is now managed via RBAC (userRoles table)
           ...additionalDetails,
         },
       },

@@ -1,22 +1,3 @@
-export interface ModifierOption {
-  id: string;
-  name: string;
-  price: number;
-  createdAt: string;
-}
-
-export interface Modifier {
-  id: string;
-  name: string;
-  type: "single" | "multiple";
-  multiSelect?: boolean; // Optional for backward compatibility
-  options: ModifierOption[];
-  required: boolean;
-  businessId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Product {
   id: string;
   name: string;
@@ -31,7 +12,7 @@ export interface Product {
   stockLevel: number;
   minStockLevel: number;
   businessId: string;
-  modifiers: Modifier[];
+
   isActive: boolean;
   // Weight-based product fields
   requiresWeight?: boolean;
@@ -87,10 +68,7 @@ export interface ProductResponse {
   message: string;
   product?: Product;
   products?: Product[];
-  modifier?: Modifier;
-  modifiers?: Modifier[];
   adjustment?: StockAdjustment;
   adjustments?: StockAdjustment[];
   errors?: string[];
 }
-

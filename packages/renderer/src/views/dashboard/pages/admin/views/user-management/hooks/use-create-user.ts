@@ -3,6 +3,9 @@ import { toast } from "sonner";
 import type { UserCreateFormData } from "../schemas/user-schema";
 import { useAuth } from "@/shared/hooks/use-auth";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-create-user');
+
 export function useCreateUser() {
   const { createUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +51,7 @@ export function useCreateUser() {
         };
       }
     } catch (error) {
-      console.error("Error creating user:", error);
+      logger.error("Error creating user:", error);
       toast.error("Failed to create staff member");
       return {
         success: false,

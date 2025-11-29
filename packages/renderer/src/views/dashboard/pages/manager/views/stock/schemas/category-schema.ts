@@ -80,9 +80,3 @@ export const categoryUpdateSchema = categoryCreateSchema.safeExtend({
  */
 export type CategoryFormData = z.infer<typeof categoryCreateSchema>;
 export type CategoryUpdateData = z.infer<typeof categoryUpdateSchema>;
-
-/**
- * @deprecated Use zodResolver with categoryCreateSchema or categoryUpdateSchema instead
- * This function is kept for backward compatibility but will be removed in future versions
- */
-export const categorySchema = categoryCreateSchema;

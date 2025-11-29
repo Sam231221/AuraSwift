@@ -5,6 +5,9 @@
 
 import { toast } from "sonner";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('payment-flow');
+
 // Payment flow step definitions
 export const PaymentStep = {
   IDLE: "idle",
@@ -145,7 +148,7 @@ export class PaymentFlow {
     this.state.startTime = startTime;
 
     try {
-      console.log("Starting payment flow:", {
+      logger.info("Starting payment flow:", {
         amount: this.config.amount,
         currency: this.config.currency,
       });
@@ -166,7 +169,7 @@ export class PaymentFlow {
       const result = await this.stepComplete(paymentResult);
 
       const duration = Date.now() - startTime;
-      console.log(`Payment flow completed in ${duration}ms`);
+      logger.info(`Payment flow completed in ${duration}ms`);
 
       const finalResult: PaymentFlowResult = {
         ...result,
@@ -177,7 +180,7 @@ export class PaymentFlow {
       return finalResult;
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error("❌ Payment flow failed:", error);
+      logger.error("❌ Payment flow failed:", error);
 
       const paymentError = this.createPaymentError(error);
 
@@ -253,7 +256,7 @@ export class PaymentFlow {
     const paymentIntentId = intentResponse.clientSecret.split("_secret_")[0];
     this.state.paymentIntentId = paymentIntentId;
 
-    console.log("Payment intent created:", paymentIntentId);
+    logger.info("Payment intent created:", paymentIntentId);
   }
 
   /**
@@ -362,7 +365,7 @@ export class PaymentFlow {
    */
   public async cancel(): Promise<boolean> {
     try {
-      console.log("Cancelling payment flow");
+      logger.info("Cancelling payment flow");
 
       if (this.state.paymentIntentId) {
         await window.paymentAPI.cancelPayment();
@@ -380,7 +383,7 @@ export class PaymentFlow {
 
       return true;
     } catch (error) {
-      console.error("❌ Failed to cancel payment:", error);
+      logger.error("❌ Failed to cancel payment:", error);
       return false;
     }
   }
@@ -394,7 +397,7 @@ export class PaymentFlow {
     }
 
     this.retryCount++;
-    console.log(`Retrying payment (attempt ${this.retryCount})`);
+    logger.info(`Retrying payment (attempt ${this.retryCount})`);
 
     // Reset state
     this.state = {
@@ -448,7 +451,7 @@ export class PaymentFlow {
    * Handle payment timeout
    */
   private handleTimeout(): void {
-    console.warn("⏰ Payment flow timeout");
+    logger.warn("⏰ Payment flow timeout");
 
     this.updateState({
       step: PaymentStep.TIMEOUT,

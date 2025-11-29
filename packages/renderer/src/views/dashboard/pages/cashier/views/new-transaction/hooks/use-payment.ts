@@ -8,6 +8,9 @@ import { flushSync } from "react-dom";
 import { toast } from "sonner";
 import type { PaymentMethod } from "../types/transaction.types";
 import type { TransactionData } from "@/types/printer";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-payment');
 import type {
   CartSession,
   CartItemWithProduct,
@@ -17,6 +20,7 @@ import {
   validateCart,
   validateBusinessId,
 } from "../utils/validation";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 
 interface UsePaymentProps {
   cartSession: CartSession | null;
@@ -233,7 +237,7 @@ export function usePayment({
         await onCartSessionInit();
       }
     } catch (error) {
-      console.error("Failed to reset and init cart:", error);
+      logger.error("Failed to reset and init cart:", error);
       toast.error("Failed to reset cart. Please refresh the page.");
     }
   }, [resetPaymentState, onCartSessionInit]);
@@ -265,7 +269,7 @@ export function usePayment({
         );
       }
     } catch (error) {
-      console.error("Failed to check printer status:", error);
+      logger.error("Failed to check printer status:", error);
       status = {
         connected: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -330,7 +334,7 @@ export function usePayment({
         );
         toast.success(successMessage);
       } catch (error) {
-        console.error("Failed to update UI state after transaction:", error);
+        logger.error("Failed to update UI state after transaction:", error);
         toast.error(
           "Transaction completed but UI update failed. Please refresh the page.",
           { duration: 10000 }
@@ -341,7 +345,7 @@ export function usePayment({
           setCompletedTransactionData(receiptData);
           setShowReceiptOptions(true);
         } catch (retryError) {
-          console.error("Failed to set receipt data on retry:", retryError);
+          logger.error("Failed to set receipt data on retry:", retryError);
         }
       }
     },
@@ -462,39 +466,75 @@ export function usePayment({
         try {
           printerStatusResult = await checkPrinterStatus();
         } catch (error) {
-          console.warn("Failed to check printer status:", error);
+          logger.warn("Failed to check printer status:", error);
           // Continue with transaction - printer check is not critical
         }
 
         try {
-          // Get active shift
-          const shiftResponse = await window.shiftAPI.getActive(userId);
-          if (!shiftResponse.success || !shiftResponse.data) {
-            toast.error(
-              "No active shift found. Please start your shift first."
-            );
+          // Get session token for authentication
+          const sessionToken = await window.authStore.get("token");
+          if (!sessionToken) {
+            toast.error("Session expired. Please log in again.");
             isProcessingRef.current = false;
             return;
           }
 
-          // FIX #13: Validate shift data structure before using
-          const shiftData = shiftResponse.data;
-          if (
-            !shiftData ||
-            typeof shiftData !== "object" ||
-            !("id" in shiftData) ||
-            typeof shiftData.id !== "string"
-          ) {
-            toast.error("Invalid shift data received. Please try again.");
-            // FIX #6: Cleanup timeout before returning on error
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current);
-              timeoutRef.current = null;
+          // Get current user to check role-based shift requirements
+          const userDataStr = await window.authStore.get("user");
+          const userData = userDataStr ? JSON.parse(userDataStr) : null;
+
+          // Use effective role (activeRole if set, otherwise primary role)
+          const effectiveRole = getUserRoleName(userData);
+
+          // Determine if shift is required based on EFFECTIVE role
+          // This allows admin/manager to switch to "cashier mode" requiring shifts
+          const shiftRequired = ["cashier", "supervisor"].includes(
+            effectiveRole || ""
+          );
+
+          let activeShift: { id: string } | null = null;
+
+          if (shiftRequired) {
+            // Get active shift - REQUIRED for cashiers/supervisors
+            const shiftResponse = await window.shiftAPI.getActive(userId);
+            if (!shiftResponse.success || !shiftResponse.data) {
+              toast.error(
+                "No active shift found. Please start your shift first."
+              );
+              isProcessingRef.current = false;
+              return;
             }
-            isProcessingRef.current = false;
-            return;
+
+            // FIX #13: Validate shift data structure before using
+            const shiftData = shiftResponse.data;
+            if (
+              !shiftData ||
+              typeof shiftData !== "object" ||
+              !("id" in shiftData) ||
+              typeof shiftData.id !== "string"
+            ) {
+              toast.error("Invalid shift data received. Please try again.");
+              // FIX #6: Cleanup timeout before returning on error
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+              }
+              isProcessingRef.current = false;
+              return;
+            }
+            activeShift = shiftData as { id: string };
+          } else {
+            // Admin/Manager/Owner - shift is optional
+            try {
+              const shiftResponse = await window.shiftAPI.getActive(userId);
+              if (shiftResponse.success && shiftResponse.data) {
+                activeShift = shiftResponse.data as { id: string };
+              }
+              // If no shift exists, that's OK for admin/manager
+            } catch (error) {
+              logger.info("Admin/Manager operating without shift");
+            }
           }
-          const activeShift = shiftData as { id: string };
           // FIX #9: Add random component to prevent receipt number collision
           const receiptNumber = `RCP-${Date.now()}-${Math.random()
             .toString(36)
@@ -509,7 +549,7 @@ export function usePayment({
 
             // Add validation warning if no payment method context
             if (!actualPaymentMethod && !paymentMethod) {
-              console.warn(
+              logger.warn(
                 "skipPaymentValidation is true but no payment method context provided"
               );
             }
@@ -522,7 +562,7 @@ export function usePayment({
 
           // FIX #12: Gate console.log for development only
           if (process.env.NODE_ENV === "development") {
-            console.log("💳 Creating transaction with payment method:", {
+            logger.info("💳 Creating transaction with payment method:", {
               selectedPaymentMethod: paymentMethod?.type,
               skipPaymentValidation,
               backendPaymentMethod,
@@ -536,8 +576,8 @@ export function usePayment({
           const transactionResponse =
             await window.transactionAPI.createFromCart({
               cartSessionId: cartSession.id,
-              shiftId: activeShift.id,
-              businessId,
+              shiftId: activeShift?.id || "", // Optional for admin/manager
+              businessId: businessId!,
               paymentMethod: backendPaymentMethod,
               cashAmount: finalCashAmount,
               cardAmount: finalCardAmount,
@@ -547,7 +587,7 @@ export function usePayment({
           if (!transactionResponse.success) {
             const errorMessage =
               transactionResponse.message || "Failed to record transaction";
-            console.error("Transaction creation error:", errorMessage);
+            logger.error("Transaction creation error:", errorMessage);
             toast.error(errorMessage);
             // FIX #6: Cleanup timeout before returning on error
             if (timeoutRef.current) {
@@ -566,7 +606,7 @@ export function usePayment({
           try {
             await window.cartAPI.completeSession(cartSession.id);
           } catch (error) {
-            console.error("Failed to complete cart session:", error);
+            logger.error("Failed to complete cart session:", error);
 
             // Attempt to void the transaction to maintain data integrity
             if (transactionId && userId) {
@@ -576,11 +616,11 @@ export function usePayment({
                   cashierId: userId,
                   reason: "Cart session completion failed - automatic void",
                 });
-                console.log(
+                logger.info(
                   "Transaction voided successfully after cart completion failure"
                 );
               } catch (voidError) {
-                console.error(
+                logger.error(
                   "Failed to void transaction after cart completion failure:",
                   voidError
                 );
@@ -614,7 +654,7 @@ export function usePayment({
             businessId
           );
         } catch (error) {
-          console.error("Transaction error:", error);
+          logger.error("Transaction error:", error);
           // FIX #11: Consistent error message formatting with details
           const errorMessage =
             error instanceof Error
@@ -705,7 +745,7 @@ export function usePayment({
             };
           }
         } catch (error) {
-          console.warn(
+          logger.warn(
             "Failed to fetch business details, using defaults:",
             error
           );
@@ -778,7 +818,7 @@ export function usePayment({
         URL.revokeObjectURL(url);
       }, 100);
     } catch (error) {
-      console.error("Error generating PDF receipt:", error);
+      logger.error("Error generating PDF receipt:", error);
       toast.error("Failed to generate PDF receipt. Please try again.", {
         id: loadingToast,
       });
@@ -815,7 +855,7 @@ export function usePayment({
         );
       }
     } catch (error) {
-      console.error("Print error:", error);
+      logger.error("Print error:", error);
       toast.error("Failed to print receipt");
     }
   }, [completedTransactionData, startPrintingFlow, handleCloseReceiptOptions]);
@@ -832,7 +872,7 @@ export function usePayment({
         handleCloseReceiptOptions();
       }, 2000);
     } catch (error) {
-      console.error("Email error:", error);
+      logger.error("Email error:", error);
       toast.error("Failed to send receipt email");
     }
   }, [completedTransactionData, handleCloseReceiptOptions]);

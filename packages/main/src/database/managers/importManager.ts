@@ -11,6 +11,9 @@ import { VatCategoryManager } from "./vatCategoryManager.js";
 import { eq, and } from "drizzle-orm";
 import * as schema from "../schema.js";
 
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('importManager');
+
 export interface ImportOptions {
   // Conflict resolution
   onDuplicateSku: "skip" | "update" | "error";
@@ -118,7 +121,7 @@ export class ImportManager {
     };
 
     try {
-      console.log(
+      logger.info(
         `🚀 Starting Booker import: ${departmentData.length} departments, ${productData.length} products`
       );
 
@@ -129,7 +132,7 @@ export class ImportManager {
         options,
         result
       );
-      console.log(
+      logger.info(
         `✅ Categories phase complete: ${result.categoriesCreated} created, ${result.categoriesUpdated} updated`
       );
 
@@ -140,7 +143,7 @@ export class ImportManager {
         options,
         result
       );
-      console.log(
+      logger.info(
         `✅ Suppliers phase complete: ${result.suppliersCreated} created, ${result.suppliersUpdated} updated`
       );
 
@@ -153,14 +156,14 @@ export class ImportManager {
         options,
         result
       );
-      console.log(
+      logger.info(
         `✅ Products phase complete: ${result.productsCreated} created, ${result.productsUpdated} updated, ${result.batchesCreated} batches`
       );
 
       result.success = result.errors.length === 0;
       result.duration = Date.now() - startTime;
 
-      console.log(`🎉 Import complete in ${result.duration}ms:`, {
+      logger.info(`🎉 Import complete in ${result.duration}ms:`, {
         categoriesCreated: result.categoriesCreated,
         vatCategoriesCreated: result.vatCategoriesCreated,
         suppliersCreated: result.suppliersCreated,
@@ -356,7 +359,7 @@ export class ImportManager {
     options: ImportOptions,
     result: ImportResult
   ): Promise<void> {
-    console.log(`📦 Starting product import: ${productData.length} products`);
+    logger.info(`📦 Starting product import: ${productData.length} products`);
 
     if (options.onProgress) {
       options.onProgress({
@@ -481,7 +484,7 @@ export class ImportManager {
         } else {
           // Create new product
           const newProductId = this.uuid.v4();
-          console.log(
+          logger.info(
             `📦 Creating product: ${product.productDescription} (SKU: ${product.itemCode})`
           );
 
@@ -524,7 +527,7 @@ export class ImportManager {
           });
           productId = newProductId;
           result.productsCreated++;
-          console.log(`✅ Product created: ${newProductId}`);
+          logger.info(`✅ Product created: ${newProductId}`);
         }
 
         // Create Batch if we have a valid product ID and stock to add
@@ -534,7 +537,7 @@ export class ImportManager {
           product.balanceOnHand > 0
         ) {
           const batchNumber = `${product.itemCode}-${dateStr}`;
-          console.log(
+          logger.info(
             `📦 Creating batch: ${batchNumber} for product ${productId} with ${product.balanceOnHand} units`
           );
 
@@ -558,7 +561,7 @@ export class ImportManager {
               manufacturingDate: importDate, // Assume received date as manufacturing date for now
             });
             result.batchesCreated++;
-            console.log(`✅ Batch created: ${batchNumber}`);
+            logger.info(`✅ Batch created: ${batchNumber}`);
           } else if (options.stockUpdateMode === "add") {
             // If batch exists and we are in 'add' mode, we might want to update it?
             // But for now, let's just log a warning or skip to avoid double counting if re-importing same file

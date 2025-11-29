@@ -1,4 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-expiry-alerts');
 import type {
   ProductBatch,
   ExpiryAlert,
@@ -78,7 +81,7 @@ export const useExpiryAlerts = ({
         setNotifications([]);
       }
     } catch (err) {
-      console.error("Error loading notifications:", err);
+      logger.error("Error loading notifications:", err);
       setNotifications([]);
     } finally {
       setLoading(false);

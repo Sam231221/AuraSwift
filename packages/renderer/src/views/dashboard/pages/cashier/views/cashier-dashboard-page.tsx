@@ -18,6 +18,9 @@ import {
 
 import { useAuth } from "@/shared/hooks";
 import { useNavigate } from "react-router-dom";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('cashier-dashboard-page');
 interface Transaction {
   id: string;
   receiptNumber: string;
@@ -60,18 +63,7 @@ interface Shift {
   updatedAt?: string;
 }
 
-interface Schedule {
-  id: string;
-  staffId: string;
-  businessId: string;
-  startTime: string; // PLANNED start time (what manager scheduled)
-  endTime: string; // PLANNED end time (what manager scheduled - can be updated live)
-  status: "upcoming" | "active" | "completed" | "missed";
-  assignedRegister?: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string; // Changes when manager modifies scheduled times
-}
+
 
 interface ShiftStats {
   totalTransactions: number;
@@ -88,7 +80,7 @@ const CashierDashboardPage = ({
   // State management
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [activeShift, setActiveShift] = useState<Shift | null>(null);
-  const [todaySchedule, setTodaySchedule] = useState<Schedule | null>(null);
+
   const [shiftStats, setShiftStats] = useState<ShiftStats>({
     totalTransactions: 0,
     totalSales: 0,
@@ -225,56 +217,7 @@ const CashierDashboardPage = ({
           });
         }
 
-        // Load today's schedule
-        const scheduleResponse = await window.shiftAPI.getTodaySchedule(
-          user.id
-        );
-        if (scheduleResponse.success && scheduleResponse.data) {
-          const newSchedule = scheduleResponse.data as Schedule;
-          setTodaySchedule((prevSchedule) => {
-            if (!prevSchedule) return newSchedule;
 
-            const now = new Date();
-            const scheduleEnd = prevSchedule
-              ? new Date(prevSchedule.endTime)
-              : null;
-            const isCurrentShiftEnded = scheduleEnd && scheduleEnd < now;
-
-            // If current displayed shift is ended and we have a new schedule, show the new one
-            if (isCurrentShiftEnded && newSchedule.startTime) {
-              const newShiftStart = new Date(newSchedule.startTime);
-              // Only update to new schedule if it's for a future or current shift
-              if (newShiftStart > scheduleEnd) {
-                return newSchedule;
-              }
-            }
-
-            // If the data is actually different and the new schedule is current/upcoming, update it
-            if (JSON.stringify(prevSchedule) !== JSON.stringify(newSchedule)) {
-              const newShiftStart = new Date(newSchedule.startTime);
-              const newShiftEnd = new Date(newSchedule.endTime);
-
-              // Only show the new schedule if:
-              // 1. It's a future shift, or
-              // 2. It's currently active, or
-              // 3. It's more recent than the current displayed shift
-              if (
-                newShiftStart > now || // Future shift
-                (newShiftStart <= now && newShiftEnd > now) || // Current shift
-                (scheduleEnd && newShiftStart > scheduleEnd)
-              ) {
-                // More recent shift
-                return newSchedule;
-              }
-            }
-
-            return prevSchedule;
-          });
-        } else {
-          setTodaySchedule((prevSchedule) =>
-            prevSchedule ? null : prevSchedule
-          );
-        }
 
         // Load recent transactions (including refunds) - prioritize current shift if active
         try {
@@ -315,7 +258,7 @@ const CashierDashboardPage = ({
             });
           }
         } catch (transactionError) {
-          console.error(
+          logger.error(
             "Failed to load recent transactions:",
             transactionError
           );
@@ -323,7 +266,7 @@ const CashierDashboardPage = ({
           setTransactions([]);
         }
       } catch (error) {
-        console.error("Failed to load shift data:", error);
+        logger.error("Failed to load shift data:", error);
       } finally {
         if (isInitialLoad) {
           setIsLoading(false);

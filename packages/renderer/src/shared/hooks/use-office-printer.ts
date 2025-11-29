@@ -6,6 +6,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-office-printer');
+
 import type {
   OfficePrinter,
   PrintJobConfig,
@@ -138,7 +141,7 @@ export const useOfficePrinter = () => {
           throw new Error(result.error || "Failed to get job status");
         }
       } catch (err) {
-        console.error("Failed to get job status:", err);
+        logger.error("Failed to get job status:", err);
         return null;
       }
     },
@@ -311,7 +314,7 @@ export const useOfficePrinter = () => {
         throw new Error(result.error || "Failed to load failed jobs");
       }
     } catch (err) {
-      console.error("Failed to load failed jobs:", err);
+      logger.error("Failed to load failed jobs:", err);
       return [];
     }
   }, []);
@@ -339,7 +342,7 @@ export const useOfficePrinter = () => {
           throw new Error(result.error || "Failed to get printer health");
         }
       } catch (err) {
-        console.error("Failed to get printer health:", err);
+        logger.error("Failed to get printer health:", err);
         return null;
       }
     },
@@ -359,7 +362,7 @@ export const useOfficePrinter = () => {
       setMetrics(result);
       return result;
     } catch (err) {
-      console.error("Failed to load metrics:", err);
+      logger.error("Failed to load metrics:", err);
       return null;
     }
   }, []);
@@ -522,7 +525,7 @@ export const usePrintJobMonitor = (jobId: string | null) => {
           }
         }
       } catch (err) {
-        console.error("Error monitoring job:", err);
+        logger.error("Error monitoring job:", err);
       }
     };
 

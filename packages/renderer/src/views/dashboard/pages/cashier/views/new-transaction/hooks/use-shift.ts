@@ -10,6 +10,9 @@ import type { Shift, Schedule } from "../types/shift.types";
 import { retryWithBackoff, isNetworkError } from "@/shared/utils/retry";
 import { getDeviceId } from "@/shared/utils/device-id";
 import { TimeChangeDetector } from "@/shared/utils/time-change-detector";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-shift');
 import {
   queueOperation,
   processQueue,
@@ -143,7 +146,7 @@ export function useShift({
           setTodaySchedule(null);
         }
       } catch (error) {
-        console.error("Failed to load shift data:", error);
+        logger.error("Failed to load shift data:", error);
       } finally {
         if (isInitialLoad) {
           setIsLoadingShift(false);
@@ -562,7 +565,7 @@ export function useShift({
       setShowStartShiftDialog(previousShowDialog);
       setStartingCash(previousStartingCash);
 
-      console.error("Failed to start shift:", error);
+      logger.error("Failed to start shift:", error);
 
       if (isNetworkError(error)) {
         toast.error(
@@ -660,7 +663,7 @@ export function useShift({
             }
             return false;
           } catch (error) {
-            console.error("Failed to process queued shift start:", error);
+            logger.error("Failed to process queued shift start:", error);
             return false;
           }
         }

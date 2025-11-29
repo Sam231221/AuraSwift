@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import type { StaffUser } from "../schemas/types";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 
 export function useUserFilters(staffUsers: StaffUser[]) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -12,7 +13,8 @@ export function useUserFilters(staffUsers: StaffUser[]) {
         staffUser.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         staffUser.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesRole = filterRole === "all" || staffUser.role === filterRole;
+      const matchesRole =
+        filterRole === "all" || getUserRoleName(staffUser) === filterRole;
 
       return matchesSearch && matchesRole;
     });

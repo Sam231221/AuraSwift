@@ -17,6 +17,9 @@ import {
 import { useFormNotification } from "@/shared/hooks/use-form-notification";
 import type { Category } from "../hooks/use-product-data";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-category-form');
+
 interface UseCategoryFormOptions {
   /**
    * Category to edit (if in edit mode)
@@ -140,7 +143,7 @@ export function useCategoryForm({
     },
     (errors) => {
       // Log validation errors for debugging
-      console.error("Category form validation errors:", errors);
+      logger.error("Category form validation errors:", errors);
     }
   );
 

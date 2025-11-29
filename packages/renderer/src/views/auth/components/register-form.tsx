@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
-import { AvatarUpload } from "@/shared/components/avatar-upload";
+import { AvatarUpload } from "@/components/avatar-upload";
 import {
   Form,
   FormField,

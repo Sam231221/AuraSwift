@@ -2,6 +2,9 @@ import {AppModule} from '../AppModule.js';
 import {ModuleContext} from '../ModuleContext.js';
 import {shell} from 'electron';
 import {URL} from 'node:url';
+import { getLogger } from '../utils/logger.js';
+
+const logger = getLogger('external-urls');
 
 export class ExternalUrls implements AppModule {
 
@@ -17,9 +20,9 @@ export class ExternalUrls implements AppModule {
         const {origin} = new URL(url);
 
         if (this.#externalUrls.has(origin)) {
-          shell.openExternal(url).catch(console.error);
+          shell.openExternal(url).catch((error) => logger.error('Failed to open external URL', error));
         } else if (import.meta.env.DEV) {
-          console.warn(`Blocked the opening of a disallowed external origin: ${origin}`);
+          logger.warn(`Blocked the opening of a disallowed external origin: ${origin}`);
         }
 
         // Prevent creating a new window.

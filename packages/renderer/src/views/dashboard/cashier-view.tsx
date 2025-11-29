@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { ViewTransitionContainer } from "@/shared/components";
+import { ViewTransitionContainer } from "@/components";
 import { useViewNavigation, useViewMap } from "@/shared/hooks";
 
 import { useAuth } from "@/shared/hooks";

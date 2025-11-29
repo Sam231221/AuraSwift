@@ -12,7 +12,7 @@ import {
   PackageCheck,
   FileSpreadsheet,
 } from "lucide-react";
-import type { Product } from "./types/product.types";
+import type { Product } from "@/features/products/types/product.types";
 import { ImportBookerModal } from "./components/import-booker-modal";
 
 interface Category {

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-delete-user');
+
 export function useDeleteUser() {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -8,7 +11,7 @@ export function useDeleteUser() {
     setIsLoading(true);
 
     try {
-      console.log(`Deleting user: ${userName} (${userId})`);
+      logger.info(`Deleting user: ${userName} (${userId})`);
       const response = await window.authAPI.deleteUser(userId);
 
       if (response.success) {
@@ -22,7 +25,7 @@ export function useDeleteUser() {
         };
       }
     } catch (error) {
-      console.error("Error deleting user:", error);
+      logger.error("Error deleting user:", error);
       toast.error("Failed to delete staff member");
       return {
         success: false,

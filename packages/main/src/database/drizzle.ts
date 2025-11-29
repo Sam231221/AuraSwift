@@ -13,6 +13,9 @@ import {
 } from "drizzle-orm/better-sqlite3";
 import type Database from "better-sqlite3";
 import * as schema from "./schema.js";
+import { getLogger } from "../utils/logger.js";
+
+const logger = getLogger('drizzle');
 
 let drizzleInstance: BetterSQLite3Database<typeof schema> | null = null;
 let rawDatabaseInstance: Database.Database | null = null;
@@ -39,7 +42,7 @@ export function initializeDrizzle(
   if (!drizzleInstance) {
     rawDatabaseInstance = sqliteDb; // Store the raw database reference
     drizzleInstance = drizzle(sqliteDb, { schema });
-    console.log("✅ Drizzle ORM initialized");
+    logger.info("Drizzle ORM initialized");
   }
   return drizzleInstance;
 }

@@ -2,9 +2,9 @@ import React, { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { AdaptiveFormField } from "@/components/adaptive-keyboard/adaptive-form-field";
-import { AdaptiveTextarea } from "@/components/adaptive-keyboard/adaptive-textarea";
-import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
+import { AdaptiveFormField } from "@/features/adaptive-keyboard/adaptive-form-field";
+import { AdaptiveTextarea } from "@/features/adaptive-keyboard/adaptive-textarea";
+import { AdaptiveKeyboard } from "@/features/adaptive-keyboard/adaptive-keyboard";
 import { useKeyboardWithRHF } from "@/shared/hooks";
 import { cn } from "@/shared/utils/cn";
 import {
@@ -1462,23 +1462,23 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
 
             <div className="flex space-x-2 p-4 border-t">
               <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                  {isSubmitting
-                    ? "Saving..."
-                    : isEditMode
-                    ? "Update Product"
-                    : "Add Product"}
+                {isSubmitting
+                  ? "Saving..."
+                  : isEditMode
+                  ? "Update Product"
+                  : "Add Product"}
+              </Button>
+              <DrawerClose asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleClose}
+                  disabled={isSubmitting}
+                >
+                  Cancel
                 </Button>
-                <DrawerClose asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={handleClose}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                </DrawerClose>
+              </DrawerClose>
             </div>
           </form>
         </Form>

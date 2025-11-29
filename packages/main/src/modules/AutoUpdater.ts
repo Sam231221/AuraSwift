@@ -7,6 +7,9 @@ import electronUpdater, {
 } from "electron-updater";
 import { app, dialog, Notification, shell, BrowserWindow } from "electron";
 
+import { getLogger } from '../utils/logger.js';
+const logger = getLogger('AutoUpdater');
+
 type DownloadNotification = Parameters<
   AppUpdater["checkForUpdatesAndNotify"]
 >[0];
@@ -105,7 +108,7 @@ export class AutoUpdater implements AppModule {
         if (this.#logger) {
           this.#logger.error(`Startup update check failed: ${errorMessage}`);
         } else {
-          console.error("Startup update check failed:", error);
+          logger.error("Startup update check failed:", error);
         }
       });
     }, this.#STARTUP_DELAY);
@@ -201,7 +204,7 @@ export class AutoUpdater implements AppModule {
       app.quit();
       return true;
     } catch (error) {
-      console.error("Unexpected error in Squirrel event handling:", error);
+      logger.error("Unexpected error in Squirrel event handling:", error);
       app.quit();
       return true;
     }
@@ -258,7 +261,7 @@ export class AutoUpdater implements AppModule {
         if (this.#logger) {
           this.#logger.error(`Periodic update check failed: ${errorMessage}`);
         } else {
-          console.error("Periodic update check failed:", error);
+          logger.error("Periodic update check failed:", error);
         }
       });
     }, CHECK_INTERVAL);
@@ -330,7 +333,7 @@ export class AutoUpdater implements AppModule {
   ): void {
     // Input validation
     if (!info || !info.version) {
-      console.error(
+      logger.error(
         "Invalid update info provided to showUpdateAvailableDialog"
       );
       return;
@@ -424,7 +427,7 @@ export class AutoUpdater implements AppModule {
             `Error showing update available dialog: ${errorMessage}`
           );
         } else {
-          console.error("Error showing update available dialog:", error);
+          logger.error("Error showing update available dialog:", error);
         }
       });
   }
@@ -507,7 +510,7 @@ export class AutoUpdater implements AppModule {
                   `Error checking for updates from error dialog: ${errorMessage}`
                 );
               } else {
-                console.error("Error checking for updates:", error);
+                logger.error("Error checking for updates:", error);
               }
             });
           }
@@ -558,7 +561,7 @@ export class AutoUpdater implements AppModule {
                 `Error retrying update check: ${errorMessage}`
               );
             } else {
-              console.error("Error retrying update check:", error);
+              logger.error("Error retrying update check:", error);
             }
           });
         }
@@ -570,7 +573,7 @@ export class AutoUpdater implements AppModule {
             `Error showing last error dialog: ${errorMessage}`
           );
         } else {
-          console.error("Error showing last error dialog:", error);
+          logger.error("Error showing last error dialog:", error);
         }
       });
   }
@@ -964,7 +967,7 @@ export class AutoUpdater implements AppModule {
               `Error showing update ready dialog: ${errorMessage}`
             );
           } else {
-            console.error("Error showing update ready dialog:", error);
+            logger.error("Error showing update ready dialog:", error);
           }
         });
     };
@@ -1080,7 +1083,7 @@ export class AutoUpdater implements AppModule {
             if (this.#logger) {
               this.#logger.error(`Error showing error dialog: ${errorMessage}`);
             } else {
-              console.error("Error showing error dialog:", error);
+              logger.error("Error showing error dialog:", error);
             }
           });
 
@@ -1314,7 +1317,7 @@ export class AutoUpdater implements AppModule {
       if (this.#logger) {
         this.#logger.warn(`Failed to format release notes: ${errorMessage}`);
       } else {
-        console.warn("Failed to format release notes:", error);
+        logger.warn("Failed to format release notes:", error);
       }
       // Return fallback with version if available
       const version = info.version ? ` (v${info.version})` : "";

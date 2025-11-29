@@ -6,6 +6,9 @@
 
 import { ipcMain } from "electron";
 import PDFDocument from "pdfkit";
+import { getLogger } from '../utils/logger.js';
+
+const logger = getLogger('pdfReceiptService');
 
 interface ReceiptItem {
   name: string;
@@ -352,11 +355,11 @@ export function initializePDFReceiptService() {
     "receipt:generate-pdf",
     async (_event, receiptData: ReceiptData) => {
       try {
-        console.log("📄 Generating PDF receipt:", receiptData.receiptNumber);
+        logger.info("📄 Generating PDF receipt:", receiptData.receiptNumber);
 
         const pdfBuffer = await generatePDFReceipt(receiptData);
 
-        console.log(
+        logger.info(
           "✅ PDF receipt generated successfully, size:",
           pdfBuffer.length,
           "bytes"
@@ -368,7 +371,7 @@ export function initializePDFReceiptService() {
           data: pdfBuffer.toString("base64"),
         };
       } catch (error) {
-        console.error("❌ Error generating PDF receipt:", error);
+        logger.error("❌ Error generating PDF receipt:", error);
         return {
           success: false,
           error: error instanceof Error ? error.message : "Unknown error",
@@ -377,7 +380,7 @@ export function initializePDFReceiptService() {
     }
   );
 
-  console.log("✅ PDF Receipt Service initialized");
+  logger.info("✅ PDF Receipt Service initialized");
 }
 
 // Auto-initialize when module is imported

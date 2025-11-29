@@ -1,14 +1,14 @@
 /**
  * Category Form Drawer Component
- * 
+ *
  * Form drawer for creating and editing categories using React Hook Form.
  */
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { AdaptiveFormField } from "@/components/adaptive-keyboard/adaptive-form-field";
-import { AdaptiveTextarea } from "@/components/adaptive-keyboard/adaptive-textarea";
-import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
+import { AdaptiveFormField } from "@/features/adaptive-keyboard/adaptive-form-field";
+import { AdaptiveTextarea } from "@/features/adaptive-keyboard/adaptive-textarea";
+import { AdaptiveKeyboard } from "@/features/adaptive-keyboard/adaptive-keyboard";
 import { useKeyboardWithRHF } from "@/shared/hooks";
 import { cn } from "@/shared/utils/cn";
 import {
@@ -95,8 +95,8 @@ export function CategoryFormDrawer({
         parentId: data.parentId || null,
         vatCategoryId:
           data.vatCategoryId && data.vatCategoryId !== ""
-          ? data.vatCategoryId 
-          : null,
+            ? data.vatCategoryId
+            : null,
         vatOverridePercent:
           data.vatOverridePercent && data.vatOverridePercent !== ""
             ? parseFloat(data.vatOverridePercent)

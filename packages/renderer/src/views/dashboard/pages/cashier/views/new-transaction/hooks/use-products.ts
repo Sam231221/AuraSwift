@@ -7,6 +7,9 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import type { Product } from "@/features/products/types/product.types";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-products');
+
 /**
  * Hook for managing products
  * @param businessId - Business ID to load products for
@@ -46,7 +49,7 @@ export function useProducts(businessId: string | undefined) {
         toast.error(errorMessage);
       }
     } catch (error) {
-      console.error("Error loading products:", error);
+      logger.error("Error loading products:", error);
       setError("Failed to load products");
       toast.error("Failed to load products");
     } finally {

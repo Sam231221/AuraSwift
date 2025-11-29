@@ -1,11 +1,13 @@
 import { useAuth } from "@/shared/hooks";
+
+import { getUserRoleName } from "../../shared/utils/rbac-helpers";
 import { AdminDashboard } from "./admin-view";
-import { CashierDashboard } from "./cashier-view";
 import { ManagerDashboard } from "./manager-view";
+import { CashierDashboard } from "./cashier-view";
 
 type Role = "admin" | "manager" | "cashier";
 
-export default function DashboardPage() {
+export default function Dashboard() {
   const { user } = useAuth();
 
   if (!user) {
@@ -35,8 +37,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Exhaustive type checking for roles
-  const role = user.role as Role;
+  // Get role from RBAC system
+  const role = getUserRoleName(user) as Role;
   switch (role) {
     case "admin":
       return <AdminDashboard />;

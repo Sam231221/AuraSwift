@@ -8,8 +8,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { UserAvatar } from "@/shared/components/user-avatar";
-import { getRoleDisplayName } from "@/shared/utils/auth";
+import { UserAvatar } from "@/components/user-avatar";
+
+import {
+  getUserRoleName,
+  getUserRoleDisplayName,
+} from "@/shared/utils/rbac-helpers";
 import { getStaffDisplayName } from "../../utils/user-helpers";
 import type { StaffUser } from "../../schemas/types";
 
@@ -78,17 +82,20 @@ export function ViewUserDialog({
               </div>
             )}
 
-
             <div>
               <Label className="text-xs sm:text-sm md:text-base lg:text-base font-medium text-gray-500">
                 Role
               </Label>
               <div className="mt-1">
                 <Badge
-                  variant={user.role === "manager" ? "default" : "secondary"}
+                  variant={
+                    getUserRoleName(user) === "manager"
+                      ? "default"
+                      : "secondary"
+                  }
                   className="text-[10px] sm:text-xs md:text-sm lg:text-base"
                 >
-                  {getRoleDisplayName(user.role)}
+                  {getUserRoleDisplayName(user)}
                 </Badge>
               </div>
             </div>

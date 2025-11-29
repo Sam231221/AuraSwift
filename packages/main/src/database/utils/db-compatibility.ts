@@ -12,6 +12,9 @@ import semver from "semver";
 import fs from "fs";
 import { getDatabaseAge, formatDatabaseAge } from "./db-validator.js";
 
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('db-compatibility');
+
 export interface CompatibilityResult {
   compatible: boolean;
   reason?: string;
@@ -115,7 +118,7 @@ export function checkDatabaseCompatibility(
       }
     } catch (error) {
       // Version table doesn't exist or error reading it - not critical
-      console.warn("Could not read app version from database:", error);
+      logger.warn("Could not read app version from database:", error);
     }
 
     // Check 4: Get database age
@@ -212,7 +215,7 @@ export function checkMigrationPathExists(
     // This is a basic check - Drizzle's migrate() will do the actual validation
     return true;
   } catch (error) {
-    console.error("Error checking migration path:", error);
+    logger.error("Error checking migration path:", error);
     return false;
   }
 }
@@ -290,7 +293,7 @@ export function getDatabaseVersionInfo(db: Database.Database): {
       schemaVersion: sqliteVersion?.version,
     };
   } catch (error) {
-    console.error("Error getting database version info:", error);
+    logger.error("Error getting database version info:", error);
     return {};
   }
 }

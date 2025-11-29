@@ -1,4 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-batch-data');
 import type {
   ProductBatch,
   BatchResponse,
@@ -39,12 +42,12 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
       if (response.success && response.batches) {
         setBatches(Array.isArray(response.batches) ? response.batches : []);
       } else {
-        console.warn("Failed to load batches:", response.error);
+        logger.warn("Failed to load batches:", response.error);
         setBatches([]);
         setError(response.error || "Failed to load batches");
       }
     } catch (err) {
-      console.error("Error loading batches:", err);
+      logger.error("Error loading batches:", err);
       setBatches([]);
       setError("Failed to load batches");
     } finally {
@@ -66,11 +69,11 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
           Array.isArray(response.suppliers) ? response.suppliers : []
         );
       } else {
-        console.warn("Failed to load suppliers");
+        logger.warn("Failed to load suppliers");
         setSuppliers([]);
       }
     } catch (err) {
-      console.error("Error loading suppliers:", err);
+      logger.error("Error loading suppliers:", err);
       setSuppliers([]);
     }
   }, [businessId]);
@@ -107,7 +110,7 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
         setExpirySettings(defaultSettings);
       }
     } catch (err) {
-      console.error("Error loading expiry settings:", err);
+      logger.error("Error loading expiry settings:", err);
       // Set default settings on error
       const defaultSettings: ExpirySettings = {
         id: "",
@@ -180,7 +183,7 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
           error: response.error,
         };
       } catch (err) {
-        console.error("Error creating batch:", err);
+        logger.error("Error creating batch:", err);
         return {
           success: false,
           error: "Failed to create batch",
@@ -229,7 +232,7 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
           error: response.error,
         };
       } catch (err) {
-        console.error("Error updating batch:", err);
+        logger.error("Error updating batch:", err);
         return {
           success: false,
           error: "Failed to update batch",
@@ -261,7 +264,7 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
           error: response.error,
         };
       } catch (err) {
-        console.error("Error deleting batch:", err);
+        logger.error("Error deleting batch:", err);
         return {
           success: false,
           error: "Failed to delete batch",

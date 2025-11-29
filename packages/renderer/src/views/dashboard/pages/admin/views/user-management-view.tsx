@@ -1,6 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Plus, Shield } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('user-management-view');
 import {
   UserStatsCards,
   UserFilters,
@@ -51,7 +55,7 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
   const { updateStaffUser, isLoading: isUpdating } = useUpdateUser();
   const { deleteStaffUser } = useDeleteUser();
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = getUserRoleName(user) === "admin";
 
   // Handle loading state
   if (!user) {
@@ -86,34 +90,34 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
 
   // Handle create user
   const handleCreateUser = async (data: UserCreateFormData) => {
-    console.log("handleCreateUser called with:", data);
+    logger.info("handleCreateUser called with:", data);
     try {
       const result = await createStaffUser(data);
-      console.log("Create result:", result);
+      logger.info("Create result:", result);
       if (result.success) {
         await refetch();
         closeAddDialog();
       } else {
-        console.error("Create failed:", result.errors);
+        logger.error("Create failed:", result.errors);
         // Error is already shown by the hook via toast
       }
     } catch (error) {
-      console.error("Error in handleCreateUser:", error);
+      logger.error("Error in handleCreateUser:", error);
       // Error handling is done in the hook
     }
   };
 
   // Handle update user
   const handleUpdateUser = async (data: UserUpdateFormData) => {
-    console.log("handleUpdateUser called with:", data);
+    logger.info("handleUpdateUser called with:", data);
     const result = await updateStaffUser(data);
-    console.log("Update result:", result);
+    logger.info("Update result:", result);
     if (result.success) {
       await refetch();
       closeEditDialog();
     } else {
       // Error is already shown by the hook via toast
-      console.error("Update failed:", result.errors);
+      logger.error("Update failed:", result.errors);
     }
   };
 

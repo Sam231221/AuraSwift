@@ -12,6 +12,9 @@ import fs from "fs";
 import { app } from "electron";
 import { validateDatabaseFile } from "./db-validator.js";
 
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('db-path-migration');
+
 export interface PathMigrationResult {
   migrated: boolean;
   oldPath?: string;
@@ -146,7 +149,7 @@ export function migrateDatabaseFromOldPath(
         // New database exists but is invalid - backup it first
         const newBackupPath = `${newPath}.invalid.${timestamp}.db`;
         fs.renameSync(newPath, newBackupPath);
-        console.log(`📦 Backed up invalid new database to: ${newBackupPath}`);
+        logger.info(`📦 Backed up invalid new database to: ${newBackupPath}`);
       }
     }
 
@@ -195,7 +198,7 @@ export function migrateDatabaseFromOldPath(
           // Ignore directory removal errors (might not be empty)
         }
       } catch (error) {
-        console.warn(`⚠️  Failed to remove old database: ${error}`);
+        logger.warn(`⚠️  Failed to remove old database: ${error}`);
         // Don't fail migration if cleanup fails
       }
     }

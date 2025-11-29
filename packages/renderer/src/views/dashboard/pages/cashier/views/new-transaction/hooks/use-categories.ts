@@ -9,6 +9,9 @@ import type { Category } from "../types/transaction.types";
 import type { Product } from "@/features/products/types/product.types";
 import type { BreadcrumbItem } from "../types/transaction.types";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-categories');
+
 interface UseCategoriesProps {
   businessId: string | undefined;
   products: Product[]; // Products are needed to filter by category
@@ -51,7 +54,7 @@ export function useCategories({
         toast.error("Failed to load categories");
       }
     } catch (error) {
-      console.error("Error loading categories:", error);
+      logger.error("Error loading categories:", error);
       toast.error("Failed to load categories");
     }
   }, [businessId]);

@@ -18,6 +18,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('payment-components');
 // Type definitions for payment components
 interface CardReaderStatus {
   connected: boolean;
@@ -102,7 +105,7 @@ export const PaymentTerminal: React.FC<PaymentTerminalProps> = ({
       const status = await window.paymentAPI.getReaderStatus();
       setReaderStatus(status);
     } catch (error) {
-      console.error("Failed to get reader status:", error);
+      logger.error("Failed to get reader status:", error);
     }
   };
 
@@ -162,7 +165,7 @@ export const PaymentTerminal: React.FC<PaymentTerminalProps> = ({
         throw new Error(paymentResult.error || "Payment failed");
       }
     } catch (error) {
-      console.error("Payment processing error:", error);
+      logger.error("Payment processing error:", error);
       setPaymentState({
         step: "error",
         message: error instanceof Error ? error.message : "Payment failed",
@@ -184,7 +187,7 @@ export const PaymentTerminal: React.FC<PaymentTerminalProps> = ({
       resetPaymentState();
       onCancel?.();
     } catch (error) {
-      console.error("Failed to cancel payment:", error);
+      logger.error("Failed to cancel payment:", error);
     }
   };
 
@@ -417,7 +420,7 @@ export const CardReaderSetup: React.FC<CardReaderSetupProps> = ({
         setAvailableReaders(response.readers);
       }
     } catch (error) {
-      console.error("Failed to discover readers:", error);
+      logger.error("Failed to discover readers:", error);
     } finally {
       setIsScanning(false);
     }
@@ -443,7 +446,7 @@ export const CardReaderSetup: React.FC<CardReaderSetupProps> = ({
         throw new Error(response.error || "Failed to connect");
       }
     } catch (error) {
-      console.error("Failed to connect reader:", error);
+      logger.error("Failed to connect reader:", error);
     } finally {
       setIsConnecting(false);
     }

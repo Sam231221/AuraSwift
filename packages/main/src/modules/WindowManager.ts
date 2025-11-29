@@ -5,6 +5,9 @@ import type { AppInitConfig } from "../AppInitConfig.js";
 import type { UpdateCheckResult } from "electron-updater";
 import { join } from "node:path";
 
+import { getLogger } from '../utils/logger.js';
+const logger = getLogger('WindowManager');
+
 class WindowManager implements AppModule {
   readonly #preload: { path: string };
   readonly #renderer: { path: string } | URL;
@@ -90,7 +93,7 @@ class WindowManager implements AppModule {
                   }
                   // If update is available, the AutoUpdater instance will show the dialog automatically
                 } catch (error) {
-                  console.error("Error checking for updates:", error);
+                  logger.error("Error checking for updates:", error);
 
                   // Show user-friendly error
                   const errorMessage =
@@ -157,7 +160,7 @@ class WindowManager implements AppModule {
                     });
                   }
                 } catch (error) {
-                  console.error("Error checking for updates:", error);
+                  logger.error("Error checking for updates:", error);
                   const errorMessage =
                     error instanceof Error ? error.message : String(error);
 
@@ -332,12 +335,12 @@ class WindowManager implements AppModule {
             throw new Error(`Dev server returned ${response.status}`);
           }
         } catch (error) {
-          console.error("\n❌ Frontend dev server is not running!");
-          console.error(`   Cannot load: ${this.#renderer.href}`);
-          console.error("\n💡 To start the frontend dev server, run:");
-          console.error("   npm run dev --workspace @app/renderer");
-          console.error("\n   Or start both frontend and backend together:");
-          console.error("   npm run dev (in root directory)\n");
+          logger.error("\n❌ Frontend dev server is not running!");
+          logger.error(`   Cannot load: ${this.#renderer.href}`);
+          logger.error("\n💡 To start the frontend dev server, run:");
+          logger.error("   npm run dev --workspace @app/renderer");
+          logger.error("\n   Or start both frontend and backend together:");
+          logger.error("   npm run dev (in root directory)\n");
 
           // Show error dialog to user
           const { dialog } = await import("electron");

@@ -7,10 +7,13 @@ import type { ProductBatch } from "../types/batch.types";
 import {
   AdaptiveKeyboard,
   AdaptiveFormField,
-} from "@/components/adaptive-keyboard";
-import type { KeyboardMode } from "@/components/adaptive-keyboard";
+} from "@/features/adaptive-keyboard";
+import type { KeyboardMode } from "@/features/adaptive-keyboard";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, TrendingUp, TrendingDown, Edit3 } from "lucide-react";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('batch-adjustment-modal');
 
 interface BatchAdjustmentModalProps {
   batch: ProductBatch | null;
@@ -137,7 +140,7 @@ const BatchAdjustmentModal: React.FC<BatchAdjustmentModalProps> = ({
       await onConfirm(batch.id, adjustmentType, quantityNum, reasonText);
       onClose();
     } catch (error) {
-      console.error("Adjustment error:", error);
+      logger.error("Adjustment error:", error);
       // Error toast handled by parent
     } finally {
       setIsSubmitting(false);

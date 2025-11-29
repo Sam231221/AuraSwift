@@ -59,7 +59,8 @@
     "db:drop": "drizzle-kit drop",
     "db:check": "drizzle-kit check",
     "db:introspect": "drizzle-kit introspect",
-    "db:bridge": "node scripts/bridge-migration.mjs"
+    "db:bridge": "node scripts/bridge-migration.mjs",
+    "migrate:rbac": "tsx packages/main/src/scripts/migrate-rbac.ts"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",

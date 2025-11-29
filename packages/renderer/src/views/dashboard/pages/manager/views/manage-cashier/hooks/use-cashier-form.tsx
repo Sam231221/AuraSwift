@@ -16,6 +16,9 @@ import {
 } from "../schemas/cashier-schema";
 import { useFormNotification } from "@/shared/hooks/use-form-notification";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-cashier-form');
+
 interface StaffUser {
   id: string;
   email: string;
@@ -128,7 +131,7 @@ export function useCashierForm({
     },
     (errors) => {
       // Log validation errors for debugging
-      console.error("Cashier create form validation errors:", errors);
+      logger.error("Cashier create form validation errors:", errors);
     }
   );
 
@@ -198,7 +201,7 @@ export function useCashierEditForm({
     },
     (errors) => {
       // Log validation errors for debugging
-      console.error("Cashier edit form validation errors:", errors);
+      logger.error("Cashier edit form validation errors:", errors);
     }
   );
 

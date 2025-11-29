@@ -1,7 +1,7 @@
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc } from "drizzle-orm";
 import * as schema from "../schema.js";
-import type { Transaction, TransactionItem } from "../schema.js";
+import type { Transaction, TransactionItem, User } from "../schema.js";
 
 // Utility types for transaction operations
 export interface RefundItem {
@@ -27,6 +27,27 @@ export class TransactionManager {
     this.uuid = uuid;
   }
 
+  /**
+   * Determine if shift is required for a user based on their role
+   * - Cashiers MUST have an active shift to make sales (preserves existing logic)
+   * - Admins/Managers/Owners can make sales without shifts (solo operator support)
+   * - Supports activeRole for multi-role users (e.g., admin acting as cashier)
+   *
+   * @param user - User object with role property
+   * @returns true if shift is required, false if shift can be bypassed
+   */
+  isShiftRequired(user: User): boolean {
+    // Check shiftRequired field:
+    // - true: shift is required
+    // - false: shift is not required (admin/owner)
+    // - null: auto-detect (default behavior for legacy users)
+    if (user.shiftRequired === true) return true;
+    if (user.shiftRequired === false) return false;
+
+    // Auto-detect mode (null): assume shift required unless proven otherwise
+    // In a proper implementation, check user's roles via RBAC
+    return true; // Conservative default
+  }
   /**
    * Create transaction
    */

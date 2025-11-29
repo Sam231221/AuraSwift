@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/shared/hooks";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 import { UserSelectionGrid } from "./user-selection-grid";
 import { PinEntryScreen } from "./pin-entry-screen";
 import { getUserColor } from "./utils";
 import type { UserForLogin } from "../types/auth.types";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('auth-user-selection');
 
 export function AuthUserSelection() {
   const [users, setUsers] = useState<UserForLogin[]>([]);
@@ -25,8 +29,9 @@ export function AuthUserSelection() {
           // Map users and assign colors
           const cashierCount = { count: 0 };
           const mappedUsers = response.users.map((user) => {
-            const color = getUserColor(user.role, cashierCount.count);
-            if (user.role === "cashier") {
+            const roleName = getUserRoleName(user);
+            const color = getUserColor(roleName, cashierCount.count);
+            if (roleName === "cashier") {
               cashierCount.count++;
             }
             return {
@@ -34,14 +39,14 @@ export function AuthUserSelection() {
               username: user.username,
               firstName: user.firstName,
               lastName: user.lastName,
-              role: user.role as "admin" | "manager" | "cashier",
+              role: roleName as "admin" | "manager" | "cashier",
               color,
             };
           });
           setUsers(mappedUsers);
         }
       } catch (error) {
-        console.error("Failed to fetch users:", error);
+        logger.error("Failed to fetch users:", error);
       } finally {
         setIsLoadingUsers(false);
       }

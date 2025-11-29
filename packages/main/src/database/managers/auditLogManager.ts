@@ -22,7 +22,7 @@ export class AuditLogManager {
     details?: any;
   }): void {
     const logId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     this.db
       .insert(schema.auditLogs)
@@ -33,7 +33,7 @@ export class AuditLogManager {
         resource: logData.resource,
         resourceId: logData.resourceId,
         details: logData.details ? JSON.stringify(logData.details) : null,
-        timestamp: now,
+        timestamp: now, // Use Date object for timestamp_ms mode
       })
       .run();
   }

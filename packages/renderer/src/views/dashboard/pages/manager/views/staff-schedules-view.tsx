@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 import {
   Plus,
   Edit2,
@@ -64,8 +65,8 @@ import {
   AdaptiveKeyboard,
   AdaptiveFormField,
   AdaptiveTextarea,
-} from "@/components/adaptive-keyboard";
-import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
+} from "@/features/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/features/adaptive-keyboard/hooks/use-keyboard-with-react-hook-form";
 import type {
   ScheduleFormData,
   ScheduleUpdateData,
@@ -82,9 +83,13 @@ import { startOfDay } from "date-fns/startOfDay";
 import { TimePicker } from "../../../../../components/time-picker";
 import { useScheduleForm } from "./staff-schedules/hooks/use-schedule-form";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('staff-schedules-view');
+
 // Using database interfaces
 interface Cashier {
   id: string;
+  username: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -152,7 +157,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         if (response.success && response.data) {
           // Filter to only show cashiers, not managers or admins
           const cashierUsers = (response.data as Cashier[]).filter(
-            (user) => user.role === "cashier"
+            (user) => getUserRoleName(user) === "cashier"
           );
           setCashiers(cashierUsers);
         } else {
@@ -161,7 +166,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           });
         }
       } catch (error) {
-        console.error("Error loading cashiers:", error);
+        logger.error("Error loading cashiers:", error);
         toast.error("Error loading staff members", {
           description: "Please refresh the page and try again",
         });
@@ -192,7 +197,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           });
         }
       } catch (error) {
-        console.error("Error loading schedules:", error);
+        logger.error("Error loading schedules:", error);
         toast.error("Error loading schedules", {
           description: "Please refresh the page and try again",
         });
@@ -945,7 +950,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         });
       }
     } catch (error) {
-      console.error("Error deleting schedule:", error);
+      logger.error("Error deleting schedule:", error);
       toast.error("An error occurred", {
         description: "Failed to delete the schedule. Please try again.",
         id: toastId,
@@ -971,7 +976,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       const diffHours = Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
       return `${diffHours}h`;
     } catch (error) {
-      console.error("Error calculating shift duration:", error);
+      logger.error("Error calculating shift duration:", error);
       return "N/A";
     }
   };
@@ -1005,7 +1010,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         color: "bg-gray-100 text-gray-800 border-gray-200",
       };
     } catch (error) {
-      console.error("Error getting schedule status:", error);
+      logger.error("Error getting schedule status:", error);
       return {
         status: "upcoming",
         color: "bg-gray-100 text-gray-800 border-gray-200",

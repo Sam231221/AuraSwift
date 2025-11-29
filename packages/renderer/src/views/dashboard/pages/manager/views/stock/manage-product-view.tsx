@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
-import type { Product } from "./types/product.types";
+import type { Product } from "@/features/products/types/product.types";
 
 import ManageCategoriesView from "@/views/dashboard/pages/manager/views/stock/manage-categories-view";
 import ProductDashboardView from "./product-dashboard-view";
@@ -10,6 +10,10 @@ import ProductDetailsView from "./product-details-view";
 import StockAdjustmentModal from "./components/stock-adjustment-modal";
 import ProductFormDrawer from "./components/product-form-drawer";
 import BatchManagementView from "./product-batch-management-view";
+import StockMovementHistoryView from "./stock-movement-history-view";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('manage-product-view');
 import type {
   Category,
   VatCategory,
@@ -30,6 +34,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     | "productManagement"
     | "categoryManagement"
     | "batchManagement"
+    | "stockMovementHistory"
   >("productDashboard");
 
   // Track which product to filter batches by
@@ -122,7 +127,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         toast.error("Failed to load products");
       }
     } catch (error) {
-      console.error("Error loading products:", error);
+      logger.error("Error loading products:", error);
       toast.error("Failed to load products");
     } finally {
       setLoading(false);
@@ -147,7 +152,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         setAllProducts(response.products);
       }
     } catch (error) {
-      console.error("Error loading all products:", error);
+      logger.error("Error loading all products:", error);
     }
   }, [user?.businessId]);
 
@@ -161,7 +166,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         setCategories(response.categories as any);
       }
     } catch (error) {
-      console.error("Error loading categories:", error);
+      logger.error("Error loading categories:", error);
     }
   }, [user?.businessId]);
 
@@ -177,7 +182,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         setVatCategories(response.vatCategories as any);
       }
     } catch (error) {
-      console.error("Error loading VAT categories:", error);
+      logger.error("Error loading VAT categories:", error);
     }
   }, [user?.businessId]);
 
@@ -233,7 +238,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           toast.error(response.message || "Failed to delete product");
         }
       } catch (error) {
-        console.error("Error deleting product:", error);
+        logger.error("Error deleting product:", error);
         toast.error("Failed to delete product");
       }
     },
@@ -278,7 +283,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           toast.error(response.message || "Failed to adjust stock");
         }
       } catch (error) {
-        console.error("Error adjusting stock:", error);
+        logger.error("Error adjusting stock:", error);
         toast.error("Failed to adjust stock");
       }
     },
@@ -360,6 +365,10 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
                 setCurrentView("productDashboard");
               }}
               initialProductId={batchFilterProductId}
+            />
+          ) : currentView === "stockMovementHistory" ? (
+            <StockMovementHistoryView
+              onBack={() => setCurrentView("productDashboard")}
             />
           ) : (
             <ProductDetailsView

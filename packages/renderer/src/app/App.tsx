@@ -5,7 +5,7 @@ import {
   Navigate,
 } from "react-router-dom";
 
-import { ProtectedRoute, PublicRoute } from "@/shared/components";
+import { ProtectedRoute, PublicRoute } from "@/components";
 import AuthPage from "@/views/auth";
 import DashboardPage from "@/views/dashboard";
 

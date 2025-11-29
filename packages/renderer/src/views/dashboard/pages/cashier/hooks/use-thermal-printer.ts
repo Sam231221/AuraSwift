@@ -6,6 +6,9 @@ import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import type { TransactionData, PrinterConfig } from "@/types/printer";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-thermal-printer');
+
 export type PrintStatus =
   | "idle"
   | "printing"
@@ -49,7 +52,7 @@ export const useThermalPrinter = () => {
         setIsConnected(status.connected);
       }
     } catch (error) {
-      console.error("Failed to check printer status:", error);
+      logger.error("Failed to check printer status:", error);
       setPrinterInfo(null);
       setIsConnected(false);
     }
@@ -104,7 +107,7 @@ export const useThermalPrinter = () => {
         toast.success("Printer disconnected");
       }
     } catch (error) {
-      console.error("Failed to disconnect printer:", error);
+      logger.error("Failed to disconnect printer:", error);
       toast.error("Failed to disconnect printer");
     }
   }, []);
@@ -223,7 +226,7 @@ export const useThermalPrinter = () => {
         toast.info("Print job cancelled");
       }
     } catch (error) {
-      console.error("Failed to cancel print:", error);
+      logger.error("Failed to cancel print:", error);
     }
   }, []);
 
@@ -246,7 +249,7 @@ export const useThermalPrinter = () => {
       }
       return [];
     } catch (error) {
-      console.error("Failed to get printer interfaces:", error);
+      logger.error("Failed to get printer interfaces:", error);
       return [];
     }
   }, []);
@@ -300,7 +303,7 @@ export const usePrinterSetup = () => {
       const interfaces = await getAvailableInterfaces();
       setAvailableInterfaces(interfaces);
     } catch (error) {
-      console.error("Failed to get available interfaces:", error);
+      logger.error("Failed to get available interfaces:", error);
       toast.error("Failed to scan for printers");
     }
   }, [getAvailableInterfaces]);

@@ -18,6 +18,9 @@ import { useFormNotification } from "@/shared/hooks/use-form-notification";
 // Optimized: Import individual function to reduce bundle size
 import { format } from "date-fns/format";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-schedule-form');
+
 interface Schedule {
   id: string;
   staffId: string;
@@ -188,7 +191,7 @@ export function useScheduleForm({
     },
     (errors) => {
       // Log validation errors for debugging
-      console.error("Schedule form validation errors:", errors);
+      logger.error("Schedule form validation errors:", errors);
     }
   );
 

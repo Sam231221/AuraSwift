@@ -1,5 +1,8 @@
 import fs from "fs";
 import { isDevelopmentMode } from "./environment.js";
+import { getLogger } from "../../utils/logger.js";
+
+const logger = getLogger('db-info');
 
 export function getDatabaseInfo(dbPath: string): {
   path: string;
@@ -16,7 +19,7 @@ export function getDatabaseInfo(dbPath: string): {
       size = stats.size;
     } catch (error) {
       // If we can't get stats (permissions, etc.), continue without size
-      console.warn(`Could not get database size for ${dbPath}:`, error);
+      logger.warn(`Could not get database size for ${dbPath}`, error);
     }
   }
   return {

@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Pagination } from "@/components/ui/pagination";
-import type { Product } from "./types/product.types";
+import type { Product } from "@/features/products/types/product.types";
 
 interface Category {
   id: string;

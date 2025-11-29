@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('void-transaction-modal');
 import {
   Select,
   SelectContent,
@@ -127,7 +130,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
         setRecentTransactions(validTransactions);
       }
     } catch (error) {
-      console.error("Failed to load recent transactions:", error);
+      logger.error("Failed to load recent transactions:", error);
       toast.error("Failed to load recent transactions");
     } finally {
       setIsLoading(false);
@@ -178,7 +181,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
         toast.error("Transaction not found");
       }
     } catch (error) {
-      console.error("Search transaction error:", error);
+      logger.error("Search transaction error:", error);
       toast.error("Failed to search transaction");
     } finally {
       setIsLoading(false);
@@ -215,7 +218,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
         return false;
       }
     } catch (error) {
-      console.error("Validate void error:", error);
+      logger.error("Validate void error:", error);
       toast.error("Failed to validate transaction");
       return false;
     }
@@ -267,7 +270,7 @@ const VoidTransactionModal: React.FC<VoidModalProps> = ({
           setCurrentStep("confirm");
         }
       } catch (error) {
-        console.error("Void transaction error:", error);
+        logger.error("Void transaction error:", error);
         toast.error("Failed to void transaction");
         setCurrentStep("confirm");
       } finally {

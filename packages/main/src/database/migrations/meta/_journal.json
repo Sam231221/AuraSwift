@@ -1,61 +1,19 @@
 {
-  "version": "7",
+  "version": "6",
   "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
       "version": "6",
-      "when": 1763416717831,
-      "tag": "0000_chemical_carnage",
+      "when": 1732800000000,
+      "tag": "0000_friendly_sunset_bain",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "6",
-      "when": 1763417161783,
-      "tag": "0001_adorable_captain_universe",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1763423659101,
-      "tag": "0002_large_the_executioner",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1763425857099,
-      "tag": "0003_funny_susan_delgado",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1763476814944,
-      "tag": "0004_fresh_power_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1763493507514,
-      "tag": "0005_rainy_black_widow",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1763674325772,
-      "tag": "0006_sticky_living_tribunal",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1763922056459,
-      "tag": "0007_sweet_patch",
+      "when": 1764348408840,
+      "tag": "0001_spicy_sir_ram",
       "breakpoints": true
     }
   ]

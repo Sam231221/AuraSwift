@@ -6,6 +6,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-scale-manager');
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -88,7 +91,7 @@ export function useScaleManager(config?: ScaleConfig) {
         return [];
       }
     } catch (error) {
-      console.error("Scale discovery error:", error);
+      logger.error("Scale discovery error:", error);
       toast.error("Error discovering scales");
       return [];
     } finally {
@@ -147,7 +150,7 @@ export function useScaleManager(config?: ScaleConfig) {
           return false;
         }
       } catch (error) {
-        console.error("Scale connection error:", error);
+        logger.error("Scale connection error:", error);
         toast.error("Error connecting to scale");
         return false;
       } finally {
@@ -184,7 +187,7 @@ export function useScaleManager(config?: ScaleConfig) {
         toast.error(result.error || "Failed to disconnect scale");
       }
     } catch (error) {
-      console.error("Scale disconnection error:", error);
+      logger.error("Scale disconnection error:", error);
       toast.error("Error disconnecting from scale");
     }
   }, []);
@@ -202,7 +205,7 @@ export function useScaleManager(config?: ScaleConfig) {
         toast.error(result.error || "Failed to tare scale");
       }
     } catch (error) {
-      console.error("Scale tare error:", error);
+      logger.error("Scale tare error:", error);
       toast.error("Error taring scale");
     }
   }, []);
@@ -234,7 +237,7 @@ export function useScaleManager(config?: ScaleConfig) {
         setCurrentReading(status.lastReading);
       }
     } catch (error) {
-      console.error("Error refreshing scale status:", error);
+      logger.error("Error refreshing scale status:", error);
     }
   }, []);
 

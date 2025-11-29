@@ -14,6 +14,48 @@ import "./appStore.js"; // Initialize auth handlers
 import { getDatabase } from "./database/index.js";
 import { registerVatCategoryIpc } from "./services/vatCategoryService.js";
 import { registerBookerImportHandlers } from "./ipc/bookerImportHandlers.js";
+import { registerLoggerHandlers } from "./ipc/loggerHandlers.js";
+import { getLogger } from "./utils/logger.js";
+
+const logger = getLogger('app-init');
+
+// ============================================================================
+// ADMIN FALLBACK SECURITY CHECK
+// ============================================================================
+
+/**
+ * Check if admin fallback is enabled and warn on startup
+ * This must match the constant in authHelpers.ts exactly
+ */
+const ENABLE_ADMIN_FALLBACK = 
+  process.env.NODE_ENV === "development" || 
+  process.env.RBAC_ADMIN_FALLBACK === "true";
+
+if (ENABLE_ADMIN_FALLBACK) {
+  const env = process.env.NODE_ENV || "unknown";
+  logger.warn(
+    "\n" +
+    "⚠️  ═══════════════════════════════════════════════════════════════\n" +
+    "⚠️  SECURITY WARNING: ADMIN PERMISSION FALLBACK IS ENABLED\n" +
+    "⚠️  \n" +
+    "⚠️  This is a temporary migration feature that allows admin users\n" +
+    "⚠️  to bypass RBAC permission checks.\n" +
+    "⚠️  \n" +
+    "⚠️  Current Environment: " + env + "\n" +
+    "⚠️  \n" +
+    "⚠️  ⚠️  DO NOT USE IN PRODUCTION! ⚠️\n" +
+    "⚠️  \n" +
+    "⚠️  To disable:\n" +
+    "⚠️    - Set NODE_ENV=production\n" +
+    "⚠️    - Remove RBAC_ADMIN_FALLBACK environment variable\n" +
+    "⚠️    - Or remove the fallback code entirely\n" +
+    "⚠️  \n" +
+    "⚠️  ═══════════════════════════════════════════════════════════════\n"
+  );
+
+  // Also log to console for visibility
+  console.warn("⚠️  SECURITY: Admin fallback is ENABLED in", env, "environment!");
+}
 
 // Global reference to autoUpdater instance for menu access
 let autoUpdaterInstance: ReturnType<typeof autoUpdater> | null = null;
@@ -24,6 +66,7 @@ export function getAutoUpdaterInstance() {
 
 export async function initApp(initConfig: AppInitConfig) {
   // Register IPC handlers
+  registerLoggerHandlers();
   registerVatCategoryIpc();
   registerBookerImportHandlers();
   
@@ -83,7 +126,7 @@ export async function initApp(initConfig: AppInitConfig) {
               // Validate cashierId before clock-out
               const cashierId = closedPosShifts[0]?.cashierId;
               if (!cashierId) {
-                console.error(
+                logger.error(
                   `Cannot clock out TimeShift ${timeShiftId}: closed shifts have no cashierId`
                 );
               } else {
@@ -106,12 +149,12 @@ export async function initApp(initConfig: AppInitConfig) {
                   // Complete the TimeShift
                   await db.timeTracking.completeShift(timeShiftId, clockOutEvent.id);
 
-                  console.log(
+                  logger.info(
                     `Auto clocked out TimeShift ${timeShiftId} after all POS shifts were auto-closed`
                   );
                 } catch (error) {
-                  console.error(
-                    `Failed to clock out TimeShift ${timeShiftId} after auto-closing shifts:`,
+                  logger.error(
+                    `Failed to clock out TimeShift ${timeShiftId} after auto-closing shifts`,
                     error
                   );
                 }
@@ -121,7 +164,7 @@ export async function initApp(initConfig: AppInitConfig) {
         }
       }
     } catch (error) {
-      console.error("Error during shift cleanup:", error);
+      logger.error("Error during shift cleanup", error);
     }
   };
 
@@ -138,9 +181,9 @@ export async function initApp(initConfig: AppInitConfig) {
       // Process expiry tasks for all businesses
       // In a multi-tenant system, you'd iterate through businesses
       // For now, we'll process when explicitly called via IPC
-      console.log("Expiry check scheduled (use IPC to trigger)");
+      logger.debug("Expiry check scheduled (use IPC to trigger)");
     } catch (error) {
-      console.error("Error during expiry check:", error);
+      logger.error("Error during expiry check", error);
     }
   }, 6 * 60 * 60 * 1000); // 6 hours
 
@@ -158,7 +201,7 @@ export async function initApp(initConfig: AppInitConfig) {
     // Auto-update expired batches for all businesses
     await db.batches.autoUpdateExpiredBatches();
   } catch (error) {
-    console.error("Error during startup expiry check:", error);
+    logger.error("Error during startup expiry check", error);
   }
 
   const moduleRunner = createModuleRunner()

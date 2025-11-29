@@ -27,14 +27,17 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ProductBatch, Supplier } from "../types/batch.types";
 import { generateBatchNumber } from "../utils/expiry-calculations";
-import type { Product } from "../types/product.types";
+import type { Product } from "@/features/products/types/product.types";
 import { useBatchForm } from "../hooks/use-batch-form";
 import {
   AdaptiveKeyboard,
   AdaptiveFormField,
-} from "@/components/adaptive-keyboard";
-import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
+} from "@/features/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/features/adaptive-keyboard/hooks/use-keyboard-with-react-hook-form";
 import type { BatchFormData, BatchUpdateData } from "../schemas/batch-schema";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('batch-form-drawer');
 
 interface BatchFormDrawerProps {
   isOpen: boolean;
@@ -116,9 +119,9 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
           throw new Error(response?.error || "Failed to update batch");
         }
       } else {
-        console.log("Creating batch with data:", batchData);
+        logger.info("Creating batch with data:", batchData);
         const response = await window.batchesAPI?.create(batchData);
-        console.log("Batch API response:", response);
+        logger.info("Batch API response:", response);
         if (response?.success && response.batch) {
           onSave(response.batch);
         } else {

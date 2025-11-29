@@ -30,6 +30,9 @@ import { CategoryRow } from "./utils/category-row";
 import { CategoryFormDrawer } from "./components/category-form-drawer";
 import { ImportBookerModal } from "./components/import-booker-modal";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('manage-categories-view');
+
 interface ManageCategoriesViewProps {
   onBack: () => void;
 }
@@ -109,7 +112,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
         toast.error("Failed to load categories");
       }
     } catch (error) {
-      console.error("Error loading categories:", error);
+      logger.error("Error loading categories:", error);
       toast.error("Failed to load categories");
     } finally {
       setLoading(false);
@@ -129,11 +132,11 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       if (response.success && response.vatCategories) {
         setVatCategories(response.vatCategories);
       } else {
-        console.error("Failed to load VAT categories:", response.message);
+        logger.error("Failed to load VAT categories:", response.message);
         setVatCategories([]);
       }
     } catch (error) {
-      console.error("Error loading VAT categories:", error);
+      logger.error("Error loading VAT categories:", error);
       setVatCategories([]);
     }
   }, [user]);
@@ -214,7 +217,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
           throw new Error(errorMsg);
         }
       } catch (error) {
-        console.error("Error saving category:", error);
+        logger.error("Error saving category:", error);
         throw error;
       } finally {
         setLoading(false);
@@ -271,7 +274,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
           throw new Error(errorMsg);
         }
       } catch (error) {
-        console.error("Error updating category:", error);
+        logger.error("Error updating category:", error);
         throw error;
       } finally {
         setLoading(false);
@@ -308,7 +311,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
         toast.error(response.message || "Failed to delete category");
       }
     } catch (error) {
-      console.error("Error deleting category:", error);
+      logger.error("Error deleting category:", error);
       toast.error("Failed to delete category");
     } finally {
       setLoading(false);
@@ -385,7 +388,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
         await loadCategories();
       }
     } catch (error) {
-      console.error("Error reordering categories:", error);
+      logger.error("Error reordering categories:", error);
       // Revert on error
       setCategories(categories);
       toast.error("Failed to reorder categories");

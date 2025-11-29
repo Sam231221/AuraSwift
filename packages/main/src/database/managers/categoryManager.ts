@@ -3,6 +3,9 @@ import { eq, and, sql as drizzleSql } from "drizzle-orm";
 import { Category, categories } from "../schema.js";
 import * as schema from "../schema.js";
 
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('categoryManager');
+
 export interface CategoryResponse {
   success: boolean;
   message: string;
@@ -414,7 +417,7 @@ export class CategoryManager {
         category,
       };
     } catch (error: any) {
-      console.error("Category creation error:", error);
+      logger.error("Category creation error:", error);
       return {
         success: false,
         message: error.message || "Failed to create category",
@@ -434,7 +437,7 @@ export class CategoryManager {
         categories,
       };
     } catch (error: any) {
-      console.error("Get categories error:", error);
+      logger.error("Get categories error:", error);
       return {
         success: false,
         message: error.message || "Failed to get categories",
@@ -452,7 +455,7 @@ export class CategoryManager {
         category,
       };
     } catch (error: any) {
-      console.error("Get category error:", error);
+      logger.error("Get category error:", error);
       return {
         success: false,
         message: error.message || "Category not found",
@@ -483,7 +486,7 @@ export class CategoryManager {
         category,
       };
     } catch (error: any) {
-      console.error("Update category error:", error);
+      logger.error("Update category error:", error);
       return {
         success: false,
         message: error.message || "Failed to update category",
@@ -500,7 +503,7 @@ export class CategoryManager {
         message: "Category deleted successfully",
       };
     } catch (error: any) {
-      console.error("Delete category error:", error);
+      logger.error("Delete category error:", error);
       return {
         success: false,
         message: error.message || "Failed to delete category",
@@ -520,7 +523,7 @@ export class CategoryManager {
         message: "Categories reordered successfully",
       };
     } catch (error: any) {
-      console.error("Reorder categories error:", error);
+      logger.error("Reorder categories error:", error);
       return {
         success: false,
         message: error.message || "Failed to reorder categories",

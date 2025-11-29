@@ -25,12 +25,18 @@ import { ExpirySettingManager } from "./managers/expirySettingsManager.js";
 import { ExpiryNotificationManager } from "./managers/expiryNotificationManager.js";
 import { StockMovementManager } from "./managers/stockMovementManager.js";
 import { CartManager } from "./managers/cartManager.js";
+import { RoleManager } from "./managers/roleManager.js";
+import { UserRoleManager } from "./managers/userRoleManager.js";
+import { UserPermissionManager } from "./managers/userPermissionManager.js";
 import { initializeDrizzle } from "./drizzle.js";
 import { getDatabaseInfo } from "./utils/dbInfo.js";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import * as schema from "./schema.js";
 import { seedDefaultData } from "./seed.js";
+
+import { getLogger } from '../utils/logger.js';
+const logger = getLogger('index');
 
 let dbManagerInstance: DBManager | null = null;
 let managersInstance: DatabaseManagers | null = null;
@@ -63,6 +69,11 @@ export interface DatabaseManagers {
   expiryNotifications: ExpiryNotificationManager;
   stockMovements: StockMovementManager;
   cart: CartManager;
+
+  // RBAC managers
+  roles: RoleManager;
+  userRoles: UserRoleManager;
+  userPermissions: UserPermissionManager;
 
   getDatabaseInfo: () => {
     path: string;
@@ -104,15 +115,15 @@ export async function getDatabase(): Promise<DatabaseManagers> {
         error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      console.error("❌ Database seeding failed:");
-      console.error(`   Error: ${errorMessage}`);
+      logger.error("❌ Database seeding failed:");
+      logger.error(`   Error: ${errorMessage}`);
       if (errorStack) {
-        console.error(`   Stack: ${errorStack}`);
+        logger.error(`   Stack: ${errorStack}`);
       }
-      console.error(
+      logger.error(
         "   ⚠️  Warning: Database may be partially initialized. Some default data may be missing."
       );
-      console.error(
+      logger.error(
         "   💡 You may need to manually seed the database or restart the application."
       );
 
@@ -141,7 +152,6 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const businesses = new BusinessManager(drizzle, uuid);
     const products = new ProductManager(drizzle, uuid);
     const categories = new CategoryManager(drizzle, uuid);
-    const inventory = new InventoryManager(drizzle, uuid);
     const schedules = new ScheduleManager(drizzle, uuid);
     const shifts = new ShiftManager(drizzle, uuid);
     const transactions = new TransactionManager(drizzle, uuid);
@@ -159,7 +169,13 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const expirySettings = new ExpirySettingManager(drizzle, uuid);
     const expiryNotifications = new ExpiryNotificationManager(drizzle, uuid);
     const stockMovements = new StockMovementManager(drizzle, uuid, batches);
+    const inventory = new InventoryManager(drizzle, uuid, stockMovements);
     const cart = new CartManager(drizzle, uuid);
+
+    // RBAC managers
+    const roles = new RoleManager(drizzle, uuid);
+    const userRoles = new UserRoleManager(drizzle, uuid);
+    const userPermissions = new UserPermissionManager(drizzle, uuid);
 
     managersInstance = {
       users,
@@ -189,6 +205,11 @@ export async function getDatabase(): Promise<DatabaseManagers> {
       stockMovements,
       cart,
 
+      // RBAC managers
+      roles,
+      userRoles,
+      userPermissions,
+
       // Database info methods
       getDatabaseInfo: () => {
         if (!dbManagerInstance) {
@@ -205,7 +226,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
         const rawDb = dbManagerInstance.getDb();
 
         try {
-          console.log("🗑️  Emptying all database tables...");
+          logger.info("🗑️  Emptying all database tables...");
 
           // Disable foreign key constraints temporarily for faster deletion
           rawDb.prepare("PRAGMA foreign_keys = OFF").run();
@@ -222,7 +243,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
             schema.shiftValidations,
             schema.timeCorrections,
             schema.breaks,
-            schema.timeShifts,
+            schema.shifts,
             schema.clockEvents,
             schema.transactionItems,
             schema.transactions,
@@ -261,7 +282,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
                 tableAny._?.name ||
                 tableAny[Symbol.for("drizzle:Name")] ||
                 "unknown";
-              console.warn(
+              logger.warn(
                 `⚠️  Warning: Failed to empty table ${tableName}:`,
                 error instanceof Error ? error.message : String(error)
               );
@@ -272,7 +293,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
           // Re-enable foreign key constraints
           rawDb.prepare("PRAGMA foreign_keys = ON").run();
 
-          console.log(
+          logger.info(
             `✅ Successfully emptied ${deletedCount} of ${tablesToEmpty.length} tables`
           );
           return { deletedCount, totalTables: tablesToEmpty.length };
@@ -309,14 +330,6 @@ export function closeDatabase(): void {
 }
 
 /**
- * Backward Compatibility
- * @deprecated Use getDatabase() instead. This function is kept for backward compatibility.
- */
-export async function initializeDatabase(): Promise<DatabaseManagers> {
-  return getDatabase();
-}
-
-/**
  * Type Exports
  *
  * Note: Database schema types should be imported directly from "./schema.js"
@@ -326,7 +339,6 @@ export async function initializeDatabase(): Promise<DatabaseManagers> {
  * - DatabaseManagers interface (database manager instances)
  * - getDatabase() function
  * - closeDatabase() function
- * - initializeDatabase() function (deprecated)
  */
 
 // Re-export manager utility types for convenience

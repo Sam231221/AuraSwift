@@ -11,6 +11,9 @@ import type {
 } from "../../../types/cart.types";
 import type { Product } from "@/features/products/types/product.types";
 import type { Category } from "../types/transaction.types";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-cart');
 import {
   calculateItemPrice,
   calculateCategoryPrice,
@@ -51,7 +54,7 @@ export function useCart({
   const initializeCartSession =
     useCallback(async (): Promise<CartSession | null> => {
       if (!businessId || !userId) {
-        console.warn("Cannot initialize cart: missing user data");
+        logger.warn("Cannot initialize cart: missing user data");
         return null;
       }
 
@@ -106,7 +109,7 @@ export function useCart({
               setCartItems([]);
               return session;
             } else {
-              console.error(
+              logger.error(
                 "Failed to create cart session:",
                 newSessionResponse
               );
@@ -126,7 +129,7 @@ export function useCart({
               setCartItems([]);
               return session;
             } else {
-              console.error(
+              logger.error(
                 "Failed to create cart session:",
                 newSessionResponse
               );
@@ -135,7 +138,7 @@ export function useCart({
           }
         }
       } catch (error) {
-        console.error("Error initializing cart session:", error);
+        logger.error("Error initializing cart session:", error);
         return null;
       } finally {
         setLoadingCart(false);
@@ -168,7 +171,7 @@ export function useCart({
       let currentSession =
         sessionOverride !== undefined ? sessionOverride : cartSession;
       if (!currentSession) {
-        console.log("🛒 Cart session not found, initializing...");
+        logger.info("🛒 Cart session not found, initializing...");
         try {
           const newSession = await initializeCartSession();
           if (!newSession) {
@@ -177,7 +180,7 @@ export function useCart({
           }
           currentSession = newSession;
         } catch (error) {
-          console.error("Error initializing cart session:", error);
+          logger.error("Error initializing cart session:", error);
           toast.error("Failed to initialize cart session. Please try again.");
           return;
         }
@@ -197,11 +200,10 @@ export function useCart({
       // Determine item type
       const itemType: "UNIT" | "WEIGHT" = isWeighted ? "WEIGHT" : "UNIT";
 
-      console.log(
-        "🛒 Adding to cart:",
-        product.name,
-        isWeighted && weight ? `(${weight.toFixed(2)} ${salesUnit})` : "",
-        customPrice ? `@ £${customPrice}` : ""
+      logger.info(
+        `🛒 Adding to cart: ${product.name} ${
+          isWeighted && weight ? `(${weight.toFixed(2)} ${salesUnit})` : ""
+        } ${customPrice ? `@ £${customPrice}` : ""}`
       );
 
       try {
@@ -285,7 +287,7 @@ export function useCart({
           } else {
             const errorMessage =
               updateResponse.message || "Failed to update cart item";
-            console.error("Failed to update cart item:", errorMessage);
+            logger.error("Failed to update cart item:", errorMessage);
             toast.error(errorMessage);
           }
         } else {
@@ -324,14 +326,14 @@ export function useCart({
           } else {
             const errorMessage =
               addResponse.message || "Failed to add item to cart";
-            console.error("Failed to add item to cart:", errorMessage);
+            logger.error("Failed to add item to cart:", errorMessage);
             toast.error(errorMessage);
           }
         }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to add item to cart";
-        console.error("Error adding to cart:", error);
+        logger.error("Error adding to cart:", error);
         toast.error(errorMessage);
       }
     },
@@ -369,7 +371,7 @@ export function useCart({
       let currentSession =
         sessionOverride !== undefined ? sessionOverride : cartSession;
       if (!currentSession) {
-        console.log("🛒 Cart session not found, initializing...");
+        logger.info("🛒 Cart session not found, initializing...");
         try {
           const newSession = await initializeCartSession();
           if (!newSession) {
@@ -378,7 +380,7 @@ export function useCart({
           }
           currentSession = newSession;
         } catch (error) {
-          console.error("Error initializing cart session:", error);
+          logger.error("Error initializing cart session:", error);
           toast.error("Failed to initialize cart session. Please try again.");
           return;
         }
@@ -397,7 +399,7 @@ export function useCart({
 
       const { unitPrice, totalPrice, taxAmount } = priceCalculation;
 
-      console.log("🛒 Adding category to cart:", category.name, `@ £${price}`);
+      logger.info(`🛒 Adding category to cart: ${category.name} @ £${price}`);
 
       try {
         // Check for existing category item
@@ -445,7 +447,7 @@ export function useCart({
           } else {
             const errorMessage =
               updateResponse.message || "Failed to update cart item";
-            console.error("Failed to update cart item:", errorMessage);
+            logger.error("Failed to update cart item:", errorMessage);
             toast.error(errorMessage);
           }
         } else {
@@ -477,14 +479,14 @@ export function useCart({
           } else {
             const errorMessage =
               addResponse.message || "Failed to add item to cart";
-            console.error("Failed to add item to cart:", errorMessage);
+            logger.error("Failed to add item to cart:", errorMessage);
             toast.error(errorMessage);
           }
         }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to add item to cart";
-        console.error("Error adding category to cart:", error);
+        logger.error("Error adding category to cart:", error);
         toast.error(errorMessage);
       }
     },
@@ -518,7 +520,7 @@ export function useCart({
           toast.error("Failed to remove item from cart");
         }
       } catch (error) {
-        console.error("Error removing from cart:", error);
+        logger.error("Error removing from cart:", error);
         toast.error("Failed to remove item from cart");
       }
     },
@@ -542,7 +544,7 @@ export function useCart({
           totalAmount: total,
           taxAmount: tax,
         })
-        .catch(console.error);
+        .catch((error) => logger.error('Failed to update cart session', error));
     }
   }, [total, tax, cartSession]);
 

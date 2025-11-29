@@ -15,10 +15,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
-import { useKeyboardWithRHF } from "@/shared/hooks/use-keyboard-with-react-hook-form";
+import { AdaptiveKeyboard } from "@/features/adaptive-keyboard/adaptive-keyboard";
+import { useKeyboardWithRHF } from "@/features/adaptive-keyboard/hooks/use-keyboard-with-react-hook-form";
 import { configuredZodResolver } from "@/shared/validation/resolvers";
-import { startShiftSchema, type StartShiftFormData } from "../../schemas/shift-schema";
+import {
+  startShiftSchema,
+  type StartShiftFormData,
+} from "../../schemas/shift-schema";
 
 interface StartShiftDialogProps {
   open: boolean;
@@ -221,7 +224,9 @@ export function StartShiftDialog({
                   onBackspace={keyboard.handleBackspace}
                   onClear={keyboard.handleClear}
                   onEnter={handleSubmit}
-                  initialMode={keyboard.activeFieldConfig?.keyboardMode || "numeric"}
+                  initialMode={
+                    keyboard.activeFieldConfig?.keyboardMode || "numeric"
+                  }
                   inputType="number"
                   visible={keyboard.showKeyboard}
                   onClose={keyboard.handleCloseKeyboard}
@@ -241,7 +246,9 @@ export function StartShiftDialog({
               <Button
                 type="submit"
                 className="w-full sm:w-auto min-h-[44px] h-10 sm:h-11 text-sm sm:text-base touch-manipulation"
-                disabled={!form.formState.isValid || form.formState.isSubmitting}
+                disabled={
+                  !form.formState.isValid || form.formState.isSubmitting
+                }
               >
                 Start Shift
               </Button>

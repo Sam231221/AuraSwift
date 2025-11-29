@@ -10,6 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('cash-drawer-count-modal');
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -109,7 +112,7 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
         setExpectedCash(startingCash);
       }
     } catch (error) {
-      console.error("Failed to load expected cash:", error);
+      logger.error("Failed to load expected cash:", error);
       setExpectedCash(startingCash);
     } finally {
       setIsLoading(false);
@@ -212,7 +215,7 @@ const CashDrawerCountModal: React.FC<CashDrawerCountModalProps> = ({
           setCurrentStep("review");
         }
       } catch (error) {
-        console.error("Cash count error:", error);
+        logger.error("Cash count error:", error);
         toast.error("Failed to record cash count");
         setCurrentStep("review");
       } finally {

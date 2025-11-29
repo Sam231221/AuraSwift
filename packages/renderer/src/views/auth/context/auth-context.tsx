@@ -1,6 +1,9 @@
 import { createContext, useState, useEffect, type ReactNode } from "react";
 import type { User, AuthContextType } from "../types/auth.types";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('auth-context');
+
 /* eslint-disable react-refresh/only-export-components */
 export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
@@ -48,7 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           );
         }
         if (response.shift) {
-          await window.authStore.set("activeShift", JSON.stringify(response.shift));
+          await window.authStore.set(
+            "activeShift",
+            JSON.stringify(response.shift)
+          );
         }
 
         // Show message if clock-in is required
@@ -69,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
     } catch (error) {
-      console.error("Login error:", error);
+      logger.error("Login error:", error);
       const errorMessage = "Login failed due to network error";
       setError(errorMessage);
       return { success: false, message: errorMessage };
@@ -107,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
     } catch (error) {
-      console.error("Registration error:", error);
+      logger.error("Registration error:", error);
       const errorMessage = "Registration failed due to network error";
       setError(errorMessage);
       return { success: false, message: errorMessage };
@@ -153,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
     } catch (error) {
-      console.error("Business registration error:", error);
+      logger.error("Business registration error:", error);
       const errorMessage = "Business registration failed due to network error";
       setError(errorMessage);
       return { success: false, message: errorMessage };
@@ -191,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
     } catch (error) {
-      console.error("User creation error:", error);
+      logger.error("User creation error:", error);
       const errorMessage = "User creation failed due to network error";
       setError(errorMessage);
       return { success: false, message: errorMessage };
@@ -200,9 +206,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = async (
-    options?: { clockOut?: boolean }
-  ): Promise<{ needsClockOutWarning?: boolean }> => {
+  const logout = async (options?: {
+    clockOut?: boolean;
+  }): Promise<{ needsClockOutWarning?: boolean }> => {
     setIsLoading(true);
     setError(null);
 
@@ -224,7 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error) {
-      console.error("Logout error:", error);
+      logger.error("Logout error:", error);
     } finally {
       setUser(null);
       await window.authStore.delete("user");
@@ -259,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error) {
-        console.error("Session validation error:", error);
+        logger.error("Session validation error:", error);
         // Clear stored data on error
         await window.authStore.delete("user");
         await window.authStore.delete("token");
@@ -301,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         message: response.message || "Failed to clock in",
       };
     } catch (error) {
-      console.error("Clock-in error:", error);
+      logger.error("Clock-in error:", error);
       return { success: false, message: "Failed to clock in" };
     }
   };
@@ -330,7 +336,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         message: response.message || "Failed to clock out",
       };
     } catch (error) {
-      console.error("Clock-out error:", error);
+      logger.error("Clock-out error:", error);
       return { success: false, message: "Failed to clock out" };
     }
   };
@@ -340,7 +346,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await window.timeTrackingAPI.getActiveShift(userId);
       return response.shift || null;
     } catch (error) {
-      console.error("Get active shift error:", error);
+      logger.error("Get active shift error:", error);
       return null;
     }
   };

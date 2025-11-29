@@ -1,7 +1,10 @@
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, like, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
-import type { User, Permission } from "../schema.js";
+import type { User } from "../schema.js";
+
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('userManager');
 
 import {
   registerSchema,
@@ -55,8 +58,27 @@ export class UserManager {
 
   getUserByEmail(email: string): User | null {
     const [user] = this.db
-      .select()
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        email: schema.users.email,
+        passwordHash: schema.users.passwordHash,
+        pinHash: schema.users.pinHash,
+        salt: schema.users.salt,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        businessId: schema.users.businessId,
+        businessName: schema.users.businessName,
+        primaryRoleId: schema.users.primaryRoleId,
+        shiftRequired: schema.users.shiftRequired,
+        createdAt: schema.users.createdAt,
+        updatedAt: schema.users.updatedAt,
+        isActive: schema.users.isActive,
+        address: schema.users.address,
+        roleName: schema.roles.name,
+      })
       .from(schema.users)
+      .leftJoin(schema.roles, eq(schema.users.primaryRoleId, schema.roles.id))
       .where(
         and(eq(schema.users.email, email), eq(schema.users.isActive, true))
       )
@@ -65,19 +87,32 @@ export class UserManager {
 
     if (!user) return null;
 
-    return {
-      ...user,
-      permissions:
-        typeof user.permissions === "string"
-          ? JSON.parse(user.permissions)
-          : user.permissions,
-    } as User;
+    return user as User;
   }
 
   getUserById(id: string): User | null {
     const [user] = this.db
-      .select()
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        email: schema.users.email,
+        passwordHash: schema.users.passwordHash,
+        pinHash: schema.users.pinHash,
+        salt: schema.users.salt,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        businessId: schema.users.businessId,
+        businessName: schema.users.businessName,
+        primaryRoleId: schema.users.primaryRoleId,
+        shiftRequired: schema.users.shiftRequired,
+        createdAt: schema.users.createdAt,
+        updatedAt: schema.users.updatedAt,
+        isActive: schema.users.isActive,
+        address: schema.users.address,
+        roleName: schema.roles.name,
+      })
       .from(schema.users)
+      .leftJoin(schema.roles, eq(schema.users.primaryRoleId, schema.roles.id))
       .where(and(eq(schema.users.id, id), eq(schema.users.isActive, true)))
       .limit(1)
       .all();
@@ -129,8 +164,27 @@ export class UserManager {
 
   getUserByUsername(username: string): User | null {
     const [user] = this.db
-      .select()
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        email: schema.users.email,
+        passwordHash: schema.users.passwordHash,
+        pinHash: schema.users.pinHash,
+        salt: schema.users.salt,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        businessId: schema.users.businessId,
+        businessName: schema.users.businessName,
+        primaryRoleId: schema.users.primaryRoleId,
+        shiftRequired: schema.users.shiftRequired,
+        createdAt: schema.users.createdAt,
+        updatedAt: schema.users.updatedAt,
+        isActive: schema.users.isActive,
+        address: schema.users.address,
+        roleName: schema.roles.name,
+      })
       .from(schema.users)
+      .leftJoin(schema.roles, eq(schema.users.primaryRoleId, schema.roles.id))
       .where(
         and(
           eq(schema.users.username, username),
@@ -165,10 +219,26 @@ export class UserManager {
     return userWithoutSecrets as User;
   }
 
-  getUsersByBusiness(businessId: string): User[] {
-    const users = this.db
-      .select()
+  getUsersByBusiness(businessId: string): any[] {
+    // Get users with their primary role from RBAC system
+    const usersWithRoles = this.db
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        email: schema.users.email,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        businessId: schema.users.businessId,
+        businessName: schema.users.businessName,
+        createdAt: schema.users.createdAt,
+        updatedAt: schema.users.updatedAt,
+        isActive: schema.users.isActive,
+        address: schema.users.address,
+        primaryRoleId: schema.users.primaryRoleId,
+        roleName: schema.roles.name,
+      })
       .from(schema.users)
+      .leftJoin(schema.roles, eq(schema.users.primaryRoleId, schema.roles.id))
       .where(
         and(
           eq(schema.users.businessId, businessId),
@@ -178,7 +248,9 @@ export class UserManager {
       .orderBy(desc(schema.users.createdAt))
       .all();
 
-    return users as User[];
+    // Return users with primary role information from RBAC system
+    // No longer includes deprecated 'role' field - use primaryRole.name instead
+    return usersWithRoles;
   }
 
   //CRUD
@@ -200,35 +272,6 @@ export class UserManager {
     const hashedPin = await this.bcrypt.hash(userData.pin, salt);
     const now = new Date();
 
-    // Set permissions based on role
-    let permissions: Permission[];
-    switch (userData.role) {
-      case "cashier":
-        permissions = ["read:sales", "write:sales"];
-        break;
-      case "manager":
-        permissions = [
-          "read:sales",
-          "write:sales",
-          "read:reports",
-          "manage:inventory",
-          "override:transactions",
-        ];
-        break;
-      case "admin":
-        permissions = [
-          "read:sales",
-          "write:sales",
-          "read:reports",
-          "manage:inventory",
-          "manage:users",
-          "view:analytics",
-          "override:transactions",
-          "manage:settings",
-        ];
-        break;
-    }
-
     // If businessId is provided, check that it exists
     if (userData.businessId) {
       const [businessExists] = this.db
@@ -247,10 +290,12 @@ export class UserManager {
       // 1. Create business if not provided
       if (!userData.businessId) {
         // Split businessName into firstName and lastName for the business
-        const businessNameParts = (userData.businessName || "Business").split(" ");
+        const businessNameParts = (userData.businessName || "Business").split(
+          " "
+        );
         const businessFirstName = businessNameParts[0] || "Business";
         const businessLastName = businessNameParts.slice(1).join(" ") || "Name";
-        
+
         tx.insert(schema.businesses)
           .values({
             id: businessId,
@@ -274,7 +319,7 @@ export class UserManager {
           .run();
       }
 
-      // 2. Create user (new schema fields)
+      // 2. Create user (using RBAC system)
       tx.insert(schema.users)
         .values({
           id: userId,
@@ -286,14 +331,44 @@ export class UserManager {
           firstName: userData.firstName,
           lastName: userData.lastName,
           businessName: userData.businessName,
-          role: userData.role,
           businessId,
-          permissions: permissions,
           isActive: true,
           loginAttempts: 0,
           address: "",
         })
         .run();
+
+      // 3. Assign role via RBAC userRoles table
+      // Find the role by name for this business
+      const [roleRecord] = tx
+        .select()
+        .from(schema.roles)
+        .where(
+          and(
+            eq(schema.roles.name, userData.role),
+            eq(schema.roles.businessId, businessId)
+          )
+        )
+        .limit(1)
+        .all();
+
+      if (roleRecord) {
+        // Assign the role to the user
+        tx.insert(schema.userRoles)
+          .values({
+            id: this.uuid.v4(),
+            userId: userId,
+            roleId: roleRecord.id,
+            assignedBy: null, // System assignment
+            assignedAt: now,
+            isActive: true,
+          })
+          .run();
+      } else {
+        logger.warn(
+          `Warning: No role found for '${userData.role}' in business ${businessId}. User created without role assignment.`
+        );
+      }
     });
 
     const user = this.getUserById(userId);
@@ -341,15 +416,34 @@ export class UserManager {
       .run();
   }
 
-  getAllActiveUsers(): User[] {
-    const users = this.db
-      .select()
+  getAllActiveUsers(): any[] {
+    // Get all active users with their primary role from RBAC system
+    const usersWithRoles = this.db
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        email: schema.users.email,
+        firstName: schema.users.firstName,
+        lastName: schema.users.lastName,
+        businessId: schema.users.businessId,
+        businessName: schema.users.businessName,
+        createdAt: schema.users.createdAt,
+        updatedAt: schema.users.updatedAt,
+        isActive: schema.users.isActive,
+        pin: schema.users.pinHash,
+        address: schema.users.address,
+        primaryRoleId: schema.users.primaryRoleId,
+        roleName: schema.roles.name,
+      })
       .from(schema.users)
+      .leftJoin(schema.roles, eq(schema.users.primaryRoleId, schema.roles.id))
       .where(eq(schema.users.isActive, true))
-      .orderBy(desc(schema.users.role), schema.users.firstName)
+      .orderBy(schema.users.firstName)
       .all();
 
-    return users as User[];
+    // Return users with primary role information from RBAC system
+    // No longer includes deprecated 'role' field - use primaryRole.name instead
+    return usersWithRoles;
   }
 
   async searchUsers(businessId: string, searchTerm: string): Promise<User[]> {
@@ -441,7 +535,7 @@ export class UserManager {
         token: session.token,
       };
     } catch (error) {
-      console.error("Registration error:", error);
+      logger.error("Registration error:", error);
       return {
         success: false,
         message: "Registration failed due to server error",
@@ -542,9 +636,12 @@ export class UserManager {
       let requiresClockIn = false;
 
       if (this.timeTrackingManager) {
+        // Check if user requires shift based on shiftRequired field
+        // If shiftRequired is null (auto-detect), check if user has non-admin roles
         const shouldClockIn =
           data.autoClockIn !== false &&
-          (user.role === "cashier" || user.role === "manager");
+          (user.shiftRequired === true ||
+            (user.shiftRequired === null && !this.isAdminUser(user)));
 
         if (shouldClockIn) {
           // Check for existing active shift
@@ -568,7 +665,7 @@ export class UserManager {
 
               if (!validation.valid) {
                 // Log warnings but don't fail login
-                console.warn(
+                logger.warn(
                   "Clock-in validation warnings:",
                   validation.warnings
                 );
@@ -586,7 +683,7 @@ export class UserManager {
               }
             } catch (error) {
               // Don't fail login if clock-in fails, but log it
-              console.error("Auto clock-in failed:", error);
+              logger.error("Auto clock-in failed:", error);
               requiresClockIn = true;
             }
           } else {
@@ -606,7 +703,7 @@ export class UserManager {
         requiresClockIn,
       };
     } catch (error) {
-      console.error("Login error:", error);
+      logger.error("Login error:", error);
       return {
         success: false,
         message: "Login failed due to server error",
@@ -650,7 +747,7 @@ export class UserManager {
         user: userWithoutSecrets as User,
       };
     } catch (error) {
-      console.error("Session validation error:", error);
+      logger.error("Session validation error:", error);
       return {
         success: false,
         message: "Session validation failed",
@@ -689,11 +786,11 @@ export class UserManager {
       if (this.timeTrackingManager && user) {
         activeShift = this.timeTrackingManager.getActiveShift(user.id);
         isClockedIn = !!activeShift;
-
         // Auto clock-out if enabled and user is clocked in
         const shouldClockOut =
           options?.autoClockOut !== false &&
-          (user.role === "cashier" || user.role === "manager") &&
+          (user.shiftRequired === true ||
+            (user.shiftRequired === null && !this.isAdminUser(user))) &&
           isClockedIn;
 
         if (shouldClockOut && activeShift) {
@@ -722,7 +819,7 @@ export class UserManager {
             );
           } catch (error) {
             // Don't fail logout if clock-out fails, but log it
-            console.error("Auto clock-out failed:", error);
+            logger.error("Auto clock-out failed:", error);
           }
         }
       }
@@ -737,7 +834,7 @@ export class UserManager {
         activeShift: activeShift as any,
       };
     } catch (error) {
-      console.error("Logout error:", error);
+      logger.error("Logout error:", error);
       return {
         success: false,
         message: "Logout failed",
@@ -769,7 +866,7 @@ export class UserManager {
         user: userWithoutSecrets as User,
       };
     } catch (error) {
-      console.error("Get user error:", error);
+      logger.error("Get user error:", error);
       return {
         success: false,
         message: "Failed to get user",
@@ -819,7 +916,7 @@ export class UserManager {
         user: userWithoutSecrets as User,
       };
     } catch (error) {
-      console.error("Update user error:", error);
+      logger.error("Update user error:", error);
       return {
         success: false,
         message: "Update failed due to server error",
@@ -851,7 +948,7 @@ export class UserManager {
         message: "User deleted successfully",
       };
     } catch (error) {
-      console.error("Delete user error:", error);
+      logger.error("Delete user error:", error);
       return {
         success: false,
         message: "Delete failed due to server error",
@@ -869,7 +966,7 @@ export class UserManager {
         users,
       };
     } catch (error: any) {
-      console.error("Get users by business error:", error);
+      logger.error("Get users by business error:", error);
       return {
         success: false,
         message: error.message || "Failed to get users",
@@ -922,11 +1019,32 @@ export class UserManager {
         user: userWithoutSecrets as User,
       };
     } catch (error: any) {
-      console.error("Create user error:", error);
+      logger.error("Create user error:", error);
       return {
         success: false,
         message: error.message || "Failed to create user",
       };
     }
+  }
+
+  /**
+   * Helper to check if a user has admin-level roles (admin/owner)
+   * Used to determine if clock-in/out is required
+   */
+  private isAdminUser(user: User): boolean {
+    // Check if user has admin or owner role via RBAC
+    const userRoles = this.db
+      .select({ name: schema.roles.name })
+      .from(schema.userRoles)
+      .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+      .where(
+        and(
+          eq(schema.userRoles.userId, user.id),
+          eq(schema.userRoles.isActive, true)
+        )
+      )
+      .all();
+
+    return userRoles.some((ur) => ur.name === "admin" || ur.name === "owner");
   }
 }

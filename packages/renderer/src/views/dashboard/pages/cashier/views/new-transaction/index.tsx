@@ -51,15 +51,22 @@ import {
   VoidTransactionModal,
   CashDrawerCountModal,
 } from "./components/modals";
-import type { AgeVerificationData, SelectedBatchData } from "./components/modals";
-import { ScaleDisplay } from "@/components/scale/ScaleDisplay";
+import type {
+  AgeVerificationData,
+  SelectedBatchData,
+} from "./components/modals";
+import { ScaleDisplay } from "@/views/dashboard/pages/cashier/views/new-transaction/components/input/ScaleDisplay";
 
 // Types
-import type { Product } from "../../../manager/views/stock/types/product.types";
+import type { Product } from "@/features/products/types/product.types";
 import type { PrinterConfig } from "@/types/printer";
 
 // Utils
 import { isWeightedProduct } from "./utils/product-helpers";
+import { userHasAnyRole, getUserRoleName } from "@/shared/utils/rbac-helpers";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('index');
 
 // Constants
 const DOUBLE_CLICK_DELAY = 300;
@@ -95,13 +102,15 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   const [pendingGenericProduct, setPendingGenericProduct] =
     useState<Product | null>(null);
   const [showScaleDisplay, setShowScaleDisplay] = useState(false);
-  
+
   // Batch selection modal states
   const [showBatchSelectionModal, setShowBatchSelectionModal] = useState(false);
   const [pendingProductForBatchSelection, setPendingProductForBatchSelection] =
     useState<Product | null>(null);
-  const [pendingQuantityForBatchSelection, setPendingQuantityForBatchSelection] =
-    useState<number>(1);
+  const [
+    pendingQuantityForBatchSelection,
+    setPendingQuantityForBatchSelection,
+  ] = useState<number>(1);
 
   // Receipt printing flow
   const { isShowingStatus, startPrintingFlow, handleSkipReceipt } =
@@ -277,7 +286,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             });
 
             if (!auditResponse.success) {
-              console.error(
+              logger.error(
                 "Failed to create age verification record:",
                 auditResponse.message
               );
@@ -303,7 +312,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             );
           }
         } catch (error) {
-          console.error("Error during age verification completion:", error);
+          logger.error("Error during age verification completion:", error);
           toast.error("Failed to complete age verification");
         }
       }
@@ -346,7 +355,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
 
       // TODO: When cart API supports batch info in addToCart, pass it here
       // For now, the backend auto-selects using FEFO during transaction creation
-      
+
       toast.success(
         `Added ${pendingProductForBatchSelection.name} from batch ${batchData.batchNumber}`
       );
@@ -380,7 +389,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   // Initialize cart session on mount
   useEffect(() => {
     if (user && shift.activeShift) {
-      cart.initializeCartSession().catch(console.error);
+      cart.initializeCartSession().catch((error) => logger.error('Failed to initialize cart session', error));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, shift.activeShift]);
@@ -398,7 +407,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
           }
         }
       } catch (error) {
-        console.error("Printer auto-connect failed:", error);
+        logger.error("Printer auto-connect failed:", error);
       }
     };
     initPrinter();
@@ -419,16 +428,13 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   }
 
   // Show loading state while checking shift
-  if (
-    shift.isLoadingShift &&
-    (user.role === "cashier" || user.role === "manager")
-  ) {
+  if (shift.isLoadingShift && userHasAnyRole(user, ["cashier", "manager"])) {
     return <LoadingState message="Loading shift data..." />;
   }
 
   // Show blocking UI if no scheduled shift OR if shift has ended with no future shift
   if (
-    (user.role === "cashier" || user.role === "manager") &&
+    userHasAnyRole(user, ["cashier", "manager"]) &&
     !shift.isLoadingShift &&
     !shift.activeShift &&
     (!shift.todaySchedule || shiftHasEnded)
@@ -673,7 +679,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                 }
 
                 // Handle other numeric keypad input
-                console.log("Numeric keypad input:", value);
+                logger.info("Numeric keypad input:", value);
               }}
               keysOverride={[
                 ["7", "8", "9", "Enter"],
@@ -741,7 +747,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             setPendingWeightForAgeVerification(undefined);
             weightInput.resetWeightInput();
           }}
-          currentUser={user}
+          currentUser={user ? { id: user.id, role: getUserRoleName(user) } : null}
         />
       )}
 

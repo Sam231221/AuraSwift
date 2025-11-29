@@ -1,6 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
 import type { Product } from "@/features/products/types/product.types";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-product-data');
+
 interface Category {
   id: string;
   name: string;
@@ -38,7 +41,7 @@ export const useProductData = ({ businessId }: UseProductDataProps) => {
 
   const loadProducts = useCallback(async () => {
     if (!businessId) {
-      console.warn("Cannot load products: businessId is missing");
+      logger.warn("Cannot load products: businessId is missing");
       setProducts([]);
       return;
     }
@@ -48,11 +51,11 @@ export const useProductData = ({ businessId }: UseProductDataProps) => {
       if (response.success && response.products) {
         setProducts(Array.isArray(response.products) ? response.products : []);
       } else {
-        console.warn("Failed to load products");
+        logger.warn("Failed to load products");
         setProducts([]);
       }
     } catch (error) {
-      console.error("Error loading products:", error);
+      logger.error("Error loading products:", error);
       setProducts([]);
     } finally {
       setLoading(false);
@@ -61,7 +64,7 @@ export const useProductData = ({ businessId }: UseProductDataProps) => {
 
   const loadCategories = useCallback(async () => {
     if (!businessId) {
-      console.warn("Cannot load categories: businessId is missing");
+      logger.warn("Cannot load categories: businessId is missing");
       setCategories([]);
       return;
     }
@@ -72,11 +75,11 @@ export const useProductData = ({ businessId }: UseProductDataProps) => {
           Array.isArray(response.categories) ? response.categories : []
         );
       } else {
-        console.warn("Failed to load categories");
+        logger.warn("Failed to load categories");
         setCategories([]);
       }
     } catch (error) {
-      console.error("Error loading categories:", error);
+      logger.error("Error loading categories:", error);
       setCategories([]);
     }
   }, [businessId]);
@@ -91,11 +94,11 @@ export const useProductData = ({ businessId }: UseProductDataProps) => {
       if (response.success && response.vatCategories) {
         setVatCategories(response.vatCategories);
       } else {
-        console.error("Failed to load VAT categories");
+        logger.error("Failed to load VAT categories");
         setVatCategories([]);
       }
     } catch (error) {
-      console.error("Error loading VAT categories:", error);
+      logger.error("Error loading VAT categories:", error);
       setVatCategories([]);
     }
   }, [businessId]);

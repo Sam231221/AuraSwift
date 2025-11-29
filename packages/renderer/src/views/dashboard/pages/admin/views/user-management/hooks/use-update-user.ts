@@ -2,6 +2,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { UserUpdateFormData } from "../schemas/user-schema";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-update-user');
+
 export function useUpdateUser() {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -35,7 +38,7 @@ export function useUpdateUser() {
         };
       }
     } catch (error) {
-      console.error("Error updating user:", error);
+      logger.error("Error updating user:", error);
       toast.error("Failed to update staff member");
       return {
         success: false,

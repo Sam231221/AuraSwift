@@ -18,6 +18,9 @@ import { useFormNotification } from "@/shared/hooks/use-form-notification";
 import type { Product } from "@/features/products/types/product.types";
 import type { Category, VatCategory } from "./use-product-data";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-product-form');
+
 interface UseProductFormOptions {
   /**
    * Product to edit (if in edit mode)
@@ -113,7 +116,7 @@ const mapProductToFormData = (
     ? safeCategories[0].id
     : "";
 
-  const normalizedModifiers = (product.modifiers || []).map((modifier) => ({
+  const normalizedModifiers = ((product as any).modifiers || []).map((modifier: any) => ({
     ...modifier,
     multiSelect:
       "multiSelect" in modifier
@@ -273,7 +276,7 @@ export function useProductForm({
     },
     (errors) => {
       // Log validation errors for debugging
-      console.error("Product form validation errors:", errors);
+      logger.error("Product form validation errors:", errors);
     }
   );
 

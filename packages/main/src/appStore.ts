@@ -1,6 +1,32 @@
-import { ipcMain } from "electron";
+import { ipcMain, safeStorage } from "electron";
 import { getDatabase, type DatabaseManagers } from "./database/index.js";
 import { ExpiryNotificationService } from "./services/expiryNotificationService.js";
+import {
+  validateSessionAndPermission,
+  logAction,
+} from "./utils/authHelpers.js";
+import { PERMISSIONS } from "./constants/permissions.js";
+import type { User } from "./database/schema.js";
+import { getLogger } from "./utils/logger.js";
+
+const logger = getLogger("appStore");
+
+// ============================================================================
+// SECURE TOKEN STORAGE CONFIGURATION
+// ============================================================================
+
+// Check if encryption is available (done once at module load)
+const isEncryptionAvailable = safeStorage.isEncryptionAvailable();
+
+if (!isEncryptionAvailable) {
+  logger.warn(
+    "⚠️  Safe storage encryption not available on this platform! " +
+      "Tokens will be stored in plaintext. Consider using a different encryption method."
+  );
+}
+
+// Keys that should be encrypted
+const ENCRYPTED_KEYS = ["token", "user", "refreshToken"];
 
 // Get database instance
 let db: DatabaseManagers | null = null;
@@ -8,15 +34,63 @@ getDatabase().then((database) => {
   db = database;
 });
 
+/**
+ * Helper to check if a user is NOT an admin/owner (requires shift tracking)
+ */
+async function isNonAdminUser(
+  db: DatabaseManagers,
+  user: User
+): Promise<boolean> {
+  const userRoles = db.userRoles.getUserRole(user.id, undefined, true);
+  const hasAdminRole = userRoles.some(
+    (ur: any) => ur.role.name === "admin" || ur.role.name === "owner"
+  );
+  return !hasAdminRole;
+}
+
 // IPC handlers for persistent key-value storage using app_settings table
 ipcMain.handle("auth:set", async (event, key: string, value: string) => {
   try {
     if (!db) db = await getDatabase();
-    // Store key-value pair in app_settings table
-    db.settings.setSetting(key, value);
+
+    // Determine if this key should be encrypted
+    const shouldEncrypt = ENCRYPTED_KEYS.includes(key);
+
+    let storedValue = value;
+    let isEncrypted = false;
+
+    // Encrypt sensitive data if encryption is available
+    if (shouldEncrypt && isEncryptionAvailable) {
+      try {
+        const buffer = safeStorage.encryptString(value);
+        // Store as base64 to save in text field
+        storedValue = buffer.toString("base64");
+        isEncrypted = true;
+
+        // Mark as encrypted for later decryption
+        db.settings.setSetting(`${key}_encrypted`, "true");
+      } catch (encryptError) {
+        logger.error(
+          `Failed to encrypt ${key}, storing in plaintext:`,
+          encryptError
+        );
+        // Fallback to plaintext if encryption fails
+        isEncrypted = false;
+      }
+    }
+
+    // Store the value (encrypted or plaintext)
+    db.settings.setSetting(key, storedValue);
+
+    if (shouldEncrypt && !isEncrypted) {
+      logger.warn(
+        `⚠️  Storing ${key} in plaintext (encryption unavailable or failed)`
+      );
+    }
+
     return true;
   } catch (error) {
-    console.error("Error setting auth data:", error);
+    logger.error("Error setting auth data:", error);
     return false;
   }
 });
@@ -24,10 +98,31 @@ ipcMain.handle("auth:set", async (event, key: string, value: string) => {
 ipcMain.handle("auth:get", async (event, key: string) => {
   try {
     if (!db) db = await getDatabase();
+
     const value = db.settings.getSetting(key);
+
+    if (!value) return null;
+
+    // Check if this was encrypted
+    const isEncrypted = db.settings.getSetting(`${key}_encrypted`) === "true";
+
+    // Decrypt if needed
+    if (isEncrypted && isEncryptionAvailable) {
+      try {
+        const buffer = Buffer.from(value, "base64");
+        const decrypted = safeStorage.decryptString(buffer);
+        return decrypted;
+      } catch (decryptError) {
+        logger.error(`Failed to decrypt ${key}:`, decryptError);
+        // If decryption fails, return null (data is corrupted)
+        return null;
+      }
+    }
+
+    // Return plaintext value
     return value;
   } catch (error) {
-    console.error("Error getting auth data:", error);
+    logger.error("Error getting auth data:", error);
     return null;
   }
 });
@@ -35,10 +130,14 @@ ipcMain.handle("auth:get", async (event, key: string) => {
 ipcMain.handle("auth:delete", async (event, key: string) => {
   try {
     if (!db) db = await getDatabase();
+
+    // Delete both the value and encryption marker
     db.settings.deleteSetting(key);
+    db.settings.deleteSetting(`${key}_encrypted`);
+
     return true;
   } catch (error) {
-    console.error("Error deleting auth data:", error);
+    logger.error("Error deleting auth data:", error);
     return false;
   }
 });
@@ -49,7 +148,7 @@ ipcMain.handle("auth:register", async (event, userData) => {
     if (!db) db = await getDatabase();
     return await db.users.register(userData);
   } catch (error) {
-    console.error("Registration IPC error:", error);
+    logger.error("Registration IPC error:", error);
     return {
       success: false,
       message: "Registration failed due to server error",
@@ -69,7 +168,7 @@ ipcMain.handle("auth:registerBusiness", async (event, userData) => {
 
     return await db.users.register(registrationData);
   } catch (error) {
-    console.error("Business registration IPC error:", error);
+    logger.error("Business registration IPC error:", error);
     return {
       success: false,
       message: "Business registration failed due to server error",
@@ -82,7 +181,7 @@ ipcMain.handle("auth:login", async (event, credentials) => {
     if (!db) db = await getDatabase();
     return await db.users.login(credentials);
   } catch (error) {
-    console.error("Login IPC error:", error);
+    logger.error("Login IPC error:", error);
     return {
       success: false,
       message: "Login failed due to server error",
@@ -95,7 +194,7 @@ ipcMain.handle("auth:validateSession", async (event, token) => {
     if (!db) db = await getDatabase();
     return db.users.validateSession(token);
   } catch (error) {
-    console.error("Session validation IPC error:", error);
+    logger.error("Session validation IPC error:", error);
     return {
       success: false,
       message: "Session validation failed",
@@ -113,7 +212,12 @@ ipcMain.handle("auth:logout", async (event, token, options) => {
       const user = db.users.getUserById(session.userId);
 
       // Check for active POS shifts before allowing clock-out
-      if (user && (user.role === "cashier" || user.role === "manager")) {
+      // Use shiftRequired field (null = auto-detect, true = required, false = not required)
+      const requiresShift =
+        user &&
+        (user.shiftRequired === true ||
+          (user.shiftRequired === null && (await isNonAdminUser(db, user))));
+      if (requiresShift) {
         const activeTimeShift = db.timeTracking.getActiveShift(user.id);
 
         if (activeTimeShift) {
@@ -124,7 +228,7 @@ ipcMain.handle("auth:logout", async (event, token, options) => {
 
           if (activePosShifts.length > 0 && options?.autoClockOut !== false) {
             // User has active POS shifts - auto-end them before clock-out
-            console.log(
+            logger.info(
               `Auto-ending ${activePosShifts.length} active POS shift(s) before clock-out for user ${user.id}`
             );
 
@@ -149,10 +253,10 @@ ipcMain.handle("auth:logout", async (event, token, options) => {
                     : "Auto-ended on logout",
                 });
 
-                console.log(`Auto-ended POS shift ${posShift.id} on logout`);
+                logger.info(`Auto-ended POS shift ${posShift.id} on logout`);
               } catch (error) {
                 failedShifts.push(posShift.id);
-                console.error(
+                logger.error(
                   `Failed to auto-end POS shift ${posShift.id} on logout:`,
                   error
                 );
@@ -187,18 +291,18 @@ ipcMain.handle("auth:logout", async (event, token, options) => {
                     activeTimeShift.id,
                     clockOutEvent.id
                   );
-                  console.log(
+                  logger.info(
                     `Auto clocked out TimeShift ${activeTimeShift.id} after ending all POS shifts on logout`
                   );
                 } catch (error) {
-                  console.error(
+                  logger.error(
                     "Failed to clock out TimeShift after ending POS shifts:",
                     error
                   );
                 }
               }
             } else {
-              console.warn(
+              logger.warn(
                 `Cannot clock out TimeShift ${activeTimeShift.id}: ${
                   failedShifts.length
                 } POS shift(s) failed to end: ${failedShifts.join(", ")}`
@@ -211,7 +315,7 @@ ipcMain.handle("auth:logout", async (event, token, options) => {
 
     return await db.users.logout(token, options);
   } catch (error) {
-    console.error("Logout IPC error:", error);
+    logger.error("Logout IPC error:", error);
     return {
       success: false,
       message: "Logout failed",
@@ -224,7 +328,7 @@ ipcMain.handle("auth:getUserById", async (event, userId) => {
     if (!db) db = await getDatabase();
     return db.users.getUserByIdWithResponse(userId);
   } catch (error) {
-    console.error("Get user IPC error:", error);
+    logger.error("Get user IPC error:", error);
     return {
       success: false,
       message: "Failed to get user",
@@ -237,7 +341,7 @@ ipcMain.handle("auth:updateUser", async (event, userId, updates) => {
     if (!db) db = await getDatabase();
     return db.users.updateUserWithResponse(userId, updates);
   } catch (error) {
-    console.error("Update user IPC error:", error);
+    logger.error("Update user IPC error:", error);
     return {
       success: false,
       message: "Update failed",
@@ -250,7 +354,7 @@ ipcMain.handle("auth:deleteUser", async (event, userId) => {
     if (!db) db = await getDatabase();
     return db.users.deleteUserWithResponse(userId);
   } catch (error) {
-    console.error("Delete user IPC error:", error);
+    logger.error("Delete user IPC error:", error);
     return {
       success: false,
       message: "Delete failed",
@@ -263,7 +367,7 @@ ipcMain.handle("auth:getUsersByBusiness", async (event, businessId) => {
     if (!db) db = await getDatabase();
     return db.users.getUsersByBusinessWithResponse(businessId);
   } catch (error) {
-    console.error("Get users by business IPC error:", error);
+    logger.error("Get users by business IPC error:", error);
     return {
       success: false,
       message: "Failed to get users",
@@ -276,7 +380,7 @@ ipcMain.handle("auth:createUser", async (event, userData) => {
     if (!db) db = await getDatabase();
     return await db.users.createUserForBusiness(userData);
   } catch (error) {
-    console.error("Create user IPC error:", error);
+    logger.error("Create user IPC error:", error);
     return {
       success: false,
       message: "Failed to create user",
@@ -294,7 +398,7 @@ ipcMain.handle("auth:getAllActiveUsers", async (event) => {
       users,
     };
   } catch (error) {
-    console.error("Get all active users IPC error:", error);
+    logger.error("Get all active users IPC error:", error);
     return {
       success: false,
       message: "Failed to get active users",
@@ -320,7 +424,7 @@ ipcMain.handle("auth:getBusinessById", async (event, businessId) => {
       };
     }
   } catch (error) {
-    console.error("Get business IPC error:", error);
+    logger.error("Get business IPC error:", error);
     return {
       success: false,
       message: "Failed to get business details",
@@ -334,7 +438,7 @@ ipcMain.handle("products:create", async (event, productData) => {
     if (!db) db = await getDatabase();
     return await db.products.createProductWithValidation(productData);
   } catch (error: any) {
-    console.error("Create product IPC error:", error);
+    logger.error("Create product IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to create product",
@@ -342,30 +446,36 @@ ipcMain.handle("products:create", async (event, productData) => {
   }
 });
 
-ipcMain.handle("products:getByBusiness", async (event, businessId, includeInactive = false) => {
-  try {
-    if (!db) db = await getDatabase();
-    const products = await db.products.getProductsByBusiness(businessId, includeInactive);
-    return {
-      success: true,
-      message: "Products retrieved successfully",
-      products,
-    };
-  } catch (error: any) {
-    console.error("Get products by business IPC error:", error);
-    return {
-      success: false,
-      message: error.message || "Failed to get products",
-    };
+ipcMain.handle(
+  "products:getByBusiness",
+  async (event, businessId, includeInactive = false) => {
+    try {
+      if (!db) db = await getDatabase();
+      const products = await db.products.getProductsByBusiness(
+        businessId,
+        includeInactive
+      );
+      return {
+        success: true,
+        message: "Products retrieved successfully",
+        products,
+      };
+    } catch (error: any) {
+      logger.error("Get products by business IPC error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get products",
+      };
+    }
   }
-});
+);
 
 ipcMain.handle("products:getById", async (event, id) => {
   try {
     if (!db) db = await getDatabase();
     return await db.products.getProductByIdWithResponse(id);
   } catch (error: any) {
-    console.error("Get product by ID IPC error:", error);
+    logger.error("Get product by ID IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to get product",
@@ -378,7 +488,7 @@ ipcMain.handle("products:update", async (event, id, updates) => {
     if (!db) db = await getDatabase();
     return await db.products.updateProductWithValidation(id, updates);
   } catch (error: any) {
-    console.error("Update product IPC error:", error);
+    logger.error("Update product IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to update product",
@@ -391,7 +501,7 @@ ipcMain.handle("products:delete", async (event, id) => {
     if (!db) db = await getDatabase();
     return await db.products.deleteProductWithResponse(id);
   } catch (error: any) {
-    console.error("Delete product IPC error:", error);
+    logger.error("Delete product IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to delete product",
@@ -415,7 +525,7 @@ ipcMain.handle(
         data: result,
       };
     } catch (error: any) {
-      console.error("Get paginated products IPC error:", error);
+      logger.error("Get paginated products IPC error:", error);
       return {
         success: false,
         message: error.message || "Failed to get products",
@@ -423,6 +533,103 @@ ipcMain.handle(
     }
   }
 );
+
+// Stock adjustment with audit trail
+ipcMain.handle("products:adjustStock", async (event, adjustmentData) => {
+  try {
+    if (!db) db = await getDatabase();
+
+    const { productId, type, quantity, reason, userId, businessId, batchId } =
+      adjustmentData;
+
+    // Validate inputs
+    if (!productId || !type || !quantity || !userId || !businessId) {
+      return {
+        success: false,
+        message: "Missing required fields for stock adjustment",
+      };
+    }
+
+    // Get product to check if batch tracking is required
+    const product = await db.products.getProductById(productId, true);
+
+    if (!product) {
+      return {
+        success: false,
+        message: "Product not found",
+      };
+    }
+
+    // Determine movement type based on adjustment type
+    let movementType:
+      | "INBOUND"
+      | "OUTBOUND"
+      | "ADJUSTMENT"
+      | "TRANSFER"
+      | "WASTE";
+
+    if (type === "add") {
+      movementType = "INBOUND";
+    } else if (type === "remove") {
+      movementType = "OUTBOUND";
+    } else if (type === "waste") {
+      movementType = "WASTE";
+    } else {
+      movementType = "ADJUSTMENT";
+    }
+
+    // If product requires batch tracking and no batch specified, return error
+    if (product.requiresBatchTracking && !batchId) {
+      return {
+        success: false,
+        message:
+          "This product requires batch tracking. Please specify a batch.",
+      };
+    }
+
+    // Create stock movement record for audit trail
+    await db.stockMovements.createStockMovement({
+      productId,
+      batchId: batchId || undefined,
+      movementType,
+      quantity,
+      reason: reason || `Manual ${type} adjustment`,
+      reference: undefined,
+      userId,
+      businessId,
+    });
+
+    // Update product stock level (or batch if batch tracking)
+    if (product.requiresBatchTracking && batchId) {
+      // Update batch quantity
+      await db.batches.updateBatchQuantity(
+        batchId,
+        quantity,
+        type === "add" ? "INBOUND" : "OUTBOUND"
+      );
+    } else {
+      // Update product stock level directly
+      const currentStock = product.stockLevel || 0;
+      const newStock =
+        type === "add" ? currentStock + quantity : currentStock - quantity;
+
+      await db.products.updateProduct(productId, {
+        stockLevel: Math.max(0, newStock),
+      });
+    }
+
+    return {
+      success: true,
+      message: "Stock adjusted successfully",
+    };
+  } catch (error: any) {
+    logger.error("Adjust stock IPC error:", error);
+    return {
+      success: false,
+      message: error.message || "Failed to adjust stock",
+    };
+  }
+});
 
 // Sync product stock from batches
 ipcMain.handle("products:syncStock", async (event, businessId) => {
@@ -468,7 +675,7 @@ ipcMain.handle("products:syncStock", async (event, businessId) => {
       },
     };
   } catch (error: any) {
-    console.error("Sync product stock IPC error:", error);
+    logger.error("Sync product stock IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to sync product stock",
@@ -482,7 +689,7 @@ ipcMain.handle("categories:create", async (event, categoryData) => {
     if (!db) db = await getDatabase();
     return await db.categories.createCategoryWithResponse(categoryData);
   } catch (error: any) {
-    console.error("Create category IPC error:", error);
+    logger.error("Create category IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to create category",
@@ -495,7 +702,7 @@ ipcMain.handle("categories:getByBusiness", async (event, businessId) => {
     if (!db) db = await getDatabase();
     return await db.categories.getCategoriesByBusinessWithResponse(businessId);
   } catch (error: any) {
-    console.error("Get categories by business IPC error:", error);
+    logger.error("Get categories by business IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to get categories",
@@ -508,7 +715,7 @@ ipcMain.handle("categories:getById", async (event, id) => {
     if (!db) db = await getDatabase();
     return await db.categories.getCategoryByIdWithResponse(id);
   } catch (error: any) {
-    console.error("Get category by ID IPC error:", error);
+    logger.error("Get category by ID IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to get category",
@@ -521,7 +728,7 @@ ipcMain.handle("categories:update", async (event, id, updates) => {
     if (!db) db = await getDatabase();
     return await db.categories.updateCategoryWithResponse(id, updates);
   } catch (error: any) {
-    console.error("Update category IPC error:", error);
+    logger.error("Update category IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to update category",
@@ -534,7 +741,7 @@ ipcMain.handle("categories:delete", async (event, id) => {
     if (!db) db = await getDatabase();
     return await db.categories.deleteCategoryWithResponse(id);
   } catch (error: any) {
-    console.error("Delete category IPC error:", error);
+    logger.error("Delete category IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to delete category",
@@ -550,7 +757,7 @@ ipcMain.handle("categories:reorder", async (event, businessId, categoryIds) => {
       categoryIds
     );
   } catch (error: any) {
-    console.error("Reorder categories IPC error:", error);
+    logger.error("Reorder categories IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to reorder categories",
@@ -567,7 +774,7 @@ ipcMain.handle("modifiers:create", async (event, modifierData) => {
       message: "Modifier creation not yet implemented in new architecture",
     };
   } catch (error: any) {
-    console.error("Create modifier IPC error:", error);
+    logger.error("Create modifier IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to create modifier",
@@ -578,14 +785,14 @@ ipcMain.handle("modifiers:create", async (event, modifierData) => {
 ipcMain.handle("stock:adjust", async (event, adjustmentData) => {
   try {
     if (!db) db = await getDatabase();
-    const adjustment = db.inventory.createStockAdjustment(adjustmentData);
+    const adjustment = await db.inventory.createStockAdjustment(adjustmentData);
     return {
       success: true,
       message: "Stock adjustment created successfully",
       adjustment,
     };
   } catch (error: any) {
-    console.error("Stock adjustment IPC error:", error);
+    logger.error("Stock adjustment IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to adjust stock",
@@ -603,7 +810,7 @@ ipcMain.handle("stock:getAdjustments", async (event, productId) => {
       adjustments,
     };
   } catch (error: any) {
-    console.error("Get stock adjustments IPC error:", error);
+    logger.error("Get stock adjustments IPC error:", error);
     return {
       success: false,
       message: error.message || "Failed to get stock adjustments",
@@ -628,7 +835,7 @@ ipcMain.handle("schedules:create", async (event, scheduleData) => {
       data: serializedSchedule,
     };
   } catch (error) {
-    console.error("Create schedule IPC error:", error);
+    logger.error("Create schedule IPC error:", error);
     return {
       success: false,
       message: "Failed to create schedule",
@@ -649,7 +856,7 @@ ipcMain.handle("schedules:getByBusiness", async (event, businessId) => {
       data: serializedSchedules,
     };
   } catch (error) {
-    console.error("Get schedules IPC error:", error);
+    logger.error("Get schedules IPC error:", error);
     return {
       success: false,
       message: "Failed to get schedules",
@@ -670,7 +877,7 @@ ipcMain.handle("schedules:getByStaff", async (event, staffId) => {
       data: serializedSchedules,
     };
   } catch (error) {
-    console.error("Get staff schedules IPC error:", error);
+    logger.error("Get staff schedules IPC error:", error);
     return {
       success: false,
       message: "Failed to get staff schedules",
@@ -693,7 +900,7 @@ ipcMain.handle("schedules:update", async (event, id, updates) => {
       data: serializedSchedule,
     };
   } catch (error) {
-    console.error("Update schedule IPC error:", error);
+    logger.error("Update schedule IPC error:", error);
     return {
       success: false,
       message:
@@ -713,7 +920,7 @@ ipcMain.handle("schedules:delete", async (event, id) => {
       message: "Schedule deleted successfully",
     };
   } catch (error) {
-    console.error("Delete schedule IPC error:", error);
+    logger.error("Delete schedule IPC error:", error);
     return {
       success: false,
       message:
@@ -731,7 +938,7 @@ ipcMain.handle("schedules:updateStatus", async (event, id, status) => {
       message: "Schedule status updated successfully",
     };
   } catch (error) {
-    console.error("Update schedule status IPC error:", error);
+    logger.error("Update schedule status IPC error:", error);
     return {
       success: false,
       message: "Failed to update schedule status",
@@ -743,9 +950,10 @@ ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
   try {
     if (!db) db = await getDatabase();
     const users = db.users.getUsersByBusiness(businessId);
-    // Filter for cashier and manager roles only
+    // Filter for users who require shifts (cashier, manager, supervisor)
+    // Get users with shiftRequired = true or null (auto-detect)
     const staffUsers = users.filter(
-      (user) => user.role === "cashier" || user.role === "manager"
+      (user) => user.shiftRequired === true || user.shiftRequired === null
     );
 
     // Convert to plain objects to ensure serialization works
@@ -756,7 +964,7 @@ ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
       data: serializedUsers,
     };
   } catch (error) {
-    console.error("Get cashier users IPC error:", error);
+    logger.error("Get cashier users IPC error:", error);
     return {
       success: false,
       message: "Failed to get cashier users",
@@ -810,7 +1018,7 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
             // Validate cashierId before clock-out
             const cashierId = closedPosShifts[0]?.cashierId;
             if (!cashierId) {
-              console.error(
+              logger.error(
                 `Cannot clock out TimeShift ${timeShiftId}: closed shifts have no cashierId`
               );
             } else {
@@ -837,11 +1045,11 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
                   clockOutEvent.id
                 );
 
-                console.log(
+                logger.info(
                   `Auto clocked out TimeShift ${timeShiftId} after all POS shifts were auto-closed`
                 );
               } catch (error) {
-                console.error(
+                logger.error(
                   `Failed to clock out TimeShift ${timeShiftId} after auto-closing shifts:`,
                   error
                 );
@@ -930,7 +1138,7 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
         notes: shiftData.notes ?? null,
       } as any);
     } catch (error) {
-      console.error("Failed to create shift:", error);
+      logger.error("Failed to create shift:", error);
       return {
         success: false,
         message:
@@ -945,7 +1153,7 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
       try {
         db.schedules.updateScheduleStatus(shiftData.scheduleId, "active");
       } catch (error) {
-        console.warn("Could not update schedule status:", error);
+        logger.warn("Could not update schedule status:", error);
         // Don't fail shift creation if schedule update fails
       }
     }
@@ -959,7 +1167,7 @@ ipcMain.handle("shift:start", async (event, shiftData) => {
       data: serializedShift,
     };
   } catch (error) {
-    console.error("Start shift IPC error:", error);
+    logger.error("Start shift IPC error:", error);
     return {
       success: false,
       message: "Failed to start shift",
@@ -1001,7 +1209,7 @@ ipcMain.handle("shift:end", async (event, shiftId, endData) => {
         if (timeShift && timeShift.status === "active") {
           // Validate cashierId before clock-out
           if (!shift.cashierId) {
-            console.error(
+            logger.error(
               `Cannot clock out TimeShift ${timeShiftId}: shift ${shiftId} has no cashierId`
             );
           } else {
@@ -1027,12 +1235,12 @@ ipcMain.handle("shift:end", async (event, shiftId, endData) => {
                 clockOutEvent.id
               );
 
-              console.log(
+              logger.info(
                 `Auto clocked out TimeShift ${timeShiftId} after last POS shift ended`
               );
             } catch (error) {
               // Log error but don't fail shift end
-              console.error(
+              logger.error(
                 "Failed to auto clock-out TimeShift after shift end:",
                 error
               );
@@ -1049,7 +1257,7 @@ ipcMain.handle("shift:end", async (event, shiftId, endData) => {
       message: "Shift ended successfully",
     };
   } catch (error) {
-    console.error("End shift IPC error:", error);
+    logger.error("End shift IPC error:", error);
     return {
       success: false,
       message: "Failed to end shift",
@@ -1084,7 +1292,7 @@ ipcMain.handle("shift:getActive", async (event, cashierId) => {
       data: serializedShift,
     };
   } catch (error) {
-    console.error("Get active shift IPC error:", error);
+    logger.error("Get active shift IPC error:", error);
     return {
       success: false,
       message: "Failed to get active shift",
@@ -1153,7 +1361,7 @@ ipcMain.handle("shift:getTodaySchedule", async (event, cashierId) => {
       data: mostRecent,
     };
   } catch (error) {
-    console.error("Get today's schedule IPC error:", error);
+    logger.error("Get today's schedule IPC error:", error);
     return {
       success: false,
       message: "Failed to get today's schedule",
@@ -1186,7 +1394,7 @@ ipcMain.handle("shift:getStats", async (event, shiftId) => {
       data: stats,
     };
   } catch (error) {
-    console.error("Get shift stats IPC error:", error);
+    logger.error("Get shift stats IPC error:", error);
     return {
       success: false,
       message: "Failed to get shift stats",
@@ -1205,7 +1413,7 @@ ipcMain.handle("shift:getHourlyStats", async (event, shiftId) => {
       data: hourlyStats,
     };
   } catch (error) {
-    console.error("Get hourly stats IPC error:", error);
+    logger.error("Get hourly stats IPC error:", error);
     return {
       success: false,
       message: "Failed to get hourly stats",
@@ -1224,7 +1432,7 @@ ipcMain.handle("shift:getCashDrawerBalance", async (event, shiftId) => {
       data: cashBalance,
     };
   } catch (error) {
-    console.error("Get cash drawer balance IPC error:", error);
+    logger.error("Get cash drawer balance IPC error:", error);
     return {
       success: false,
       message: "Failed to get cash drawer balance",
@@ -1233,28 +1441,100 @@ ipcMain.handle("shift:getCashDrawerBalance", async (event, shiftId) => {
 });
 
 // Transaction API endpoints
-ipcMain.handle("transactions:create", async (event, transactionData) => {
-  try {
-    const db = await getDatabase();
-    const transaction = await db.transactions.createTransaction(
-      transactionData
-    );
+ipcMain.handle(
+  "transactions:create",
+  async (event, sessionToken, transactionData) => {
+    try {
+      const db = await getDatabase();
 
-    // Convert to plain object to ensure serialization works
-    const serializedTransaction = JSON.parse(JSON.stringify(transaction));
+      // Validate session and check SALES_WRITE permission
+      const auth = await validateSessionAndPermission(
+        db,
+        sessionToken,
+        PERMISSIONS.SALES_WRITE
+      );
 
-    return {
-      success: true,
-      transaction: serializedTransaction,
-    };
-  } catch (error) {
-    console.error("Create transaction IPC error:", error);
-    return {
-      success: false,
-      message: "Failed to create transaction",
-    };
+      if (!auth.success) {
+        return { success: false, message: auth.message, code: auth.code };
+      }
+
+      const user = auth.user!;
+
+      // Check if shift is required for this user role
+      const shiftRequired = db.transactions.isShiftRequired(user);
+
+      if (shiftRequired) {
+        // Cashiers/supervisors must have a shift
+        if (!transactionData.shiftId) {
+          return {
+            success: false,
+            message: "Shift is required for your role to create transactions",
+            code: "SHIFT_REQUIRED",
+          };
+        }
+
+        // Validate shift ownership - cashiers can only use their own shifts
+        if (
+          !db.shifts.validateShiftOwnership(transactionData.shiftId, user.id)
+        ) {
+          return {
+            success: false,
+            message: "You can only create transactions on your own shift",
+            code: "SHIFT_OWNERSHIP_VIOLATION",
+          };
+        }
+
+        // Validate shift is active
+        const shift = db.shifts.getShiftById(transactionData.shiftId);
+        if (shift.status !== "active") {
+          return {
+            success: false,
+            message: "Cannot create transaction on inactive shift",
+            code: "SHIFT_INACTIVE",
+          };
+        }
+      } else {
+        // Admin/Manager/Owner - shift is optional but if provided, must be valid
+        if (transactionData.shiftId) {
+          const shift = db.shifts.getShiftById(transactionData.shiftId);
+          if (shift.status !== "active") {
+            return {
+              success: false,
+              message: "Cannot create transaction on inactive shift",
+              code: "SHIFT_INACTIVE",
+            };
+          }
+        }
+      }
+
+      const transaction = await db.transactions.createTransaction(
+        transactionData
+      );
+
+      // Audit log the transaction creation
+      await logAction(db, user, "create", "transaction", transaction.id, {
+        shiftId: transactionData.shiftId || "none",
+        shiftRequired,
+        total: transactionData.total,
+        paymentMethod: transactionData.paymentMethod,
+      });
+
+      // Convert to plain object to ensure serialization works
+      const serializedTransaction = JSON.parse(JSON.stringify(transaction));
+
+      return {
+        success: true,
+        transaction: serializedTransaction,
+      };
+    } catch (error) {
+      logger.error("Create transaction IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to create transaction",
+      };
+    }
   }
-});
+);
 
 ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
   try {
@@ -1269,7 +1549,7 @@ ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
       data: serializedTransactions,
     };
   } catch (error) {
-    console.error("Get transactions by shift IPC error:", error);
+    logger.error("Get transactions by shift IPC error:", error);
     return {
       success: false,
       message: "Failed to get transactions",
@@ -1277,412 +1557,481 @@ ipcMain.handle("transactions:getByShift", async (event, shiftId) => {
   }
 });
 
-ipcMain.handle("transactions:createFromCart", async (event, data) => {
-  try {
-    console.log("Creating transaction from cart:", {
-      cartSessionId: data.cartSessionId,
-      shiftId: data.shiftId,
-      businessId: data.businessId,
-      paymentMethod: data.paymentMethod,
-    });
-
-    const db = await getDatabase();
-
-    // Get cart session
-    const cartSession = await db.cart.getSessionById(data.cartSessionId);
-    if (!cartSession) {
-      console.error("Cart session not found:", data.cartSessionId);
-      return {
-        success: false,
-        message: "Cart session not found",
-      };
-    }
-
-    // Get all cart items
-    const cartItems = await db.cart.getItemsBySession(data.cartSessionId);
-    if (!cartItems || cartItems.length === 0) {
-      console.error("Cart is empty:", data.cartSessionId);
-      return {
-        success: false,
-        message: "Cart is empty",
-      };
-    }
-
-    console.log(`Processing ${cartItems.length} cart items`);
-
-    // Validate that all items have either productId or categoryId
-    const invalidItems = cartItems.filter(
-      (item) => !item.productId && !item.categoryId
-    );
-    if (invalidItems.length > 0) {
-      console.error(
-        `Found ${invalidItems.length} cart items without productId or categoryId`
-      );
-      return {
-        success: false,
-        message:
-          "Some cart items are invalid. Each item must have either a product ID or category ID.",
-      };
-    }
-
-    // Calculate totals from all cart items
-    const subtotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
-    const tax = cartItems.reduce((sum, item) => sum + item.taxAmount, 0);
-    const total = subtotal + tax;
-
-    console.log("Calculated totals:", { subtotal, tax, total });
-
-    // ============================================================
-    // BATCH-AWARE CHECKOUT: FEFO Batch Selection and Deduction
-    // ============================================================
-    // For products with requiresBatchTracking = true, we:
-    // 1. Select batches using FEFO (First-Expiry-First-Out)
-    // 2. Deduct quantities from selected batches
-    // 3. Assign batch info to transaction items
-    // ============================================================
-
-    // Map to track batch selections for each cart item
-    interface BatchSelection {
-      batchId: string;
-      batchNumber: string;
-      expiryDate: number;
-      quantity: number;
-    }
-    const batchSelectionsMap = new Map<string, BatchSelection[]>();
-
-    // Pre-process: Select batches for products that require batch tracking
-    for (const item of cartItems) {
-      if (!item.productId) continue; // Skip category items
-
-      try {
-        const product = await db.products.getProductById(item.productId);
-
-        // Check if product requires batch tracking
-        if (product.requiresBatchTracking) {
-          // Calculate quantity needed
-          let quantityNeeded: number;
-          if (item.itemType === "WEIGHT" && item.weight) {
-            quantityNeeded = item.weight;
-          } else {
-            quantityNeeded = item.quantity || 1;
-          }
-
-          // If cart item already has batch info (pre-selected), use it
-          if (item.batchId && item.batchNumber) {
-            console.log(
-              `📦 Cart item already has batch info: ${item.batchNumber}`
-            );
-            batchSelectionsMap.set(item.id, [
-              {
-                batchId: item.batchId,
-                batchNumber: item.batchNumber,
-                expiryDate:
-                  typeof item.expiryDate === "number"
-                    ? item.expiryDate
-                    : item.expiryDate instanceof Date
-                    ? item.expiryDate.getTime()
-                    : new Date(item.expiryDate || Date.now()).getTime(),
-                quantity: quantityNeeded,
-              },
-            ]);
-          } else {
-            // Auto-select batches using FEFO
-            const rotationMethod =
-              (product.stockRotationMethod as "FIFO" | "FEFO" | "NONE") ||
-              "FEFO";
-
-            console.log(
-              `📦 Auto-selecting batches for ${product.name} using ${rotationMethod}`
-            );
-
-            try {
-              const selectedBatches = await db.batches.selectBatchesForSale(
-                item.productId,
-                quantityNeeded,
-                rotationMethod
-              );
-
-              if (selectedBatches.length > 0) {
-                const batchSelections: BatchSelection[] = selectedBatches.map(
-                  (batch) => ({
-                    batchId: batch.batchId,
-                    batchNumber: batch.batchNumber,
-                    expiryDate: batch.expiryDate.getTime(),
-                    quantity: batch.quantity,
-                  })
-                );
-                batchSelectionsMap.set(item.id, batchSelections);
-
-                console.log(
-                  `✅ Selected ${selectedBatches.length} batch(es) for ${product.name}:`,
-                  selectedBatches.map(
-                    (b) => `${b.batchNumber} (qty: ${b.quantity})`
-                  )
-                );
-              }
-            } catch (batchError) {
-              console.warn(
-                `⚠️ Could not auto-select batches for ${product.name}:`,
-                batchError instanceof Error
-                  ? batchError.message
-                  : "Unknown error"
-              );
-              // Continue without batch tracking for this item
-              // The sale will still go through, but without batch deduction
-            }
-          }
-        }
-      } catch (productError) {
-        console.warn(
-          `Could not get product ${item.productId} for batch processing:`,
-          productError
-        );
-        // Continue with next item
-      }
-    }
-
-    // Create transaction items from cart items (with batch info from selections)
-    const transactionItems = cartItems.map((item) => {
-      // Get batch selection for this item (use first batch if multiple)
-      const batchSelections = batchSelectionsMap.get(item.id);
-      const primaryBatch = batchSelections?.[0];
-
-      // Convert expiryDate to timestamp in milliseconds
-      let expiryDateTimestamp: number | null = null;
-
-      // Use batch expiry date if available, otherwise use cart item's expiry date
-      if (primaryBatch?.expiryDate) {
-        expiryDateTimestamp = primaryBatch.expiryDate;
-      } else if (item.expiryDate) {
-        try {
-          if (item.expiryDate instanceof Date) {
-            expiryDateTimestamp = item.expiryDate.getTime();
-          } else if (typeof item.expiryDate === "string") {
-            expiryDateTimestamp = new Date(item.expiryDate).getTime();
-            if (isNaN(expiryDateTimestamp)) {
-              console.warn(`Invalid expiryDate string: ${item.expiryDate}`);
-              expiryDateTimestamp = null;
-            }
-          } else if (typeof item.expiryDate === "number") {
-            expiryDateTimestamp = item.expiryDate;
-          }
-        } catch (e) {
-          console.warn(`Error parsing expiryDate for item ${item.id}:`, e);
-        }
-      }
-
-      return {
-        productId: item.productId || null,
-        categoryId: item.categoryId || null,
-        productName: item.itemName || "Unknown Item",
-        quantity: item.itemType === "UNIT" ? item.quantity || 1 : 1,
-        weight: item.itemType === "WEIGHT" ? item.weight || null : null,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        taxAmount: item.taxAmount,
-        unitOfMeasure: item.unitOfMeasure || null,
-        // Use batch info from FEFO selection or cart item
-        batchId: primaryBatch?.batchId || item.batchId || null,
-        batchNumber: primaryBatch?.batchNumber || item.batchNumber || null,
-        expiryDate: expiryDateTimestamp,
-        ageRestrictionLevel: item.ageRestrictionLevel || "NONE",
-        ageVerified: item.ageVerified || false,
-        // Store cart item ID for reference
-        cartItemId: item.id,
-      } as any;
-    });
-
-    console.log(`Creating transaction with ${transactionItems.length} items`);
-
-    // Create transaction using createTransactionWithItems
-    const transaction = await db.transactions.createTransactionWithItems({
-      shiftId: data.shiftId,
-      businessId: data.businessId,
-      type: "sale",
-      subtotal,
-      tax,
-      total,
-      paymentMethod: data.paymentMethod,
-      cashAmount: data.cashAmount || null,
-      cardAmount: data.cardAmount || null,
-      status: "completed",
-      receiptNumber: data.receiptNumber,
-      timestamp: new Date().toISOString(),
-      voidReason: null,
-      customerId: null,
-      originalTransactionId: null,
-      refundReason: null,
-      refundMethod: null,
-      managerApprovalId: null,
-      isPartialRefund: false,
-      discountAmount: 0,
-      appliedDiscounts: null,
-      items: transactionItems,
-    } as any);
-
-    console.log("Transaction created successfully:", transaction.id);
-
-    // ============================================================
-    // BATCH-AWARE INVENTORY UPDATE
-    // ============================================================
-    // For products with batch tracking: deduct from batches (FEFO)
-    // For products without batch tracking: use standard stock adjustment
-    // ============================================================
-
+ipcMain.handle(
+  "transactions:createFromCart",
+  async (event, sessionToken, data) => {
     try {
-      const cashierId = cartSession.cashierId;
+      logger.info("Creating transaction from cart:", {
+        cartSessionId: data.cartSessionId,
+        shiftId: data.shiftId,
+        businessId: data.businessId,
+        paymentMethod: data.paymentMethod,
+      });
 
-      for (const item of transaction.items) {
-        // Only update inventory for products (not category items)
-        if (!item.productId) {
-          continue;
+      const db = await getDatabase();
+
+      // Validate session and check SALES_WRITE permission
+      const auth = await validateSessionAndPermission(
+        db,
+        sessionToken,
+        PERMISSIONS.SALES_WRITE
+      );
+
+      if (!auth.success) {
+        return { success: false, message: auth.message, code: auth.code };
+      }
+
+      const user = auth.user!;
+
+      // Check if shift is required for this user role
+      const shiftRequired = db.transactions.isShiftRequired(user);
+
+      if (shiftRequired) {
+        // Cashiers/supervisors must have a shift
+        if (!data.shiftId) {
+          return {
+            success: false,
+            message: "Shift is required for your role to create transactions",
+            code: "SHIFT_REQUIRED",
+          };
         }
 
-        // Get product to check if inventory/batch tracking is enabled
+        // Validate shift ownership - cashiers can only use their own shifts
+        if (!db.shifts.validateShiftOwnership(data.shiftId, user.id)) {
+          return {
+            success: false,
+            message: "You can only create transactions on your own shift",
+            code: "SHIFT_OWNERSHIP_VIOLATION",
+          };
+        }
+
+        // Validate shift is active
+        const shift = db.shifts.getShiftById(data.shiftId);
+        if (shift.status !== "active") {
+          return {
+            success: false,
+            message: "Cannot create transaction on inactive shift",
+            code: "SHIFT_INACTIVE",
+          };
+        }
+      } else {
+        // Admin/Manager/Owner - shift is optional but if provided, must be valid
+        if (data.shiftId) {
+          try {
+            const shift = db.shifts.getShiftById(data.shiftId);
+            if (shift.status !== "active") {
+              return {
+                success: false,
+                message: "Cannot create transaction on inactive shift",
+                code: "SHIFT_INACTIVE",
+              };
+            }
+          } catch (error) {
+            // Shift doesn't exist - for admin/manager this is OK, they can operate without shift
+            logger.info("Admin/Manager creating transaction without shift");
+          }
+        }
+      }
+
+      // Get cart session
+      const cartSession = await db.cart.getSessionById(data.cartSessionId);
+      if (!cartSession) {
+        logger.error("Cart session not found:", data.cartSessionId);
+        return {
+          success: false,
+          message: "Cart session not found",
+        };
+      }
+
+      // Get all cart items
+      const cartItems = await db.cart.getItemsBySession(data.cartSessionId);
+      if (!cartItems || cartItems.length === 0) {
+        logger.error("Cart is empty:", data.cartSessionId);
+        return {
+          success: false,
+          message: "Cart is empty",
+        };
+      }
+
+      logger.info(`Processing ${cartItems.length} cart items`);
+
+      // Validate that all items have either productId or categoryId
+      const invalidItems = cartItems.filter(
+        (item) => !item.productId && !item.categoryId
+      );
+      if (invalidItems.length > 0) {
+        logger.error(
+          `Found ${invalidItems.length} cart items without productId or categoryId`
+        );
+        return {
+          success: false,
+          message:
+            "Some cart items are invalid. Each item must have either a product ID or category ID.",
+        };
+      }
+
+      // Calculate totals from all cart items
+      const subtotal = cartItems.reduce(
+        (sum, item) => sum + item.totalPrice,
+        0
+      );
+      const tax = cartItems.reduce((sum, item) => sum + item.taxAmount, 0);
+      const total = subtotal + tax;
+
+      logger.info("Calculated totals:", { subtotal, tax, total });
+
+      // ============================================================
+      // BATCH-AWARE CHECKOUT: FEFO Batch Selection and Deduction
+      // ============================================================
+      // For products with requiresBatchTracking = true, we:
+      // 1. Select batches using FEFO (First-Expiry-First-Out)
+      // 2. Deduct quantities from selected batches
+      // 3. Assign batch info to transaction items
+      // ============================================================
+
+      // Map to track batch selections for each cart item
+      interface BatchSelection {
+        batchId: string;
+        batchNumber: string;
+        expiryDate: number;
+        quantity: number;
+      }
+      const batchSelectionsMap = new Map<string, BatchSelection[]>();
+
+      // Pre-process: Select batches for products that require batch tracking
+      for (const item of cartItems) {
+        if (!item.productId) continue; // Skip category items
+
         try {
           const product = await db.products.getProductById(item.productId);
 
-          if (!product.trackInventory) {
-            console.log(
-              `Skipping inventory update for product ${item.productId} - tracking disabled`
-            );
+          // Check if product requires batch tracking
+          if (product.requiresBatchTracking) {
+            // Calculate quantity needed
+            let quantityNeeded: number;
+            if (item.itemType === "WEIGHT" && item.weight) {
+              quantityNeeded = item.weight;
+            } else {
+              quantityNeeded = item.quantity || 1;
+            }
+
+            // If cart item already has batch info (pre-selected), use it
+            if (item.batchId && item.batchNumber) {
+              logger.info(
+                `📦 Cart item already has batch info: ${item.batchNumber}`
+              );
+              batchSelectionsMap.set(item.id, [
+                {
+                  batchId: item.batchId,
+                  batchNumber: item.batchNumber,
+                  expiryDate:
+                    typeof item.expiryDate === "number"
+                      ? item.expiryDate
+                      : item.expiryDate instanceof Date
+                      ? item.expiryDate.getTime()
+                      : new Date(item.expiryDate || Date.now()).getTime(),
+                  quantity: quantityNeeded,
+                },
+              ]);
+            } else {
+              // Auto-select batches using FEFO
+              const rotationMethod =
+                (product.stockRotationMethod as "FIFO" | "FEFO" | "NONE") ||
+                "FEFO";
+
+              logger.info(
+                `📦 Auto-selecting batches for ${product.name} using ${rotationMethod}`
+              );
+
+              try {
+                const selectedBatches = await db.batches.selectBatchesForSale(
+                  item.productId,
+                  quantityNeeded,
+                  rotationMethod
+                );
+
+                if (selectedBatches.length > 0) {
+                  const batchSelections: BatchSelection[] = selectedBatches.map(
+                    (batch) => ({
+                      batchId: batch.batchId,
+                      batchNumber: batch.batchNumber,
+                      expiryDate: batch.expiryDate.getTime(),
+                      quantity: batch.quantity,
+                    })
+                  );
+                  batchSelectionsMap.set(item.id, batchSelections);
+
+                  logger.info(
+                    `✅ Selected ${selectedBatches.length} batch(es) for ${product.name}:`,
+                    selectedBatches.map(
+                      (b) => `${b.batchNumber} (qty: ${b.quantity})`
+                    )
+                  );
+                }
+              } catch (batchError) {
+                logger.warn(
+                  `⚠️ Could not auto-select batches for ${product.name}:`,
+                  batchError instanceof Error
+                    ? batchError.message
+                    : "Unknown error"
+                );
+                // Continue without batch tracking for this item
+                // The sale will still go through, but without batch deduction
+              }
+            }
+          }
+        } catch (productError) {
+          logger.warn(
+            `Could not get product ${item.productId} for batch processing:`,
+            productError
+          );
+          // Continue with next item
+        }
+      }
+
+      // Create transaction items from cart items (with batch info from selections)
+      const transactionItems = cartItems.map((item) => {
+        // Get batch selection for this item (use first batch if multiple)
+        const batchSelections = batchSelectionsMap.get(item.id);
+        const primaryBatch = batchSelections?.[0];
+
+        // Convert expiryDate to timestamp in milliseconds
+        let expiryDateTimestamp: number | null = null;
+
+        // Use batch expiry date if available, otherwise use cart item's expiry date
+        if (primaryBatch?.expiryDate) {
+          expiryDateTimestamp = primaryBatch.expiryDate;
+        } else if (item.expiryDate) {
+          try {
+            if (item.expiryDate instanceof Date) {
+              expiryDateTimestamp = item.expiryDate.getTime();
+            } else if (typeof item.expiryDate === "string") {
+              expiryDateTimestamp = new Date(item.expiryDate).getTime();
+              if (isNaN(expiryDateTimestamp)) {
+                logger.warn(`Invalid expiryDate string: ${item.expiryDate}`);
+                expiryDateTimestamp = null;
+              }
+            } else if (typeof item.expiryDate === "number") {
+              expiryDateTimestamp = item.expiryDate;
+            }
+          } catch (e) {
+            logger.warn(`Error parsing expiryDate for item ${item.id}:`, e);
+          }
+        }
+
+        return {
+          productId: item.productId || null,
+          categoryId: item.categoryId || null,
+          productName: item.itemName || "Unknown Item",
+          quantity: item.itemType === "UNIT" ? item.quantity || 1 : 1,
+          weight: item.itemType === "WEIGHT" ? item.weight || null : null,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          taxAmount: item.taxAmount,
+          unitOfMeasure: item.unitOfMeasure || null,
+          // Use batch info from FEFO selection or cart item
+          batchId: primaryBatch?.batchId || item.batchId || null,
+          batchNumber: primaryBatch?.batchNumber || item.batchNumber || null,
+          expiryDate: expiryDateTimestamp,
+          ageRestrictionLevel: item.ageRestrictionLevel || "NONE",
+          ageVerified: item.ageVerified || false,
+          // Store cart item ID for reference
+          cartItemId: item.id,
+        } as any;
+      });
+
+      logger.info(`Creating transaction with ${transactionItems.length} items`);
+
+      // Create transaction using createTransactionWithItems
+      const transaction = await db.transactions.createTransactionWithItems({
+        shiftId: data.shiftId,
+        businessId: data.businessId,
+        type: "sale",
+        subtotal,
+        tax,
+        total,
+        paymentMethod: data.paymentMethod,
+        cashAmount: data.cashAmount || null,
+        cardAmount: data.cardAmount || null,
+        status: "completed",
+        receiptNumber: data.receiptNumber,
+        timestamp: new Date().toISOString(),
+        voidReason: null,
+        customerId: null,
+        originalTransactionId: null,
+        refundReason: null,
+        refundMethod: null,
+        managerApprovalId: null,
+        isPartialRefund: false,
+        discountAmount: 0,
+        appliedDiscounts: null,
+        items: transactionItems,
+      } as any);
+
+      logger.info("Transaction created successfully:", transaction.id);
+
+      // ============================================================
+      // BATCH-AWARE INVENTORY UPDATE
+      // ============================================================
+      // For products with batch tracking: deduct from batches (FEFO)
+      // For products without batch tracking: use standard stock adjustment
+      // ============================================================
+
+      try {
+        const cashierId = cartSession.cashierId;
+
+        for (const item of transaction.items) {
+          // Only update inventory for products (not category items)
+          if (!item.productId) {
             continue;
           }
 
-          // Calculate quantity to decrement
-          let quantityToDecrement: number;
-          if (item.itemType === "WEIGHT" && item.weight) {
-            quantityToDecrement = item.weight;
-          } else {
-            quantityToDecrement = item.quantity || 1;
-          }
+          // Get product to check if inventory/batch tracking is enabled
+          try {
+            const product = await db.products.getProductById(item.productId);
 
-          // ============================================================
-          // BATCH DEDUCTION (FEFO/FIFO)
-          // ============================================================
-          if (product.requiresBatchTracking) {
-            // Get batch selections for this item
-            const batchSelections = batchSelectionsMap.get(
-              (item as any).cartItemId
-            );
+            if (!product.trackInventory) {
+              logger.info(
+                `Skipping inventory update for product ${item.productId} - tracking disabled`
+              );
+              continue;
+            }
 
-            if (batchSelections && batchSelections.length > 0) {
-              console.log(
-                `📦 Deducting from ${batchSelections.length} batch(es) for ${product.name}`
+            // Calculate quantity to decrement
+            let quantityToDecrement: number;
+            if (item.itemType === "WEIGHT" && item.weight) {
+              quantityToDecrement = item.weight;
+            } else {
+              quantityToDecrement = item.quantity || 1;
+            }
+
+            // ============================================================
+            // BATCH DEDUCTION (FEFO/FIFO)
+            // ============================================================
+            if (product.requiresBatchTracking) {
+              // Get batch selections for this item
+              const batchSelections = batchSelectionsMap.get(
+                (item as any).cartItemId
               );
 
-              for (const batchSelection of batchSelections) {
-                try {
-                  // Deduct quantity from batch
-                  await db.batches.updateBatchQuantity(
-                    batchSelection.batchId,
-                    batchSelection.quantity,
-                    "OUTBOUND"
-                  );
+              if (batchSelections && batchSelections.length > 0) {
+                logger.info(
+                  `📦 Deducting from ${batchSelections.length} batch(es) for ${product.name}`
+                );
 
-                  // Create stock movement record for audit trail
-                  await db.stockMovements.createStockMovement({
-                    productId: item.productId,
-                    batchId: batchSelection.batchId,
-                    movementType: "OUTBOUND",
-                    quantity: batchSelection.quantity,
-                    reason: `Sale - Transaction ${transaction.id}`,
-                    reference: transaction.id,
-                    userId: cashierId,
-                    businessId: data.businessId,
-                  });
+                for (const batchSelection of batchSelections) {
+                  try {
+                    // Deduct quantity from batch
+                    await db.batches.updateBatchQuantity(
+                      batchSelection.batchId,
+                      batchSelection.quantity,
+                      "OUTBOUND"
+                    );
 
-                  console.log(
-                    `✅ Deducted ${batchSelection.quantity} from batch ${batchSelection.batchNumber}`
-                  );
-                } catch (batchDeductError) {
-                  console.error(
-                    `Failed to deduct from batch ${batchSelection.batchNumber}:`,
-                    batchDeductError
-                  );
-                  // Continue with other batches - don't fail the transaction
+                    // Create stock movement record for audit trail
+                    await db.stockMovements.createStockMovement({
+                      productId: item.productId,
+                      batchId: batchSelection.batchId,
+                      movementType: "OUTBOUND",
+                      quantity: batchSelection.quantity,
+                      reason: `Sale - Transaction ${transaction.id}`,
+                      reference: transaction.id,
+                      userId: cashierId,
+                      businessId: data.businessId,
+                    });
+
+                    logger.info(
+                      `✅ Deducted ${batchSelection.quantity} from batch ${batchSelection.batchNumber}`
+                    );
+                  } catch (batchDeductError) {
+                    logger.error(
+                      `Failed to deduct from batch ${batchSelection.batchNumber}:`,
+                      batchDeductError
+                    );
+                    // Continue with other batches - don't fail the transaction
+                  }
                 }
-              }
 
-              // Skip standard stock adjustment - batch deduction handles it
-              continue;
-            } else {
-              console.warn(
-                `⚠️ Product ${product.name} requires batch tracking but no batches were selected. Using standard stock adjustment.`
+                // Skip standard stock adjustment - batch deduction handles it
+                continue;
+              } else {
+                logger.warn(
+                  `⚠️ Product ${product.name} requires batch tracking but no batches were selected. Using standard stock adjustment.`
+                );
+              }
+            }
+
+            // ============================================================
+            // STANDARD STOCK ADJUSTMENT (non-batch tracked products)
+            // ============================================================
+            const currentStock = product.stockLevel ?? 0;
+            if (currentStock < quantityToDecrement) {
+              logger.warn(
+                `⚠️ Insufficient stock for product ${item.productId}. Current: ${currentStock}, Required: ${quantityToDecrement}`
               );
             }
-          }
 
-          // ============================================================
-          // STANDARD STOCK ADJUSTMENT (non-batch tracked products)
-          // ============================================================
-          const currentStock = product.stockLevel ?? 0;
-          if (currentStock < quantityToDecrement) {
-            console.warn(
-              `⚠️ Insufficient stock for product ${item.productId}. Current: ${currentStock}, Required: ${quantityToDecrement}`
+            // Create stock adjustment to record the sale
+            try {
+              db.inventory.createStockAdjustment({
+                productId: item.productId,
+                type: "sale",
+                quantity: quantityToDecrement,
+                reason: `Sale - Transaction ${transaction.id}`,
+                note: null,
+                userId: cashierId,
+                businessId: data.businessId,
+              });
+              logger.info(
+                `✅ Updated inventory for product ${item.productId}: -${quantityToDecrement}`
+              );
+            } catch (inventoryError) {
+              logger.error(
+                `Failed to update inventory for product ${item.productId}:`,
+                inventoryError
+              );
+            }
+          } catch (productError) {
+            logger.error(
+              `Failed to get product ${item.productId} for inventory update:`,
+              productError
             );
           }
-
-          // Create stock adjustment to record the sale
-          try {
-            db.inventory.createStockAdjustment({
-              productId: item.productId,
-              type: "sale",
-              quantity: quantityToDecrement,
-              reason: `Sale - Transaction ${transaction.id}`,
-              note: null,
-              userId: cashierId,
-              businessId: data.businessId,
-            });
-            console.log(
-              `✅ Updated inventory for product ${item.productId}: -${quantityToDecrement}`
-            );
-          } catch (inventoryError) {
-            console.error(
-              `Failed to update inventory for product ${item.productId}:`,
-              inventoryError
-            );
-          }
-        } catch (productError) {
-          console.error(
-            `Failed to get product ${item.productId} for inventory update:`,
-            productError
-          );
         }
+      } catch (inventoryError) {
+        logger.error(
+          "Error updating inventory after transaction:",
+          inventoryError
+        );
+        // Don't fail the transaction if inventory update fails
+        // Transaction is already saved, inventory can be corrected manually
       }
-    } catch (inventoryError) {
-      console.error(
-        "Error updating inventory after transaction:",
-        inventoryError
-      );
-      // Don't fail the transaction if inventory update fails
-      // Transaction is already saved, inventory can be corrected manually
-    }
 
-    // Convert to plain object to ensure serialization works
-    const serializedTransaction = JSON.parse(JSON.stringify(transaction));
+      // Convert to plain object to ensure serialization works
+      const serializedTransaction = JSON.parse(JSON.stringify(transaction));
 
-    return {
-      success: true,
-      data: serializedTransaction,
-    };
-  } catch (error) {
-    console.error("Create transaction from cart IPC error:", error);
-    if (error instanceof Error) {
-      console.error("Error stack:", error.stack);
+      return {
+        success: true,
+        data: serializedTransaction,
+      };
+    } catch (error) {
+      logger.error("Create transaction from cart IPC error:", error);
+      if (error instanceof Error) {
+        logger.error("Error stack:", error.stack);
+      }
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+          ? error
+          : "Failed to create transaction from cart";
+      return {
+        success: false,
+        message: errorMessage,
+      };
     }
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : typeof error === "string"
-        ? error
-        : "Failed to create transaction from cart";
-    return {
-      success: false,
-      message: errorMessage,
-    };
   }
-});
+);
 
 // Shift reconciliation endpoints for auto-ended shifts
 ipcMain.handle(
@@ -1705,7 +2054,7 @@ ipcMain.handle(
         shift: serializedShift,
       };
     } catch (error) {
-      console.error("Reconcile shift IPC error:", error);
+      logger.error("Reconcile shift IPC error:", error);
       return {
         success: false,
         message: "Failed to reconcile shift",
@@ -1727,7 +2076,7 @@ ipcMain.handle("shift:getPendingReconciliation", async (event, businessId) => {
       shifts: serializedShifts,
     };
   } catch (error) {
-    console.error("Get pending reconciliation shifts IPC error:", error);
+    logger.error("Get pending reconciliation shifts IPC error:", error);
     return {
       success: false,
       message: "Failed to get pending reconciliation shifts",
@@ -1752,7 +2101,7 @@ ipcMain.handle("refunds:getTransactionById", async (event, transactionId) => {
       message: serializedTransaction ? undefined : "Transaction not found",
     };
   } catch (error) {
-    console.error("Get transaction by ID IPC error:", error);
+    logger.error("Get transaction by ID IPC error:", error);
     return {
       success: false,
       message: "Failed to get transaction",
@@ -1780,7 +2129,7 @@ ipcMain.handle(
         message: serializedTransaction ? undefined : "Transaction not found",
       };
     } catch (error) {
-      console.error("Get transaction by receipt IPC error:", error);
+      logger.error("Get transaction by receipt IPC error:", error);
       return {
         success: false,
         message: "Failed to get transaction",
@@ -1807,7 +2156,7 @@ ipcMain.handle(
         transactions: serializedTransactions,
       };
     } catch (error) {
-      console.error("Get recent transactions IPC error:", error);
+      logger.error("Get recent transactions IPC error:", error);
       return {
         success: false,
         message: "Failed to get recent transactions",
@@ -1834,7 +2183,7 @@ ipcMain.handle(
         transactions: serializedTransactions,
       };
     } catch (error) {
-      console.error("Get shift transactions IPC error:", error);
+      logger.error("Get shift transactions IPC error:", error);
       return {
         success: false,
         message: "Failed to get shift transactions",
@@ -1858,7 +2207,7 @@ ipcMain.handle(
         validation,
       };
     } catch (error) {
-      console.error("Validate refund eligibility IPC error:", error);
+      logger.error("Validate refund eligibility IPC error:", error);
       return {
         success: false,
         message: "Failed to validate refund eligibility",
@@ -1867,12 +2216,24 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle("refunds:create", async (event, refundData) => {
+ipcMain.handle("refunds:create", async (event, sessionToken, refundData) => {
   try {
     const db = await getDatabase();
 
-    // Validate refund eligibility first
+    // Validate session and check TRANSACTIONS_OVERRIDE permission
+    const auth = await validateSessionAndPermission(
+      db,
+      sessionToken,
+      PERMISSIONS.TRANSACTIONS_OVERRIDE
+    );
 
+    if (!auth.success) {
+      return { success: false, message: auth.message, code: auth.code };
+    }
+
+    const user = auth.user!;
+
+    // Validate refund eligibility first
     const validation = await db.transactions.validateRefundEligibility(
       refundData.originalTransactionId,
       refundData.refundItems
@@ -1889,12 +2250,27 @@ ipcMain.handle("refunds:create", async (event, refundData) => {
       refundData
     );
 
+    // Audit log the refund
+    await logAction(
+      db,
+      user,
+      "create_refund",
+      "transaction",
+      refundTransaction.id,
+      {
+        originalTransactionId: refundData.originalTransactionId,
+        refundAmount: refundTransaction.total,
+        refundMethod: refundData.refundMethod,
+        isPartialRefund: refundData.isPartialRefund,
+      }
+    );
+
     return {
       success: true,
       transaction: refundTransaction,
     };
   } catch (error) {
-    console.error("Create refund IPC error:", error);
+    logger.error("Create refund IPC error:", error);
     return {
       success: false,
       message: "Failed to create refund",
@@ -1913,7 +2289,7 @@ ipcMain.handle("voids:validateEligibility", async (event, transactionId) => {
       data: validation,
     };
   } catch (error) {
-    console.error("Validate void eligibility IPC error:", error);
+    logger.error("Validate void eligibility IPC error:", error);
     return {
       success: false,
       message: "Failed to validate void eligibility",
@@ -1921,9 +2297,22 @@ ipcMain.handle("voids:validateEligibility", async (event, transactionId) => {
   }
 });
 
-ipcMain.handle("voids:create", async (event, voidData) => {
+ipcMain.handle("voids:create", async (event, sessionToken, voidData) => {
   try {
     const db = await getDatabase();
+
+    // Validate session and check TRANSACTIONS_OVERRIDE permission
+    const auth = await validateSessionAndPermission(
+      db,
+      sessionToken,
+      PERMISSIONS.TRANSACTIONS_OVERRIDE
+    );
+
+    if (!auth.success) {
+      return { success: false, message: auth.message, code: auth.code };
+    }
+
+    const user = auth.user!;
 
     // Validate void eligibility first
     const validation = db.transactions.validateVoidEligibility(
@@ -1947,11 +2336,49 @@ ipcMain.handle("voids:create", async (event, voidData) => {
       };
     }
 
+    // If manager approval ID provided, validate it's a real manager
+    if (voidData.managerApprovalId) {
+      const manager = db.users.getUserById(voidData.managerApprovalId);
+      if (!manager) {
+        return {
+          success: false,
+          message: "Invalid manager approval: User not found",
+          code: "INVALID_MANAGER_APPROVAL",
+        };
+      }
+      // Check if user has manager, admin, or owner role via RBAC
+      const userRoles = db.userRoles.getUserRole(manager.id, undefined, true);
+      const hasManagerRole = userRoles.some((ur: any) =>
+        ["manager", "admin", "owner"].includes(ur.role.name)
+      );
+      if (!hasManagerRole) {
+        return {
+          success: false,
+          message: "Invalid manager approval: User is not a manager",
+          code: "INVALID_MANAGER_APPROVAL",
+        };
+      }
+    }
+
     const result = db.transactions.voidTransaction(voidData);
+
+    // Audit log the void
+    await logAction(
+      db,
+      user,
+      "void_transaction",
+      "transaction",
+      voidData.transactionId,
+      {
+        reason: voidData.reason,
+        managerApprovalId: voidData.managerApprovalId || "none",
+        requiresManagerApproval: validation.requiresManagerApproval,
+      }
+    );
 
     return result;
   } catch (error) {
-    console.error("Create void IPC error:", error);
+    logger.error("Create void IPC error:", error);
     return {
       success: false,
       message: "Failed to void transaction",
@@ -1971,7 +2398,7 @@ ipcMain.handle("voids:getTransactionById", async (event, transactionId) => {
       data: transaction,
     };
   } catch (error) {
-    console.error("Get transaction by ID for void IPC error:", error);
+    logger.error("Get transaction by ID for void IPC error:", error);
     return {
       success: false,
       message: "Failed to get transaction",
@@ -1992,7 +2419,7 @@ ipcMain.handle(
         data: transaction,
       };
     } catch (error) {
-      console.error("Get transaction by receipt for void IPC error:", error);
+      logger.error("Get transaction by receipt for void IPC error:", error);
       return {
         success: false,
         message: "Failed to get transaction",
@@ -2012,7 +2439,7 @@ ipcMain.handle("cashDrawer:getExpectedCash", async (event, shiftId) => {
       data: result,
     };
   } catch (error) {
-    console.error("Get expected cash IPC error:", error);
+    logger.error("Get expected cash IPC error:", error);
     return {
       success: false,
       message: "Failed to get expected cash amount",
@@ -2068,7 +2495,7 @@ ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
       data: cashDrawerCount,
     };
   } catch (error) {
-    console.error("Create cash count IPC error:", error);
+    logger.error("Create cash count IPC error:", error);
     return {
       success: false,
       message:
@@ -2087,7 +2514,7 @@ ipcMain.handle("cashDrawer:getCountsByShift", async (event, shiftId) => {
       data: counts,
     };
   } catch (error) {
-    console.error("Get cash drawer counts IPC error:", error);
+    logger.error("Get cash drawer counts IPC error:", error);
     return {
       success: false,
       message: "Failed to get cash drawer counts",
@@ -2106,7 +2533,7 @@ ipcMain.handle("database:getInfo", async () => {
       data: info,
     };
   } catch (error) {
-    console.error("Get database info IPC error:", error);
+    logger.error("Get database info IPC error:", error);
     return {
       success: false,
       message: "Failed to get database information",
@@ -2167,7 +2594,7 @@ ipcMain.handle("database:backup", async (event) => {
       message: "Database backed up successfully",
     };
   } catch (error) {
-    console.error("Database backup error:", error);
+    logger.error("Database backup error:", error);
     return {
       success: false,
       message:
@@ -2198,7 +2625,7 @@ ipcMain.handle("database:empty", async (event) => {
 
     // Create backup
     await fs.copyFile(info.path, backupPath);
-    console.log(`Backup created before emptying: ${backupPath}`);
+    logger.info(`Backup created before emptying: ${backupPath}`);
 
     // Get backup file stats
     const backupStats = await fs.stat(backupPath);
@@ -2226,7 +2653,7 @@ ipcMain.handle("database:empty", async (event) => {
       message: "Database emptied successfully",
     };
   } catch (error) {
-    console.error("Database empty error:", error);
+    logger.error("Database empty error:", error);
     return {
       success: false,
       message:
@@ -2263,7 +2690,7 @@ ipcMain.handle("database:import", async (event) => {
     }
 
     const importPath = result.filePaths[0];
-    console.log("Importing database from:", importPath);
+    logger.info("Importing database from:", importPath);
 
     // Verify the file exists and is readable
     try {
@@ -2297,20 +2724,20 @@ ipcMain.handle("database:import", async (event) => {
     // Backup current database
     if (info.exists) {
       await fs.copyFile(info.path, backupPath);
-      console.log(`Current database backed up to: ${backupPath}`);
+      logger.info(`Current database backed up to: ${backupPath}`);
     }
 
     // Close current database connection
     const { closeDatabase } = await import("./database/index.js");
     closeDatabase();
-    console.log("Database connection closed");
+    logger.info("Database connection closed");
 
     // Wait a bit to ensure database is fully closed
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Copy imported file to database location
     await fs.copyFile(importPath, info.path);
-    console.log(`Database imported from: ${importPath}`);
+    logger.info(`Database imported from: ${importPath}`);
 
     // Get stats of imported database
     const newStats = await fs.stat(info.path);
@@ -2327,7 +2754,7 @@ ipcMain.handle("database:import", async (event) => {
       message: "Database imported successfully",
     };
   } catch (error) {
-    console.error("Database import error:", error);
+    logger.error("Database import error:", error);
 
     // Try to reinitialize database if import failed
     try {
@@ -2336,10 +2763,7 @@ ipcMain.handle("database:import", async (event) => {
       );
       await getNewDatabase();
     } catch (reinitError) {
-      console.error(
-        "Failed to reinitialize database after error:",
-        reinitError
-      );
+      logger.error("Failed to reinitialize database after error:", reinitError);
     }
 
     return {
@@ -2355,7 +2779,7 @@ ipcMain.handle("app:restart", async () => {
   try {
     const { app: electronApp } = await import("electron");
 
-    console.log("Restarting application...");
+    logger.info("Restarting application...");
 
     // Close database connection before restart
     const { closeDatabase } = await import("./database/index.js");
@@ -2367,7 +2791,7 @@ ipcMain.handle("app:restart", async () => {
 
     return { success: true };
   } catch (error) {
-    console.error("App restart error:", error);
+    logger.error("App restart error:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to restart app",
@@ -2405,7 +2829,7 @@ ipcMain.handle("timeTracking:clockIn", async (event, data) => {
       shift: activeShift,
     };
   } catch (error) {
-    console.error("Clock-in IPC error:", error);
+    logger.error("Clock-in IPC error:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to clock in",
@@ -2449,7 +2873,7 @@ ipcMain.handle("timeTracking:clockOut", async (event, data) => {
       shift: completedShift,
     };
   } catch (error) {
-    console.error("Clock-out IPC error:", error);
+    logger.error("Clock-out IPC error:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to clock out",
@@ -2486,7 +2910,7 @@ ipcMain.handle("timeTracking:getActiveShift", async (event, userId) => {
       breaks,
     };
   } catch (error) {
-    console.error("Get active shift IPC error:", error);
+    logger.error("Get active shift IPC error:", error);
     return {
       success: false,
       message: "Failed to get active shift",
@@ -2503,7 +2927,7 @@ ipcMain.handle("timeTracking:startBreak", async (event, data) => {
       break: breakRecord,
     };
   } catch (error) {
-    console.error("Start break IPC error:", error);
+    logger.error("Start break IPC error:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to start break",
@@ -2520,7 +2944,7 @@ ipcMain.handle("timeTracking:endBreak", async (event, breakId) => {
       break: breakRecord,
     };
   } catch (error) {
-    console.error("End break IPC error:", error);
+    logger.error("End break IPC error:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to end break",
@@ -2541,7 +2965,7 @@ ipcMain.handle("ageVerification:create", async (event, verificationData) => {
       record: JSON.parse(JSON.stringify(record)),
     };
   } catch (error) {
-    console.error("Create age verification IPC error:", error);
+    logger.error("Create age verification IPC error:", error);
     return {
       success: false,
       message:
@@ -2566,7 +2990,7 @@ ipcMain.handle(
         records: JSON.parse(JSON.stringify(records)),
       };
     } catch (error) {
-      console.error("Get age verifications by transaction IPC error:", error);
+      logger.error("Get age verifications by transaction IPC error:", error);
       return {
         success: false,
         message: "Failed to get age verification records",
@@ -2590,7 +3014,7 @@ ipcMain.handle(
         records: JSON.parse(JSON.stringify(records)),
       };
     } catch (error) {
-      console.error(
+      logger.error(
         "Get age verifications by transaction item IPC error:",
         error
       );
@@ -2617,7 +3041,7 @@ ipcMain.handle(
         records: JSON.parse(JSON.stringify(records)),
       };
     } catch (error) {
-      console.error("Get age verifications by business IPC error:", error);
+      logger.error("Get age verifications by business IPC error:", error);
       return {
         success: false,
         message: "Failed to get age verification records",
@@ -2638,7 +3062,7 @@ ipcMain.handle("ageVerification:getByProduct", async (event, productId) => {
       records: JSON.parse(JSON.stringify(records)),
     };
   } catch (error) {
-    console.error("Get age verifications by product IPC error:", error);
+    logger.error("Get age verifications by product IPC error:", error);
     return {
       success: false,
       message: "Failed to get age verification records",
@@ -2661,7 +3085,7 @@ ipcMain.handle(
         records: JSON.parse(JSON.stringify(records)),
       };
     } catch (error) {
-      console.error("Get age verifications by staff IPC error:", error);
+      logger.error("Get age verifications by staff IPC error:", error);
       return {
         success: false,
         message: "Failed to get age verification records",
@@ -2684,7 +3108,7 @@ ipcMain.handle("batches:create", async (event, batchData) => {
       batch: JSON.parse(JSON.stringify(batch)),
     };
   } catch (error) {
-    console.error("Create batch IPC error:", error);
+    logger.error("Create batch IPC error:", error);
     return {
       success: false,
       message:
@@ -2703,7 +3127,7 @@ ipcMain.handle("batches:getById", async (event, batchId) => {
       batch: JSON.parse(JSON.stringify(batch)),
     };
   } catch (error) {
-    console.error("Get batch IPC error:", error);
+    logger.error("Get batch IPC error:", error);
     return {
       success: false,
       message: "Failed to get batch",
@@ -2721,7 +3145,7 @@ ipcMain.handle("batches:getByProduct", async (event, productId, options) => {
       batches: JSON.parse(JSON.stringify(batches)),
     };
   } catch (error) {
-    console.error("Get batches by product IPC error:", error);
+    logger.error("Get batches by product IPC error:", error);
     return {
       success: false,
       message: "Failed to get batches",
@@ -2739,7 +3163,7 @@ ipcMain.handle("batches:getByBusiness", async (event, businessId, options) => {
       batches: JSON.parse(JSON.stringify(batches)),
     };
   } catch (error) {
-    console.error("Get batches by business IPC error:", error);
+    logger.error("Get batches by business IPC error:", error);
     return {
       success: false,
       message: "Failed to get batches",
@@ -2763,7 +3187,7 @@ ipcMain.handle(
         data: JSON.parse(JSON.stringify(result)),
       };
     } catch (error: any) {
-      console.error("Get paginated batches IPC error:", error);
+      logger.error("Get paginated batches IPC error:", error);
       return {
         success: false,
         message: error.message || "Failed to get batches",
@@ -2787,7 +3211,7 @@ ipcMain.handle(
         batches: JSON.parse(JSON.stringify(batches)),
       };
     } catch (error) {
-      console.error("Get active batches IPC error:", error);
+      logger.error("Get active batches IPC error:", error);
       return {
         success: false,
         message: "Failed to get active batches",
@@ -2812,7 +3236,7 @@ ipcMain.handle(
         batches: JSON.parse(JSON.stringify(selected)),
       };
     } catch (error) {
-      console.error("Select batches for sale IPC error:", error);
+      logger.error("Select batches for sale IPC error:", error);
       return {
         success: false,
         message:
@@ -2863,7 +3287,7 @@ ipcMain.handle(
             updatedAt: now,
           });
         } catch (movementError) {
-          console.error("Failed to record stock movement:", movementError);
+          logger.error("Failed to record stock movement:", movementError);
           // Don't fail the whole operation if stock movement fails
         }
       }
@@ -2873,7 +3297,7 @@ ipcMain.handle(
         batch: JSON.parse(JSON.stringify(updatedBatch)),
       };
     } catch (error) {
-      console.error("Update batch quantity IPC error:", error);
+      logger.error("Update batch quantity IPC error:", error);
       return {
         success: false,
         message:
@@ -2895,7 +3319,7 @@ ipcMain.handle("batches:updateStatus", async (event, batchId, status) => {
       batch: JSON.parse(JSON.stringify(batch)),
     };
   } catch (error) {
-    console.error("Update batch status IPC error:", error);
+    logger.error("Update batch status IPC error:", error);
     return {
       success: false,
       message: "Failed to update batch status",
@@ -2913,7 +3337,7 @@ ipcMain.handle("batches:getExpiringSoon", async (event, businessId, days) => {
       batches: JSON.parse(JSON.stringify(batches)),
     };
   } catch (error) {
-    console.error("Get expiring batches IPC error:", error);
+    logger.error("Get expiring batches IPC error:", error);
     return {
       success: false,
       message: "Failed to get expiring batches",
@@ -2931,7 +3355,7 @@ ipcMain.handle("batches:calculateProductStock", async (event, productId) => {
       stock,
     };
   } catch (error) {
-    console.error("Calculate product stock IPC error:", error);
+    logger.error("Calculate product stock IPC error:", error);
     return {
       success: false,
       message: "Failed to calculate product stock",
@@ -2949,7 +3373,7 @@ ipcMain.handle("batches:autoUpdateExpired", async (event, businessId) => {
       updatedCount: count,
     };
   } catch (error) {
-    console.error("Auto-update expired batches IPC error:", error);
+    logger.error("Auto-update expired batches IPC error:", error);
     return {
       success: false,
       message: "Failed to auto-update expired batches",
@@ -2967,7 +3391,7 @@ ipcMain.handle("batches:remove", async (event, batchId) => {
       message: "Batch removed successfully",
     };
   } catch (error) {
-    console.error("Remove batch IPC error:", error);
+    logger.error("Remove batch IPC error:", error);
     return {
       success: false,
       message: "Failed to remove batch",
@@ -2998,7 +3422,7 @@ ipcMain.handle(
         batch: JSON.parse(JSON.stringify(batch)),
       };
     } catch (error) {
-      console.error("Get batch by number IPC error:", error);
+      logger.error("Get batch by number IPC error:", error);
       return {
         success: false,
         message: "Failed to get batch",
@@ -3021,7 +3445,7 @@ ipcMain.handle("suppliers:create", async (event, supplierData) => {
       supplier: JSON.parse(JSON.stringify(supplier)),
     };
   } catch (error) {
-    console.error("Create supplier IPC error:", error);
+    logger.error("Create supplier IPC error:", error);
     return {
       success: false,
       message:
@@ -3040,7 +3464,7 @@ ipcMain.handle("suppliers:getById", async (event, supplierId) => {
       supplier: JSON.parse(JSON.stringify(supplier)),
     };
   } catch (error) {
-    console.error("Get supplier IPC error:", error);
+    logger.error("Get supplier IPC error:", error);
     return {
       success: false,
       message: "Failed to get supplier",
@@ -3063,7 +3487,7 @@ ipcMain.handle(
         suppliers: JSON.parse(JSON.stringify(suppliers)),
       };
     } catch (error) {
-      console.error("Get suppliers by business IPC error:", error);
+      logger.error("Get suppliers by business IPC error:", error);
       return {
         success: false,
         message: "Failed to get suppliers",
@@ -3082,7 +3506,7 @@ ipcMain.handle("suppliers:update", async (event, supplierId, updates) => {
       supplier: JSON.parse(JSON.stringify(supplier)),
     };
   } catch (error) {
-    console.error("Update supplier IPC error:", error);
+    logger.error("Update supplier IPC error:", error);
     return {
       success: false,
       message:
@@ -3101,7 +3525,7 @@ ipcMain.handle("suppliers:delete", async (event, supplierId) => {
       message: deleted ? "Supplier deleted successfully" : "Supplier not found",
     };
   } catch (error) {
-    console.error("Delete supplier IPC error:", error);
+    logger.error("Delete supplier IPC error:", error);
     return {
       success: false,
       message: "Failed to delete supplier",
@@ -3123,7 +3547,7 @@ ipcMain.handle("expirySettings:get", async (event, businessId) => {
       settings: JSON.parse(JSON.stringify(settings)),
     };
   } catch (error) {
-    console.error("Get expiry settings IPC error:", error);
+    logger.error("Get expiry settings IPC error:", error);
     return {
       success: false,
       message: "Failed to get expiry settings",
@@ -3146,7 +3570,7 @@ ipcMain.handle(
         settings: JSON.parse(JSON.stringify(settings)),
       };
     } catch (error) {
-      console.error("Create/update expiry settings IPC error:", error);
+      logger.error("Create/update expiry settings IPC error:", error);
       return {
         success: false,
         message: "Failed to create/update expiry settings",
@@ -3173,7 +3597,7 @@ ipcMain.handle(
         notification: JSON.parse(JSON.stringify(notification)),
       };
     } catch (error) {
-      console.error("Create expiry notification IPC error:", error);
+      logger.error("Create expiry notification IPC error:", error);
       return {
         success: false,
         message:
@@ -3197,7 +3621,7 @@ ipcMain.handle("expiryNotifications:getByBatch", async (event, batchId) => {
       notifications: JSON.parse(JSON.stringify(notifications)),
     };
   } catch (error) {
-    console.error("Get notifications by batch IPC error:", error);
+    logger.error("Get notifications by batch IPC error:", error);
     return {
       success: false,
       message: "Failed to get notifications",
@@ -3221,7 +3645,7 @@ ipcMain.handle(
         notifications: JSON.parse(JSON.stringify(notifications)),
       };
     } catch (error) {
-      console.error("Get notifications by business IPC error:", error);
+      logger.error("Get notifications by business IPC error:", error);
       return {
         success: false,
         message: "Failed to get notifications",
@@ -3242,7 +3666,7 @@ ipcMain.handle("expiryNotifications:getPending", async (event, businessId) => {
       notifications: JSON.parse(JSON.stringify(notifications)),
     };
   } catch (error) {
-    console.error("Get pending notifications IPC error:", error);
+    logger.error("Get pending notifications IPC error:", error);
     return {
       success: false,
       message: "Failed to get pending notifications",
@@ -3265,7 +3689,7 @@ ipcMain.handle(
         notification: JSON.parse(JSON.stringify(notification)),
       };
     } catch (error) {
-      console.error("Acknowledge notification IPC error:", error);
+      logger.error("Acknowledge notification IPC error:", error);
       return {
         success: false,
         message: "Failed to acknowledge notification",
@@ -3288,7 +3712,7 @@ ipcMain.handle("stockMovements:create", async (event, movementData) => {
       movement: JSON.parse(JSON.stringify(movement)),
     };
   } catch (error) {
-    console.error("Create stock movement IPC error:", error);
+    logger.error("Create stock movement IPC error:", error);
     return {
       success: false,
       message:
@@ -3309,7 +3733,7 @@ ipcMain.handle("stockMovements:getByProduct", async (event, productId) => {
       movements: JSON.parse(JSON.stringify(movements)),
     };
   } catch (error) {
-    console.error("Get movements by product IPC error:", error);
+    logger.error("Get movements by product IPC error:", error);
     return {
       success: false,
       message: "Failed to get stock movements",
@@ -3327,7 +3751,7 @@ ipcMain.handle("stockMovements:getByBatch", async (event, batchId) => {
       movements: JSON.parse(JSON.stringify(movements)),
     };
   } catch (error) {
-    console.error("Get movements by batch IPC error:", error);
+    logger.error("Get movements by batch IPC error:", error);
     return {
       success: false,
       message: "Failed to get stock movements",
@@ -3350,7 +3774,7 @@ ipcMain.handle(
         movements: JSON.parse(JSON.stringify(movements)),
       };
     } catch (error) {
-      console.error("Get movements by business IPC error:", error);
+      logger.error("Get movements by business IPC error:", error);
       return {
         success: false,
         message: "Failed to get stock movements",
@@ -3373,7 +3797,7 @@ ipcMain.handle("cart:createSession", async (event, sessionData) => {
       data: JSON.parse(JSON.stringify(session)),
     };
   } catch (error) {
-    console.error("Create cart session IPC error:", error);
+    logger.error("Create cart session IPC error:", error);
     return {
       success: false,
       message:
@@ -3394,7 +3818,7 @@ ipcMain.handle("cart:getSession", async (event, sessionId) => {
       data: JSON.parse(JSON.stringify(session)),
     };
   } catch (error) {
-    console.error("Get cart session IPC error:", error);
+    logger.error("Get cart session IPC error:", error);
     return {
       success: false,
       message:
@@ -3413,7 +3837,7 @@ ipcMain.handle("cart:getActiveSession", async (event, cashierId) => {
       data: session ? JSON.parse(JSON.stringify(session)) : null,
     };
   } catch (error) {
-    console.error("Get active cart session IPC error:", error);
+    logger.error("Get active cart session IPC error:", error);
     return {
       success: false,
       message:
@@ -3434,7 +3858,7 @@ ipcMain.handle("cart:updateSession", async (event, sessionId, updates) => {
       data: JSON.parse(JSON.stringify(session)),
     };
   } catch (error) {
-    console.error("Update cart session IPC error:", error);
+    logger.error("Update cart session IPC error:", error);
     return {
       success: false,
       message:
@@ -3455,7 +3879,7 @@ ipcMain.handle("cart:completeSession", async (event, sessionId) => {
       data: JSON.parse(JSON.stringify(session)),
     };
   } catch (error) {
-    console.error("Complete cart session IPC error:", error);
+    logger.error("Complete cart session IPC error:", error);
     return {
       success: false,
       message:
@@ -3476,7 +3900,7 @@ ipcMain.handle("cart:cancelSession", async (event, sessionId) => {
       data: JSON.parse(JSON.stringify(session)),
     };
   } catch (error) {
-    console.error("Cancel cart session IPC error:", error);
+    logger.error("Cancel cart session IPC error:", error);
     return {
       success: false,
       message:
@@ -3497,7 +3921,7 @@ ipcMain.handle("cart:addItem", async (event, itemData) => {
       data: JSON.parse(JSON.stringify(item)),
     };
   } catch (error) {
-    console.error("Add cart item IPC error:", error);
+    logger.error("Add cart item IPC error:", error);
     return {
       success: false,
       message:
@@ -3516,7 +3940,7 @@ ipcMain.handle("cart:getItems", async (event, sessionId) => {
       data: JSON.parse(JSON.stringify(items)),
     };
   } catch (error) {
-    console.error("Get cart items IPC error:", error);
+    logger.error("Get cart items IPC error:", error);
     return {
       success: false,
       message:
@@ -3535,7 +3959,7 @@ ipcMain.handle("cart:updateItem", async (event, itemId, updates) => {
       data: JSON.parse(JSON.stringify(item)),
     };
   } catch (error) {
-    console.error("Update cart item IPC error:", error);
+    logger.error("Update cart item IPC error:", error);
     return {
       success: false,
       message:
@@ -3553,7 +3977,7 @@ ipcMain.handle("cart:removeItem", async (event, itemId) => {
       success: true,
     };
   } catch (error) {
-    console.error("Remove cart item IPC error:", error);
+    logger.error("Remove cart item IPC error:", error);
     return {
       success: false,
       message:
@@ -3571,7 +3995,7 @@ ipcMain.handle("cart:clearCart", async (event, sessionId) => {
       success: true,
     };
   } catch (error) {
-    console.error("Clear cart IPC error:", error);
+    logger.error("Clear cart IPC error:", error);
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to clear cart",
@@ -3596,7 +4020,7 @@ ipcMain.handle(
         notificationsCreated: count,
       };
     } catch (error) {
-      console.error("Scan and create notifications IPC error:", error);
+      logger.error("Scan and create notifications IPC error:", error);
       return {
         success: false,
         message: "Failed to scan and create notifications",
@@ -3619,10 +4043,449 @@ ipcMain.handle(
         batchesAutoDisabled: result.expiredBatchesUpdated,
       };
     } catch (error) {
-      console.error("Process expiry tasks IPC error:", error);
+      logger.error("Process expiry tasks IPC error:", error);
       return {
         success: false,
         message: "Failed to process expiry tasks",
+      };
+    }
+  }
+);
+
+// ============================================================================
+// RBAC - Role Management
+// ============================================================================
+
+ipcMain.handle("roles:list", async (event, sessionToken, businessId) => {
+  if (!db) db = await getDatabase();
+
+  // First validate session
+  const sessionValidation = await validateSession(db, sessionToken);
+  if (!sessionValidation.success) {
+    logger.error("[roles:list] Session validation failed:", sessionValidation);
+    return {
+      success: false,
+      message: sessionValidation.message,
+      code: sessionValidation.code,
+    };
+  }
+
+  // Then check permission
+  const auth = await validateSessionAndPermission(
+    db,
+    sessionToken,
+    PERMISSIONS.USERS_MANAGE
+  );
+
+  if (!auth.success) {
+    logger.error(
+      "[roles:list] Permission check failed for user:",
+      sessionValidation.user?.id
+    );
+    return { success: false, message: auth.message, code: auth.code };
+  }
+
+  try {
+    const roles = db.roles.getRolesByBusiness(businessId);
+    console.log("\n\nRoles:", roles,"\n\n");
+    return { success: true, data: roles };
+  } catch (error) {
+    logger.error("List roles IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to list roles",
+    };
+  }
+});
+
+ipcMain.handle("roles:create", async (event, sessionToken, roleData) => {
+  if (!db) db = await getDatabase();
+
+  const sessionValidation = await validateSession(db, sessionToken);
+  if (!sessionValidation.success) {
+    return { success: false, message: sessionValidation.message };
+  }
+
+  const { user } = sessionValidation;
+
+  // Allow admins and owners to manage roles
+  const hasRoleAccess = await hasAnyRole(db, user!, ["admin", "owner"]);
+  if (!hasRoleAccess) {
+    return {
+      success: false,
+      message: "Unauthorized: Insufficient permissions",
+      code: "PERMISSION_DENIED",
+    };
+  }
+
+  try {
+    const role = await db.roles.createRole(roleData);
+
+    await logAction(db, auth.user!, "create", "roles", role.id, {
+      roleName: role.name,
+      permissions: role.permissions,
+    });
+
+    return { success: true, data: role };
+  } catch (error) {
+    logger.error("Create role IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to create role",
+    };
+  }
+});
+
+ipcMain.handle("roles:update", async (event, sessionToken, roleId, updates) => {
+  if (!db) db = await getDatabase();
+
+  const auth = await validateSessionAndPermission(
+    db,
+    sessionToken,
+    PERMISSIONS.USERS_MANAGE
+  );
+
+  if (!auth.success) {
+    return { success: false, message: auth.message, code: auth.code };
+  }
+
+  try {
+    const role = db.roles.updateRole(roleId, updates);
+
+    await logAction(db, auth.user!, "update", "roles", roleId, { updates });
+
+    return { success: true, data: role };
+  } catch (error) {
+    logger.error("Update role IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to update role",
+    };
+  }
+});
+
+ipcMain.handle("roles:delete", async (event, sessionToken, roleId) => {
+  if (!db) db = await getDatabase();
+
+  const auth = await validateSessionAndPermission(
+    db,
+    sessionToken,
+    PERMISSIONS.USERS_MANAGE
+  );
+
+  if (!auth.success) {
+    return { success: false, message: auth.message, code: auth.code };
+  }
+
+  try {
+    db.roles.deleteRole(roleId);
+
+    await logAction(db, auth.user!, "delete", "roles", roleId);
+
+    return { success: true };
+  } catch (error) {
+    logger.error("Delete role IPC error:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Failed to delete role",
+    };
+  }
+});
+
+ipcMain.handle("roles:getById", async (event, sessionToken, roleId) => {
+  if (!db) db = await getDatabase();
+
+  const auth = await validateSessionAndPermission(
+    db,
+    sessionToken,
+    PERMISSIONS.USERS_MANAGE
+  );
+
+  if (!auth.success) {
+    return { success: false, message: auth.message, code: auth.code };
+  }
+
+  try {
+    const role = db.roles.getRoleById(roleId);
+
+    if (!role) {
+      return { success: false, message: "Role not found" };
+    }
+
+    return { success: true, data: role };
+  } catch (error) {
+    logger.error("Get role IPC error:", error);
+    return {
+      success: false,
+      message: "Failed to get role",
+    };
+  }
+});
+
+// ============================================================================
+// RBAC - User Role Assignment
+// ============================================================================
+
+ipcMain.handle(
+  "userRoles:assign",
+  async (event, sessionToken, userId, roleId) => {
+    if (!db) db = await getDatabase();
+
+    const auth = await validateSessionAndPermission(
+      db,
+      sessionToken,
+      PERMISSIONS.USERS_MANAGE
+    );
+
+    if (!auth.success) {
+      return { success: false, message: auth.message, code: auth.code };
+    }
+
+    try {
+      const userRole = await db.userRoles.assignRole(
+        userId,
+        roleId,
+        auth.user!.id
+      );
+
+      // Invalidate permission cache for this user
+      const { invalidateUserPermissionCache } = await import(
+        "./utils/rbacHelpers.js"
+      );
+      invalidateUserPermissionCache(userId);
+
+      await logAction(
+        db,
+        auth.user!,
+        "assign_role",
+        "user_roles",
+        userRole.id,
+        { userId, roleId }
+      );
+
+      return { success: true, data: userRole };
+    } catch (error) {
+      logger.error("Assign role IPC error:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to assign role",
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  "userRoles:revoke",
+  async (event, sessionToken, userId, roleId) => {
+    if (!db) db = await getDatabase();
+
+    const auth = await validateSessionAndPermission(
+      db,
+      sessionToken,
+      PERMISSIONS.USERS_MANAGE
+    );
+
+    if (!auth.success) {
+      return { success: false, message: auth.message, code: auth.code };
+    }
+
+    try {
+      const userRole = db.userRoles.revokeRole(userId, roleId);
+
+      // Invalidate permission cache
+      const { invalidateUserPermissionCache } = await import(
+        "./utils/rbacHelpers.js"
+      );
+      invalidateUserPermissionCache(userId);
+
+      await logAction(
+        db,
+        auth.user!,
+        "revoke_role",
+        "user_roles",
+        userRole.id,
+        { userId, roleId }
+      );
+
+      return { success: true, data: userRole };
+    } catch (error) {
+      logger.error("Revoke role IPC error:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to revoke role",
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  "userRoles:getUserRoles",
+  async (event, sessionToken, userId) => {
+    if (!db) db = await getDatabase();
+
+    const auth = await validateSessionAndPermission(
+      db,
+      sessionToken,
+      PERMISSIONS.USERS_MANAGE
+    );
+
+    if (!auth.success) {
+      return { success: false, message: auth.message, code: auth.code };
+    }
+
+    try {
+      const userRoles = db.userRoles.getRolesWithDetailsForUser(userId);
+      return { success: true, data: userRoles };
+    } catch (error) {
+      logger.error("Get user roles IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to get user roles",
+      };
+    }
+  }
+);
+
+// ============================================================================
+// RBAC - Direct Permission Grants
+// ============================================================================
+
+ipcMain.handle(
+  "userPermissions:grant",
+  async (event, sessionToken, userId, permission, reason, expiresAt) => {
+    if (!db) db = await getDatabase();
+
+    const auth = await validateSessionAndPermission(
+      db,
+      sessionToken,
+      PERMISSIONS.USERS_MANAGE
+    );
+
+    if (!auth.success) {
+      return { success: false, message: auth.message, code: auth.code };
+    }
+
+    try {
+      const userPermission = await db.userPermissions.grantPermission(
+        userId,
+        permission,
+        auth.user!.id,
+        reason,
+        expiresAt ? new Date(expiresAt) : undefined
+      );
+
+      // Invalidate permission cache
+      const { invalidateUserPermissionCache } = await import(
+        "./utils/rbacHelpers.js"
+      );
+      invalidateUserPermissionCache(userId);
+
+      await logAction(
+        db,
+        auth.user!,
+        "grant_permission",
+        "user_permissions",
+        userPermission.id,
+        { userId, permission, reason }
+      );
+
+      return { success: true, data: userPermission };
+    } catch (error) {
+      logger.error("Grant permission IPC error:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to grant permission",
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  "userPermissions:revoke",
+  async (event, sessionToken, userId, permission) => {
+    if (!db) db = await getDatabase();
+
+    const auth = await validateSessionAndPermission(
+      db,
+      sessionToken,
+      PERMISSIONS.USERS_MANAGE
+    );
+
+    if (!auth.success) {
+      return { success: false, message: auth.message, code: auth.code };
+    }
+
+    try {
+      const userPermission = db.userPermissions.revokePermission(
+        userId,
+        permission
+      );
+
+      // Invalidate permission cache
+      const { invalidateUserPermissionCache } = await import(
+        "./utils/rbacHelpers.js"
+      );
+      invalidateUserPermissionCache(userId);
+
+      await logAction(
+        db,
+        auth.user!,
+        "revoke_permission",
+        "user_permissions",
+        userPermission.id,
+        { userId, permission }
+      );
+
+      return { success: true, data: userPermission };
+    } catch (error) {
+      logger.error("Revoke permission IPC error:", error);
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to revoke permission",
+      };
+    }
+  }
+);
+
+ipcMain.handle(
+  "userPermissions:getUserPermissions",
+  async (event, sessionToken, userId) => {
+    if (!db) db = await getDatabase();
+
+    const auth = await validateSessionAndPermission(
+      db,
+      sessionToken,
+      PERMISSIONS.USERS_MANAGE
+    );
+
+    if (!auth.success) {
+      return { success: false, message: auth.message, code: auth.code };
+    }
+
+    try {
+      const directPermissions =
+        db.userPermissions.getActivePermissionsByUser(userId);
+      const { getUserPermissions } = await import("./utils/rbacHelpers.js");
+      const allPermissions = await getUserPermissions(db, userId);
+
+      return {
+        success: true,
+        data: {
+          direct: directPermissions,
+          all: allPermissions,
+        },
+      };
+    } catch (error) {
+      logger.error("Get user permissions IPC error:", error);
+      return {
+        success: false,
+        message: "Failed to get user permissions",
       };
     }
   }
@@ -3634,6 +4497,6 @@ setInterval(async () => {
     if (!db) db = await getDatabase();
     db.sessions.cleanupExpiredSessions();
   } catch (error) {
-    console.error("Failed to cleanup expired sessions:", error);
+    logger.error("Failed to cleanup expired sessions:", error);
   }
 }, 60 * 60 * 1000);

@@ -30,6 +30,9 @@ import {
 import { toast } from "sonner";
 import type { Product } from "@/features/products/types/product.types";
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('batch-selection-modal');
+
 /**
  * Batch data from the API
  */
@@ -151,7 +154,7 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
         toast.error("No batches available for this product");
       }
     } catch (error) {
-      console.error("Failed to load batches:", error);
+      logger.error("Failed to load batches:", error);
       toast.error("Failed to load batch information");
       setBatches([]);
     } finally {

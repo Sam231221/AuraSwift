@@ -17,9 +17,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { AvatarUpload } from "@/shared/components/avatar-upload";
-import { AdaptiveFormField } from "@/components/adaptive-keyboard/adaptive-form-field";
-import { AdaptiveKeyboard } from "@/components/adaptive-keyboard/adaptive-keyboard";
+import { AvatarUpload } from "@/components/avatar-upload";
+import { AdaptiveFormField } from "@/features/adaptive-keyboard/adaptive-form-field";
+import { AdaptiveKeyboard } from "@/features/adaptive-keyboard/adaptive-keyboard";
 import { useKeyboardWithRHF } from "@/shared/hooks";
 import { cn } from "@/shared/utils/cn";
 import {
@@ -27,6 +27,9 @@ import {
   type UserCreateFormData,
 } from "../../schemas/user-schema";
 import { useAuth } from "@/shared/hooks/use-auth";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('add-user-form');
 
 interface AddUserFormProps {
   onSubmit: (data: UserCreateFormData) => Promise<void>;
@@ -81,7 +84,7 @@ export function AddUserForm({
   }, [isOpen, keyboard]);
 
   const handleSubmit = async (data: UserCreateFormData) => {
-    console.log("Add form submitted with data:", data);
+    logger.info("Add form submitted with data:", data);
 
     if (!user?.businessId) {
       form.setError("root", { message: "Business ID not found" });
@@ -98,7 +101,7 @@ export function AddUserForm({
       // Close keyboard on successful submit
       keyboard.handleCloseKeyboard();
     } catch (error) {
-      console.error("Error in add form submit:", error);
+      logger.error("Error in add form submit:", error);
       form.setError("root", {
         message: "Failed to create staff member. Please try again.",
       });
@@ -109,7 +112,7 @@ export function AddUserForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(handleSubmit, (errors) => {
-          console.error("Add form validation errors:", errors);
+          logger.error("Add form validation errors:", errors);
         })}
         className="space-y-4"
       >
@@ -125,7 +128,6 @@ export function AddUserForm({
           name="avatar"
           render={({ field }) => (
             <FormItem>
-
               <FormControl>
                 <AvatarUpload
                   label="Profile Picture (Optional)"
@@ -147,7 +149,6 @@ export function AddUserForm({
             name="firstName"
             render={() => (
               <FormItem>
-
                 <FormControl>
                   <AdaptiveFormField
                     {...form.register("firstName")}
@@ -158,7 +159,8 @@ export function AddUserForm({
                     placeholder="John"
                     className={cn(
                       "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                      keyboard.activeField === "firstName" && "ring-2 ring-primary border-primary"
+                      keyboard.activeField === "firstName" &&
+                        "ring-2 ring-primary border-primary"
                     )}
                     readOnly
                   />
@@ -173,7 +175,6 @@ export function AddUserForm({
             name="lastName"
             render={() => (
               <FormItem>
-
                 <FormControl>
                   <AdaptiveFormField
                     {...form.register("lastName")}
@@ -184,7 +185,8 @@ export function AddUserForm({
                     placeholder="Smith"
                     className={cn(
                       "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                      keyboard.activeField === "lastName" && "ring-2 ring-primary border-primary"
+                      keyboard.activeField === "lastName" &&
+                        "ring-2 ring-primary border-primary"
                     )}
                     readOnly
                   />
@@ -201,7 +203,6 @@ export function AddUserForm({
           name="email"
           render={() => (
             <FormItem>
-        
               <FormControl>
                 <AdaptiveFormField
                   {...form.register("email")}
@@ -212,7 +213,8 @@ export function AddUserForm({
                   placeholder="john.smith@example.com"
                   className={cn(
                     "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                    keyboard.activeField === "email" && "ring-2 ring-primary border-primary"
+                    keyboard.activeField === "email" &&
+                      "ring-2 ring-primary border-primary"
                   )}
                   readOnly
                 />
@@ -228,7 +230,6 @@ export function AddUserForm({
           name="address"
           render={() => (
             <FormItem>
-
               <FormControl>
                 <AdaptiveFormField
                   {...form.register("address")}
@@ -239,7 +240,8 @@ export function AddUserForm({
                   placeholder="123 Main Street, City, State"
                   className={cn(
                     "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                    keyboard.activeField === "address" && "ring-2 ring-primary border-primary"
+                    keyboard.activeField === "address" &&
+                      "ring-2 ring-primary border-primary"
                   )}
                   readOnly
                 />
@@ -310,7 +312,8 @@ export function AddUserForm({
                     placeholder="Minimum 8 characters"
                     className={cn(
                       "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                      keyboard.activeField === "password" && "ring-2 ring-primary border-primary"
+                      keyboard.activeField === "password" &&
+                        "ring-2 ring-primary border-primary"
                     )}
                     readOnly
                   />
@@ -336,7 +339,8 @@ export function AddUserForm({
                     placeholder="Confirm password"
                     className={cn(
                       "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                      keyboard.activeField === "confirmPassword" && "ring-2 ring-primary border-primary"
+                      keyboard.activeField === "confirmPassword" &&
+                        "ring-2 ring-primary border-primary"
                     )}
                     readOnly
                   />
@@ -348,10 +352,12 @@ export function AddUserForm({
         </div>
 
         {/* Actions */}
-        <div className={cn(
-          "flex flex-col sm:flex-row gap-2 sm:gap-2 pt-4",
-          keyboard.showKeyboard && "pb-[340px]"
-        )}>
+        <div
+          className={cn(
+            "flex flex-col sm:flex-row gap-2 sm:gap-2 pt-4",
+            keyboard.showKeyboard && "pb-[340px]"
+          )}
+        >
           <Button
             type="submit"
             disabled={isLoading}

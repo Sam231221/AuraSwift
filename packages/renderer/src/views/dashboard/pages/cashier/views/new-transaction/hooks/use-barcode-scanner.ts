@@ -5,10 +5,16 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { useProductionScanner } from "@/shared/hooks/use-production-scanner";
+import { useProductionScanner } from "@/features/barcode-scanner/use-production-scanner";
 import { ScannerAudio } from "@/shared/services/scanner-audio";
 import type { Product } from "@/features/products/types/product.types";
-import { isWeightedProduct, getProductSalesUnit } from "../utils/product-helpers";
+
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('use-barcode-scanner');
+import {
+  isWeightedProduct,
+  getProductSalesUnit,
+} from "../utils/product-helpers";
 
 interface UseBarcodeScannerProps {
   products: Product[];
@@ -47,7 +53,7 @@ export function useBarcodeScanner({
    */
   const handleHardwareScan = useCallback(
     async (barcode: string): Promise<boolean> => {
-      console.log("🔍 Hardware scanner detected barcode:", barcode);
+      logger.info("🔍 Hardware scanner detected barcode:", barcode);
 
       // Search by barcode, PLU, or SKU
       const product = products.find(
@@ -98,11 +104,11 @@ export function useBarcodeScanner({
         } else {
           // Normal product, add directly to cart
           await onProductFound(product);
-          console.log("✅ Product added to cart:", product.name);
+          logger.info("✅ Product added to cart:", product.name);
           return true; // Success!
         }
       } else {
-        console.warn("❌ Product not found for barcode:", barcode);
+        logger.warn("❌ Product not found for barcode:", barcode);
         toast.error(`Product not found: ${barcode}`);
         return false; // Product not found
       }
@@ -156,9 +162,7 @@ export function useBarcodeScanner({
           onSetWeightDisplayPrice("0.00");
           onSetSelectedWeightProduct(product);
           const unit = getProductSalesUnit(product);
-          toast.error(
-            `Please enter weight in ${unit} for ${product.name}`
-          );
+          toast.error(`Please enter weight in ${unit} for ${product.name}`);
         }
       } else {
         await onProductFound(product);
@@ -192,7 +196,7 @@ export function useBarcodeScanner({
   // Initialize audio on component mount
   useEffect(() => {
     if (audioEnabled) {
-      ScannerAudio.init().catch(console.warn);
+      ScannerAudio.init().catch((error) => logger.warn('Failed to initialize scanner audio', error));
     }
   }, [audioEnabled]);
 
@@ -202,4 +206,3 @@ export function useBarcodeScanner({
     handleBarcodeScan,
   };
 }
-

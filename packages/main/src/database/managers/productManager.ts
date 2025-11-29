@@ -2,6 +2,9 @@ import type { Product, NewProduct, StockAdjustment } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql, desc, asc } from "drizzle-orm";
 import * as schema from "../schema.js";
+
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('productManager');
 import type {
   PaginationParams,
   PaginatedResult,
@@ -445,7 +448,7 @@ export class ProductManager {
         product: completeProduct,
       };
     } catch (error: any) {
-      console.error("Product creation error:", error);
+      logger.error("Product creation error:", error);
       return {
         success: false,
         message: error.message || "Failed to create product",
@@ -465,7 +468,7 @@ export class ProductManager {
         products,
       };
     } catch (error: any) {
-      console.error("Get products error:", error);
+      logger.error("Get products error:", error);
       return {
         success: false,
         message: error.message || "Failed to get products",
@@ -483,7 +486,7 @@ export class ProductManager {
         product,
       };
     } catch (error: any) {
-      console.error("Get product error:", error);
+      logger.error("Get product error:", error);
       return {
         success: false,
         message: error.message || "Product not found",
@@ -538,7 +541,7 @@ export class ProductManager {
         product: updatedProduct,
       };
     } catch (error: any) {
-      console.error("Product update error:", error);
+      logger.error("Product update error:", error);
       return {
         success: false,
         message: error.message || "Failed to update product",
@@ -555,7 +558,7 @@ export class ProductManager {
         message: "Product deleted successfully",
       };
     } catch (error: any) {
-      console.error("Product deletion error:", error);
+      logger.error("Product deletion error:", error);
       return {
         success: false,
         message: error.message || "Failed to delete product",

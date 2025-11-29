@@ -26,7 +26,7 @@ export class ScannerAudio {
         await this.audioContext.resume();
       }
     } catch (error) {
-      console.warn("Failed to initialize audio context:", error);
+      logger.warn("Failed to initialize audio context:", error);
       this.isEnabled = false;
     }
   }
@@ -101,7 +101,7 @@ export class ScannerAudio {
         }, 150);
       }
     } catch (error) {
-      console.warn("Failed to play beep sound:", error);
+      logger.warn("Failed to play beep sound:", error);
       // Fallback to system beep if available
       this.playFallbackBeep();
     }
@@ -136,7 +136,7 @@ export class ScannerAudio {
       oscillator.start(this.audioContext.currentTime);
       oscillator.stop(this.audioContext.currentTime + 0.3);
     } catch (error) {
-      console.warn("Failed to play secondary error tone:", error);
+      logger.warn("Failed to play secondary error tone:", error);
     }
   }
 
@@ -197,7 +197,7 @@ export class ScannerAudio {
    * Test audio functionality
    */
   static async test(): Promise<void> {
-    console.log("Testing scanner audio...");
+    logger.info("Testing scanner audio...");
     await this.success();
     setTimeout(async () => {
       await this.warning();

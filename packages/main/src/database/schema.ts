@@ -12,19 +12,10 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { relations, sql } from "drizzle-orm";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
+import type { Permission } from "../constants/permissions.js";
 
 const createTable = sqliteTableCreator((name) => name);
 const index = drizzleIndex;
-
-export type Permission =
-  | "read:sales"
-  | "write:sales"
-  | "read:reports"
-  | "manage:inventory"
-  | "manage:users"
-  | "view:analytics"
-  | "override:transactions"
-  | "manage:settings";
 
 // ============================================================================
 // COMMON COLUMN DEFINITIONS
@@ -72,21 +63,21 @@ export const appSettings = createTable("app_settings", {
  */
 export const auditLogs = createTable("audit_logs", {
   id: text("id").primaryKey(),
-  userId: text("userId")
+  user_id: text("user_id")
     .notNull()
     .references(() => users.id),
   action: text("action").notNull(),
   resource: text("resource").notNull(),
-  resourceId: text("resourceId").notNull(),
-  entityType: text("entityType"),
-  entityId: text("entityId"),
+  resource_id: text("resource_id").notNull(),
+  entity_type: text("entity_type"),
+  entity_id: text("entity_id"),
   details: text("details"),
-  ipAddress: text("ipAddress"),
-  terminalId: text("terminalId"),
-  timestamp: text("timestamp").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
+  ip_address: text("ip_address"),
+  terminal_id: text("terminal_id").references(() => terminals.id),
+  timestamp: integer("timestamp", { mode: "timestamp_ms" })
     .$defaultFn(() => new Date())
     .notNull(),
+  ...timestampColumns,
 });
 
 // ============================================================================
@@ -129,6 +120,34 @@ export const businesses = createTable("businesses", {
 });
 
 /**
+ * Roles - Define sets of permissions that can be assigned to users
+ * Supports both system roles and custom business-specific roles
+ */
+export const roles = createTable(
+  "roles",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(), // 'cashier', 'manager', 'admin', 'custom_role'
+    displayName: text("display_name").notNull(), // 'Cashier', 'Store Manager', 'Administrator'
+    description: text("description"),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    permissions: text("permissions", { mode: "json" })
+      .$type<Permission[]>()
+      .notNull(),
+    isSystemRole: integer("is_system_role", { mode: "boolean" }).default(false), // 1 for built-in roles
+    isActive: integer("is_active", { mode: "boolean" }).default(true),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("idx_roles_business").on(table.businessId),
+    index("idx_roles_name").on(table.name),
+    unique("unique_role_name_per_business").on(table.businessId, table.name),
+  ]
+);
+
+/**
  * User accounts with authentication and authorization
  */
 export const users = createTable("users", {
@@ -141,23 +160,117 @@ export const users = createTable("users", {
   firstName: text("firstName").notNull(),
   lastName: text("lastName").notNull(),
   businessName: text("businessName").notNull(),
-  role: text("role", {
-    enum: ["cashier", "supervisor", "manager", "admin", "owner"],
-  }).notNull(),
+
   businessId: text("businessId")
     .notNull()
     .references(() => businesses.id, { onDelete: "cascade" }),
-  permissions: text("permissions", { mode: "json" })
-    .$type<Permission[]>()
-    .notNull(),
 
-  lastLoginAt: integer("lastLoginAt", { mode: "timestamp_ms" }),
+  // RBAC fields
+  primaryRoleId: text("primary_role_id").references(() => roles.id), // Main role for UI/display
+  shiftRequired: integer("shift_required", { mode: "boolean" }), // NULL = auto-detect, 0 = no, 1 = yes
+  activeRoleContext: text("active_role_context"), // For UI role switcher (optional)
+
   isActive: integer("isActive", { mode: "boolean" }).default(true),
-  loginAttempts: integer("login_attempts").default(0),
-  lockedUntil: integer("locked_until", { mode: "timestamp_ms" }),
   address: text("address").default(""),
   ...timestampColumns,
 });
+
+/**
+ * User Roles - Junction table for many-to-many relationship between users and roles
+ */
+export const userRoles = createTable(
+  "user_roles",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roleId: text("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    assignedBy: text("assigned_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    assignedAt: integer("assigned_at", { mode: "timestamp_ms" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }), // Optional: temporary role
+    isActive: integer("is_active", { mode: "boolean" }).default(true),
+  },
+  (table) => [
+    unique("idx_user_roles_unique").on(table.userId, table.roleId),
+    index("idx_user_roles_user").on(table.userId),
+    index("idx_user_roles_role").on(table.roleId),
+  ]
+);
+
+/**
+ * User Permissions - Direct permission grants to users (outside of roles)
+ */
+export const userPermissions = createTable(
+  "user_permissions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    permission: text("permission").notNull(), // 'read:sales', 'write:sales', etc.
+    grantedBy: text("granted_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    grantedAt: integer("granted_at", { mode: "timestamp_ms" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }), // Optional: temporary permission
+    reason: text("reason"), // Why was this permission granted?
+    isActive: integer("is_active", { mode: "boolean" }).default(true),
+  },
+  (table) => [
+    unique("idx_user_permissions_unique").on(table.userId, table.permission),
+    index("idx_user_permissions_user").on(table.userId),
+  ]
+);
+
+/**
+ * Terminals/Devices authorized to access the system
+ */
+export const terminals = createTable(
+  "terminals",
+  {
+    id: text("id").primaryKey(),
+    business_id: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+
+    name: text("name").notNull(), // e.g., "Front Counter 1"
+    type: text("type", {
+      enum: ["pos", "kiosk", "handheld", "kitchen_display", "server"],
+    })
+      .notNull()
+      .default("pos"),
+
+    status: text("status", {
+      enum: ["active", "inactive", "maintenance", "decommissioned"],
+    })
+      .notNull()
+      .default("active"),
+
+    device_token: text("device_token").unique(), // For API authentication
+    ip_address: text("ip_address"),
+    mac_address: text("mac_address"),
+
+    // Hardware configuration
+    settings: text("settings", { mode: "json" }), // Printer, scanner, card reader config
+
+    last_active_at: integer("last_active_at", { mode: "timestamp_ms" }),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("terminals_business_idx").on(table.business_id),
+    index("terminals_status_idx").on(table.status),
+    index("terminals_token_idx").on(table.device_token),
+  ]
+);
 
 /**
  * User session tokens for authentication
@@ -702,7 +815,7 @@ export const stockAdjustments = createTable("stock_adjustments", {
   type: text("type", {
     enum: ["add", "remove", "sale", "waste", "adjustment"],
   }).notNull(),
-  quantity: integer("quantity").notNull(),
+  quantity: real("quantity").notNull(),
   reason: text("reason"),
   note: text("note"),
   userId: text("userId")
@@ -735,7 +848,7 @@ export const cartSessions = createTable(
     businessId: text("business_id")
       .notNull()
       .references(() => businesses.id),
-    stationId: text("station_id"), // Optional: POS station identifier
+    terminal_id: text("terminal_id").references(() => terminals.id),
 
     // Session status
     status: text("status", {
@@ -858,6 +971,7 @@ export const transactions = createTable("transactions", {
   businessId: text("businessId")
     .notNull()
     .references(() => businesses.id),
+  terminalId: text("terminal_id").references(() => terminals.id),
   type: text("type", { enum: ["sale", "refund", "void"] }).notNull(),
   subtotal: real("subtotal").notNull(),
   tax: real("tax").notNull(),
@@ -1034,8 +1148,8 @@ export const schedules = createTable("schedules", {
   businessId: text("businessId")
     .notNull()
     .references(() => businesses.id),
-  startTime: text("startTime").notNull(),
-  endTime: text("endTime").notNull(),
+  startTime: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+  endTime: integer("end_time", { mode: "timestamp_ms" }),
   status: text("status", {
     enum: ["upcoming", "active", "completed", "missed"],
   }).notNull(),
@@ -1045,36 +1159,82 @@ export const schedules = createTable("schedules", {
 });
 
 /**
- * Cashier shifts for POS operations
- * Linked to timeShifts for clock-in/clock-out tracking
+ * Unified Shifts table for POS operations and time tracking
+ * Uses clock events as source of truth for timing
+ * Supports both cashier shifts (with cash drawer) and general employee shifts
  */
-export const shifts = createTable("shifts", {
-  id: text("id").primaryKey(),
-  scheduleId: text("scheduleId").references(() => schedules.id),
-  timeShiftId: text("timeShiftId").references(() => timeShifts.id, {
-    onDelete: "set null",
-  }), // Link to time tracking shift
-  cashierId: text("cashierId")
-    .notNull()
-    .references(() => users.id),
-  businessId: text("businessId")
-    .notNull()
-    .references(() => businesses.id),
-  deviceId: text("deviceId"), // Device/terminal identifier for concurrent access tracking
-  startTime: text("startTime").notNull(),
-  endTime: text("endTime"),
-  status: text("status", { enum: ["active", "ended"] }).notNull(),
-  startingCash: real("startingCash").notNull(),
-  finalCashDrawer: real("finalCashDrawer"),
-  expectedCashDrawer: real("expectedCashDrawer"),
-  cashVariance: real("cashVariance"),
-  totalSales: real("totalSales").default(0),
-  totalTransactions: integer("totalTransactions").default(0),
-  totalRefunds: real("totalRefunds").default(0),
-  totalVoids: real("totalVoids").default(0),
-  notes: text("notes"),
-  ...timestampColumns,
-});
+export const shifts = createTable(
+  "shifts",
+  {
+    id: text("id").primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    business_id: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+
+    // Scheduling
+    schedule_id: text("schedule_id").references(() => schedules.id, {
+      onDelete: "set null",
+    }),
+
+    // Clock events (time tracking) - SOURCE OF TRUTH for timing
+    clock_in_id: text("clock_in_id")
+      .notNull()
+      .references(() => clockEvents.id, { onDelete: "restrict" }),
+    clock_out_id: text("clock_out_id").references(() => clockEvents.id, {
+      onDelete: "restrict",
+    }),
+
+    // Shift status
+    status: text("status", {
+      enum: ["active", "ended", "pending_review"],
+    })
+      .notNull()
+      .default("active"),
+
+    // POS-specific data (nullable for non-POS shifts)
+    terminal_id: text("terminal_id").references(() => terminals.id), // Terminal identifier
+    starting_cash: real("starting_cash"), // Only for POS shifts, recorded at shift start
+
+    // Sales totals (for POS shifts)
+    total_sales: real("total_sales").default(0),
+    total_transactions: integer("total_transactions").default(0),
+    total_refunds: real("total_refunds").default(0),
+    total_voids: real("total_voids").default(0),
+
+    // Time tracking calculations
+    // ⚠️ COMPUTED: Calculated from clockOut.timestamp - clockIn.timestamp - break_duration_seconds
+    total_hours: real("total_hours"),
+    regular_hours: real("regular_hours"),
+    overtime_hours: real("overtime_hours"),
+
+    // ⚠️ COMPUTED: SUM(duration_seconds) from breaks table
+    break_duration_seconds: integer("break_duration_seconds").default(0),
+
+    notes: text("notes"),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("shifts_user_idx").on(table.user_id),
+    index("shifts_business_idx").on(table.business_id),
+    index("shifts_status_idx").on(table.status),
+    index("shifts_schedule_idx").on(table.schedule_id),
+    index("shifts_clock_in_idx").on(table.clock_in_id),
+    index("shifts_clock_out_idx").on(table.clock_out_id),
+    index("shifts_terminal_idx").on(table.terminal_id),
+
+    // Compound indexes for common queries
+    index("shifts_user_status_idx").on(table.user_id, table.status),
+    index("shifts_business_created_idx").on(table.business_id, table.createdAt),
+    index("shifts_user_created_idx").on(table.user_id, table.createdAt),
+
+    // Unique constraints - each clock event can only be used once
+    unique("shifts_clock_in_unique").on(table.clock_in_id),
+    unique("shifts_clock_out_unique").on(table.clock_out_id),
+  ]
+);
 
 /**
  * Cash drawer counts (mid-shift and end-shift)
@@ -1083,40 +1243,40 @@ export const cashDrawerCounts = createTable(
   "cash_drawer_counts",
   {
     id: text("id").primaryKey(),
-    businessId: text("business_id").notNull(),
-    createdAt: text("created_at")
-      .default(sql`CURRENT_TIMESTAMP`)
-      .notNull(),
-    updatedAt: text("updated_at")
-      .default(sql`CURRENT_TIMESTAMP`)
-      .$onUpdate(() => sql`CURRENT_TIMESTAMP`),
-
-    shiftId: text("shift_id")
+    business_id: text("business_id")
       .notNull()
-      .references(() => shifts.id),
-    countType: text("count_type", {
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    shift_id: text("shift_id")
+      .notNull()
+      .references(() => shifts.id, { onDelete: "cascade" }),
+    terminal_id: text("terminal_id").references(() => terminals.id),
+
+    count_type: text("count_type", {
       enum: ["mid-shift", "end-shift"],
     }).notNull(),
-    expectedAmount: real("expected_amount").notNull(),
-    countedAmount: real("counted_amount").notNull(),
+
+    expected_amount: real("expected_amount").notNull(),
+    counted_amount: real("counted_amount").notNull(),
     variance: real("variance").notNull(),
+
     notes: text("notes"),
-    countedBy: text("counted_by")
+    counted_by: text("counted_by")
       .notNull()
       .references(() => users.id),
-    timestamp: text("timestamp").notNull(), // ISO string
+
+    timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+    ...timestampColumns,
   },
   (table) => [
-    // Index for frequent queries
-    index("cash_drawer_counts_shift_idx").on(table.shiftId),
-    index("cash_drawer_counts_business_idx").on(table.businessId),
+    index("cash_drawer_counts_shift_idx").on(table.shift_id),
+    index("cash_drawer_counts_business_idx").on(table.business_id),
     index("cash_drawer_counts_timestamp_idx").on(table.timestamp),
-    index("cash_drawer_counts_counted_by_idx").on(table.countedBy),
+    index("cash_drawer_counts_counted_by_idx").on(table.counted_by),
 
     // Ensure only one end-shift count per shift
     unique("cash_drawer_counts_shift_type_unique").on(
-      table.shiftId,
-      table.countType
+      table.shift_id,
+      table.count_type
     ),
   ]
 );
@@ -1146,6 +1306,10 @@ export const VALIDATION_ISSUE_CODES = {
 
   // Compliance issues
   MISSING_BREAK: "MISSING_BREAK",
+  BREAK_TOO_SHORT: "BREAK_TOO_SHORT",
+  BREAK_TOO_LONG: "BREAK_TOO_LONG",
+  MISSED_REQUIRED_BREAK: "MISSED_REQUIRED_BREAK",
+  LATE_BREAK_RETURN: "LATE_BREAK_RETURN",
   EXCESSIVE_OVERTIME: "EXCESSIVE_OVERTIME",
 } as const;
 
@@ -1384,105 +1548,162 @@ export const attendanceReports = createTable(
 /**
  * Clock in/out events for time tracking
  */
-export const clockEvents = createTable("clock_events", {
-  id: text("id").primaryKey(),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id),
-  terminalId: text("terminalId").notNull(),
-  locationId: text("locationId"),
-  type: text("type", { enum: ["in", "out"] }).notNull(),
-  timestamp: text("timestamp").notNull(),
-  method: text("method", {
-    enum: ["login", "manual", "auto", "manager"],
-  }).notNull(),
-  status: text("status", { enum: ["pending", "confirmed", "disputed"] })
-    .notNull()
-    .default("confirmed"),
-  geolocation: text("geolocation"),
-  ipAddress: text("ipAddress"),
-  notes: text("notes"),
-  ...timestampColumns,
-});
+export const clockEvents = createTable(
+  "clock_events",
+  {
+    id: text("id").primaryKey(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    business_id: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    terminal_id: text("terminal_id")
+      .notNull()
+      .references(() => terminals.id),
+    location_id: text("location_id"),
+
+    type: text("type", { enum: ["in", "out"] }).notNull(),
+    timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+
+    method: text("method", {
+      enum: ["login", "manual", "auto", "manager"],
+    }).notNull(),
+    status: text("status", { enum: ["pending", "confirmed", "disputed"] })
+      .notNull()
+      .default("confirmed"),
+
+    geolocation: text("geolocation"),
+    ip_address: text("ip_address"),
+    notes: text("notes"),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("clock_events_user_idx").on(table.user_id),
+    index("clock_events_business_idx").on(table.business_id),
+    index("clock_events_timestamp_idx").on(table.timestamp),
+    index("clock_events_type_idx").on(table.type),
+    index("clock_events_status_idx").on(table.status),
+
+    // Compound indexes for common queries
+    index("clock_events_user_timestamp_idx").on(table.user_id, table.timestamp),
+    index("clock_events_business_timestamp_idx").on(
+      table.business_id,
+      table.timestamp
+    ),
+  ]
+);
 
 /**
- * Time shifts (work periods) linked to clock events
+ * Break periods during shifts
+ * Supports compliance tracking and scheduling
  */
-export const timeShifts = createTable("time_shifts", {
-  id: text("id").primaryKey(),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id),
-  businessId: text("businessId")
-    .notNull()
-    .references(() => businesses.id),
-  clockInId: text("clockInId")
-    .notNull()
-    .references(() => clockEvents.id),
-  clockOutId: text("clockOutId").references(() => clockEvents.id),
-  scheduleId: text("scheduleId").references(() => schedules.id),
-  status: text("status", { enum: ["active", "completed", "pending_review"] })
-    .notNull()
-    .default("active"),
-  totalHours: real("totalHours"),
-  regularHours: real("regularHours"),
-  overtimeHours: real("overtimeHours"),
-  breakDuration: integer("breakDuration"),
-  notes: text("notes"),
-  ...timestampColumns,
-});
+export const breaks = createTable(
+  "breaks",
+  {
+    id: text("id").primaryKey(),
+    shift_id: text("shift_id")
+      .notNull()
+      .references(() => shifts.id, { onDelete: "cascade" }),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    business_id: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
 
-/**
- * Break periods during time shifts
- */
-export const breaks = createTable("breaks", {
-  id: text("id").primaryKey(),
-  shiftId: text("shiftId")
-    .notNull()
-    .references(() => timeShifts.id),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id),
-  type: text("type", { enum: ["meal", "rest", "other"] })
-    .notNull()
-    .default("rest"),
-  startTime: text("startTime").notNull(),
-  endTime: text("endTime"),
-  duration: integer("duration"),
-  isPaid: integer("isPaid", { mode: "boolean" }).default(false),
-  status: text("status", { enum: ["active", "completed"] })
-    .notNull()
-    .default("active"),
-  notes: text("notes"),
-  ...timestampColumns,
-});
+    // Break type and timing
+    type: text("type", { enum: ["meal", "rest", "other"] })
+      .notNull()
+      .default("rest"),
+    start_time: integer("start_time", { mode: "timestamp_ms" }).notNull(),
+    end_time: integer("end_time", { mode: "timestamp_ms" }),
+    duration_seconds: integer("duration_seconds"), // Actual duration when completed
+    is_paid: integer("is_paid", { mode: "boolean" }).default(false),
+
+    // Status
+    status: text("status", {
+      enum: ["scheduled", "active", "completed", "cancelled", "missed"],
+    })
+      .notNull()
+      .default("active"),
+
+    // Compliance tracking
+    is_required: integer("is_required", { mode: "boolean" }).default(false),
+    required_reason: text("required_reason"), // e.g., "Labor law: 30min after 6 hours"
+    minimum_duration_seconds: integer("minimum_duration_seconds"),
+
+    // Scheduled vs actual
+    scheduled_start: integer("scheduled_start", { mode: "timestamp_ms" }),
+    scheduled_end: integer("scheduled_end", { mode: "timestamp_ms" }),
+
+    // Violation tracking
+    is_missed: integer("is_missed", { mode: "boolean" }).default(false),
+    is_short: integer("is_short", { mode: "boolean" }).default(false), // Didn't meet minimum
+
+    notes: text("notes"),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("breaks_shift_idx").on(table.shift_id),
+    index("breaks_user_idx").on(table.user_id),
+    index("breaks_business_idx").on(table.business_id),
+    index("breaks_status_idx").on(table.status),
+    index("breaks_type_idx").on(table.type),
+    index("breaks_start_time_idx").on(table.start_time),
+
+    // Compound indexes
+    index("breaks_shift_status_idx").on(table.shift_id, table.status),
+    index("breaks_user_start_idx").on(table.user_id, table.start_time),
+  ]
+);
 
 /**
  * Time corrections for manual adjustments to clock events
  */
-export const timeCorrections = createTable("time_corrections", {
-  id: text("id").primaryKey(),
-  clockEventId: text("clockEventId").references(() => clockEvents.id),
-  shiftId: text("shiftId").references(() => timeShifts.id),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id),
-  correctionType: text("correctionType", {
-    enum: ["clock_time", "break_time", "manual_entry"],
-  }).notNull(),
-  originalTime: text("originalTime"),
-  correctedTime: text("correctedTime").notNull(),
-  timeDifference: integer("timeDifference").notNull(),
-  reason: text("reason").notNull(),
-  requestedBy: text("requestedBy")
-    .notNull()
-    .references(() => users.id),
-  approvedBy: text("approvedBy").references(() => users.id),
-  status: text("status", { enum: ["pending", "approved", "rejected"] })
-    .notNull()
-    .default("pending"),
-  ...timestampColumns,
-});
+export const timeCorrections = createTable(
+  "time_corrections",
+  {
+    id: text("id").primaryKey(),
+    clock_event_id: text("clock_event_id").references(() => clockEvents.id),
+    shift_id: text("shift_id").references(() => shifts.id),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    business_id: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+
+    correction_type: text("correction_type", {
+      enum: ["clock_time", "break_time", "manual_entry"],
+    }).notNull(),
+
+    original_time: integer("original_time", { mode: "timestamp_ms" }),
+    corrected_time: integer("corrected_time", {
+      mode: "timestamp_ms",
+    }).notNull(),
+    time_difference_seconds: integer("time_difference_seconds").notNull(),
+
+    reason: text("reason").notNull(),
+    requested_by: text("requested_by")
+      .notNull()
+      .references(() => users.id),
+    approved_by: text("approved_by").references(() => users.id),
+
+    status: text("status", { enum: ["pending", "approved", "rejected"] })
+      .notNull()
+      .default("pending"),
+
+    ...timestampColumns,
+  },
+  (table) => [
+    index("time_corrections_clock_event_idx").on(table.clock_event_id),
+    index("time_corrections_shift_idx").on(table.shift_id),
+    index("time_corrections_user_idx").on(table.user_id),
+    index("time_corrections_business_idx").on(table.business_id),
+    index("time_corrections_status_idx").on(table.status),
+  ]
+);
 
 // ============================================================================
 // PRINTING
@@ -1513,6 +1734,7 @@ export const printJobs = createTable("print_jobs", {
   metadata: text("metadata"),
   createdBy: text("created_by").references(() => users.id),
   businessId: text("business_id").references(() => businesses.id),
+  terminalId: text("terminal_id").references(() => terminals.id),
   createdAt: text("created_at").notNull(),
   startedAt: text("started_at"),
   completedAt: text("completed_at"),
@@ -1567,9 +1789,37 @@ export const businessesRelations = relations(businesses, ({ one, many }) => ({
   shiftValidations: many(shiftValidations),
   cashDrawerCounts: many(cashDrawerCounts),
   attendanceReports: many(attendanceReports),
-  timeShifts: many(timeShifts),
   ageVerificationRecords: many(ageVerificationRecords),
   cartSessions: many(cartSessions),
+  clockEvents: many(clockEvents),
+  breaks: many(breaks),
+  timeCorrections: many(timeCorrections),
+  terminals: many(terminals),
+}));
+
+export const terminalsRelations = relations(terminals, ({ one, many }) => ({
+  business: one(businesses, {
+    fields: [terminals.business_id],
+    references: [businesses.id],
+  }),
+  shifts: many(shifts),
+  clockEvents: many(clockEvents),
+  auditLogs: many(auditLogs),
+  transactions: many(transactions),
+  cartSessions: many(cartSessions),
+  printJobs: many(printJobs),
+  cashDrawerCounts: many(cashDrawerCounts),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLogs.user_id],
+    references: [users.id],
+  }),
+  terminal: one(terminals, {
+    fields: [auditLogs.terminal_id],
+    references: [terminals.id],
+  }),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -1577,6 +1827,12 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.businessId],
     references: [businesses.id],
   }),
+  primaryRole: one(roles, {
+    fields: [users.primaryRoleId],
+    references: [roles.id],
+  }),
+  userRoles: many(userRoles),
+  userPermissions: many(userPermissions),
   sessions: many(sessions),
   auditLogs: many(auditLogs),
   shifts: many(shifts),
@@ -1588,7 +1844,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   printJobs: many(printJobs),
   cashDrawerCounts: many(cashDrawerCounts),
   clockEvents: many(clockEvents),
-  timeShifts: many(timeShifts),
   breaks: many(breaks),
   timeCorrections: many(timeCorrections),
   timeCorrectionsRequested: many(timeCorrections, {
@@ -1612,6 +1867,50 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+// ----------------------------------------------------------------------------
+// RBAC Relations
+// ----------------------------------------------------------------------------
+
+export const rolesRelations = relations(roles, ({ one, many }) => ({
+  business: one(businesses, {
+    fields: [roles.businessId],
+    references: [businesses.id],
+  }),
+  userRoles: many(userRoles),
+  primaryUsers: many(users),
+}));
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, {
+    fields: [userRoles.userId],
+    references: [users.id],
+  }),
+  role: one(roles, {
+    fields: [userRoles.roleId],
+    references: [roles.id],
+  }),
+  assignedByUser: one(users, {
+    fields: [userRoles.assignedBy],
+    references: [users.id],
+    relationName: "assignedBy",
+  }),
+}));
+
+export const userPermissionsRelations = relations(
+  userPermissions,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userPermissions.userId],
+      references: [users.id],
+    }),
+    grantedByUser: one(users, {
+      fields: [userPermissions.grantedBy],
+      references: [users.id],
+      relationName: "grantedBy",
+    }),
+  })
+);
 
 // ----------------------------------------------------------------------------
 // Product Catalog Relations
@@ -1935,26 +2234,32 @@ export const schedulesRelations = relations(schedules, ({ one, many }) => ({
     references: [businesses.id],
   }),
   shifts: many(shifts),
-  timeShifts: many(timeShifts),
 }));
 
 export const shiftsRelations = relations(shifts, ({ one, many }) => ({
-  timeShift: one(timeShifts, {
-    fields: [shifts.timeShiftId],
-    references: [timeShifts.id],
-  }),
-  schedule: one(schedules, {
-    fields: [shifts.scheduleId],
-    references: [schedules.id],
-  }),
-  cashier: one(users, {
-    fields: [shifts.cashierId],
+  user: one(users, {
+    fields: [shifts.user_id],
     references: [users.id],
   }),
   business: one(businesses, {
-    fields: [shifts.businessId],
+    fields: [shifts.business_id],
     references: [businesses.id],
   }),
+  schedule: one(schedules, {
+    fields: [shifts.schedule_id],
+    references: [schedules.id],
+  }),
+  clockIn: one(clockEvents, {
+    fields: [shifts.clock_in_id],
+    references: [clockEvents.id],
+    relationName: "clockIn",
+  }),
+  clockOut: one(clockEvents, {
+    fields: [shifts.clock_out_id],
+    references: [clockEvents.id],
+    relationName: "clockOut",
+  }),
+  breaks: many(breaks),
   transactions: many(transactions),
   cartSessions: many(cartSessions),
   cashDrawerCounts: many(cashDrawerCounts),
@@ -1963,18 +2268,30 @@ export const shiftsRelations = relations(shifts, ({ one, many }) => ({
     fields: [shifts.id],
     references: [shiftReports.shiftId],
   }),
+  terminal: one(terminals, {
+    fields: [shifts.terminal_id],
+    references: [terminals.id],
+  }),
 }));
 
 export const cashDrawerCountsRelations = relations(
   cashDrawerCounts,
   ({ one }) => ({
     shift: one(shifts, {
-      fields: [cashDrawerCounts.shiftId],
+      fields: [cashDrawerCounts.shift_id],
       references: [shifts.id],
     }),
     countedByUser: one(users, {
-      fields: [cashDrawerCounts.countedBy],
+      fields: [cashDrawerCounts.counted_by],
       references: [users.id],
+    }),
+    business: one(businesses, {
+      fields: [cashDrawerCounts.business_id],
+      references: [businesses.id],
+    }),
+    terminal: one(terminals, {
+      fields: [cashDrawerCounts.terminal_id],
+      references: [terminals.id],
     }),
   })
 );
@@ -2031,56 +2348,41 @@ export const attendanceReportsRelations = relations(
 
 export const clockEventsRelations = relations(clockEvents, ({ one, many }) => ({
   user: one(users, {
-    fields: [clockEvents.userId],
-    references: [users.id],
-  }),
-  clockInShifts: many(timeShifts, {
-    relationName: "clockIn",
-  }),
-  clockOutShifts: many(timeShifts, {
-    relationName: "clockOut",
-  }),
-  corrections: many(timeCorrections),
-}));
-
-export const timeShiftsRelations = relations(timeShifts, ({ one, many }) => ({
-  user: one(users, {
-    fields: [timeShifts.userId],
+    fields: [clockEvents.user_id],
     references: [users.id],
   }),
   business: one(businesses, {
-    fields: [timeShifts.businessId],
+    fields: [clockEvents.business_id],
     references: [businesses.id],
   }),
-  clockIn: one(clockEvents, {
-    fields: [timeShifts.clockInId],
-    references: [clockEvents.id],
+  clockInShifts: many(shifts, {
     relationName: "clockIn",
   }),
-  clockOut: one(clockEvents, {
-    fields: [timeShifts.clockOutId],
-    references: [clockEvents.id],
+  clockOutShifts: many(shifts, {
     relationName: "clockOut",
   }),
-  schedule: one(schedules, {
-    fields: [timeShifts.scheduleId],
-    references: [schedules.id],
-  }),
-  breaks: many(breaks),
-  posShifts: many(shifts, {
-    relationName: "timeShift",
-  }),
+
   corrections: many(timeCorrections),
+  terminal: one(terminals, {
+    fields: [clockEvents.terminal_id],
+    references: [terminals.id],
+  }),
 }));
 
+// timeShiftsRelations removed - table merged into shifts
+
 export const breaksRelations = relations(breaks, ({ one }) => ({
-  shift: one(timeShifts, {
-    fields: [breaks.shiftId],
-    references: [timeShifts.id],
+  shift: one(shifts, {
+    fields: [breaks.shift_id],
+    references: [shifts.id],
   }),
   user: one(users, {
-    fields: [breaks.userId],
+    fields: [breaks.user_id],
     references: [users.id],
+  }),
+  business: one(businesses, {
+    fields: [breaks.business_id],
+    references: [businesses.id],
   }),
 }));
 
@@ -2088,24 +2390,28 @@ export const timeCorrectionsRelations = relations(
   timeCorrections,
   ({ one }) => ({
     clockEvent: one(clockEvents, {
-      fields: [timeCorrections.clockEventId],
+      fields: [timeCorrections.clock_event_id],
       references: [clockEvents.id],
     }),
-    shift: one(timeShifts, {
-      fields: [timeCorrections.shiftId],
-      references: [timeShifts.id],
+    shift: one(shifts, {
+      fields: [timeCorrections.shift_id],
+      references: [shifts.id],
     }),
     user: one(users, {
-      fields: [timeCorrections.userId],
+      fields: [timeCorrections.user_id],
       references: [users.id],
     }),
+    business: one(businesses, {
+      fields: [timeCorrections.business_id],
+      references: [businesses.id],
+    }),
     requestedByUser: one(users, {
-      fields: [timeCorrections.requestedBy],
+      fields: [timeCorrections.requested_by],
       references: [users.id],
       relationName: "requestedBy",
     }),
     approvedByUser: one(users, {
-      fields: [timeCorrections.approvedBy],
+      fields: [timeCorrections.approved_by],
       references: [users.id],
       relationName: "approvedBy",
     }),
@@ -2125,6 +2431,10 @@ export const printJobsRelations = relations(printJobs, ({ one, many }) => ({
     fields: [printJobs.businessId],
     references: [businesses.id],
   }),
+  terminal: one(terminals, {
+    fields: [printJobs.terminalId],
+    references: [terminals.id],
+  }),
   retries: many(printJobRetries),
 }));
 
@@ -2141,6 +2451,14 @@ export const printJobRetriesRelations = relations(
 // ============================================================================
 // TYPE EXPORTS
 // ============================================================================
+
+// RBAC types
+export type Role = InferSelectModel<typeof roles>;
+export type NewRole = InferInsertModel<typeof roles>;
+export type UserRole = InferSelectModel<typeof userRoles>;
+export type NewUserRole = InferInsertModel<typeof userRoles>;
+export type UserPermission = InferSelectModel<typeof userPermissions>;
+export type NewUserPermission = InferInsertModel<typeof userPermissions>;
 
 // Category types
 export type Category = InferSelectModel<typeof categories>;
@@ -2202,6 +2520,10 @@ export type NewSchedule = InferInsertModel<typeof schedules>;
 export type Shift = InferSelectModel<typeof shifts>;
 export type NewShift = InferInsertModel<typeof shifts>;
 
+// Terminal types
+export type Terminal = InferSelectModel<typeof terminals>;
+export type NewTerminal = InferInsertModel<typeof terminals>;
+
 // Session types
 export type Session = InferSelectModel<typeof sessions>;
 export type NewSession = InferInsertModel<typeof sessions>;
@@ -2213,8 +2535,7 @@ export type NewCashDrawerCount = InferInsertModel<typeof cashDrawerCounts>;
 // Time Tracking types
 export type ClockEvent = InferSelectModel<typeof clockEvents>;
 export type NewClockEvent = InferInsertModel<typeof clockEvents>;
-export type TimeShift = InferSelectModel<typeof timeShifts>;
-export type NewTimeShift = InferInsertModel<typeof timeShifts>;
+
 export type Break = InferSelectModel<typeof breaks>;
 export type NewBreak = InferInsertModel<typeof breaks>;
 export type TimeCorrection = InferSelectModel<typeof timeCorrections>;

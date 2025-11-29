@@ -39,6 +39,9 @@ import Database from "better-sqlite3";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema.js";
 
+import { getLogger } from '../utils/logger.js';
+const logger = getLogger('drizzle-migrator');
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
@@ -86,7 +89,7 @@ function getMigrationsFolder(): string {
       `1. ${resourcesMigrationsPath} (extraResources - recommended)`
     );
     if (existsSync(resourcesMigrationsPath)) {
-      console.log(
+      logger.info(
         `   📁 Found migrations in extraResources: ${resourcesMigrationsPath}`
       );
       return resourcesMigrationsPath;
@@ -97,7 +100,7 @@ function getMigrationsFolder(): string {
   const distMigrationsPath = join(__dirname, "migrations");
   checkedPaths.push(`2. ${distMigrationsPath} (inside asar)`);
   if (existsSync(distMigrationsPath)) {
-    console.log(`   📁 Found migrations in asar: ${distMigrationsPath}`);
+    logger.info(`   📁 Found migrations in asar: ${distMigrationsPath}`);
     return distMigrationsPath;
   }
 
@@ -113,7 +116,7 @@ function getMigrationsFolder(): string {
   );
   checkedPaths.push(`3. ${appMigrationsPath} (app path)`);
   if (existsSync(appMigrationsPath)) {
-    console.log(`   📁 Found migrations in app path: ${appMigrationsPath}`);
+    logger.info(`   📁 Found migrations in app path: ${appMigrationsPath}`);
     return appMigrationsPath;
   }
 
@@ -121,7 +124,7 @@ function getMigrationsFolder(): string {
   const asarMigrationsPath = join(appPath, "database", "migrations");
   checkedPaths.push(`4. ${asarMigrationsPath} (legacy)`);
   if (existsSync(asarMigrationsPath)) {
-    console.log(
+    logger.info(
       `   📁 Found migrations in legacy location: ${asarMigrationsPath}`
     );
     return asarMigrationsPath;
@@ -161,10 +164,10 @@ function checkDatabaseIntegrity(
         quick_check: string;
       };
       if (quickCheck.quick_check !== "ok") {
-        console.warn("Quick check found issues, running full check...");
+        logger.warn("Quick check found issues, running full check...");
         // Fall through to full integrity check
       } else {
-        console.log("Quick integrity check passed");
+        logger.info("Quick integrity check passed");
       }
     }
 
@@ -173,10 +176,10 @@ function checkDatabaseIntegrity(
       integrity_check: string;
     };
     if (result.integrity_check !== "ok") {
-      console.error("Database integrity check failed:", result.integrity_check);
+      logger.error("Database integrity check failed:", result.integrity_check);
       return false;
     }
-    console.log("   ✅ Database integrity check passed");
+    logger.info("   ✅ Database integrity check passed");
 
     // 3. Foreign key check (if foreign keys are enabled)
     try {
@@ -187,28 +190,28 @@ function checkDatabaseIntegrity(
         fkid: number;
       }>;
       if (fkCheck.length > 0) {
-        console.error(
+        logger.error(
           `   ❌ Foreign key violations found: ${fkCheck.length} violation(s)`
         );
         if (!isProduction) {
           // In development, show details
           fkCheck.slice(0, 5).forEach((violation) => {
-            console.error(
+            logger.error(
               `      - Table: ${violation.table}, Row: ${violation.rowid}, Parent: ${violation.parent}`
             );
           });
         }
         return false;
       }
-      console.log("   ✅ Foreign key check passed");
+      logger.info("   ✅ Foreign key check passed");
     } catch (fkError) {
       // Foreign keys might not be enabled, which is OK
-      console.log("   ℹ️  Foreign key check skipped (FKs may not be enabled)");
+      logger.info("   ℹ️  Foreign key check skipped (FKs may not be enabled)");
     }
 
     return true;
   } catch (error) {
-    console.error("   ❌ Integrity check error:", error);
+    logger.error("   ❌ Integrity check error:", error);
     return false;
   }
 }
@@ -245,19 +248,19 @@ function cleanupOldBackups(backupDir: string, maxBackups: number = 10): void {
         try {
           totalFreed += backup.size;
           unlinkSync(backup.path);
-          console.log(`   🗑️  Removed old backup: ${backup.name}`);
+          logger.info(`   🗑️  Removed old backup: ${backup.name}`);
         } catch (error) {
-          console.warn(`   ⚠️  Failed to remove backup ${backup.name}:`, error);
+          logger.warn(`   ⚠️  Failed to remove backup ${backup.name}:`, error);
         }
       }
 
       if (totalFreed > 0) {
         const freedMB = (totalFreed / (1024 * 1024)).toFixed(2);
-        console.log(`   💾 Freed ${freedMB} MB by cleaning up old backups`);
+        logger.info(`   💾 Freed ${freedMB} MB by cleaning up old backups`);
       }
     }
   } catch (error) {
-    console.warn("   ⚠️  Failed to cleanup old backups:", error);
+    logger.warn("   ⚠️  Failed to cleanup old backups:", error);
     // Don't throw - backup cleanup failure shouldn't block migrations
   }
 }
@@ -274,7 +277,7 @@ async function rollbackMigration(
   rawDb: Database.Database
 ): Promise<boolean> {
   try {
-    console.log("   🔄 Attempting to rollback migration...");
+    logger.info("   🔄 Attempting to rollback migration...");
 
     // Close current database connection if it's open
     try {
@@ -287,18 +290,18 @@ async function rollbackMigration(
 
     // Verify backup exists
     if (!existsSync(backupPath)) {
-      console.error(`   ❌ Backup file not found: ${backupPath}`);
+      logger.error(`   ❌ Backup file not found: ${backupPath}`);
       return false;
     }
 
     // Restore from backup
     copyFileSync(backupPath, dbPath);
-    console.log("   ✅ Database restored from backup");
-    console.log(`   📦 Restored from: ${backupPath}`);
+    logger.info("   ✅ Database restored from backup");
+    logger.info(`   📦 Restored from: ${backupPath}`);
 
     return true;
   } catch (error) {
-    console.error("   ❌ Rollback failed:", error);
+    logger.error("   ❌ Rollback failed:", error);
     return false;
   }
 }
@@ -321,44 +324,44 @@ export async function runDrizzleMigrations(
   const migrationsFolder = getMigrationsFolder();
 
   try {
-    console.log("\n🚀 Running Drizzle ORM Migrations...");
+    logger.info("\n🚀 Running Drizzle ORM Migrations...");
     if (isProduction) {
-      console.log("   🔒 Production mode: Enhanced safety checks enabled");
+      logger.info("   🔒 Production mode: Enhanced safety checks enabled");
     } else {
-      console.log("   🛠️  Development mode: Relaxed migration checks");
+      logger.info("   🛠️  Development mode: Relaxed migration checks");
     }
-    console.log(`   📁 Migrations folder: ${migrationsFolder}`);
+    logger.info(`   📁 Migrations folder: ${migrationsFolder}`);
 
     // Check if migrations folder exists (getMigrationsFolder now throws if not found)
     // But we still check here for additional diagnostics
     if (!existsSync(migrationsFolder)) {
-      console.error(`   ❌ Migrations folder not found: ${migrationsFolder}`);
-      console.error(
+      logger.error(`   ❌ Migrations folder not found: ${migrationsFolder}`);
+      logger.error(
         "   💡 Make sure migrations are bundled with the app in production"
       );
-      console.error(`   📍 Current __dirname: ${__dirname}`);
-      console.error(
+      logger.error(`   📍 Current __dirname: ${__dirname}`);
+      logger.error(
         `   📍 App path: ${
           app.isPackaged ? app.getAppPath() : "N/A (dev mode)"
         }`
       );
-      console.error(`   📍 Resources path: ${process.resourcesPath || "N/A"}`);
+      logger.error(`   📍 Resources path: ${process.resourcesPath || "N/A"}`);
 
       // Try to list what's actually in the dist directory
       if (existsSync(__dirname)) {
         try {
           const distContents = readdirSync(__dirname);
-          console.error(
+          logger.error(
             `   📂 Contents of dist directory: ${distContents.join(", ")}`
           );
           if (!distContents.includes("migrations")) {
-            console.error(
+            logger.error(
               "   ⚠️  'migrations' folder not found in dist directory"
             );
           }
         } catch (e) {
           const errorMessage = e instanceof Error ? e.message : String(e);
-          console.error(
+          logger.error(
             `   ⚠️  Could not read dist directory: ${errorMessage}`
           );
         }
@@ -368,16 +371,16 @@ export async function runDrizzleMigrations(
       if (process.resourcesPath && existsSync(process.resourcesPath)) {
         try {
           const resourcesContents = readdirSync(process.resourcesPath);
-          console.error(
+          logger.error(
             `   📂 Contents of resources directory: ${resourcesContents.join(
               ", "
             )}`
           );
           if (!resourcesContents.includes("migrations")) {
-            console.error(
+            logger.error(
               "   ⚠️  'migrations' folder not found in resources directory"
             );
-            console.error(
+            logger.error(
               "   💡 Add migrations to extraResources in electron-builder.mjs"
             );
           }
@@ -397,7 +400,7 @@ export async function runDrizzleMigrations(
     }
 
     // Integrity check before migrations
-    console.log("   🔍 Checking database integrity...");
+    logger.info("   🔍 Checking database integrity...");
     if (!checkDatabaseIntegrity(rawDb, isProduction)) {
       throw new Error("Database integrity check failed - aborting migration");
     }
@@ -417,7 +420,7 @@ export async function runDrizzleMigrations(
 
     // Verify database file exists before backing up
     if (!existsSync(dbPath)) {
-      console.log(
+      logger.info(
         "   ℹ️  Database file doesn't exist yet - creating new database"
       );
     } else {
@@ -426,15 +429,15 @@ export async function runDrizzleMigrations(
       // .db-wal and .db-shm files that aren't included in simple file copies
       try {
         rawDb.prepare("PRAGMA wal_checkpoint(TRUNCATE)").run();
-        console.log("   ✅ WAL checkpoint completed - all data in main file");
+        logger.info("   ✅ WAL checkpoint completed - all data in main file");
       } catch (walError) {
-        console.warn("   ⚠️  WAL checkpoint failed (non-fatal):", walError);
+        logger.warn("   ⚠️  WAL checkpoint failed (non-fatal):", walError);
         // Continue with backup even if checkpoint fails
       }
 
       // Create backup
       copyFileSync(dbPath, backupPath);
-      console.log(`   📦 Backup created: ${backupPath}`);
+      logger.info(`   📦 Backup created: ${backupPath}`);
 
       // Verify backup was created successfully and is valid
       if (!existsSync(backupPath)) {
@@ -451,7 +454,7 @@ export async function runDrizzleMigrations(
         );
       }
 
-      console.log(
+      logger.info(
         `   ✅ Backup verified: ${(backupStats.size / 1024).toFixed(2)} KB`
       );
     }
@@ -477,30 +480,30 @@ export async function runDrizzleMigrations(
     // - Only running pending migrations
     // - Executing SQL statements in order
     // - Transaction management (each migration runs in its own transaction)
-    console.log("   ⚙️  Applying pending migrations...");
+    logger.info("   ⚙️  Applying pending migrations...");
     const startTime = Date.now();
     await migrate(db, { migrationsFolder: migrationsFolder });
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`   ⏱️  Migrations completed in ${duration}s`);
+    logger.info(`   ⏱️  Migrations completed in ${duration}s`);
 
     // Integrity check after migrations
-    console.log("   🔍 Verifying database integrity after migration...");
+    logger.info("   🔍 Verifying database integrity after migration...");
     if (!checkDatabaseIntegrity(rawDb, isProduction)) {
       throw new Error("Database integrity check failed after migration");
     }
 
-    console.log("   ✅ All migrations completed successfully!\n");
+    logger.info("   ✅ All migrations completed successfully!\n");
     return true;
   } catch (error) {
     // Provide detailed error context
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    console.error("   ❌ Migration failed:");
-    console.error(`   📍 Database path: ${dbPath}`);
-    console.error(`   📝 Error message: ${errorMessage}`);
+    logger.error("   ❌ Migration failed:");
+    logger.error(`   📍 Database path: ${dbPath}`);
+    logger.error(`   📝 Error message: ${errorMessage}`);
     if (errorStack) {
-      console.error(
+      logger.error(
         `   📋 Stack trace:\n${errorStack
           .split("\n")
           .map((line) => `      ${line}`)
@@ -510,25 +513,25 @@ export async function runDrizzleMigrations(
 
     // Attempt automatic rollback if backup exists
     if (backupPath && existsSync(backupPath) && existsSync(dbPath)) {
-      console.error("   🔄 Attempting automatic rollback...");
+      logger.error("   🔄 Attempting automatic rollback...");
       const rollbackSuccess = await rollbackMigration(
         dbPath,
         backupPath,
         rawDb
       );
       if (rollbackSuccess) {
-        console.error("   ✅ Migration rolled back successfully");
-        console.error("   💡 Database restored to pre-migration state");
+        logger.error("   ✅ Migration rolled back successfully");
+        logger.error("   💡 Database restored to pre-migration state");
       } else {
-        console.error("   ⚠️  Automatic rollback failed");
-        console.error(`   📦 Manual restore required from: ${backupPath}`);
+        logger.error("   ⚠️  Automatic rollback failed");
+        logger.error(`   📦 Manual restore required from: ${backupPath}`);
       }
     } else {
-      console.error(
+      logger.error(
         "   💡 Drizzle automatically rolled back the failed migration"
       );
       if (backupPath) {
-        console.error(`   📦 Backup available at: ${backupPath}`);
+        logger.error(`   📦 Backup available at: ${backupPath}`);
       }
     }
 
