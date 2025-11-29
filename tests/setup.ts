@@ -70,6 +70,33 @@ if (typeof window !== "undefined") {
 process.env.NODE_ENV = "test";
 process.env.HARDWARE_SIMULATION_MODE = "true";
 
+// Mock Electron app for logger (needed for main process tests)
+vi.mock("electron", () => {
+  return {
+    app: {
+      getPath: vi.fn((name: string) => {
+        if (name === "userData") {
+          return "/tmp/test-user-data";
+        }
+        return "/tmp/test-path";
+      }),
+      getName: vi.fn(() => "AuraSwift"),
+      getVersion: vi.fn(() => "1.8.0"),
+    },
+    ipcMain: {
+      handle: vi.fn(),
+      on: vi.fn(),
+      removeHandler: vi.fn(),
+    },
+    ipcRenderer: {
+      invoke: vi.fn(),
+      on: vi.fn(),
+      removeListener: vi.fn(),
+      send: vi.fn(),
+    },
+  };
+});
+
 // Cleanup after each test
 afterEach(() => {
   cleanup();
