@@ -27,8 +27,10 @@ export class TimeTrackingManager {
    */
   async createClockEvent(data: {
     userId: string;
+    businessId: string; // ✅ REQUIRED: business_id is NOT NULL in schema
     terminalId: string;
     locationId?: string;
+    scheduleId?: string; // ✅ NEW: Link to schedule
     type: "in" | "out";
     method?: "login" | "manual" | "auto" | "manager";
     geolocation?: string;
@@ -41,8 +43,10 @@ export class TimeTrackingManager {
     const clockEvent: ClockEvent = {
       id: eventId,
       userId: data.userId,
+      businessId: data.businessId, // ✅ REQUIRED: business_id is NOT NULL
       terminalId: data.terminalId,
       locationId: data.locationId ?? null,
+      scheduleId: data.scheduleId ?? null, // ✅ NEW: Link to schedule
       type: data.type,
       timestamp: now.toISOString(),
       method: data.method || "manual",
@@ -689,7 +693,7 @@ export class TimeTrackingManager {
     managerId: string,
     reason: string
   ): Promise<{ clockEvent: ClockEvent; shift: TimeShift }> {
-    const activeShift = this.getActiveShift(userId);
+    const activeShift = this.getShiftById(userId);
     if (!activeShift) {
       throw new Error("No active shift found for user");
     }
@@ -697,6 +701,7 @@ export class TimeTrackingManager {
     // Create clock-out event with manager method
     const clockOutEvent = await this.createClockEvent({
       userId,
+      businessId: activeShift.businessId, // ✅ REQUIRED: Get from shift
       terminalId: "manager_override",
       type: "out",
       method: "manager",

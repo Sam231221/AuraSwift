@@ -15,6 +15,7 @@ import {
 export interface AuthResponse {
   success: boolean;
   message: string;
+  code?: string; // ✅ NEW: Error code (e.g., "NO_SCHEDULED_SHIFT")
   user?: schema.User;
   users?: schema.User[];
   token?: string;
@@ -26,6 +27,8 @@ export interface AuthResponse {
   activeShift?: any; // Active shift (on logout)
   mode?: "admin" | "cashier"; // NEW: Sales mode (admin or cashier)
   requiresShift?: boolean; // NEW: Whether shift is required for this user
+  warning?: string; // Warning message (e.g., clock-in failure)
+  clockInError?: string; // Error message if clock-in failed
 }
 
 export class UserManager {
@@ -34,19 +37,22 @@ export class UserManager {
   private uuid: any;
   private sessionManager: any;
   private timeTrackingManager: any;
+  private scheduleManager: any;
 
   constructor(
     drizzle: DrizzleDB,
     bcrypt: any,
     uuid: any,
     sessionManager?: any,
-    timeTrackingManager?: any
+    timeTrackingManager?: any,
+    scheduleManager?: any
   ) {
     this.db = drizzle;
     this.bcrypt = bcrypt;
     this.uuid = uuid;
     this.sessionManager = sessionManager;
     this.timeTrackingManager = timeTrackingManager;
+    this.scheduleManager = scheduleManager;
   }
 
   setSessionManager(sessionManager: any): void {
@@ -55,6 +61,10 @@ export class UserManager {
 
   setTimeTrackingManager(timeTrackingManager: any): void {
     this.timeTrackingManager = timeTrackingManager;
+  }
+
+  setScheduleManager(scheduleManager: any): void {
+    this.scheduleManager = scheduleManager;
   }
 
   getUserByEmail(email: string): User | null {
@@ -147,6 +157,10 @@ export class UserManager {
   }
 
   getUserByUsername(username: string): User | null {
+    logger.info(
+      `[getUserByUsername] Looking up user with username: "${username}"`
+    );
+
     const [user] = this.db
       .select({
         id: schema.users.id,
@@ -178,8 +192,31 @@ export class UserManager {
       .limit(1)
       .all();
 
-    if (!user) return null;
+    if (!user) {
+      logger.warn(
+        `[getUserByUsername] No active user found with username: "${username}"`
+      );
+      // Try case-insensitive lookup for debugging
+      const allUsers = this.db
+        .select({
+          username: schema.users.username,
+          isActive: schema.users.isActive,
+        })
+        .from(schema.users)
+        .all();
+      logger.info(
+        `[getUserByUsername] Available usernames: ${allUsers
+          .map((u) => `${u.username} (active: ${u.isActive})`)
+          .join(", ")}`
+      );
+      return null;
+    }
 
+    logger.info(
+      `[getUserByUsername] Found user: ${user.id} (${user.firstName} ${
+        user.lastName
+      }), role: ${user.roleName || "none"}`
+    );
     return user as User;
   }
 
@@ -187,11 +224,68 @@ export class UserManager {
     username: string,
     pin: string
   ): Promise<User | null> {
-    const user = this.getUserByUsername(username);
-    if (!user) return null;
+    logger.info(
+      `[authenticateUserByUsernamePin] Attempting login for username: ${username}`
+    );
 
-    const isValidPin = await this.bcrypt.compare(pin, user.pinHash);
-    if (!isValidPin) return null;
+    const user = this.getUserByUsername(username);
+    if (!user) {
+      logger.warn(
+        `[authenticateUserByUsernamePin] User not found for username: ${username}`
+      );
+      return null;
+    }
+
+    logger.info(
+      `[authenticateUserByUsernamePin] User found: ${user.id} (${
+        user.firstName
+      } ${user.lastName}), isActive: ${
+        user.isActive
+      }, hasPinHash: ${!!user.pinHash}`
+    );
+
+    if (!user.pinHash) {
+      logger.error(
+        `[authenticateUserByUsernamePin] User ${user.id} has no PIN hash`
+      );
+      return null;
+    }
+
+    // Ensure PIN is a string and trim whitespace
+    const cleanPin = String(pin).trim();
+
+    logger.info(
+      `[authenticateUserByUsernamePin] Comparing PIN (length: ${cleanPin.length}, value: "${cleanPin}") for user ${user.id}`
+    );
+
+    // Validate PIN hash format
+    if (user.pinHash && !user.pinHash.startsWith("$2")) {
+      logger.error(
+        `[authenticateUserByUsernamePin] PIN hash format appears invalid (should start with $2): ${user.pinHash.substring(
+          0,
+          20
+        )}...`
+      );
+      return null;
+    }
+
+    const isValidPin = await this.bcrypt.compare(cleanPin, user.pinHash);
+    if (!isValidPin) {
+      logger.warn(
+        `[authenticateUserByUsernamePin] Invalid PIN for user ${user.id} (username: ${username}, PIN length: ${cleanPin.length})`
+      );
+      // Try to provide helpful debugging info
+      logger.info(
+        `[authenticateUserByUsernamePin] PIN hash exists: ${!!user.pinHash}, hash length: ${
+          user.pinHash?.length || 0
+        }, hash prefix: ${user.pinHash?.substring(0, 10) || "none"}`
+      );
+      return null;
+    }
+
+    logger.info(
+      `[authenticateUserByUsernamePin] ✅ Authentication successful for user ${user.id}`
+    );
 
     // Return user without passwordHash, pinHash, and salt
     const {
@@ -369,6 +463,8 @@ export class UserManager {
       primaryRoleId: string;
       isActive: boolean;
       address: string;
+      pinHash?: string;
+      salt?: string;
     }>
   ): { changes: number } {
     const result = this.db
@@ -378,6 +474,37 @@ export class UserManager {
       .run();
 
     return result;
+  }
+
+  /**
+   * Update user PIN (hashes the PIN before storing)
+   */
+  async updateUserPin(
+    userId: string,
+    newPin: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const user = this.getUserById(userId);
+      if (!user) {
+        return { success: false, message: "User not found" };
+      }
+
+      // Generate new salt and hash the PIN
+      const salt = await this.bcrypt.genSalt(10);
+      const pinHash = await this.bcrypt.hash(newPin, salt);
+
+      // Update user with new PIN hash and salt
+      this.updateUser(userId, { pinHash, salt });
+
+      logger.info(`[updateUserPin] PIN updated for user ${userId}`);
+      return { success: true, message: "PIN updated successfully" };
+    } catch (error) {
+      logger.error(
+        `[updateUserPin] Error updating PIN for user ${userId}:`,
+        error
+      );
+      return { success: false, message: "Failed to update PIN" };
+    }
   }
 
   deleteUser(id: string): { changes: number } {
@@ -548,8 +675,6 @@ export class UserManager {
     rememberMe?: boolean;
     terminalId?: string;
     ipAddress?: string;
-    locationId?: string;
-    autoClockIn?: boolean; // Default true for cashier/manager
   }): Promise<AuthResponse> {
     try {
       let user: User | null = null;
@@ -591,34 +716,24 @@ export class UserManager {
         };
       }
 
-      // Create session with custom expiry if rememberMe is set
+      // Create session with appropriate duration for desktop EPOS system
       if (!this.sessionManager) {
         throw new Error("Session manager not initialized");
       }
-      const session = this.sessionManager.createSession(
-        user.id,
-        rememberMe ? 30 : 0.5 // 30 days or 12 hours
-      );
 
       // Auto clock-in for cashiers and managers (if enabled)
       let clockEvent = null;
-      let shift = null;
-      let requiresClockIn = false;
+      let timeShift = null;
       let mode: "admin" | "cashier" = "admin";
+      let sessionExpiryHours: number;
 
+      // Resolve mode if time tracking is available
       if (this.timeTrackingManager) {
-        // Resolve shift requirement using RBAC-based resolver
         const { shiftRequirementResolver } = await import(
           "../../utils/shiftRequirementResolver.js"
         );
-        const { scheduleValidator } = await import(
-          "../../utils/scheduleValidator.js"
-        );
-
-        // Get database managers for resolver
         const { getDatabase } = await import("../index.js");
         const db = await getDatabase();
-
         const shiftRequirement = await shiftRequirementResolver.resolve(
           user,
           db
@@ -626,106 +741,108 @@ export class UserManager {
         mode = shiftRequirement.mode;
 
         logger.info(
-          `[login] Shift requirement resolved: requiresShift=${shiftRequirement.requiresShift}, mode=${shiftRequirement.mode}`
+          `[login] Shift requirement resolved: requiresShift=${shiftRequirement.requiresShift}, mode=${mode}`
         );
 
-        // Only auto clock-in if shift is required (cashier/manager mode)
-        if (shiftRequirement.requiresShift && data.autoClockIn !== false) {
+        // Auto clock-in if shift is required (cashier/manager mode)
+        if (shiftRequirement.requiresShift) {
+          // ✅ NEW: Find active schedule
+          const schedule = this.scheduleManager?.findActiveScheduleForClockIn(
+            user.id
+          );
+
+          if (!schedule) {
+            return {
+              success: false,
+              message:
+                "No scheduled shift found. You cannot clock in at this time.",
+              code: "NO_SCHEDULED_SHIFT",
+            };
+          }
+
           // Check for existing active shift
           const activeShift = this.timeTrackingManager.getActiveShift(user.id);
 
           if (!activeShift) {
             try {
-              // Validate schedule before clock-in
+              // Get business ID first
               const userWithBusiness = this.getUserWithBusiness(user.id);
-              if (userWithBusiness?.businessId) {
-                const scheduleValidation =
-                  await scheduleValidator.validateClockIn(
-                    user.id,
-                    userWithBusiness.businessId,
-                    db
-                  );
-
-                if (!scheduleValidation.canClockIn) {
-                  if (!scheduleValidation.requiresApproval) {
-                    // No schedule or critical issue - require manual clock-in
-                    logger.warn(
-                      `[login] Cannot auto clock-in: ${scheduleValidation.reason}`
-                    );
-                    requiresClockIn = true;
-                  } else {
-                    // Schedule validation failed but can proceed with approval
-                    logger.warn(
-                      `[login] Schedule validation warnings: ${scheduleValidation.warnings.join(
-                        ", "
-                      )}`
-                    );
-                    // Continue with clock-in but log the warnings
-                  }
-                }
-
-                // Proceed with clock-in (even if schedule validation has warnings)
-                if (!requiresClockIn) {
-                  // Create clock-in event
-                  clockEvent = await this.timeTrackingManager.createClockEvent({
-                    userId: user.id,
-                    terminalId: data.terminalId || "unknown",
-                    locationId: data.locationId,
-                    type: "in",
-                    method: "login",
-                    ipAddress: data.ipAddress,
-                  });
-
-                  // Validate clock event
-                  const validation =
-                    await this.timeTrackingManager.validateClockEvent(
-                      clockEvent
-                    );
-
-                  if (!validation.valid) {
-                    // Log warnings but don't fail login
-                    logger.warn(
-                      "Clock-in validation warnings:",
-                      validation.warnings
-                    );
-                  }
-
-                  // Create time shift
-                  shift = await this.timeTrackingManager.createShift({
-                    userId: user.id,
-                    businessId: userWithBusiness.businessId,
-                    clockInId: clockEvent.id,
-                    scheduleId: scheduleValidation.schedule?.id,
-                  });
-                }
+              if (!userWithBusiness?.businessId) {
+                throw new Error("User business not found");
               }
+
+              // Create clock-in event linked to schedule
+              clockEvent = await this.timeTrackingManager.createClockEvent({
+                userId: user.id,
+                businessId: userWithBusiness.businessId, // ✅ REQUIRED
+                terminalId: data.terminalId || "unknown",
+                scheduleId: schedule.id, // ✅ NEW: Link to schedule
+                type: "in",
+                method: "login",
+                ipAddress: data.ipAddress,
+              });
+
+              // Create time shift
+              // Create shift linked to schedule
+              timeShift = await this.timeTrackingManager.createShift({
+                userId: user.id,
+                businessId: userWithBusiness.businessId,
+                scheduleId: schedule.id, // ✅ Link to schedule
+                clockInId: clockEvent.id,
+              });
+
+              // Update schedule status to "active"
+              this.scheduleManager.updateScheduleStatus(schedule.id, "active");
+
+              logger.info(
+                `[login] Auto clock-in successful for scheduled shift ${schedule.id}`
+              );
             } catch (error) {
-              // Don't fail login if clock-in fails, but log it
               logger.error("Auto clock-in failed:", error);
-              requiresClockIn = true;
+              // Don't fail login if clock-in fails
             }
           } else {
             // User already has active shift
-            shift = activeShift;
+            timeShift = activeShift;
+            logger.info(
+              `[login] User ${user.id} already has active TimeShift ${activeShift.id}`
+            );
           }
-        } else {
-          // Admin/Owner mode - no clock-in needed
-          logger.info(
-            `[login] Admin/Owner mode - skipping auto clock-in for user ${user.id}`
-          );
         }
       }
+
+      // Set session expiry based on mode
+      if (mode === "cashier") {
+        // Shift-based users: 12 hours covers full shift, 48 hours for rememberMe
+        sessionExpiryHours = rememberMe ? 48 : 12;
+      } else {
+        // Admin users: 8 hours default, 30 days with rememberMe
+        sessionExpiryHours = rememberMe ? 30 * 24 : 8;
+      }
+
+      // Create session (Desktop EPOS: single long-lived token with secure storage)
+      const session = this.sessionManager.createSession(
+        user.id,
+        sessionExpiryHours / 24 // Convert hours to days
+      );
+
+      // Return user without sensitive fields
+      const {
+        passwordHash: _,
+        pinHash: __,
+        salt: ___,
+        ...userWithoutSecrets
+      } = user;
 
       return {
         success: true,
         message: "Login successful",
-        user,
+        user: userWithoutSecrets as schema.User,
         token: session.token,
+        mode, // Indicate mode (admin or cashier)
+        requiresShift: mode === "cashier", // Explicit shift requirement flag
         clockEvent: clockEvent as any,
-        shift: shift as any,
-        requiresClockIn,
-        mode, // NEW: Indicate mode (admin or cashier)
-        requiresShift: mode === "cashier", // NEW: Explicit shift requirement flag
+        shift: timeShift as any,
       };
     } catch (error) {
       logger.error("Login error:", error);
@@ -785,7 +902,6 @@ export class UserManager {
     options?: {
       terminalId?: string;
       ipAddress?: string;
-      autoClockOut?: boolean; // Default true for cashier/manager
     }
   ): Promise<AuthResponse> {
     try {
@@ -804,21 +920,11 @@ export class UserManager {
 
       const user = this.getUserById(session.userId);
 
-      // Check if user is clocked in (for warning, but don't force clock-out)
-      let activeShift = null;
-      let isClockedIn = false;
-
+      // Auto clock-out if user has active shift
       if (this.timeTrackingManager && user) {
-        activeShift = this.timeTrackingManager.getActiveShift(user.id);
-        isClockedIn = !!activeShift;
-        // Auto clock-out if enabled and user is clocked in
-        const shouldClockOut =
-          options?.autoClockOut !== false &&
-          (user.shiftRequired === true ||
-            (user.shiftRequired === null && !this.isAdminUser(user))) &&
-          isClockedIn;
+        const activeShift = this.timeTrackingManager.getActiveShift(user.id);
 
-        if (shouldClockOut && activeShift) {
+        if (activeShift) {
           try {
             // End any active breaks
             const activeBreak = this.timeTrackingManager.getActiveBreak(
@@ -826,25 +932,59 @@ export class UserManager {
             );
             if (activeBreak) {
               await this.timeTrackingManager.endBreak(activeBreak.id);
+              logger.info(
+                `[logout] Ended active break ${activeBreak.id} for user ${user.id}`
+              );
             }
 
-            // Create clock-out event
-            const clockEvent = await this.timeTrackingManager.createClockEvent({
-              userId: user.id,
-              terminalId: options?.terminalId || "unknown",
-              type: "out",
-              method: "logout",
-              ipAddress: options?.ipAddress,
-            });
+            // Get business ID for clock-out event
+            const userWithBusiness = this.getUserWithBusiness(user.id);
+            if (!userWithBusiness?.businessId) {
+              throw new Error("User business not found");
+            }
+
+            // Create clock-out event linked to schedule (if shift has one)
+            const clockOutEvent =
+              await this.timeTrackingManager.createClockEvent({
+                userId: user.id,
+                businessId: userWithBusiness.businessId, // ✅ REQUIRED
+                terminalId: options?.terminalId || "unknown",
+                scheduleId: activeShift.scheduleId ?? undefined, // ✅ Link to schedule
+                type: "out",
+                method: "logout",
+                ipAddress: options?.ipAddress,
+              });
 
             // Complete shift
             await this.timeTrackingManager.completeShift(
               activeShift.id,
-              clockEvent.id
+              clockOutEvent.id
+            );
+
+            // Update schedule status to "completed" if linked
+            if (activeShift.scheduleId) {
+              try {
+                this.scheduleManager?.updateScheduleStatus(
+                  activeShift.scheduleId,
+                  "completed"
+                );
+                logger.info(
+                  `[logout] Updated schedule ${activeShift.scheduleId} status to completed`
+                );
+              } catch (error) {
+                logger.warn(
+                  `[logout] Failed to update schedule status: ${error}`
+                );
+                // Don't fail logout if schedule update fails
+              }
+            }
+
+            logger.info(
+              `[logout] Auto clock-out successful for user ${user.id}: TimeShift ${activeShift.id} completed`
             );
           } catch (error) {
-            // Don't fail logout if clock-out fails, but log it
             logger.error("Auto clock-out failed:", error);
+            // Don't fail logout if clock-out fails
           }
         }
       }
@@ -855,8 +995,6 @@ export class UserManager {
       return {
         success: deleted,
         message: deleted ? "Logged out successfully" : "Session not found",
-        isClockedIn: isClockedIn as any, // Flag to show warning in UI
-        activeShift: activeShift as any,
       };
     } catch (error) {
       logger.error("Logout error:", error);

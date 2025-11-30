@@ -79,9 +79,27 @@ export class ScheduleValidator {
       }
 
       // 3. Validate time window
+      // Note: schedule.startTime and endTime are numbers (milliseconds) from timestamp_ms columns
       const now = new Date();
-      const scheduleStart = new Date(schedule.startTime);
-      const scheduleEnd = new Date(schedule.endTime || scheduleStart);
+
+      // Convert timestamp (milliseconds) to Date object
+      const startTimeMs =
+        typeof schedule.startTime === "number"
+          ? schedule.startTime
+          : schedule.startTime instanceof Date
+          ? schedule.startTime.getTime()
+          : new Date(schedule.startTime as string).getTime();
+
+      const endTimeMs = schedule.endTime
+        ? typeof schedule.endTime === "number"
+          ? schedule.endTime
+          : schedule.endTime instanceof Date
+          ? schedule.endTime.getTime()
+          : new Date(schedule.endTime as string).getTime()
+        : startTimeMs;
+
+      const scheduleStart = new Date(startTimeMs);
+      const scheduleEnd = new Date(endTimeMs);
 
       // Calculate grace period boundaries
       const scheduleStartWithGrace = new Date(scheduleStart);
@@ -191,8 +209,17 @@ export class ScheduleValidator {
     const schedules = db.schedules.getSchedulesByStaffId(userId);
 
     // Filter for today's schedules
+    // Note: schedule.startTime is a number (milliseconds) from timestamp_ms column
     const todaySchedules = schedules.filter((schedule) => {
-      const scheduleDate = new Date(schedule.startTime);
+      // Handle both number (milliseconds) and Date object formats
+      const startTime =
+        typeof schedule.startTime === "number"
+          ? schedule.startTime
+          : schedule.startTime instanceof Date
+          ? schedule.startTime.getTime()
+          : new Date(schedule.startTime as string).getTime();
+
+      const scheduleDate = new Date(startTime);
       const scheduleDateString = scheduleDate.toISOString().split("T")[0];
       return scheduleDateString === dateString;
     });
@@ -210,24 +237,55 @@ export class ScheduleValidator {
     // 1. Schedules that haven't ended yet (current or future)
     // 2. Among those, prefer the one that starts later (most recent)
     // 3. If all have ended, prefer the one that starts later (most recent)
-    const activeSchedules = todaySchedules.filter(
-      (schedule) => new Date(schedule.endTime || schedule.startTime) > now
-    );
+    const activeSchedules = todaySchedules.filter((schedule) => {
+      const endTimeMs = schedule.endTime
+        ? typeof schedule.endTime === "number"
+          ? schedule.endTime
+          : schedule.endTime instanceof Date
+          ? schedule.endTime.getTime()
+          : new Date(schedule.endTime as string).getTime()
+        : typeof schedule.startTime === "number"
+        ? schedule.startTime
+        : schedule.startTime instanceof Date
+        ? schedule.startTime.getTime()
+        : new Date(schedule.startTime as string).getTime();
+      return new Date(endTimeMs) > now;
+    });
 
     if (activeSchedules.length > 0) {
       // Return the one with the latest start time among active schedules
       return activeSchedules.reduce((latest, current) => {
-        return new Date(current.startTime) > new Date(latest.startTime)
-          ? current
-          : latest;
+        const latestStart =
+          typeof latest.startTime === "number"
+            ? latest.startTime
+            : latest.startTime instanceof Date
+            ? latest.startTime.getTime()
+            : new Date(latest.startTime as string).getTime();
+        const currentStart =
+          typeof current.startTime === "number"
+            ? current.startTime
+            : current.startTime instanceof Date
+            ? current.startTime.getTime()
+            : new Date(current.startTime as string).getTime();
+        return currentStart > latestStart ? current : latest;
       });
     }
 
     // All schedules have ended - return the most recent one
     return todaySchedules.reduce((latest, current) => {
-      return new Date(current.startTime) > new Date(latest.startTime)
-        ? current
-        : latest;
+      const latestStart =
+        typeof latest.startTime === "number"
+          ? latest.startTime
+          : latest.startTime instanceof Date
+          ? latest.startTime.getTime()
+          : new Date(latest.startTime as string).getTime();
+      const currentStart =
+        typeof current.startTime === "number"
+          ? current.startTime
+          : current.startTime instanceof Date
+          ? current.startTime.getTime()
+          : new Date(current.startTime as string).getTime();
+      return currentStart > latestStart ? current : latest;
     });
   }
 }

@@ -12,10 +12,24 @@ export function registerShiftHandlers() {
   ipcMain.handle("schedules:create", async (event, scheduleData) => {
     try {
       if (!db) db = await getDatabase();
-      const schedule = db.schedules.createSchedule({
+
+      // Convert ISO string timestamps to Date objects
+      // Drizzle expects Date objects for timestamp_ms columns (it will convert to milliseconds)
+      const processedData = {
         ...scheduleData,
+        startTime:
+          scheduleData.startTime instanceof Date
+            ? scheduleData.startTime
+            : new Date(scheduleData.startTime as string),
+        endTime: scheduleData.endTime
+          ? scheduleData.endTime instanceof Date
+            ? scheduleData.endTime
+            : new Date(scheduleData.endTime as string)
+          : null,
         status: "upcoming" as const,
-      });
+      };
+
+      const schedule = db.schedules.createSchedule(processedData);
 
       // Convert to plain object to ensure serialization works
       const serializedSchedule = JSON.parse(JSON.stringify(schedule));
@@ -79,7 +93,23 @@ export function registerShiftHandlers() {
     try {
       if (!db) db = await getDatabase();
 
-      const updatedSchedule = db.schedules.updateSchedule(id, updates);
+      // Convert ISO string timestamps to Date objects if present
+      // Drizzle expects Date objects for timestamp_ms columns
+      const processedUpdates = { ...updates };
+      if (processedUpdates.startTime) {
+        processedUpdates.startTime =
+          processedUpdates.startTime instanceof Date
+            ? processedUpdates.startTime
+            : new Date(processedUpdates.startTime as string);
+      }
+      if (processedUpdates.endTime) {
+        processedUpdates.endTime =
+          processedUpdates.endTime instanceof Date
+            ? processedUpdates.endTime
+            : new Date(processedUpdates.endTime as string);
+      }
+
+      const updatedSchedule = db.schedules.updateSchedule(id, processedUpdates);
 
       // Convert to plain object to ensure serialization works
       const serializedSchedule = JSON.parse(JSON.stringify(updatedSchedule));
@@ -140,14 +170,17 @@ export function registerShiftHandlers() {
     try {
       if (!db) db = await getDatabase();
       const users = db.users.getUsersByBusiness(businessId);
-      // Filter for users who require shifts (cashier, manager, supervisor)
-      // Get users with shiftRequired = true or null (auto-detect)
-      const staffUsers = users.filter(
-        (user) => user.shiftRequired === true || user.shiftRequired === null
-      );
+
+      // Return all active users - let the frontend filter by role using RBAC
+      // This ensures we get users even if they don't have shiftRequired set
+      // The frontend will filter to show only cashiers using getUserRoleName()
 
       // Convert to plain objects to ensure serialization works
-      const serializedUsers = JSON.parse(JSON.stringify(staffUsers));
+      const serializedUsers = JSON.parse(JSON.stringify(users));
+
+      logger.info(
+        `[getCashierUsers] Found ${serializedUsers.length} users for business ${businessId}`
+      );
 
       return {
         success: true,
@@ -230,6 +263,7 @@ export function registerShiftHandlers() {
                   // Create clock-out event
                   const clockOutEvent = await db.timeTracking.createClockEvent({
                     userId: cashierId,
+                    businessId: timeShift.businessId, // ✅ REQUIRED: Get from shift
                     terminalId: "system",
                     type: "out",
                     method: "auto",
@@ -473,6 +507,7 @@ export function registerShiftHandlers() {
                 // Create clock-out event
                 const clockOutEvent = await db.timeTracking.createClockEvent({
                   userId: shift.cashierId,
+                  businessId: timeShift.businessId, // ✅ REQUIRED: Get from shift
                   terminalId: "system",
                   type: "out",
                   method: "auto",
@@ -591,13 +626,38 @@ export function registerShiftHandlers() {
       if (!db) db = await getDatabase();
 
       const now = new Date();
-      const dateString = now.toISOString().split("T")[0];
+      // Use local date string to match schedules created in local timezone
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const dateString = `${year}-${month}-${day}`;
+
+      logger.info(
+        `[shift:getTodaySchedule] Checking schedules for user ${cashierId} on date: ${dateString}`
+      );
 
       // Get schedules for this cashier today
       const schedules = db.schedules.getSchedulesByStaffId(cashierId);
-      const todaySchedules = schedules.filter(
-        (schedule) => schedule.startTime.split("T")[0] === dateString
+
+      logger.info(
+        `[shift:getTodaySchedule] Found ${schedules.length} total schedules for user ${cashierId}`
       );
+
+      // Filter for today's schedules
+      // Note: schedule.startTime is a number (milliseconds) from timestamp_ms column
+      const todaySchedules = schedules.filter((schedule) => {
+        // Convert timestamp (milliseconds) to Date object
+        const startTimeMs =
+          typeof schedule.startTime === "number"
+            ? schedule.startTime
+            : schedule.startTime instanceof Date
+            ? schedule.startTime.getTime()
+            : new Date(schedule.startTime as string).getTime();
+
+        const scheduleDate = new Date(startTimeMs);
+        const scheduleDateString = scheduleDate.toISOString().split("T")[0];
+        return scheduleDateString === dateString;
+      });
 
       if (todaySchedules.length === 0) {
         return {
@@ -618,16 +678,37 @@ export function registerShiftHandlers() {
       // 1. Schedules that haven't ended yet (current or future)
       // 2. Among those, prefer the one that starts later (most recent)
       // 3. If all have ended, prefer the one that starts later (most recent)
-      const activeSchedules = todaySchedules.filter(
-        (schedule) => new Date(schedule.endTime) > now
-      );
+      const activeSchedules = todaySchedules.filter((schedule) => {
+        const endTimeMs = schedule.endTime
+          ? typeof schedule.endTime === "number"
+            ? schedule.endTime
+            : schedule.endTime instanceof Date
+            ? schedule.endTime.getTime()
+            : new Date(schedule.endTime as string).getTime()
+          : typeof schedule.startTime === "number"
+          ? schedule.startTime
+          : schedule.startTime instanceof Date
+          ? schedule.startTime.getTime()
+          : new Date(schedule.startTime as string).getTime();
+        return new Date(endTimeMs) > now;
+      });
 
       if (activeSchedules.length > 0) {
         // Return the one with the latest start time among active schedules
         const mostRecentActive = activeSchedules.reduce((latest, current) => {
-          return new Date(current.startTime) > new Date(latest.startTime)
-            ? current
-            : latest;
+          const latestStart =
+            typeof latest.startTime === "number"
+              ? latest.startTime
+              : latest.startTime instanceof Date
+              ? latest.startTime.getTime()
+              : new Date(latest.startTime as string).getTime();
+          const currentStart =
+            typeof current.startTime === "number"
+              ? current.startTime
+              : current.startTime instanceof Date
+              ? current.startTime.getTime()
+              : new Date(current.startTime as string).getTime();
+          return currentStart > latestStart ? current : latest;
         });
         return {
           success: true,
@@ -637,9 +718,19 @@ export function registerShiftHandlers() {
 
       // All schedules have ended - return the most recent one
       const mostRecent = todaySchedules.reduce((latest, current) => {
-        return new Date(current.startTime) > new Date(latest.startTime)
-          ? current
-          : latest;
+        const latestStart =
+          typeof latest.startTime === "number"
+            ? latest.startTime
+            : latest.startTime instanceof Date
+            ? latest.startTime.getTime()
+            : new Date(latest.startTime as string).getTime();
+        const currentStart =
+          typeof current.startTime === "number"
+            ? current.startTime
+            : current.startTime instanceof Date
+            ? current.startTime.getTime()
+            : new Date(current.startTime as string).getTime();
+        return currentStart > latestStart ? current : latest;
       });
 
       return {

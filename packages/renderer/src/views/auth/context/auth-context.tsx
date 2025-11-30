@@ -16,6 +16,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Login: Authenticate user and create session
+   */
   const login = async (
     username: string,
     pin: string,
@@ -35,51 +38,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         rememberMe,
         terminalId,
         ipAddress,
-        autoClockIn: true, // Auto clock-in for cashiers/managers
       });
 
       if (response.success && response.user && response.token) {
-        setUser(response.user);
-        // Persist user and token for session restoration
-        await window.authStore.set("user", JSON.stringify(response.user));
+        // Store token and user in SafeStorage (encrypted)
         await window.authStore.set("token", response.token);
+        await window.authStore.set("user", JSON.stringify(response.user));
 
-        // Store mode and shift requirement (NEW: for dual-mode sales)
-        if ((response as any).mode) {
-          await window.authStore.set("salesMode", (response as any).mode);
-        }
-        if ((response as any).requiresShift !== undefined) {
-          await window.authStore.set(
-            "requiresShift",
-            String((response as any).requiresShift)
-          );
-        }
-
-        // Store clock-in info if available
-        if (response.clockEvent) {
-          await window.authStore.set(
-            "clockEvent",
-            JSON.stringify(response.clockEvent)
-          );
-        }
+        // Store shift and clock event data if present
         if (response.shift) {
           await window.authStore.set(
             "activeShift",
             JSON.stringify(response.shift)
           );
         }
-
-        // Show message if clock-in is required
-        if (response.requiresClockIn) {
-          return {
-            success: true,
-            message: "Login successful. Please clock in to track your time.",
-          };
+        if (response.clockEvent) {
+          await window.authStore.set(
+            "clockEvent",
+            JSON.stringify(response.clockEvent)
+          );
         }
 
+        // Update React context state
+        setUser(response.user);
+
+        // Clear permission cache
+        if (typeof window !== "undefined") {
+          const cache = (
+            window as typeof window & { permissionCache?: Map<string, unknown> }
+          ).permissionCache;
+          if (cache && typeof cache.clear === "function") {
+            cache.clear();
+            logger.info("[Login] Cleared permission cache");
+          }
+        }
+
+        logger.info(`[Login] User ${response.user.id} logged in successfully`);
         return { success: true, message: response.message };
       } else {
-        setError(response.message);
+        // Handle specific error codes
+        if (response.code === "NO_SCHEDULED_SHIFT") {
+          setError(
+            "You don't have a scheduled shift at this time. Please contact your manager."
+          );
+        } else {
+          setError(response.message);
+        }
         return {
           success: false,
           message: response.message,
@@ -96,6 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Register: Create new user account
+   */
   const register = async (userData: {
     email?: string;
     username: string;
@@ -112,10 +119,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await window.authAPI.register(userData);
 
       if (response.success && response.user && response.token) {
-        setUser(response.user);
-        // Persist user and token for session restoration
-        await window.authStore.set("user", JSON.stringify(response.user));
+        // Store token and user in SafeStorage
         await window.authStore.set("token", response.token);
+        await window.authStore.set("user", JSON.stringify(response.user));
+
+        // Update React context state
+        setUser(response.user);
+
+        logger.info(
+          `[Register] User ${response.user.id} registered successfully`
+        );
         return { success: true, message: response.message };
       } else {
         setError(response.message);
@@ -135,6 +148,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Register Business: Create business owner account
+   */
   const registerBusiness = async (userData: {
     email?: string;
     username: string;
@@ -152,17 +168,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await window.authAPI.registerBusiness(userData);
 
       if (response.success && response.user && response.token) {
-        setUser(response.user);
-        // Persist user and token for session restoration
-        await window.authStore.set("user", JSON.stringify(response.user));
+        // Store token and user in SafeStorage
         await window.authStore.set("token", response.token);
-        // Also store business info if needed
+        await window.authStore.set("user", JSON.stringify(response.user));
+
+        // Store business info if provided
         if (response.business) {
           await window.authStore.set(
             "business",
             JSON.stringify(response.business)
           );
         }
+
+        // Update React context state
+        setUser(response.user);
+
+        logger.info(
+          `[RegisterBusiness] Business owner ${response.user.id} registered successfully`
+        );
         return { success: true, message: response.message };
       } else {
         setError(response.message);
@@ -182,6 +205,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Create User: Admin creates new staff user
+   */
   const createUser = async (userData: {
     businessId: string;
     username: string;
@@ -225,47 +251,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = async (options?: {
-    clockOut?: boolean;
-  }): Promise<{ needsClockOutWarning?: boolean }> => {
+  /**
+   * Logout: End user session
+   * Note: UI should ensure user has ended their shift before calling this
+   */
+  const logout = async (): Promise<{ needsClockOutWarning?: boolean }> => {
     setIsLoading(true);
     setError(null);
 
     try {
       const token = await window.authStore.get("token");
       if (token) {
+        // Get terminal ID for clock-out tracking
         const terminalId = `TERMINAL-${navigator.userAgent.slice(0, 10)}`;
         const ipAddress = "127.0.0.1";
 
-        const response = await window.authAPI.logout(token, {
+        await window.authAPI.logout(token, {
           terminalId,
           ipAddress,
-          autoClockOut: options?.clockOut ?? false, // Only clock out if explicitly requested
         });
-
-        // Check if user is still clocked in
-        if (response.isClockedIn && !options?.clockOut) {
-          return { needsClockOutWarning: true };
-        }
       }
     } catch (error) {
       logger.error("Logout error:", error);
     } finally {
+      // Clear all auth data from SafeStorage
+      try {
+        await Promise.all([
+          window.authStore.delete("user"),
+          window.authStore.delete("token"),
+          window.authStore.delete("salesMode"),
+          window.authStore.delete("requiresShift"),
+          window.authStore.delete("clockEvent"),
+          window.authStore.delete("activeShift"),
+        ]);
+      } catch (clearError) {
+        logger.error("Failed to clear SafeStorage:", clearError);
+      }
+
+      // Clear permission cache
+      if (typeof window !== "undefined") {
+        const cache = (
+          window as typeof window & { permissionCache?: Map<string, unknown> }
+        ).permissionCache;
+        if (cache && typeof cache.clear === "function") {
+          cache.clear();
+        }
+      }
+
+      // Clear React context state
       setUser(null);
-      await window.authStore.delete("user");
-      await window.authStore.delete("token");
-      await window.authStore.delete("clockEvent");
-      await window.authStore.delete("activeShift");
       setIsLoading(false);
+
+      logger.info("[Logout] User logged out successfully");
     }
 
     return { needsClockOutWarning: false };
   };
 
-  // Validate session on app start (but not immediately after login)
+  /**
+   * Validate session on app start
+   */
   useEffect(() => {
     const validateSession = async () => {
       setIsInitializing(true);
+
       try {
         const token = await window.authStore.get("token");
         const storedUser = await window.authStore.get("user");
@@ -274,59 +323,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Basic token format validation
           if (typeof token !== "string" || token.length < 10) {
             logger.warn("Invalid token format, clearing session");
-            await window.authStore.delete("user");
-            await window.authStore.delete("token");
+            await Promise.all([
+              window.authStore.delete("user"),
+              window.authStore.delete("token"),
+            ]);
             setIsInitializing(false);
             return;
           }
 
+          // Validate session with backend
           const response = await window.authAPI.validateSession(token);
 
           if (response.success && response.user) {
+            // Session is valid - update React context
             setUser(response.user);
-            // Update stored user data
-            await window.authStore.set("user", JSON.stringify(response.user));
-          } else {
-            // Session is invalid, clear stored data
-            // Don't show error toast on initial validation - only if user was already logged in
-            // This prevents false errors right after login
-            const errorCode = (response as { code?: string }).code;
-            logger.warn(
-              "Session validation failed:",
-              response.message || errorCode
+            logger.info(
+              `[ValidateSession] Session validated for user ${response.user.id}`
             );
-            await window.authStore.delete("user");
-            await window.authStore.delete("token");
-            // Only clear user state if it was set (not on initial mount)
-            // We intentionally don't include 'user' in deps - this only runs on mount
-            const currentUser = user;
-            if (currentUser) {
-              setUser(null);
-            }
+          } else {
+            // Session is invalid - clear stored data
+            logger.warn("Session validation failed:", response.message);
+            await Promise.all([
+              window.authStore.delete("user"),
+              window.authStore.delete("token"),
+            ]);
           }
+        } else {
+          logger.debug("[ValidateSession] No stored session found");
         }
       } catch (error) {
         logger.error("Session validation error:", error);
         // Clear stored data on error
-        await window.authStore.delete("user");
-        await window.authStore.delete("token");
-        if (user) {
-          setUser(null);
-        }
+        await Promise.all([
+          window.authStore.delete("user"),
+          window.authStore.delete("token"),
+        ]);
       } finally {
         setIsInitializing(false);
       }
     };
 
-    // Small delay to avoid race condition with login
-    const timeoutId = setTimeout(() => {
-      validateSession();
-    }, 100);
+    validateSession();
+  }, []); // Run only on mount
 
-    return () => clearTimeout(timeoutId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount, not when user changes
-
+  /**
+   * Clock In: Start time tracking shift
+   */
   const clockIn = async (
     userId: string,
     businessId: string
@@ -362,6 +404,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Clock Out: End time tracking shift
+   */
   const clockOut = async (
     userId: string
   ): Promise<{ success: boolean; message?: string }> => {
@@ -391,6 +436,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Get Active Shift: Check if user has active time tracking shift
+   */
   const getActiveShift = async (userId: string): Promise<unknown> => {
     try {
       const response = await window.timeTrackingAPI.getActiveShift(userId);

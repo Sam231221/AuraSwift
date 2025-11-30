@@ -1,6 +1,6 @@
 import type { Schedule } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
-import { eq, and, desc, asc, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class ScheduleManager {
@@ -102,6 +102,97 @@ export class ScheduleManager {
       assignedRegister: s.assignedRegister ?? undefined,
       notes: s.notes ?? undefined,
     })) as Schedule[];
+  }
+
+  /**
+   * Find active schedule for user on given date
+   * Returns schedule if:
+   * - Status is "upcoming" or "active"
+   * - Start time is today
+   * - Current time is within clock-in window (15 mins early to scheduled start)
+   */
+  findActiveScheduleForClockIn(
+    userId: string,
+    currentTime: Date = new Date()
+  ): Schedule | null {
+    // Helper functions to get start and end of day
+    const startOfDay = (date: Date): Date => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
+
+    const endOfDay = (date: Date): Date => {
+      const d = new Date(date);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    };
+
+    const todayStart = startOfDay(currentTime);
+    const todayEnd = endOfDay(currentTime);
+
+    // Find schedules for today
+    // Note: Drizzle's gte/lte for timestamp_ms columns expect Date objects
+    const schedules = this.db
+      .select()
+      .from(schema.schedules)
+      .where(
+        and(
+          eq(schema.schedules.staffId, userId),
+          drizzleSql`${schema.schedules.status} IN ('upcoming', 'active')`,
+          gte(schema.schedules.startTime, todayStart),
+          lte(schema.schedules.startTime, todayEnd)
+        )
+      )
+      .orderBy(schema.schedules.startTime)
+      .all();
+
+    if (!schedules.length) return null;
+
+    // Check if current time is within clock-in window
+    const GRACE_PERIOD_EARLY_MS = 15 * 60 * 1000; // 15 minutes
+    const currentTimeMs = currentTime.getTime();
+
+    // Helper to convert timestamp to number (handles both Date and number)
+    const toTimestamp = (
+      value: Date | number | null | undefined
+    ): number | null => {
+      if (value === null || value === undefined) return null;
+      if (value instanceof Date) return value.getTime();
+      return value as number;
+    };
+
+    for (const schedule of schedules) {
+      // Convert schedule times to timestamps (numbers) for comparison
+      // Drizzle returns Date objects for timestamp_ms columns
+      const scheduledStart = toTimestamp(schedule.startTime as Date | number);
+      const scheduledEnd = toTimestamp(
+        schedule.endTime as Date | number | null | undefined
+      );
+
+      if (scheduledStart === null) continue; // Skip if no start time
+
+      const earliestClockIn = scheduledStart - GRACE_PERIOD_EARLY_MS;
+
+      // Allow clock-in if:
+      // 1. Within 15 mins early to scheduled start time, OR
+      // 2. After scheduled start but before shift end (or no end time specified)
+      const isWithinEarlyWindow =
+        currentTimeMs >= earliestClockIn && currentTimeMs <= scheduledStart;
+      const isAfterStartButBeforeEnd =
+        currentTimeMs > scheduledStart &&
+        (scheduledEnd === null || currentTimeMs <= scheduledEnd);
+
+      if (isWithinEarlyWindow || isAfterStartButBeforeEnd) {
+        return {
+          ...schedule,
+          assignedRegister: schedule.assignedRegister ?? undefined,
+          notes: schedule.notes ?? undefined,
+        } as Schedule;
+      }
+    }
+
+    return null;
   }
 
   /**

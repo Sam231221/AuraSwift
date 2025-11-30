@@ -3,8 +3,8 @@ import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
-import { getLogger } from '../../utils/logger.js';
-const logger = getLogger('shiftManager');
+import { getLogger } from "../../utils/logger.js";
+const logger = getLogger("shiftManager");
 
 export class ShiftManager {
   private db: DrizzleDB;
@@ -26,7 +26,8 @@ export class ShiftManager {
   validateShiftOwnership(shiftId: string, userId: string): boolean {
     try {
       const shift = this.getShiftById(shiftId);
-      return shift.cashierId === userId;
+      // Use user_id from schema (snake_case)
+      return shift.user_id === userId;
     } catch (error) {
       logger.error("Error validating shift ownership:", error);
       return false;
@@ -62,10 +63,10 @@ export class ShiftManager {
       tx.insert(schema.shifts)
         .values({
           id: shiftId,
-          scheduleId: shiftData.scheduleId ?? null,
-          timeShiftId: (shiftData as any).timeShiftId ?? null, // Link to time shift
-          cashierId: shiftData.cashierId,
-          businessId: shiftData.businessId,
+          schedule_id: shiftData.scheduleId ?? null,
+          time_shift_id: (shiftData as any).timeShiftId ?? null, // Link to time shift
+          cashier_id: shiftData.cashierId,
+          business_id: shiftData.businessId,
           deviceId: (shiftData as any).deviceId ?? null, // Device/terminal identifier
           startTime: shiftData.startTime,
           endTime: shiftData.endTime ?? null,
@@ -246,16 +247,21 @@ export class ShiftManager {
     basicCutoffTime.setDate(basicCutoffTime.getDate() - 1);
     basicCutoffTime.setHours(6, 0, 0, 0);
 
-    // Get all active shifts with their schedules
+    // Get all active shifts with their schedules and clock-in events
     const activeShifts = this.db
       .select({
         shift: schema.shifts,
         scheduledEndTime: schema.schedules.endTime,
+        clockInTimestamp: schema.clockEvents.timestamp,
       })
       .from(schema.shifts)
       .leftJoin(
         schema.schedules,
-        eq(schema.shifts.scheduleId, schema.schedules.id)
+        eq(schema.shifts.schedule_id, schema.schedules.id)
+      )
+      .leftJoin(
+        schema.clockEvents,
+        eq(schema.shifts.clock_in_id, schema.clockEvents.id)
       )
       .where(eq(schema.shifts.status, "active"))
       .all();
@@ -266,11 +272,25 @@ export class ShiftManager {
       cashierId: string;
     }> = [];
 
-    for (const { shift, scheduledEndTime } of activeShifts) {
+    for (const { shift, scheduledEndTime, clockInTimestamp } of activeShifts) {
       let shouldClose = false;
       let closeReason = "";
 
-      const shiftStart = new Date(shift.startTime);
+      // Get shift start time from clock-in event timestamp
+      // Note: clockInTimestamp is a number (milliseconds) from timestamp_ms column
+      const shiftStartMs =
+        clockInTimestamp && typeof clockInTimestamp === "number"
+          ? clockInTimestamp
+          : clockInTimestamp instanceof Date
+          ? clockInTimestamp.getTime()
+          : clockInTimestamp
+          ? new Date(clockInTimestamp as string).getTime()
+          : shift.createdAt instanceof Date
+          ? shift.createdAt.getTime()
+          : typeof shift.createdAt === "number"
+          ? shift.createdAt
+          : new Date(shift.createdAt as string).getTime();
+      const shiftStart = new Date(shiftStartMs);
 
       // Rule 1: Close shifts older than 24 hours
       if (shiftStart < basicCutoffTime) {
@@ -280,7 +300,14 @@ export class ShiftManager {
       }
       // Rule 2: Close shifts that are way past their scheduled end time
       else if (scheduledEndTime) {
-        const scheduledEnd = new Date(scheduledEndTime);
+        // Convert scheduledEndTime (number milliseconds) to Date
+        const scheduledEndMs =
+          typeof scheduledEndTime === "number"
+            ? scheduledEndTime
+            : scheduledEndTime instanceof Date
+            ? scheduledEndTime.getTime()
+            : new Date(scheduledEndTime as string).getTime();
+        const scheduledEnd = new Date(scheduledEndMs);
         const hoursOverdue =
           (now.getTime() - scheduledEnd.getTime()) / (1000 * 60 * 60);
 
@@ -304,26 +331,26 @@ export class ShiftManager {
       }
 
       if (shouldClose) {
-        const estimatedCash = shift.startingCash + (shift.totalSales || 0);
+        // Use snake_case field names from schema
+        const estimatedCash =
+          (shift.starting_cash || 0) + (shift.total_sales || 0);
 
         this.db
           .update(schema.shifts)
           .set({
             status: "ended",
-            endTime: nowString,
-            finalCashDrawer: estimatedCash,
-            expectedCashDrawer: estimatedCash,
             notes: shift.notes ? `${shift.notes}; ${closeReason}` : closeReason,
-            updatedAt: now,
+            updated_at: now,
           })
           .where(eq(schema.shifts.id, shift.id))
           .run();
 
         // Store closed shift info for clock-out handling
+        // Note: shift.id is the timeShiftId (shifts table is the unified time shift table)
         closedShifts.push({
           id: shift.id,
-          timeShiftId: shift.timeShiftId,
-          cashierId: shift.cashierId,
+          timeShiftId: shift.id, // The shift itself is the time shift
+          cashierId: shift.user_id, // Use user_id from schema
         });
 
         logger.info(`Auto-closed shift ${shift.id}: ${closeReason}`);
@@ -345,23 +372,47 @@ export class ShiftManager {
     const now = new Date();
     const nowString = now.toISOString();
 
+    // Get all active shifts with their schedules and clock-in events
     const activeShifts = this.db
       .select({
         shift: schema.shifts,
         scheduledEndTime: schema.schedules.endTime,
+        clockInTimestamp: schema.clockEvents.timestamp,
       })
       .from(schema.shifts)
       .leftJoin(
         schema.schedules,
-        eq(schema.shifts.scheduleId, schema.schedules.id)
+        eq(schema.shifts.schedule_id, schema.schedules.id)
       )
-      .where(
-        and(
-          eq(schema.shifts.status, "active"),
-          drizzleSql`DATE(${schema.shifts.startTime}) = DATE(${nowString})`
-        )
+      .leftJoin(
+        schema.clockEvents,
+        eq(schema.shifts.clock_in_id, schema.clockEvents.id)
       )
-      .all();
+      .where(eq(schema.shifts.status, "active"))
+      .all()
+      .filter((item) => {
+        // Filter for today's shifts
+        // Get shift start time from clock-in event timestamp
+        const clockInMs =
+          item.clockInTimestamp && typeof item.clockInTimestamp === "number"
+            ? item.clockInTimestamp
+            : item.clockInTimestamp instanceof Date
+            ? item.clockInTimestamp.getTime()
+            : item.clockInTimestamp
+            ? new Date(item.clockInTimestamp as string).getTime()
+            : item.shift.createdAt instanceof Date
+            ? item.shift.createdAt.getTime()
+            : typeof item.shift.createdAt === "number"
+            ? item.shift.createdAt
+            : new Date(item.shift.createdAt as string).getTime();
+        const shiftDate = new Date(clockInMs);
+        const today = new Date();
+        return (
+          shiftDate.getDate() === today.getDate() &&
+          shiftDate.getMonth() === today.getMonth() &&
+          shiftDate.getFullYear() === today.getFullYear()
+        );
+      });
 
     const closedShifts: Array<{
       id: string;
@@ -369,12 +420,34 @@ export class ShiftManager {
       cashierId: string;
     }> = [];
 
-    for (const { shift, scheduledEndTime } of activeShifts) {
+    for (const { shift, scheduledEndTime, clockInTimestamp } of activeShifts) {
       let shouldClose = false;
       let closeReason = "";
 
+      // Get shift start time from clock-in event timestamp
+      const shiftStartMs =
+        clockInTimestamp && typeof clockInTimestamp === "number"
+          ? clockInTimestamp
+          : clockInTimestamp instanceof Date
+          ? clockInTimestamp.getTime()
+          : clockInTimestamp
+          ? new Date(clockInTimestamp as string).getTime()
+          : shift.createdAt instanceof Date
+          ? shift.createdAt.getTime()
+          : typeof shift.createdAt === "number"
+          ? shift.createdAt
+          : new Date(shift.createdAt as string).getTime();
+      const shiftStart = new Date(shiftStartMs);
+
       if (scheduledEndTime) {
-        const scheduledEnd = new Date(scheduledEndTime);
+        // Convert scheduledEndTime (number milliseconds) to Date
+        const scheduledEndMs =
+          typeof scheduledEndTime === "number"
+            ? scheduledEndTime
+            : scheduledEndTime instanceof Date
+            ? scheduledEndTime.getTime()
+            : new Date(scheduledEndTime as string).getTime();
+        const scheduledEnd = new Date(scheduledEndMs);
         const hoursOverdue =
           (now.getTime() - scheduledEnd.getTime()) / (1000 * 60 * 60);
 
@@ -387,7 +460,6 @@ export class ShiftManager {
         }
       } else {
         // No schedule - close if active for more than 12 hours
-        const shiftStart = new Date(shift.startTime);
         const hoursActive =
           (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60);
         if (hoursActive > 12) {
@@ -399,17 +471,16 @@ export class ShiftManager {
       }
 
       if (shouldClose) {
-        const estimatedCash = shift.startingCash + (shift.totalSales || 0);
+        // Use snake_case field names from schema
+        const estimatedCash =
+          (shift.starting_cash || 0) + (shift.total_sales || 0);
 
         this.db
           .update(schema.shifts)
           .set({
             status: "ended",
-            endTime: nowString,
-            finalCashDrawer: estimatedCash,
-            expectedCashDrawer: estimatedCash,
             notes: shift.notes ? `${shift.notes}; ${closeReason}` : closeReason,
-            updatedAt: now,
+            updated_at: now,
           })
           .where(eq(schema.shifts.id, shift.id))
           .run();
@@ -417,8 +488,8 @@ export class ShiftManager {
         // Store closed shift info for clock-out handling
         closedShifts.push({
           id: shift.id,
-          timeShiftId: shift.timeShiftId,
-          cashierId: shift.cashierId,
+          timeShiftId: shift.id, // The shift itself is the time shift
+          cashierId: shift.user_id, // Use user_id from schema
         });
 
         logger.info(`Auto-ended overdue shift ${shift.id}: ${closeReason}`);

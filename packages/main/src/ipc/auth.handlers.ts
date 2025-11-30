@@ -10,7 +10,11 @@ import {
 } from "../utils/authHelpers.js";
 import { invalidateUserPermissionCache } from "../utils/rbacHelpers.js";
 import { PERMISSIONS } from "@app/shared/constants/permissions.js";
-import { shiftRequirementResolver } from "../utils/shiftRequirementResolver.js";
+import {
+  checkRateLimit,
+  recordFailedAttempt,
+  clearRateLimit,
+} from "../utils/rateLimiter.js";
 
 const logger = getLogger("authHandlers");
 
@@ -33,19 +37,6 @@ getDatabase().then((database) => {
   db = database;
 });
 
-/**
- * Helper to check if a user is NOT an admin/owner (requires shift tracking)
- */
-async function isNonAdminUser(
-  db: DatabaseManagers,
-  user: User
-): Promise<boolean> {
-  const userRolesWithDetails = db.userRoles.getRolesWithDetailsForUser(user.id);
-  const hasAdminRole = userRolesWithDetails.some(
-    (ur) => ur.role?.name === "admin" || ur.role?.name === "owner"
-  );
-  return !hasAdminRole;
-}
 export function registerAuthHandlers() {
   ipcMain.handle("auth:set", async (event, key: string, value: string) => {
     try {
@@ -178,11 +169,56 @@ export function registerAuthHandlers() {
     try {
       if (!db) db = await getDatabase();
 
+      // Rate limiting: Check if login attempts are allowed
+      // For desktop EPOS: Use terminal ID + username combination
+      // This prevents one compromised terminal from affecting others
+      const username = credentials.username || "";
+      const terminalId = credentials.terminalId || "unknown";
+      const rateLimitCheck = checkRateLimit(username, "username", terminalId);
+
+      if (!rateLimitCheck.allowed) {
+        logger.warn(
+          `[Login] Rate limit exceeded for username: ${username}. ` +
+            `Locked until: ${
+              rateLimitCheck.lockedUntil
+                ? new Date(rateLimitCheck.lockedUntil).toISOString()
+                : "N/A"
+            }`
+        );
+
+        // Log rate limit event to application logs
+        // Note: We can't log to audit trail without a userId (schema requires it)
+        // Application logs are sufficient for security monitoring
+        logger.warn(
+          `[Login] Rate limit exceeded for username: ${username}. ` +
+            `Remaining attempts: ${rateLimitCheck.remainingAttempts}, ` +
+            `Locked until: ${
+              rateLimitCheck.lockedUntil
+                ? new Date(rateLimitCheck.lockedUntil).toISOString()
+                : "N/A"
+            }`
+        );
+
+        return {
+          success: false,
+          message:
+            rateLimitCheck.message ||
+            "Too many login attempts. Please try again later.",
+          code: "RATE_LIMIT_EXCEEDED",
+          remainingAttempts: rateLimitCheck.remainingAttempts,
+          resetAt: rateLimitCheck.resetAt,
+          lockedUntil: rateLimitCheck.lockedUntil,
+        };
+      }
+
       // Perform login
       const loginResponse = await db.users.login(credentials);
 
       // 🔥 RBAC: Invalidate permission cache on login (clear any stale permissions)
       if (loginResponse.success && loginResponse.user) {
+        // Clear rate limit on successful login (both terminal and username)
+        clearRateLimit(username, "username", terminalId);
+
         invalidateUserPermissionCache(loginResponse.user.id);
         logger.info(
           `[Login] Cleared permission cache for user ${loginResponse.user.id}`
@@ -200,6 +236,16 @@ export function registerAuthHandlers() {
             rememberMe: credentials.rememberMe || false,
           }
         );
+      } else {
+        // Record failed attempt for rate limiting (both terminal and username)
+        recordFailedAttempt(username, "username", terminalId);
+
+        // Log failed login attempt to audit trail
+        // Note: We can't log to audit trail without a userId (schema requires it)
+        // Instead, we log to application logs which are sufficient for security monitoring
+        logger.warn(
+          `[Login] Failed login attempt for username: ${username}. Reason: ${loginResponse.message}`
+        );
       }
 
       return loginResponse;
@@ -208,6 +254,95 @@ export function registerAuthHandlers() {
       return {
         success: false,
         message: "Login failed due to server error",
+      };
+    }
+  });
+
+  ipcMain.handle("auth:refreshToken", async (event, refreshToken) => {
+    try {
+      if (!db) db = await getDatabase();
+
+      // Validate refresh token format
+      if (
+        !refreshToken ||
+        typeof refreshToken !== "string" ||
+        refreshToken.trim().length === 0
+      ) {
+        logger.warn("[refreshToken] Invalid refresh token format provided");
+        return {
+          success: false,
+          message: "Invalid refresh token",
+          code: "INVALID_REFRESH_TOKEN",
+        };
+      }
+
+      // Get session by refresh token
+      const session = db.sessions.getSessionByRefreshToken(refreshToken);
+
+      if (!session) {
+        logger.warn("[refreshToken] Invalid or expired refresh token");
+        return {
+          success: false,
+          message: "Invalid or expired refresh token",
+          code: "REFRESH_TOKEN_INVALID",
+        };
+      }
+
+      // Get user to verify they're still active
+      const user = db.users.getUserById(session.userId);
+
+      if (!user) {
+        return {
+          success: false,
+          message: "User not found",
+          code: "USER_NOT_FOUND",
+        };
+      }
+
+      if (!user.isActive) {
+        return {
+          success: false,
+          message: "User account is inactive",
+          code: "USER_INACTIVE",
+        };
+      }
+
+      // Refresh the access token
+      const refreshedSession = db.sessions.refreshAccessToken(refreshToken, 1); // 1 hour access token
+
+      if (!refreshedSession) {
+        return {
+          success: false,
+          message: "Failed to refresh token",
+          code: "REFRESH_FAILED",
+        };
+      }
+
+      // Return user without sensitive fields
+      const {
+        passwordHash: _,
+        pinHash: __,
+        salt: ___,
+        ...userWithoutSecrets
+      } = user;
+
+      logger.debug(
+        `[refreshToken] Token refreshed successfully for user ${user.id}`
+      );
+
+      return {
+        success: true,
+        message: "Token refreshed successfully",
+        user: userWithoutSecrets as User,
+        token: refreshedSession.token, // New access token
+        refreshToken: refreshedSession.refreshToken, // Same refresh token
+      };
+    } catch (error) {
+      logger.error("Token refresh IPC error:", error);
+      return {
+        success: false,
+        message: "Token refresh failed",
+        code: "REFRESH_ERROR",
       };
     }
   });
@@ -272,134 +407,28 @@ export function registerAuthHandlers() {
     try {
       if (!db) db = await getDatabase();
 
-      // Get user from session before logout to check for active POS shifts
-      const userSession = db.sessions.getSessionByToken(token);
-      if (userSession) {
-        const user = db.users.getUserById(userSession.userId);
-
-        // Check for active POS shifts before allowing clock-out
-        // Use RBAC-based shift requirement resolver
-        let requiresShift = false;
-        if (user) {
-          const shiftRequirement = await shiftRequirementResolver.resolve(
-            user,
-            db
-          );
-          requiresShift = shiftRequirement.requiresShift;
-        }
-
-        if (requiresShift && user) {
-          const activeTimeShift = db.timeTracking.getActiveShift(user.id);
-
-          if (activeTimeShift) {
-            // Check if there are active POS shifts for this TimeShift
-            const activePosShifts = db.shifts.getActiveShiftsByTimeShift(
-              activeTimeShift.id
-            );
-
-            if (
-              activePosShifts.length > 0 &&
-              options?.autoClockOut !== false &&
-              user
-            ) {
-              // User has active POS shifts - auto-end them before clock-out
-              logger.info(
-                `Auto-ending ${activePosShifts.length} active POS shift(s) before clock-out for user ${user.id}`
-              );
-
-              const failedShifts: string[] = [];
-
-              for (const posShift of activePosShifts) {
-                try {
-                  // Estimate final cash (starting cash + sales)
-                  const estimatedCash =
-                    (posShift.starting_cash || 0) + (posShift.total_sales || 0);
-
-                  db.shifts.endShift(posShift.id, {
-                    endTime: new Date().toISOString(),
-                    finalCashDrawer: estimatedCash,
-                    expectedCashDrawer: estimatedCash,
-                    totalSales: posShift.total_sales || 0,
-                    totalTransactions: posShift.total_transactions || 0,
-                    totalRefunds: posShift.total_refunds || 0,
-                    totalVoids: posShift.total_voids || 0,
-                    notes: posShift.notes
-                      ? `${posShift.notes}; Auto-ended on logout`
-                      : "Auto-ended on logout",
-                  });
-
-                  logger.info(`Auto-ended POS shift ${posShift.id} on logout`);
-                } catch (error) {
-                  failedShifts.push(posShift.id);
-                  logger.error(
-                    `Failed to auto-end POS shift ${posShift.id} on logout:`,
-                    error
-                  );
-                }
-              }
-
-              // After ending all POS shifts, check if TimeShift should be clocked out
-              // Only clock out if all shifts were successfully ended
-              if (failedShifts.length === 0) {
-                const remainingActiveShifts =
-                  db.shifts.getActiveShiftsByTimeShift(activeTimeShift.id);
-                if (remainingActiveShifts.length === 0) {
-                  // All shifts ended successfully, clock out TimeShift
-                  try {
-                    const activeBreak = db.timeTracking.getActiveBreak(
-                      activeTimeShift.id
-                    );
-                    if (activeBreak) {
-                      await db.timeTracking.endBreak(activeBreak.id);
-                    }
-
-                    const clockOutEvent =
-                      await db.timeTracking.createClockEvent({
-                        userId: user!.id,
-                        terminalId: options?.terminalId || "unknown",
-                        type: "out",
-                        method: "auto",
-                        ipAddress: options?.ipAddress,
-                        notes: "Auto clock-out: All POS shifts ended on logout",
-                      });
-
-                    await db.timeTracking.completeShift(
-                      activeTimeShift.id,
-                      clockOutEvent.id
-                    );
-                    logger.info(
-                      `Auto clocked out TimeShift ${activeTimeShift.id} after ending all POS shifts on logout`
-                    );
-                  } catch (error) {
-                    logger.error(
-                      "Failed to clock out TimeShift after ending POS shifts:",
-                      error
-                    );
-                  }
-                }
-              } else {
-                logger.warn(
-                  `Cannot clock out TimeShift ${activeTimeShift.id}: ${
-                    failedShifts.length
-                  } POS shift(s) failed to end: ${failedShifts.join(", ")}`
-                );
-              }
-            }
-          }
-        }
-      }
-
-      // Get user ID before logout for cache invalidation
-      const logoutSession = db.sessions.getSessionByToken(token);
-      const userId = logoutSession?.userId;
-
-      // Perform logout
+      // Use userManager.logout() which handles:
+      // 1. Auto clock-out if user has active shift
+      // 2. Session deletion
+      // 3. Schedule status updates
       const logoutResponse = await db.users.logout(token, options);
 
-      // 🔥 RBAC: Invalidate permission cache on logout (security)
+      // Get user ID for cache invalidation
+      const userId = logoutResponse.user?.id;
       if (userId) {
+        // 🔥 RBAC: Invalidate permission cache on logout (security)
         invalidateUserPermissionCache(userId);
         logger.info(`[Logout] Cleared permission cache for user ${userId}`);
+
+        // Log successful logout
+        if (logoutResponse.success) {
+          const user = db.users.getUserById(userId);
+          if (user) {
+            await logAction(db, user, "logout", "session", token, {
+              method: "manual",
+            });
+          }
+        }
       }
 
       return logoutResponse;

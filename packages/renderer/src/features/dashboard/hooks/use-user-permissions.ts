@@ -1,6 +1,6 @@
 /**
  * useUserPermissions Hook
- * 
+ *
  * Hook for fetching and checking user permissions from the RBAC system.
  * Provides cached permission checking with automatic refresh.
  */
@@ -30,6 +30,13 @@ const permissionCache = new Map<
   }
 >();
 
+// Expose cache for external clearing (e.g., on login)
+if (typeof window !== "undefined") {
+  (
+    window as typeof window & { permissionCache?: typeof permissionCache }
+  ).permissionCache = permissionCache;
+}
+
 export function useUserPermissions(): UserPermissions {
   const { user } = useAuth();
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -42,17 +49,26 @@ export function useUserPermissions(): UserPermissions {
         setPermissions([]);
         setIsLoading(false);
         setError(null);
+        // Clear cache when user logs out
+        permissionCache.clear();
         return;
       }
 
       // Check cache first
       const cached = permissionCache.get(user.id);
       if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-        logger.info(`[useUserPermissions] Using cached permissions for user ${user.id}`);
+        logger.info(
+          `[useUserPermissions] Using cached permissions for user ${user.id}`
+        );
         setPermissions(cached.permissions);
         setIsLoading(false);
         setError(null);
         return;
+      }
+
+      // Clear cache for other users when switching users
+      if (cached && cached.timestamp < Date.now() - CACHE_TTL_MS) {
+        permissionCache.delete(user.id);
       }
 
       try {
@@ -62,43 +78,61 @@ export function useUserPermissions(): UserPermissions {
         // Fetch user permissions from RBAC API
         const sessionToken = await window.authStore.get("token");
         if (!sessionToken) {
-          logger.warn("[useUserPermissions] No session token found");
+          // Silently handle missing session token - user is not authenticated yet
+          // This is expected during initial load or before login
           setPermissions([]);
           setIsLoading(false);
           return;
         }
 
-        const response = await window.rbacAPI.userPermissions.getUserPermissions(
-          sessionToken,
-          user.id
-        );
+        const response =
+          await window.rbacAPI.userPermissions.getUserPermissions(
+            sessionToken,
+            user.id
+          );
 
         if (response.success && response.data) {
           // Response data is an object with 'direct' and 'all' properties
-          const userPermissions = Array.isArray(response.data.all) 
-            ? response.data.all 
-            : Array.isArray(response.data) 
-            ? response.data 
+          const userPermissions = Array.isArray(response.data.all)
+            ? response.data.all
+            : Array.isArray(response.data)
+            ? response.data
             : [];
-          
+
+          if (userPermissions.length === 0) {
+            logger.warn(
+              `[useUserPermissions] No permissions found for user ${user.id}. Response:`,
+              response
+            );
+          }
+
           setPermissions(userPermissions);
-          
+
           // Update cache
           permissionCache.set(user.id, {
             permissions: userPermissions,
             timestamp: Date.now(),
           });
-          
+
           logger.info(
-            `[useUserPermissions] Loaded ${userPermissions.length} permissions for user ${user.id}: ${JSON.stringify(userPermissions)}`
+            `[useUserPermissions] Loaded ${
+              userPermissions.length
+            } permissions for user ${user.id}: ${JSON.stringify(
+              userPermissions
+            )}`
           );
         } else {
-          logger.warn("[useUserPermissions] Invalid response format", response);
+          logger.warn(
+            `[useUserPermissions] Invalid response format for user ${user.id}:`,
+            response
+          );
           setPermissions([]);
         }
       } catch (err) {
         logger.error("[useUserPermissions] Failed to load permissions:", err);
-        setError(err instanceof Error ? err : new Error("Failed to load permissions"));
+        setError(
+          err instanceof Error ? err : new Error("Failed to load permissions")
+        );
         setPermissions([]);
       } finally {
         setIsLoading(false);
@@ -108,13 +142,21 @@ export function useUserPermissions(): UserPermissions {
     loadPermissions();
   }, [user?.id]);
 
+  // Clear cache when user changes (login/logout)
+  useEffect(() => {
+    if (!user?.id) {
+      permissionCache.clear();
+      setPermissions([]);
+    }
+  }, [user?.id]);
+
   const hasPermission = useCallback(
     (permission: string): boolean => {
       if (!permission) return false;
-      
+
       // Check for wildcard permission (admin has all)
       if (permissions.includes(PERMISSIONS.ALL)) return true;
-      
+
       // Check for exact match
       if (permissions.includes(permission)) return true;
 
@@ -123,7 +165,7 @@ export function useUserPermissions(): UserPermissions {
       if (action && resource) {
         // Check for action wildcard (e.g., "manage:*" covers "manage:users")
         if (permissions.includes(`${action}:*`)) return true;
-        
+
         // Check for resource wildcard (e.g., "*:users" covers "manage:users")
         if (permissions.includes(`*:${resource}`)) return true;
       }
@@ -156,4 +198,3 @@ export function useUserPermissions(): UserPermissions {
     error,
   };
 }
-

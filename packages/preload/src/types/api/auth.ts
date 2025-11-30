@@ -47,8 +47,6 @@ export interface AuthAPIPreload {
     rememberMe?: boolean;
     terminalId?: string;
     ipAddress?: string;
-    locationId?: string;
-    autoClockIn?: boolean;
   }) => Promise<any>;
 
   validateSession: (token: string) => Promise<any>;
@@ -58,7 +56,6 @@ export interface AuthAPIPreload {
     options?: {
       terminalId?: string;
       ipAddress?: string;
-      autoClockOut?: boolean;
     }
   ) => Promise<any>;
 

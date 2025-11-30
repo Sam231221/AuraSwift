@@ -33,31 +33,6 @@ import { getLogger } from "./logger.js";
 const logger = getLogger("authHelpers");
 
 // ============================================================================
-// ADMIN FALLBACK CONFIGURATION
-// ============================================================================
-
-/**
- * Admin fallback bypass - TEMPORARY MIGRATION FEATURE
- *
- * ⚠️ SECURITY WARNING: This allows admin users to bypass RBAC permission checks.
- *
- * Options:
- * 1. Development only: Only enable in development environment
- * 2. Feature flag: Use environment variable to control
- * 3. Hard deadline: Set a date when this MUST be removed
- *
- * RECOMMENDED: Use option 1 (development only) for safety
- */
-const ENABLE_ADMIN_FALLBACK =
-  process.env.NODE_ENV === "development" ||
-  process.env.RBAC_ADMIN_FALLBACK === "true";
-
-// Alternative: Hard deadline approach (uncomment to use)
-// const FALLBACK_DEADLINE = new Date("2025-12-31");
-// const ENABLE_ADMIN_FALLBACK = Date.now() < FALLBACK_DEADLINE.getTime() &&
-//                                process.env.NODE_ENV !== "production";
-
-// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -98,17 +73,20 @@ export async function validateSession(
   }
 
   // Get session from database
+  // Note: getSessionByToken() already filters expired sessions at the database level,
+  // but we keep the explicit check below for defensive programming and clear error codes
   const session = await db.sessions.getSessionByToken(sessionToken);
 
   if (!session) {
     return {
       success: false,
-      message: "Invalid session: Session not found",
+      message: "Invalid session: Session not found or expired",
       code: "INVALID_SESSION",
     };
   }
 
-  // Check if session has expired
+  // Defensive check: Verify session hasn't expired
+  // (getSessionByToken already filters expired sessions, but this provides explicit error code)
   if (new Date(session.expiresAt) < new Date()) {
     return {
       success: false,
@@ -204,59 +182,9 @@ export async function hasPermission(
     return { granted: true };
   }
 
-  // 🔥 CHANGED: Admin fallback ONLY if enabled (development or feature flag)
-  if (ENABLE_ADMIN_FALLBACK) {
-    try {
-      const userRoles = db.userRoles.getActiveRolesByUser(user.id);
-
-      for (const userRole of userRoles) {
-        const role = db.roles.getRoleById(userRole.roleId);
-
-        if (role && (role.name === "admin" || role.name === "owner")) {
-          // ⚠️ SECURITY WARNING LOG
-          logger.warn(
-            `⚠️ [SECURITY] Admin fallback used for user ${user.id} to grant ${requiredPermission}. ` +
-              `This is a temporary migration feature. ` +
-              `Please assign proper permissions to admin role. ` +
-              `Fallback enabled: ${ENABLE_ADMIN_FALLBACK}, Environment: ${process.env.NODE_ENV}`
-          );
-
-          // 🔥 CRITICAL: Log to audit trail for security monitoring
-          try {
-            await db.audit.createAuditLog({
-              userId: user.id,
-              action: "admin_fallback_used",
-              entityType: "permission",
-              entityId: requiredPermission,
-              details: {
-                roleName: role.name,
-                roleId: role.id,
-                permission: requiredPermission,
-                timestamp: Date.now(),
-                environment: process.env.NODE_ENV,
-                WARNING:
-                  "SECURITY: Admin fallback bypass used - ensure admin role has proper permissions",
-              },
-            });
-          } catch (auditError) {
-            // Don't fail permission check if audit logging fails, but log it
-            logger.error(
-              "[hasPermission] Failed to log admin fallback to audit:",
-              auditError
-            );
-          }
-
-          return { granted: true };
-        }
-      }
-    } catch (error) {
-      logger.error(
-        "[hasPermission] Error checking admin role fallback:",
-        error
-      );
-      // Don't grant permission if there's an error checking roles
-    }
-  }
+  // Note: Admin fallback has been removed for security.
+  // Admin users must have "*:*" permission in their role to access all resources.
+  // This ensures proper RBAC enforcement and auditability.
 
   logger.info(
     `[hasPermission] ❌ Permission denied: ${requiredPermission} for user ${user.id}`
@@ -635,7 +563,7 @@ export async function validateSessionPermissionAndBusiness(
         await db.audit.createAuditLog({
           userId: auth.user!.id,
           action: "business_access_denied",
-          entityType: "security",
+          entityType: "session",
           entityId: resourceBusinessId,
           details: {
             userBusinessId: auth.user!.businessId,

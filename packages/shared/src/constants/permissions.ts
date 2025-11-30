@@ -113,6 +113,22 @@ export const PERMISSIONS = {
   CUSTOMERS_MANAGE: "manage:customers",
 
   // ---------------------------------------------------------------------------
+  // Schedule Management Permissions
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Manage schedules for all staff (cashiers and managers)
+   * Typically granted to admins
+   */
+  SCHEDULES_MANAGE_ALL: "manage:schedules:all",
+
+  /**
+   * Manage schedules for cashiers only
+   * Typically granted to managers
+   */
+  SCHEDULES_MANAGE_CASHIERS: "manage:schedules:cashiers",
+
+  // ---------------------------------------------------------------------------
   // Special Permissions
   // ---------------------------------------------------------------------------
 
@@ -154,4 +170,3 @@ export function isValidPermission(permission: string): boolean {
 
 /** Type-safe permission string */
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
-

@@ -20,48 +20,11 @@ import { getLogger } from "./utils/logger.js";
 const logger = getLogger("app-init");
 
 // ============================================================================
-// ADMIN FALLBACK SECURITY CHECK
+// SECURITY NOTE
 // ============================================================================
-
-/**
- * Check if admin fallback is enabled and warn on startup
- * This must match the constant in authHelpers.ts exactly
- */
-const ENABLE_ADMIN_FALLBACK =
-  process.env.NODE_ENV === "development" ||
-  process.env.RBAC_ADMIN_FALLBACK === "true";
-
-if (ENABLE_ADMIN_FALLBACK) {
-  const env = process.env.NODE_ENV || "unknown";
-  logger.warn(
-    "\n" +
-      "⚠️  ═══════════════════════════════════════════════════════════════\n" +
-      "⚠️  SECURITY WARNING: ADMIN PERMISSION FALLBACK IS ENABLED\n" +
-      "⚠️  \n" +
-      "⚠️  This is a temporary migration feature that allows admin users\n" +
-      "⚠️  to bypass RBAC permission checks.\n" +
-      "⚠️  \n" +
-      "⚠️  Current Environment: " +
-      env +
-      "\n" +
-      "⚠️  \n" +
-      "⚠️  ⚠️  DO NOT USE IN PRODUCTION! ⚠️\n" +
-      "⚠️  \n" +
-      "⚠️  To disable:\n" +
-      "⚠️    - Set NODE_ENV=production\n" +
-      "⚠️    - Remove RBAC_ADMIN_FALLBACK environment variable\n" +
-      "⚠️    - Or remove the fallback code entirely\n" +
-      "⚠️  \n" +
-      "⚠️  ═══════════════════════════════════════════════════════════════\n"
-  );
-
-  // Also log to console for visibility
-  console.warn(
-    "⚠️  SECURITY: Admin fallback is ENABLED in",
-    env,
-    "environment!"
-  );
-}
+// Admin fallback has been removed for security.
+// Admin users must have "*:*" permission in their role to access all resources.
+// This ensures proper RBAC enforcement and auditability.
 
 // Global reference to autoUpdater instance for menu access
 let autoUpdaterInstance: ReturnType<typeof autoUpdater> | null = null;
@@ -73,7 +36,7 @@ export function getAutoUpdaterInstance() {
 export async function initApp(initConfig: AppInitConfig) {
   // Register all IPC handlers (must be done before database operations)
   registerAllIpcHandlers();
-  
+
   // Register additional service-specific handlers
   registerLoggerHandlers();
   registerVatCategoryIpc();
@@ -160,6 +123,7 @@ export async function initApp(initConfig: AppInitConfig) {
                   // Create clock-out event
                   const clockOutEvent = await db.timeTracking.createClockEvent({
                     userId: cashierId,
+                    businessId: timeShift.businessId, // ✅ REQUIRED: Get from shift
                     terminalId: "system",
                     type: "out",
                     method: "auto",
@@ -191,11 +155,38 @@ export async function initApp(initConfig: AppInitConfig) {
     }
   };
 
+  // Clean up expired sessions on startup
+  try {
+    const cleanedCount = db.sessions.cleanupExpiredSessions();
+    if (cleanedCount > 0) {
+      logger.info(
+        `[Session Cleanup] Removed ${cleanedCount} expired session(s) on startup`
+      );
+    }
+  } catch (error) {
+    logger.error("Error during startup session cleanup", error);
+  }
+
   // Set up periodic cleanup of old unclosed shifts
   // Run cleanup every 30 minutes
   const cleanupInterval = setInterval(() => {
     handleAutoCloseShifts();
   }, 30 * 60 * 1000); // 30 minutes
+
+  // Set up periodic session cleanup
+  // Run cleanup every hour to remove expired sessions
+  const sessionCleanupInterval = setInterval(() => {
+    try {
+      const cleanedCount = db.sessions.cleanupExpiredSessions();
+      if (cleanedCount > 0) {
+        logger.info(
+          `[Session Cleanup] Removed ${cleanedCount} expired session(s)`
+        );
+      }
+    } catch (error) {
+      logger.error("Error during periodic session cleanup", error);
+    }
+  }, 60 * 60 * 1000); // 1 hour
 
   // Set up daily expiry checks and notifications
   // Run expiry checks every 6 hours
@@ -213,6 +204,7 @@ export async function initApp(initConfig: AppInitConfig) {
   // Clean up on app exit
   process.on("exit", () => {
     clearInterval(cleanupInterval);
+    clearInterval(sessionCleanupInterval);
     clearInterval(expiryCheckInterval);
   });
 

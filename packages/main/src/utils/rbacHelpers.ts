@@ -6,7 +6,6 @@
  */
 
 import type { DatabaseManagers } from "../database/index.js";
-import type { Permission } from "@app/shared/constants/permissions.js";
 
 import { getLogger } from "./logger.js";
 const logger = getLogger("rbacHelpers");
@@ -25,6 +24,12 @@ const permissionCache = new Map<
     timestamp: number;
   }
 >();
+
+/**
+ * Cache locks - prevents race conditions when multiple requests
+ * try to load permissions for the same user simultaneously
+ */
+const cacheLocks = new Map<string, Promise<string[]>>();
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -55,169 +60,233 @@ export async function getUserPermissions(
       );
       return cached.permissions;
     }
+
+    // Check if permissions are already being loaded for this user (prevent race condition)
+    const existingLoad = cacheLocks.get(userId);
+    if (existingLoad) {
+      logger.info(
+        `[getUserPermissions] Waiting for existing load to complete for userId: ${userId}`
+      );
+      return await existingLoad;
+    }
   }
 
-  const permissions = new Set<string>();
+  // Create a promise for loading permissions (prevents concurrent loads)
+  const loadPromise = (async (): Promise<string[]> => {
+    const permissions = new Set<string>();
+
+    try {
+      // 1. Get permissions from all assigned roles
+      const userRoles = db.userRoles.getActiveRolesByUser(userId);
+      logger.info(
+        "[getUserPermissions] Found",
+        userRoles.length,
+        "active roles for user"
+      );
+
+      // If no roles in user_roles table, fall back to primaryRoleId
+      if (userRoles.length === 0) {
+        logger.info(
+          "[getUserPermissions] No roles in user_roles table, checking primaryRoleId fallback"
+        );
+        const user = db.users.getUserById(userId);
+        if (user?.primaryRoleId) {
+          logger.info(
+            "[getUserPermissions] Found primaryRoleId:",
+            user.primaryRoleId
+          );
+          const primaryRole = db.roles.getRoleById(user.primaryRoleId);
+          if (primaryRole) {
+            logger.info(
+              "[getUserPermissions] Using primary role:",
+              primaryRole.name
+            );
+            // Process primary role permissions
+            if (primaryRole.isActive && primaryRole.permissions) {
+              let rolePermissions: string[] = [];
+              if (typeof primaryRole.permissions === "string") {
+                try {
+                  const parsed = JSON.parse(primaryRole.permissions);
+                  // Validate that parsed result is an array
+                  if (!Array.isArray(parsed)) {
+                    throw new Error(
+                      "Permissions must be an array, got: " + typeof parsed
+                    );
+                  }
+                  // Validate that all items are strings
+                  if (!parsed.every((p) => typeof p === "string")) {
+                    throw new Error("All permissions must be strings");
+                  }
+                  rolePermissions = parsed;
+                } catch (e) {
+                  logger.error(
+                    "[getUserPermissions] Failed to parse primary role permissions:",
+                    e
+                  );
+                  // Fail safe: don't grant permissions if parsing fails
+                  rolePermissions = [];
+                  logger.warn(
+                    `[getUserPermissions] Skipping invalid permissions for primary role ${primaryRole.id}. ` +
+                      `Please fix the permissions format in the database.`
+                  );
+                }
+              } else if (Array.isArray(primaryRole.permissions)) {
+                rolePermissions = primaryRole.permissions as string[];
+              }
+
+              logger.info(
+                "[getUserPermissions] Primary role permissions:",
+                rolePermissions
+              );
+
+              for (const permission of rolePermissions) {
+                logger.info(
+                  "[getUserPermissions] Adding permission from primary role:",
+                  permission
+                );
+                permissions.add(permission);
+              }
+            }
+          }
+        }
+      } else {
+        // Process roles from user_roles table
+        for (const userRole of userRoles) {
+          try {
+            const role = db.roles.getRoleById(userRole.roleId);
+            logger.info(
+              "[getUserPermissions] Processing role:",
+              role?.name,
+              "isActive:",
+              role?.isActive
+            );
+            logger.info(
+              "[getUserPermissions] Role permissions type:",
+              typeof role?.permissions,
+              "value:",
+              role?.permissions
+            );
+
+            if (role && role.isActive && role.permissions) {
+              // Handle permissions - could be array or JSON string
+              let rolePermissions: string[] = [];
+              if (typeof role.permissions === "string") {
+                try {
+                  const parsed = JSON.parse(role.permissions);
+                  // Validate that parsed result is an array
+                  if (!Array.isArray(parsed)) {
+                    throw new Error(
+                      "Permissions must be an array, got: " + typeof parsed
+                    );
+                  }
+                  // Validate that all items are strings
+                  if (!parsed.every((p) => typeof p === "string")) {
+                    throw new Error("All permissions must be strings");
+                  }
+                  rolePermissions = parsed;
+                } catch (e) {
+                  logger.error(
+                    "[getUserPermissions] Failed to parse role permissions:",
+                    e
+                  );
+                  // Fail safe: don't grant permissions if parsing fails
+                  rolePermissions = [];
+                  logger.warn(
+                    `[getUserPermissions] Skipping invalid permissions for role ${role.id} (${role.name}). ` +
+                      `Please fix the permissions format in the database.`
+                  );
+                }
+              } else if (Array.isArray(role.permissions)) {
+                rolePermissions = role.permissions as string[];
+              }
+
+              logger.info(
+                "[getUserPermissions] Parsed permissions:",
+                rolePermissions
+              );
+
+              // Add all role permissions
+              for (const permission of rolePermissions) {
+                logger.info(
+                  "[getUserPermissions] Adding permission from role:",
+                  permission
+                );
+                permissions.add(permission);
+              }
+            }
+          } catch (error) {
+            logger.error(
+              "[getUserPermissions] Error processing role:",
+              userRole.roleId,
+              error
+            );
+          }
+        }
+      }
+
+      // 2. Get direct permissions assigned to user
+      const directPermissions =
+        db.userPermissions.getActivePermissionsByUser(userId);
+      logger.info(
+        "[getUserPermissions] Found",
+        directPermissions.length,
+        "direct permissions"
+      );
+
+      for (const perm of directPermissions) {
+        logger.info(
+          "[getUserPermissions] Adding direct permission:",
+          perm.permission
+        );
+        permissions.add(perm.permission);
+      }
+    } catch (error) {
+      logger.error(
+        "[getUserPermissions] Error aggregating permissions:",
+        error
+      );
+    }
+
+    const permissionArray = Array.from(permissions);
+    logger.info(
+      `[getUserPermissions] Final aggregated permissions: ${JSON.stringify(
+        permissionArray
+      )}`
+    );
+
+    // Update cache
+    permissionCache.set(userId, {
+      permissions: permissionArray,
+      timestamp: Date.now(),
+    });
+
+    return permissionArray;
+  })();
+
+  // Store the load promise to prevent concurrent loads
+  if (useCache) {
+    cacheLocks.set(userId, loadPromise);
+  }
 
   try {
-    // 1. Get permissions from all assigned roles
-    const userRoles = db.userRoles.getActiveRolesByUser(userId);
-    logger.info(
-      "[getUserPermissions] Found",
-      userRoles.length,
-      "active roles for user"
-    );
-
-    // If no roles in user_roles table, fall back to primaryRoleId
-    if (userRoles.length === 0) {
-      logger.info(
-        "[getUserPermissions] No roles in user_roles table, checking primaryRoleId fallback"
-      );
-      const user = db.users.getUserById(userId);
-      if (user?.primaryRoleId) {
-        logger.info(
-          "[getUserPermissions] Found primaryRoleId:",
-          user.primaryRoleId
-        );
-        const primaryRole = db.roles.getRoleById(user.primaryRoleId);
-        if (primaryRole) {
-          logger.info(
-            "[getUserPermissions] Using primary role:",
-            primaryRole.name
-          );
-          // Process primary role permissions
-          if (primaryRole.isActive && primaryRole.permissions) {
-            let rolePermissions: string[] = [];
-            if (typeof primaryRole.permissions === "string") {
-              try {
-                rolePermissions = JSON.parse(primaryRole.permissions);
-              } catch (e) {
-                logger.error(
-                  "[getUserPermissions] Failed to parse primary role permissions:",
-                  e
-                );
-                rolePermissions = [primaryRole.permissions];
-              }
-            } else if (Array.isArray(primaryRole.permissions)) {
-              rolePermissions = primaryRole.permissions as string[];
-            }
-
-            logger.info(
-              "[getUserPermissions] Primary role permissions:",
-              rolePermissions
-            );
-
-            for (const permission of rolePermissions) {
-              logger.info(
-                "[getUserPermissions] Adding permission from primary role:",
-                permission
-              );
-              permissions.add(permission);
-            }
-          }
-        }
-      }
-    } else {
-      // Process roles from user_roles table
-      for (const userRole of userRoles) {
-        try {
-          const role = db.roles.getRoleById(userRole.roleId);
-          logger.info(
-            "[getUserPermissions] Processing role:",
-            role?.name,
-            "isActive:",
-            role?.isActive
-          );
-          logger.info(
-            "[getUserPermissions] Role permissions type:",
-            typeof role?.permissions,
-            "value:",
-            role?.permissions
-          );
-
-          if (role && role.isActive && role.permissions) {
-            // Handle permissions - could be array or JSON string
-            let rolePermissions: string[] = [];
-            if (typeof role.permissions === "string") {
-              try {
-                rolePermissions = JSON.parse(role.permissions);
-              } catch (e) {
-                logger.error(
-                  "[getUserPermissions] Failed to parse role permissions:",
-                  e
-                );
-                rolePermissions = [role.permissions];
-              }
-            } else if (Array.isArray(role.permissions)) {
-              rolePermissions = role.permissions as string[];
-            }
-
-            logger.info(
-              "[getUserPermissions] Parsed permissions:",
-              rolePermissions
-            );
-
-            // Add all role permissions
-            for (const permission of rolePermissions) {
-              logger.info(
-                "[getUserPermissions] Adding permission from role:",
-                permission
-              );
-              permissions.add(permission);
-            }
-          }
-        } catch (error) {
-          logger.error(
-            "[getUserPermissions] Error processing role:",
-            userRole.roleId,
-            error
-          );
-        }
-      }
+    const result = await loadPromise;
+    return result;
+  } finally {
+    // Clean up lock after load completes
+    if (useCache) {
+      cacheLocks.delete(userId);
     }
-
-    // 2. Get direct permissions assigned to user
-    const directPermissions =
-      db.userPermissions.getActivePermissionsByUser(userId);
-    logger.info(
-      "[getUserPermissions] Found",
-      directPermissions.length,
-      "direct permissions"
-    );
-
-    for (const perm of directPermissions) {
-      logger.info(
-        "[getUserPermissions] Adding direct permission:",
-        perm.permission
-      );
-      permissions.add(perm.permission);
-    }
-  } catch (error) {
-    logger.error("[getUserPermissions] Error aggregating permissions:", error);
   }
-
-  const permissionArray = Array.from(permissions);
-  logger.info(
-    `[getUserPermissions] Final aggregated permissions: ${JSON.stringify(
-      permissionArray
-    )}`
-  );
-
-  // Update cache
-  permissionCache.set(userId, {
-    permissions: permissionArray,
-    timestamp: Date.now(),
-  });
-
-  return permissionArray;
 }
 
 /**
  * Invalidate permission cache for a user
  * Call this when user's roles or permissions change
+ * Also clears any pending load locks for this user
  */
 export function invalidateUserPermissionCache(userId: string): void {
   permissionCache.delete(userId);
+  cacheLocks.delete(userId);
 }
 
 /**
@@ -238,9 +307,11 @@ export function invalidateRolePermissionCache(
 /**
  * Clear entire permission cache
  * Use sparingly - mainly for testing or system-wide permission updates
+ * Also clears all pending load locks
  */
 export function clearPermissionCache(): void {
   permissionCache.clear();
+  cacheLocks.clear();
 }
 
 /**

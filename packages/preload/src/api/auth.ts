@@ -42,8 +42,6 @@ export const authAPI = {
     rememberMe?: boolean;
     terminalId?: string;
     ipAddress?: string;
-    locationId?: string;
-    autoClockIn?: boolean;
   }) => ipcRenderer.invoke("auth:login", credentials),
 
   validateSession: (token: string) =>
@@ -54,7 +52,6 @@ export const authAPI = {
     options?: {
       terminalId?: string;
       ipAddress?: string;
-      autoClockOut?: boolean;
     }
   ) => ipcRenderer.invoke("auth:logout", token, options),
 

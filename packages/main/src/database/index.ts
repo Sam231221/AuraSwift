@@ -35,8 +35,8 @@ import { v4 as uuidv4 } from "uuid";
 import * as schema from "./schema.js";
 import { seedDefaultData } from "./seed.js";
 
-import { getLogger } from '../utils/logger.js';
-const logger = getLogger('index');
+import { getLogger } from "../utils/logger.js";
+const logger = getLogger("index");
 
 let dbManagerInstance: DBManager | null = null;
 let managersInstance: DatabaseManagers | null = null;
@@ -142,17 +142,18 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     // Create all manager instances with drizzle support
     const sessions = new SessionManager(drizzle, uuid);
     const timeTracking = new TimeTrackingManager(drizzle, uuid);
+    const schedules = new ScheduleManager(drizzle, uuid);
     const users = new UserManager(
       drizzle,
       bcryptWrapper,
       uuid,
       sessions,
-      timeTracking
+      timeTracking,
+      schedules
     );
     const businesses = new BusinessManager(drizzle, uuid);
     const products = new ProductManager(drizzle, uuid);
     const categories = new CategoryManager(drizzle, uuid);
-    const schedules = new ScheduleManager(drizzle, uuid);
     const shifts = new ShiftManager(drizzle, uuid);
     const transactions = new TransactionManager(drizzle, uuid);
     const cashDrawers = new CashDrawerManager(drizzle, uuid);

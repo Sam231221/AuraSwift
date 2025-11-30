@@ -92,7 +92,8 @@ export function DashboardLayout({
 
   const handleClockOutAndLogout = async () => {
     setShowClockOutDialog(false);
-    await logout({ clockOut: true });
+    // Logout will auto-handle clock-out
+    await logout();
   };
 
   const handleLogoutOnly = async () => {

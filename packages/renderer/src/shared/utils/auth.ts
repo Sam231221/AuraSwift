@@ -1,25 +1,21 @@
 import type { User } from "@/types/domain";
-import { getUserRoleName } from "./rbac-helpers";
-
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('auth');
 
 /**
- * Check if a user has a specific permission
- * Note: This is deprecated. Use the backend RBAC system instead.
+ * Authentication utility functions for frontend
+ * 
+ * ⚠️ IMPORTANT: Permission checking is handled by the backend RBAC system.
+ * 
+ * For permission checks in React components:
+ * - ✅ Use `useUserPermissions()` hook from `@/features/dashboard/hooks/use-user-permissions`
+ * - ✅ This hook fetches permissions from backend RBAC API
+ * - ✅ Frontend permission checks are for UI only - backend enforces security
+ * 
+ * For role-based checks:
+ * - ✅ Use `userHasRole()` from `@/shared/utils/rbac-helpers`
+ * - ✅ Use `getUserRoleName()` for role name
+ * 
+ * ❌ DO NOT check permissions locally - always use backend RBAC system
  */
-export function hasPermission(
-  user: User,
-  action: string,
-  resource: string
-): boolean {
-  // Temporary: Admin has all permissions
-  if (getUserRoleName(user) === "admin") return true;
-
-  // For now, return false - permissions should be checked via backend
-  logger.warn("hasPermission is deprecated. Use backend RBAC checks instead.");
-  return false;
-}
 
 /**
  * Get the display name for a role

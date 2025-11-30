@@ -275,14 +275,16 @@ export const userPermissions = createTable(
 
 /**
  * User session tokens for authentication
+ * Desktop EPOS: Uses long-lived tokens with secure storage (Electron safeStorage)
+ * No refresh tokens needed - simplified architecture for desktop apps
  */
 export const sessions = createTable("sessions", {
   id: text("id").primaryKey(),
   userId: text("userId")
     .notNull()
     .references(() => users.id),
-  token: text("token").unique().notNull(),
-  expiresAt: text("expiresAt").notNull(),
+  token: text("token").unique().notNull(), // Session token (long-lived for desktop EPOS)
+  expiresAt: text("expiresAt").notNull(), // Session expiry
   ...timestampColumns,
 });
 
@@ -1133,6 +1135,50 @@ export const ageVerificationRecords = createTable(
     ),
   ]
 );
+/**
+ * Cash drawer counts (mid-shift and end-shift)
+ */
+export const cashDrawerCounts = createTable(
+  "cash_drawer_counts",
+  {
+    id: text("id").primaryKey(),
+    business_id: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+    shift_id: text("shift_id")
+      .notNull()
+      .references(() => shifts.id, { onDelete: "cascade" }),
+    terminal_id: text("terminal_id").references(() => terminals.id),
+
+    count_type: text("count_type", {
+      enum: ["mid-shift", "end-shift"],
+    }).notNull(),
+
+    expected_amount: real("expected_amount").notNull(),
+    counted_amount: real("counted_amount").notNull(),
+    variance: real("variance").notNull(),
+
+    notes: text("notes"),
+    counted_by: text("counted_by")
+      .notNull()
+      .references(() => users.id),
+
+    timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+    ...timestampColumns,
+  },
+  (table) => [
+    index("cash_drawer_counts_shift_idx").on(table.shift_id),
+    index("cash_drawer_counts_business_idx").on(table.business_id),
+    index("cash_drawer_counts_timestamp_idx").on(table.timestamp),
+    index("cash_drawer_counts_counted_by_idx").on(table.counted_by),
+
+    // Ensure only one end-shift count per shift
+    unique("cash_drawer_counts_shift_type_unique").on(
+      table.shift_id,
+      table.count_type
+    ),
+  ]
+);
 
 // ============================================================================
 // SHIFT MANAGEMENT
@@ -1234,51 +1280,6 @@ export const shifts = createTable(
     // Unique constraints - each clock event can only be used once
     unique("shifts_clock_in_unique").on(table.clock_in_id),
     unique("shifts_clock_out_unique").on(table.clock_out_id),
-  ]
-);
-
-/**
- * Cash drawer counts (mid-shift and end-shift)
- */
-export const cashDrawerCounts = createTable(
-  "cash_drawer_counts",
-  {
-    id: text("id").primaryKey(),
-    business_id: text("business_id")
-      .notNull()
-      .references(() => businesses.id, { onDelete: "cascade" }),
-    shift_id: text("shift_id")
-      .notNull()
-      .references(() => shifts.id, { onDelete: "cascade" }),
-    terminal_id: text("terminal_id").references(() => terminals.id),
-
-    count_type: text("count_type", {
-      enum: ["mid-shift", "end-shift"],
-    }).notNull(),
-
-    expected_amount: real("expected_amount").notNull(),
-    counted_amount: real("counted_amount").notNull(),
-    variance: real("variance").notNull(),
-
-    notes: text("notes"),
-    counted_by: text("counted_by")
-      .notNull()
-      .references(() => users.id),
-
-    timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
-    ...timestampColumns,
-  },
-  (table) => [
-    index("cash_drawer_counts_shift_idx").on(table.shift_id),
-    index("cash_drawer_counts_business_idx").on(table.business_id),
-    index("cash_drawer_counts_timestamp_idx").on(table.timestamp),
-    index("cash_drawer_counts_counted_by_idx").on(table.counted_by),
-
-    // Ensure only one end-shift count per shift
-    unique("cash_drawer_counts_shift_type_unique").on(
-      table.shift_id,
-      table.count_type
-    ),
   ]
 );
 
@@ -1564,6 +1565,11 @@ export const clockEvents = createTable(
       .references(() => terminals.id),
     location_id: text("location_id"),
 
+    // Link to scheduled shift (nullable - not all clock events are scheduled)
+    schedule_id: text("schedule_id").references(() => schedules.id, {
+      onDelete: "set null",
+    }),
+
     type: text("type", { enum: ["in", "out"] }).notNull(),
     timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
 
@@ -1585,6 +1591,7 @@ export const clockEvents = createTable(
     index("clock_events_timestamp_idx").on(table.timestamp),
     index("clock_events_type_idx").on(table.type),
     index("clock_events_status_idx").on(table.status),
+    index("clock_events_schedule_idx").on(table.schedule_id),
 
     // Compound indexes for common queries
     index("clock_events_user_timestamp_idx").on(table.user_id, table.timestamp),
@@ -1668,6 +1675,10 @@ export const timeCorrections = createTable(
     id: text("id").primaryKey(),
     clock_event_id: text("clock_event_id").references(() => clockEvents.id),
     shift_id: text("shift_id").references(() => shifts.id),
+
+    // Allow break time corrections
+    break_id: text("break_id").references(() => breaks.id),
+
     user_id: text("user_id")
       .notNull()
       .references(() => users.id),
@@ -1700,6 +1711,7 @@ export const timeCorrections = createTable(
   (table) => [
     index("time_corrections_clock_event_idx").on(table.clock_event_id),
     index("time_corrections_shift_idx").on(table.shift_id),
+    index("time_corrections_break_idx").on(table.break_id),
     index("time_corrections_user_idx").on(table.user_id),
     index("time_corrections_business_idx").on(table.business_id),
     index("time_corrections_status_idx").on(table.status),

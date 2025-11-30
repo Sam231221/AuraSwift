@@ -13,8 +13,45 @@ export function registerTimeTrackingHandlers() {
     try {
       if (!db) db = await getDatabase();
 
+      // Comprehensive validation before clock-in
+      const userId = data.userId;
+      if (!userId) {
+        return {
+          success: false,
+          message: "User ID is required",
+          code: "MISSING_USER_ID",
+        };
+      }
+
+      // 1. Validate user exists and is active
+      const user = db.users.getUserById(userId);
+      if (!user) {
+        return {
+          success: false,
+          message: "User not found",
+          code: "USER_NOT_FOUND",
+        };
+      }
+
+      if (!user.isActive) {
+        return {
+          success: false,
+          message: "User account is inactive",
+          code: "USER_INACTIVE",
+        };
+      }
+
+      // 2. Check for existing active shift (prevent duplicate clock-in)
+      const existingActiveShift = db.timeTracking.getActiveShift(userId);
+      if (existingActiveShift) {
+        return {
+          success: false,
+          message: "You already have an active shift. Please clock out first.",
+          code: "DUPLICATE_CLOCK_IN",
+        };
+      }
+
       // Validate schedule if user requires shift (cashier/manager)
-      const user = db.users.getUserById(data.userId);
       if (user && data.businessId) {
         const shiftRequirement = await shiftRequirementResolver.resolve(
           user,
@@ -105,14 +142,110 @@ export function registerTimeTrackingHandlers() {
   ipcMain.handle("timeTracking:clockOut", async (event, data) => {
     try {
       if (!db) db = await getDatabase();
-      const activeShift = db.timeTracking.getActiveShift(data.userId);
+
+      // Comprehensive validation before clock-out
+      const userId = data.userId;
+      if (!userId) {
+        return {
+          success: false,
+          message: "User ID is required",
+          code: "MISSING_USER_ID",
+        };
+      }
+
+      // 1. Validate user exists and is active
+      const user = db.users.getUserById(userId);
+      if (!user) {
+        return {
+          success: false,
+          message: "User not found",
+          code: "USER_NOT_FOUND",
+        };
+      }
+
+      if (!user.isActive) {
+        return {
+          success: false,
+          message: "User account is inactive",
+          code: "USER_INACTIVE",
+        };
+      }
+
+      // 2. Get active shift and validate ownership
+      const activeShift = db.timeTracking.getActiveShift(userId);
 
       if (!activeShift) {
         return {
           success: false,
-          message: "No active shift found",
+          message: "No active shift found. Cannot clock out without an active shift.",
+          code: "NO_ACTIVE_SHIFT",
         };
       }
+
+      // 3. Validate user owns the shift
+      if (activeShift.userId !== userId) {
+        logger.warn(
+          `[ClockOut] User ${userId} attempted to clock out shift ${activeShift.id} owned by ${activeShift.userId}`
+        );
+        return {
+          success: false,
+          message: "You can only clock out your own shift",
+          code: "SHIFT_OWNERSHIP_MISMATCH",
+        };
+      }
+
+      // 4. Check if shift is actually active (not already completed)
+      if (activeShift.endTime) {
+        return {
+          success: false,
+          message: "Shift is already completed",
+          code: "SHIFT_ALREADY_COMPLETED",
+        };
+      }
+
+      // 5. Check for duplicate clock-out events
+      // Get the clock-in event for this shift
+      if (activeShift.clockInId) {
+        const clockInEvent = db.timeTracking.getClockEventById(
+          activeShift.clockInId
+        );
+        if (clockInEvent) {
+          // Check if shift already has a clock-out event (via clockOutId)
+          if (activeShift.clockOutId) {
+            const existingClockOut = db.timeTracking.getClockEventById(
+              activeShift.clockOutId
+            );
+            if (existingClockOut && existingClockOut.type === "out") {
+              return {
+                success: false,
+                message: "Clock-out event already exists for this shift",
+                code: "DUPLICATE_CLOCK_OUT",
+              };
+            }
+          }
+        }
+      }
+
+      // 6. Validate minimum shift duration (optional - can be configured)
+      if (activeShift.clockInId) {
+        const clockInEvent = db.timeTracking.getClockEventById(
+          activeShift.clockInId
+        );
+        if (clockInEvent) {
+          const shiftDuration =
+            Date.now() - new Date(clockInEvent.timestamp).getTime();
+          const minDuration = 1 * 60 * 1000; // 1 minute minimum
+
+          if (shiftDuration < minDuration) {
+            logger.warn(
+              `[ClockOut] Shift duration too short: ${shiftDuration}ms for user ${userId}`
+            );
+            // Don't block, but log warning
+          }
+        }
+      }
+
+      // All validations passed - proceed with clock-out
 
       // End any active breaks
       const activeBreak = db.timeTracking.getActiveBreak(activeShift.id);
@@ -126,6 +259,15 @@ export function registerTimeTrackingHandlers() {
         type: "out",
       });
 
+      // Validate clock event (fraud detection)
+      const validation = await db.timeTracking.validateClockEvent(clockEvent);
+      if (!validation.valid && validation.violations.length > 0) {
+        logger.warn(
+          `[ClockOut] Clock-out validation violations: ${validation.violations.join(", ")}`
+        );
+        // Log but don't block - violations are warnings, not blockers
+      }
+
       // Complete shift
       const completedShift = await db.timeTracking.completeShift(
         activeShift.id,
@@ -136,12 +278,14 @@ export function registerTimeTrackingHandlers() {
         success: true,
         clockEvent,
         shift: completedShift,
+        validation: validation.warnings.length > 0 ? validation : undefined, // Include warnings if any
       };
     } catch (error) {
       logger.error("Clock-out IPC error:", error);
       return {
         success: false,
         message: error instanceof Error ? error.message : "Failed to clock out",
+        code: "CLOCK_OUT_ERROR",
       };
     }
   });

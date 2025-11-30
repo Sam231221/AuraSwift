@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import { getUserRoleName } from "@/shared/utils/rbac-helpers";
+import {
+  getUserRoleName,
+  getUserRoleDisplayName,
+} from "@/shared/utils/rbac-helpers";
 import {
   Plus,
   Edit2,
@@ -16,6 +19,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
+import { useUserPermissions } from "@/features/dashboard/hooks/use-user-permissions";
+import { PERMISSIONS } from "@app/shared/constants/permissions";
 import {
   Drawer,
   DrawerClose,
@@ -83,10 +88,10 @@ import { startOfDay } from "date-fns/startOfDay";
 import { TimePicker } from "../../../../../components/time-picker";
 import { useScheduleForm } from "./staff-schedules/hooks/use-schedule-form";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('staff-schedules-view');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("staff-schedules-view");
 
-// Using database interfaces
+// Using database interfaces with RBAC support
 interface Cashier {
   id: string;
   username: string;
@@ -94,11 +99,20 @@ interface Cashier {
   firstName: string;
   lastName: string;
   businessName: string;
-  role: "cashier" | "manager" | "admin";
   businessId: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  // RBAC fields (from backend)
+  primaryRoleId?: string;
+  roleName?: string; // From backend join query (lowercase role name)
+  primaryRole?: {
+    id: string;
+    name: string;
+    displayName: string;
+    description?: string;
+    permissions?: unknown[];
+  };
 }
 
 interface Schedule {
@@ -120,6 +134,16 @@ interface StaffSchedulesViewProps {
 
 const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   const { user } = useAuth();
+  const { hasPermission, isLoading: isLoadingPermissions } =
+    useUserPermissions();
+
+  // RBAC: Determine which roles the current user can schedule
+  // Admin: can schedule both cashiers and managers (has SCHEDULES_MANAGE_ALL)
+  // Manager: can only schedule cashiers (has SCHEDULES_MANAGE_CASHIERS)
+  const canScheduleAll = hasPermission(PERMISSIONS.SCHEDULES_MANAGE_ALL);
+  const canScheduleCashiers = hasPermission(
+    PERMISSIONS.SCHEDULES_MANAGE_CASHIERS
+  );
 
   // State for cashiers - will be loaded from database
   const [cashiers, setCashiers] = useState<Cashier[]>([]);
@@ -146,7 +170,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   // Load cashiers/staff users
   useEffect(() => {
     const loadCashiers = async () => {
-      if (!businessId) {
+      if (!businessId || isLoadingPermissions) {
         setIsLoadingCashiers(false);
         return;
       }
@@ -155,12 +179,60 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         setIsLoadingCashiers(true);
         const response = await window.scheduleAPI.getCashierUsers(businessId);
         if (response.success && response.data) {
-          // Filter to only show cashiers, not managers or admins
-          const cashierUsers = (response.data as Cashier[]).filter(
-            (user) => getUserRoleName(user) === "cashier"
+          const allUsers = response.data as Cashier[];
+          logger.info(
+            `[loadCashiers] Received ${allUsers.length} users from API`
           );
-          setCashiers(cashierUsers);
+
+          // Log all users for debugging
+          allUsers.forEach((user) => {
+            const roleName = getUserRoleName(user);
+            logger.info(
+              `[loadCashiers] User: ${user.firstName} ${user.lastName} (${user.id}), roleName: ${user.roleName}, primaryRoleId: ${user.primaryRoleId}, resolved role: ${roleName}`
+            );
+          });
+
+          // RBAC-based filtering: Filter staff members based on user's permissions
+          // - Admin (SCHEDULES_MANAGE_ALL): can schedule cashiers and managers
+          // - Manager (SCHEDULES_MANAGE_CASHIERS): can only schedule cashiers
+          const filteredUsers = allUsers.filter((staffUser) => {
+            const staffRoleName = getUserRoleName(staffUser);
+
+            // Skip admin users (they shouldn't have schedules)
+            if (staffRoleName === "admin") {
+              return false;
+            }
+
+            // If user can schedule all, include both cashiers and managers
+            if (canScheduleAll) {
+              return staffRoleName === "cashier" || staffRoleName === "manager";
+            }
+
+            // If user can only schedule cashiers, filter to cashiers only
+            if (canScheduleCashiers) {
+              return staffRoleName === "cashier";
+            }
+
+            // No permission - don't show any users
+            logger.warn(
+              `[loadCashiers] User ${user?.id} has no schedule management permissions`
+            );
+            return false;
+          });
+
+          logger.info(
+            `[loadCashiers] Filtered to ${filteredUsers.length} staff members out of ${allUsers.length} total users (canScheduleAll: ${canScheduleAll}, canScheduleCashiers: ${canScheduleCashiers})`
+          );
+
+          if (filteredUsers.length === 0 && allUsers.length > 0) {
+            logger.warn(
+              `[loadCashiers] No staff members available for scheduling. Check permissions or ensure users have roles assigned.`
+            );
+          }
+
+          setCashiers(filteredUsers);
         } else {
+          logger.error("Failed to load staff members:", response.message);
           toast.error("Failed to load staff members", {
             description: response.message || "Please try again",
           });
@@ -176,7 +248,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     };
 
     loadCashiers();
-  }, [businessId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, isLoadingPermissions, canScheduleAll, canScheduleCashiers]);
 
   // Load schedules
   useEffect(() => {
@@ -410,6 +483,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       staffId: string,
       excludeScheduleId?: string
     ) => boolean;
+    canScheduleAll: boolean;
+    canScheduleCashiers: boolean;
     onClose: () => void;
     onSuccess: (schedule: Schedule) => void;
   }> = ({
@@ -422,6 +497,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     isLoadingCashiers,
     businessId,
     checkShiftOverlap,
+    canScheduleAll,
+    canScheduleCashiers,
     onClose,
     onSuccess,
   }) => {
@@ -430,6 +507,29 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
       selectedDate,
       businessId,
       onSubmit: async (data) => {
+        // RBAC: Validate permission to schedule the selected staff member
+        const selectedStaffMember = cashiers.find((c) => c.id === data.staffId);
+        if (!selectedStaffMember) {
+          throw new Error("Selected staff member not found");
+        }
+
+        const staffRoleName = getUserRoleName(selectedStaffMember);
+
+        // Check if user has permission to schedule this staff member
+        if (staffRoleName === "manager" && !canScheduleAll) {
+          throw new Error(
+            "You do not have permission to schedule managers. Only cashiers can be scheduled."
+          );
+        }
+
+        if (
+          staffRoleName === "cashier" &&
+          !canScheduleCashiers &&
+          !canScheduleAll
+        ) {
+          throw new Error("You do not have permission to create schedules.");
+        }
+
         // Check for overlapping shifts (business logic)
         if (
           checkShiftOverlap(
@@ -573,7 +673,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                                       {cashier.firstName} {cashier.lastName}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                      {cashier.email} • {cashier.role}
+                                      {cashier.email} •{" "}
+                                      {getUserRoleDisplayName(cashier)}
                                     </div>
                                   </div>
                                 </div>
@@ -1110,6 +1211,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 isLoadingCashiers={isLoadingCashiers}
                 businessId={businessId}
                 checkShiftOverlap={checkShiftOverlap}
+                canScheduleAll={canScheduleAll}
+                canScheduleCashiers={canScheduleCashiers}
                 onClose={closeDrawer}
                 onSuccess={(schedule) => {
                   if (editingSchedule) {
@@ -1310,7 +1413,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                                 <span className="truncate">{staffName}</span>
                               </CardTitle>
                               <p className="text-xs sm:text-sm text-slate-600 truncate">
-                                {staffMember?.role || "Staff"} •{" "}
+                                {staffMember
+                                  ? getUserRoleDisplayName(staffMember)
+                                  : "Staff"}{" "}
+                                •{" "}
                                 {schedule.assignedRegister ||
                                   "No register assigned"}
                               </p>

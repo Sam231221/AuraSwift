@@ -12,9 +12,21 @@ export class SessionManager {
     this.uuid = uuid;
   }
 
-  createSession(userId: string, expiryDays: number = 7): Session {
+  /**
+   * Create a new session with access token
+   * Desktop EPOS: Uses long-lived tokens with secure storage (Electron safeStorage)
+   * No refresh tokens needed - simplified architecture for desktop apps
+   * 
+   * @param userId - User ID
+   * @param expiryDays - Session expiry in days (default: 7 days)
+   * @returns Session object
+   */
+  createSession(
+    userId: string,
+    expiryDays: number = 7
+  ): Session {
     const sessionId = this.uuid.v4();
-    const token = this.uuid.v4();
+    const token = this.uuid.v4(); // Session token
     const now = new Date();
     const expiresAt = new Date(
       now.getTime() + expiryDays * 24 * 60 * 60 * 1000
@@ -85,6 +97,16 @@ export class SessionManager {
     }
   }
 
+  /**
+   * Get session by token, filtering out expired sessions
+   *
+   * Note: This method filters expired sessions at the database level.
+   * For explicit error codes and consistent validation, use validateSession()
+   * from authHelpers.ts instead.
+   *
+   * @param token - Session token
+   * @returns Session if found and not expired, null otherwise
+   */
   getSessionByToken(token: string): Session | null {
     const now = new Date().toISOString();
     const [session] = this.drizzle
@@ -153,5 +175,28 @@ export class SessionManager {
       .all();
 
     return sessions as Session[];
+  }
+
+  /**
+   * @deprecated Refresh tokens are not used in desktop EPOS architecture
+   * Desktop apps use long-lived tokens with secure storage (Electron safeStorage)
+   * This method is kept for backward compatibility but will always return null
+   */
+  getSessionByRefreshToken(refreshToken: string): Session | null {
+    // Refresh tokens not supported in desktop EPOS
+    return null;
+  }
+
+  /**
+   * @deprecated Refresh tokens are not used in desktop EPOS architecture
+   * Desktop apps use long-lived tokens with secure storage (Electron safeStorage)
+   * This method is kept for backward compatibility but will always return null
+   */
+  refreshAccessToken(
+    refreshToken: string,
+    accessTokenExpiryHours: number = 1
+  ): Session | null {
+    // Refresh tokens not supported in desktop EPOS
+    return null;
   }
 }
