@@ -1,14 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Shield } from "lucide-react";
 import type { StaffUser } from "../schemas/types";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 
 interface UserStatsCardsProps {
   staffUsers: StaffUser[];
 }
 
 export function UserStatsCards({ staffUsers }: UserStatsCardsProps) {
-  const cashierCount = staffUsers.filter((u) => u.role === "cashier").length;
-  const managerCount = staffUsers.filter((u) => u.role === "manager").length;
+  const cashierCount = staffUsers.filter(
+    (u) => getUserRoleName(u) === "cashier"
+  ).length;
+  const managerCount = staffUsers.filter(
+    (u) => getUserRoleName(u) === "manager"
+  ).length;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">

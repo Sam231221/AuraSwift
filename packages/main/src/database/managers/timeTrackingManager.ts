@@ -239,7 +239,7 @@ export class TimeTrackingManager {
           eq(schema.shifts.status, "active")
         )
       )
-      .orderBy(desc(schema.shifts.created_at))
+      .orderBy(desc(schema.shifts.createdAt))
       .limit(1)
       .all();
 

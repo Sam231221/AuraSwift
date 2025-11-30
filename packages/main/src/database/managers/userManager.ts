@@ -366,6 +366,7 @@ export class UserManager {
       lastName: string;
       businessName: string;
       role: "cashier" | "supervisor" | "manager" | "admin" | "owner";
+      primaryRoleId: string;
       isActive: boolean;
       address: string;
     }>

@@ -7,6 +7,7 @@ import { Mail, Calendar, Eye, Edit, Trash2 } from "lucide-react";
 import {
   getUserRoleName,
   getUserRoleDisplayName,
+  getRoleBadgeVariant,
 } from "@/shared/utils/rbac-helpers";
 import { getStaffDisplayName } from "../utils/user-helpers";
 import type { StaffUser } from "../schemas/types";
@@ -25,6 +26,9 @@ export function UserTableRow({
   onDelete,
 }: UserTableRowProps) {
   const displayName = getStaffDisplayName(staffUser);
+  const roleName = getUserRoleName(staffUser);
+  const roleDisplayName = getUserRoleDisplayName(staffUser);
+  const roleBadgeVariant = getRoleBadgeVariant(roleName);
 
   return (
     <TableRow>
@@ -54,12 +58,16 @@ export function UserTableRow({
       </TableCell>
       <TableCell className="whitespace-nowrap">
         <Badge
-          variant={
-            getUserRoleName(staffUser) === "manager" ? "default" : "secondary"
-          }
+          variant={roleBadgeVariant}
           className="text-[10px] sm:text-xs md:text-sm lg:text-base"
+          title={
+            staffUser.primaryRole?.description ||
+            `Role: ${roleDisplayName}${
+              staffUser.primaryRoleId ? ` (ID: ${staffUser.primaryRoleId})` : ""
+            }`
+          }
         >
-          {getUserRoleDisplayName(staffUser)}
+          {roleDisplayName}
         </Badge>
       </TableCell>
       <TableCell className="hidden md:table-cell whitespace-nowrap">

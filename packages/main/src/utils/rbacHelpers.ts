@@ -42,15 +42,16 @@ export async function getUserPermissions(
   userId: string,
   useCache = true
 ): Promise<string[]> {
-  logger.info("[getUserPermissions] Starting for userId:", userId);
+  logger.info(`[getUserPermissions] Starting for userId: ${userId}`);
 
   // Check cache first
   if (useCache) {
     const cached = permissionCache.get(userId);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
       logger.info(
-        "[getUserPermissions] Returning cached permissions:",
-        cached.permissions
+        `[getUserPermissions] Returning cached permissions: ${JSON.stringify(
+          cached.permissions
+        )}`
       );
       return cached.permissions;
     }
@@ -197,8 +198,9 @@ export async function getUserPermissions(
 
   const permissionArray = Array.from(permissions);
   logger.info(
-    "[getUserPermissions] Final aggregated permissions:",
-    permissionArray
+    `[getUserPermissions] Final aggregated permissions: ${JSON.stringify(
+      permissionArray
+    )}`
   );
 
   // Update cache

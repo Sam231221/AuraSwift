@@ -64,7 +64,29 @@ export interface RBACUserRolesAPI {
   ) => Promise<APIResponse>;
 }
 
+export interface RBACUserPermissionsAPI {
+  grant: (
+    sessionToken: string,
+    userId: string,
+    permission: string,
+    reason?: string,
+    expiresAt?: number
+  ) => Promise<APIResponse>;
+  
+  revoke: (
+    sessionToken: string,
+    userId: string,
+    permission: string
+  ) => Promise<APIResponse>;
+  
+  getUserPermissions: (
+    sessionToken: string,
+    userId: string
+  ) => Promise<APIResponse>;
+}
+
 export interface RBACAPI {
   roles: RBACRolesAPI;
   userRoles: RBACUserRolesAPI;
+  userPermissions: RBACUserPermissionsAPI;
 }

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -27,9 +27,10 @@ import {
   type UserCreateFormData,
 } from "../../schemas/user-schema";
 import { useAuth } from "@/shared/hooks/use-auth";
+import { useRoles } from "@/views/dashboard/pages/admin/views/rbac-management/hooks/useRoles";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('add-user-form');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("add-user-form");
 
 interface AddUserFormProps {
   onSubmit: (data: UserCreateFormData) => Promise<void>;
@@ -46,6 +47,24 @@ export function AddUserForm({
 }: AddUserFormProps) {
   const { user } = useAuth();
 
+  // Fetch roles dynamically
+  const { data: roles, isLoading: isLoadingRoles } = useRoles();
+
+  // Filter roles to only show active staff roles (cashier, manager)
+  const availableRoles = useMemo(() => {
+    return roles.filter(
+      (role) =>
+        role.isActive && (role.name === "cashier" || role.name === "manager")
+    );
+  }, [roles]);
+
+  const defaultRole = useMemo(() => {
+    const firstRole = availableRoles.find(
+      (r) => r.name === "cashier" || r.name === "manager"
+    );
+    return (firstRole?.name as "cashier" | "manager") || "cashier";
+  }, [availableRoles]);
+
   const form = useForm<UserCreateFormData>({
     resolver: zodResolver(userCreateSchema),
     mode: "onChange", // Enable real-time validation for better UX with keyboard
@@ -55,7 +74,7 @@ export function AddUserForm({
       pin: "",
       firstName: "",
       lastName: "",
-      role: "cashier",
+      role: defaultRole,
       avatar: "",
       address: "",
       businessId: user?.businessId || "",
@@ -287,33 +306,45 @@ export function AddUserForm({
               <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
                 Role *
               </FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value || availableRoles[0]?.name || "cashier"}
+                disabled={isLoadingRoles || availableRoles.length === 0}
+              >
                 <FormControl>
                   <SelectTrigger className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10">
-                    <SelectValue />
+                    <SelectValue
+                      placeholder={
+                        isLoadingRoles ? "Loading roles..." : "Select a role"
+                      }
+                    />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="cashier">
-                    <div className="flex flex-col items-start">
-                      <span className="text-xs sm:text-sm md:text-base lg:text-base">
-                        Cashier
-                      </span>
-                      <span className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
-                        Process sales and view basic reports
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="manager">
-                    <div className="flex flex-col items-start">
-                      <span className="text-xs sm:text-sm md:text-base lg:text-base">
-                        Manager
-                      </span>
-                      <span className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
-                        Full sales management and inventory control
-                      </span>
-                    </div>
-                  </SelectItem>
+                  {isLoadingRoles ? (
+                    <SelectItem value="loading" disabled>
+                      Loading roles...
+                    </SelectItem>
+                  ) : availableRoles.length === 0 ? (
+                    <SelectItem value="no-roles" disabled>
+                      No roles available
+                    </SelectItem>
+                  ) : (
+                    availableRoles.map((role) => (
+                      <SelectItem key={role.id} value={role.name}>
+                        <div className="flex flex-col items-start">
+                          <span className="text-xs sm:text-sm md:text-base lg:text-base">
+                            {role.displayName}
+                          </span>
+                          {role.description && (
+                            <span className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
+                              {role.description}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -335,14 +366,14 @@ export function AddUserForm({
                   value={keyboard.formValues.pin || ""}
                   error={form.formState.errors.pin?.message}
                   onFocus={() => keyboard.handleFieldFocus("pin")}
-                  placeholder="Enter 6-digit PIN"
+                  placeholder="Enter 4-digit PIN"
                   className={cn(
                     "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
                     keyboard.activeField === "pin" &&
                       "ring-2 ring-primary border-primary"
                   )}
                   readOnly
-                  maxLength={6}
+                  maxLength={4}
                 />
               </FormControl>
               <FormMessage />

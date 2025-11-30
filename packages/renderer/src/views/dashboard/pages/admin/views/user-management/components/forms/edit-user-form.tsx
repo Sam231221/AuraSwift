@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -30,9 +30,10 @@ import {
   type UserUpdateFormData,
 } from "../../schemas/user-schema";
 import type { StaffUser } from "../../schemas/types";
+import { useRoles } from "@/views/dashboard/pages/admin/views/rbac-management/hooks/useRoles";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('edit-user-form');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("edit-user-form");
 
 interface EditUserFormProps {
   user: StaffUser;
@@ -49,6 +50,18 @@ export function EditUserForm({
   isLoading,
   isOpen = true,
 }: EditUserFormProps) {
+  // Fetch roles dynamically
+  const { data: roles, isLoading: isLoadingRoles } = useRoles();
+
+  // Filter roles to only show active staff roles (cashier, manager)
+  // Exclude admin roles from staff assignment
+  const availableRoles = useMemo(() => {
+    return roles.filter(
+      (role) =>
+        role.isActive && (role.name === "cashier" || role.name === "manager")
+    );
+  }, [roles]);
+
   const form = useForm<UserUpdateFormData>({
     resolver: zodResolver(userUpdateSchema),
     mode: "onChange", // Enable real-time validation for better UX with keyboard
@@ -304,34 +317,43 @@ export function EditUserForm({
               </FormLabel>
               <Select
                 onValueChange={field.onChange}
-                value={field.value || "cashier"}
+                value={field.value || availableRoles[0]?.name || "cashier"}
+                disabled={isLoadingRoles || availableRoles.length === 0}
               >
                 <FormControl>
                   <SelectTrigger className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10">
-                    <SelectValue placeholder="Select a role" />
+                    <SelectValue
+                      placeholder={
+                        isLoadingRoles ? "Loading roles..." : "Select a role"
+                      }
+                    />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="cashier">
-                    <div className="flex flex-col items-start">
-                      <span className="text-xs sm:text-sm md:text-base lg:text-base">
-                        Cashier
-                      </span>
-                      <span className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
-                        Process sales and view basic reports
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="manager">
-                    <div className="flex flex-col items-start">
-                      <span className="text-xs sm:text-sm md:text-base lg:text-base">
-                        Manager
-                      </span>
-                      <span className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
-                        Full sales management and inventory control
-                      </span>
-                    </div>
-                  </SelectItem>
+                  {isLoadingRoles ? (
+                    <SelectItem value="loading" disabled>
+                      Loading roles...
+                    </SelectItem>
+                  ) : availableRoles.length === 0 ? (
+                    <SelectItem value="no-roles" disabled>
+                      No roles available
+                    </SelectItem>
+                  ) : (
+                    availableRoles.map((role) => (
+                      <SelectItem key={role.id} value={role.name}>
+                        <div className="flex flex-col items-start">
+                          <span className="text-xs sm:text-sm md:text-base lg:text-base">
+                            {role.displayName}
+                          </span>
+                          {role.description && (
+                            <span className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
+                              {role.description}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               <FormMessage />

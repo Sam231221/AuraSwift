@@ -1,16 +1,5 @@
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { useState } from "react";
 import { toast } from "sonner";
-
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('admin-dashboard-page');
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,32 +10,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
 import {
-  BarChart3,
-  TrendingUp,
-  Store,
-  Users,
-  Settings,
-  Shield,
-  DollarSign,
-  AlertTriangle,
-  Upload,
-  Download,
-  Trash2,
-  ShoppingCart,
-} from "lucide-react";
+  DashboardGrid,
+  FEATURE_REGISTRY,
+  StatsCards,
+} from "@/features/dashboard";
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("admin-dashboard-page");
 
 const AdminDashboardPage = ({
   onFront,
   onNewTransaction,
   onNavigateToRoles,
   onNavigateToUserRoles,
+  onManageUsers,
+  onManageProducts,
+  onStaffSchedules,
 }: {
   onFront: () => void;
   onNewTransaction?: () => void;
   onNavigateToRoles?: () => void;
   onNavigateToUserRoles?: () => void;
+  onManageUsers?: () => void;
+  onManageCashiers?: () => void;
+  onManageProducts?: () => void;
+  onStaffSchedules?: () => void;
 }) => {
   const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
   const [isEmptyDialogOpen, setIsEmptyDialogOpen] = useState(false);
@@ -62,11 +51,9 @@ const AdminDashboardPage = ({
     try {
       toast.loading("Opening save dialog...", { id: "backup" });
 
-      // Call database backup API which will show save dialog
       const response = await window.databaseAPI.backup();
 
       if (!response || !response.success) {
-        // Check if user cancelled the save dialog
         const responseWithCancelled = response as typeof response & {
           cancelled?: boolean;
         };
@@ -104,18 +91,16 @@ const AdminDashboardPage = ({
     }
   };
 
-  // Import Database Handler (placeholder)
+  // Import Database Handler
   const handleImportDatabase = async () => {
     setIsImporting(true);
 
     try {
       toast.loading("Opening file picker...", { id: "import" });
 
-      // Call database import API which will show open file dialog
       const response = await window.databaseAPI.import();
 
       if (!response || !response.success) {
-        // Check if user cancelled the file dialog
         const responseWithCancelled = response as typeof response & {
           cancelled?: boolean;
         };
@@ -147,13 +132,11 @@ const AdminDashboardPage = ({
         duration: 5000,
       });
 
-      // Restart the application after a short delay
       setTimeout(async () => {
         try {
           await window.appAPI.restart();
         } catch (restartError) {
           logger.error("Restart error:", restartError);
-          // Fallback to window reload if restart fails
           window.location.reload();
         }
       }, 1500);
@@ -183,7 +166,6 @@ const AdminDashboardPage = ({
         id: "empty-db",
       });
 
-      // Call database empty API
       const response = await window.databaseAPI.empty();
 
       if (!response || !response.success) {
@@ -204,13 +186,11 @@ const AdminDashboardPage = ({
         duration: 5000,
       });
 
-      // Restart the application after a short delay
       setTimeout(async () => {
         try {
           await window.appAPI.restart();
         } catch (restartError) {
           logger.error("Restart error:", restartError);
-          // Fallback to window reload if restart fails
           window.location.reload();
         }
       }, 1500);
@@ -223,6 +203,71 @@ const AdminDashboardPage = ({
       });
     } finally {
       setIsEmptying(false);
+    }
+  };
+
+  // Handle feature action clicks
+  const handleActionClick = (featureId: string, actionId: string) => {
+    logger.info(
+      `[handleActionClick] Feature: ${featureId}, Action: ${actionId}`
+    );
+
+    switch (featureId) {
+      case "user-management":
+        if (actionId === "manage-users") {
+          logger.info("[handleActionClick] Calling onFront()");
+          onFront();
+        } else if (actionId === "role-permissions") {
+          logger.info("[handleActionClick] Calling onNavigateToRoles()");
+          onNavigateToRoles?.();
+        } else if (actionId === "user-role-assignment") {
+          logger.info("[handleActionClick] Calling onNavigateToUserRoles()");
+          onNavigateToUserRoles?.();
+        }
+        break;
+
+      case "management-actions":
+        if (actionId === "new-sale") {
+          logger.info("[handleActionClick] Calling onNewTransaction()");
+          onNewTransaction?.();
+        } else if (actionId === "manage-inventory") {
+          logger.info("[handleActionClick] Calling onManageProducts()");
+          onManageProducts?.();
+        } else if (actionId === "manage-users") {
+          logger.info("[handleActionClick] Calling onManageCashiers()");
+          onManageUsers?.();
+        } else if (actionId === "staff-schedules") {
+          logger.info("[handleActionClick] Calling onStaffSchedules()");
+          onStaffSchedules?.();
+        }
+        // Other actions (void-transaction, apply-discount) can be handled when implemented
+        break;
+
+      case "quick-actions":
+        if (actionId === "quick-new-sale") {
+          logger.info("[handleActionClick] Calling onNewTransaction()");
+          onNewTransaction?.();
+        } else if (actionId === "quick-manage-users") {
+          logger.info("[handleActionClick] Calling onFront()");
+          onFront();
+        }
+        break;
+
+      case "database-management":
+        if (actionId === "import-database") {
+          handleImportDatabase();
+        } else if (actionId === "backup-database") {
+          setIsBackupDialogOpen(true);
+        } else if (actionId === "empty-database") {
+          handleEmptyDatabase();
+        }
+        break;
+
+      default:
+        logger.warn(
+          `[handleActionClick] Unhandled feature: ${featureId}, action: ${actionId}`
+        );
+        break;
     }
   };
 
@@ -297,225 +342,17 @@ const AdminDashboardPage = ({
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Admin Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">$45,231.89</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                +20.1% from last month
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Users
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground mt-1">3 online now</p>
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                System Health
-              </CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">99.9%</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Uptime this month
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Alerts
-              </CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">2</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Require attention
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Admin Stats */}
+        <StatsCards />
 
-        {/* Admin Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">
-                Quick Actions
-              </CardTitle>
-              <CardDescription>Common admin tasks</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 flex-1">
-              {onNewTransaction && (
-                <Button
-                  className="w-full justify-start bg-blue-600 hover:bg-blue-700 text-white"
-                  onClick={onNewTransaction}
-                >
-                  <ShoppingCart className="w-4 h-4 mr-2 shrink-0" />
-                  New Sale
-                </Button>
-              )}
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-                onClick={onFront}
-              >
-                <Users className="w-4 h-4 mr-2 shrink-0" />
-                Manage Users
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">
-                User Management
-              </CardTitle>
-              <CardDescription>Manage staff and permissions</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 flex-1">
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-                onClick={onFront}
-              >
-                <Users className="w-4 h-4 mr-2 shrink-0" />
-                Manage Users
-              </Button>
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-                onClick={onNavigateToRoles}
-              >
-                <Shield className="w-4 h-4 mr-2 shrink-0" />
-                Role Permissions
-              </Button>
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-                onClick={onNavigateToUserRoles}
-              >
-                <Settings className="w-4 h-4 mr-2 shrink-0" />
-                User Role Assignment
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">
-                System Settings
-              </CardTitle>
-              <CardDescription>Configure system preferences</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 flex-1">
-              <Button className="w-full justify-start" variant="outline">
-                <Settings className="w-4 h-4 mr-2 shrink-0" />
-                General Settings
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Store className="w-4 h-4 mr-2 shrink-0" />
-                Store Configuration
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Shield className="w-4 h-4 mr-2 shrink-0" />
-                Security Settings
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">
-                Advanced Reports
-              </CardTitle>
-              <CardDescription>Comprehensive analytics</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 flex-1">
-              <Button className="w-full justify-start" variant="outline">
-                <BarChart3 className="w-4 h-4 mr-2 shrink-0" />
-                Financial Reports
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <TrendingUp className="w-4 h-4 mr-2 shrink-0" />
-                Business Intelligence
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Users className="w-4 h-4 mr-2 shrink-0" />
-                User Activity Logs
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">
-                DB Management
-              </CardTitle>
-              <CardDescription>Database backup and maintenance</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 flex-1">
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-                onClick={handleImportDatabase}
-                disabled={isImporting}
-              >
-                <Upload className="w-4 h-4 mr-2 shrink-0" />
-                <span className="truncate">
-                  {isImporting ? "Importing Database..." : "Import Database"}
-                </span>
-              </Button>
-              <Button
-                className="w-full justify-start"
-                variant="outline"
-                onClick={() => setIsBackupDialogOpen(true)}
-                disabled={isBackingUp}
-              >
-                {isBackingUp ? (
-                  <Download className="w-4 h-4 mr-2 animate-spin shrink-0" />
-                ) : (
-                  <Download className="w-4 h-4 mr-2 shrink-0" />
-                )}
-                <span className="truncate">
-                  {isBackingUp ? "Creating Backup..." : "Backup Database"}
-                </span>
-              </Button>
-              <Button
-                className="w-full justify-start bg-transparent text-red-600 hover:text-red-700 hover:bg-red-50"
-                variant="outline"
-                onClick={handleEmptyDatabase}
-                disabled={isEmptying}
-              >
-                <Trash2 className="w-4 h-4 mr-2 shrink-0" />
-                <span className="truncate">
-                  {isEmptying ? "Emptying Database..." : "Empty Database"}
-                </span>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Admin Features - Permission-based rendering */}
+        <DashboardGrid
+          features={FEATURE_REGISTRY}
+          onActionClick={handleActionClick}
+        />
       </div>
     </>
   );
 };
+
 export default AdminDashboardPage;

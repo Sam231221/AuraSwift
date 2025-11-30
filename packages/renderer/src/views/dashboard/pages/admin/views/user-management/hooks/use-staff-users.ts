@@ -33,7 +33,30 @@ export function useStaffUsers() {
 
       if (response.success && response.users) {
         // Filter out admin users and convert to StaffUser format
-        const staffUsers: StaffUser[] = response.users
+        const staffUsers: StaffUser[] = (
+          response.users as Array<{
+            id: string;
+            username?: string;
+            email?: string;
+            firstName: string;
+            lastName: string;
+            businessName: string;
+            businessId: string;
+            avatar?: string;
+            address?: string;
+            createdAt?: string;
+            isActive?: boolean;
+            primaryRoleId?: string;
+            roleName?: string;
+            primaryRole?: {
+              id: string;
+              name: string;
+              displayName: string;
+              description?: string;
+              permissions?: unknown[];
+            };
+          }>
+        )
           .filter((u) => getUserRoleName(u) !== "admin")
           .map((u) => ({
             id: u.id,
@@ -41,13 +64,16 @@ export function useStaffUsers() {
             email: u.email || "",
             firstName: u.firstName,
             lastName: u.lastName,
-            role: getUserRoleName(u) as "cashier" | "manager",
             businessName: u.businessName,
             businessId: u.businessId,
             avatar: u.avatar,
-            address: (u as any).address || "",
+            address: u.address || "",
             createdAt: u.createdAt || new Date().toISOString(),
             isActive: u.isActive !== undefined ? u.isActive : true,
+            // RBAC fields
+            primaryRoleId: u.primaryRoleId,
+            roleName: u.roleName,
+            primaryRole: u.primaryRole,
           }));
 
         setStaffUsers(staffUsers);

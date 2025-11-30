@@ -9,13 +9,26 @@
 
 import type { User } from "../types/user";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('rbac-helpers');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("rbac-helpers");
+
+/**
+ * Type for user objects that have RBAC role information
+ * Used to make helpers work with both User and StaffUser types
+ */
+type UserWithRole = {
+  primaryRole?: {
+    name: string;
+    displayName?: string;
+  };
+  roleName?: string;
+  role?: string; // Deprecated but kept for backward compatibility
+};
 
 /**
  * Get user's primary role name (for UI display and logic)
  *
- * @param user - User object with RBAC data
+ * @param user - User object with RBAC data (User or StaffUser)
  * @returns Role name (e.g., "cashier", "manager", "admin") or default "cashier"
  *
  * @example
@@ -26,7 +39,9 @@ const logger = getLogger('rbac-helpers');
  * }
  * ```
  */
-export function getUserRoleName(user: User | null | undefined): string {
+export function getUserRoleName(
+  user: User | UserWithRole | null | undefined
+): string {
   if (!user) return "cashier";
 
   // Try to get from primaryRole (RBAC system)
@@ -39,6 +54,11 @@ export function getUserRoleName(user: User | null | undefined): string {
     return user.roleName.toLowerCase();
   }
 
+  // Fallback: try deprecated role field
+  if ("role" in user && user.role) {
+    return user.role.toLowerCase();
+  }
+
   // Default fallback
   return "cashier";
 }
@@ -46,7 +66,7 @@ export function getUserRoleName(user: User | null | undefined): string {
 /**
  * Get user's display role name (human-readable, for UI labels)
  *
- * @param user - User object with RBAC data
+ * @param user - User object with RBAC data (User or StaffUser)
  * @returns Display name (e.g., "Cashier", "Store Manager", "Administrator")
  *
  * @example
@@ -54,7 +74,9 @@ export function getUserRoleName(user: User | null | undefined): string {
  * <Badge>{getUserRoleDisplayName(user)}</Badge>
  * ```
  */
-export function getUserRoleDisplayName(user: User | null | undefined): string {
+export function getUserRoleDisplayName(
+  user: User | UserWithRole | null | undefined
+): string {
   if (!user) return "Cashier";
 
   // Try to get from primaryRole (RBAC system)
@@ -132,14 +154,14 @@ export async function userHasPermission(
   permission: string
 ): Promise<boolean> {
   try {
-    const sessionToken = sessionStorage.getItem("sessionToken");
+    const sessionToken = await window.authStore.get("token");
     if (!sessionToken) return false;
 
     const response = await window.rbacAPI.userPermissions.getUserPermissions(
       sessionToken,
       userId
     );
-    
+
     if (response.success && Array.isArray(response.data)) {
       return (response.data as string[]).includes(permission);
     }

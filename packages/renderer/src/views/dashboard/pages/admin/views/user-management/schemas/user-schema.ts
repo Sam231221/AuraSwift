@@ -16,20 +16,19 @@ const nameSchema = requiredStringSchema("Name")
     "Name can only contain letters, spaces, hyphens, and apostrophes"
   );
 
-export const userCreateSchema = z
-  .object({
-    email: emailSchema.optional(),
-    username: requiredStringSchema("Username")
-      .min(3, "Username must be at least 3 characters")
-      .max(50, "Username must not exceed 50 characters"),
-    pin: pinSchema(6),
-    firstName: nameSchema,
-    lastName: nameSchema,
-    role: z.enum(["cashier", "manager"]),
-    avatar: z.string(),
-    address: z.string().max(200, "Address must not exceed 200 characters"),
-    businessId: z.string().min(1, "Business ID is required"), // Accept any non-empty string, not just UUIDs
-  });
+export const userCreateSchema = z.object({
+  email: emailSchema.optional(),
+  username: requiredStringSchema("Username")
+    .min(3, "Username must be at least 3 characters")
+    .max(50, "Username must not exceed 50 characters"),
+  pin: pinSchema(4),
+  firstName: nameSchema,
+  lastName: nameSchema,
+  role: z.enum(["cashier", "manager"]),
+  avatar: z.string(),
+  address: z.string().max(200, "Address must not exceed 200 characters"),
+  businessId: z.string().min(1, "Business ID is required"), // Accept any non-empty string, not just UUIDs
+});
 
 export const userUpdateSchema = z.object({
   id: z.string().min(1, "ID is required"), // Accept any non-empty string, not just UUIDs

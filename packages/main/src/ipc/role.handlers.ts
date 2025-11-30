@@ -363,6 +363,101 @@ export function registerRoleHandlers() {
   );
 
   ipcMain.handle(
+    "userRoles:setPrimaryRole",
+    async (event, sessionToken, userId, roleId) => {
+      if (!db) db = await getDatabase();
+
+      const auth = await validateSessionAndPermission(
+        db,
+        sessionToken,
+        PERMISSIONS.USERS_MANAGE
+      );
+
+      if (!auth.success) {
+        return { success: false, message: auth.message, code: auth.code };
+      }
+
+      try {
+        // Verify the role exists
+        const role = db.roles.getRoleById(roleId);
+        if (!role) {
+          return { success: false, message: "Role not found" };
+        }
+
+        // Verify the user exists
+        const user = db.users.getUserById(userId);
+        if (!user) {
+          return { success: false, message: "User not found" };
+        }
+
+        // Validate business access
+        const { validateBusinessAccess } = await import(
+          "../utils/authHelpers.js"
+        );
+        const businessCheck = validateBusinessAccess(
+          auth.user!,
+          user.businessId
+        );
+        if (!businessCheck.success) {
+          return {
+            success: false,
+            message: businessCheck.message,
+            code: businessCheck.code,
+          };
+        }
+
+        // Ensure the role is assigned to the user (if not already assigned)
+        try {
+          await db.userRoles.assignRole(userId, roleId, auth.user!.id);
+        } catch (error: any) {
+          // If role is already assigned, that's fine - continue
+          if (!error.message?.includes("already has this role")) {
+            logger.warn(
+              "Error assigning role (may already be assigned):",
+              error
+            );
+          }
+        }
+
+        // Update the user's primaryRoleId
+        const result = db.users.updateUser(userId, {
+          primaryRoleId: roleId,
+        });
+
+        if (result.changes === 0) {
+          return {
+            success: false,
+            message: "Failed to update primary role",
+          };
+        }
+
+        // Invalidate permission cache
+        const { invalidateUserPermissionCache } = await import(
+          "../utils/rbacHelpers.js"
+        );
+        invalidateUserPermissionCache(userId);
+
+        await logAction(db, auth.user!, "set_primary_role", "users", userId, {
+          userId,
+          roleId,
+          roleName: role.name,
+        });
+
+        return { success: true, data: { userId, roleId } };
+      } catch (error) {
+        logger.error("Set primary role IPC error:", error);
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to set primary role",
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
     "roles:getUsersByRole",
     async (event, sessionToken, roleId) => {
       if (!db) db = await getDatabase();

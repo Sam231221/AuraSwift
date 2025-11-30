@@ -18,6 +18,9 @@ export const ADMIN_VIEWS = [
   "roleManagement",
   "userRoleAssignment",
   "newTransaction",
+  "cashierManagement",
+  "productDashboard",
+  "staffSchedules",
 ] as const;
 export const CASHIER_VIEWS = ["dashboard", "newTransaction"] as const;
 export const MANAGER_VIEWS = [
@@ -41,6 +44,10 @@ export function createAdminViewDefinitions(
         onNewTransaction={() => navigateTo("newTransaction")}
         onNavigateToRoles={() => navigateTo("roleManagement")}
         onNavigateToUserRoles={() => navigateTo("userRoleAssignment")}
+        onManageUsers={() => navigateTo("userManagement")}
+        onManageCashiers={() => navigateTo("cashierManagement")}
+        onManageProducts={() => navigateTo("productDashboard")}
+        onStaffSchedules={() => navigateTo("staffSchedules")}
       />
     ),
     userManagement: (
@@ -54,6 +61,15 @@ export function createAdminViewDefinitions(
     ),
     newTransaction: (
       <NewTransactionView onBack={() => navigateTo("dashboard")} />
+    ),
+    cashierManagement: (
+      <CashierManagementView onBack={() => navigateTo("dashboard")} />
+    ),
+    productDashboard: (
+      <ProductManagementView onBack={() => navigateTo("dashboard")} />
+    ),
+    staffSchedules: (
+      <StaffSchedulesView onBack={() => navigateTo("dashboard")} />
     ),
   };
 }
