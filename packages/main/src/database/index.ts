@@ -23,6 +23,7 @@ import { SupplierManager } from "./managers/supplierManager.js";
 import { VatCategoryManager } from "./managers/vatCategoryManager.js";
 import { ExpirySettingManager } from "./managers/expirySettingsManager.js";
 import { ExpiryNotificationManager } from "./managers/expiryNotificationManager.js";
+import { SalesUnitSettingManager } from "./managers/salesUnitSettingsManager.js";
 import { StockMovementManager } from "./managers/stockMovementManager.js";
 import { CartManager } from "./managers/cartManager.js";
 import { RoleManager } from "./managers/roleManager.js";
@@ -67,6 +68,7 @@ export interface DatabaseManagers {
   vatCategories: VatCategoryManager;
   expirySettings: ExpirySettingManager;
   expiryNotifications: ExpiryNotificationManager;
+  salesUnitSettings: SalesUnitSettingManager;
   stockMovements: StockMovementManager;
   cart: CartManager;
 
@@ -169,6 +171,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const vatCategories = new VatCategoryManager(drizzle, uuid);
     const expirySettings = new ExpirySettingManager(drizzle, uuid);
     const expiryNotifications = new ExpiryNotificationManager(drizzle, uuid);
+    const salesUnitSettings = new SalesUnitSettingManager(drizzle, uuid);
     const stockMovements = new StockMovementManager(drizzle, uuid, batches);
     const inventory = new InventoryManager(drizzle, uuid, stockMovements);
     const cart = new CartManager(drizzle, uuid);
@@ -203,6 +206,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
       vatCategories,
       expirySettings,
       expiryNotifications,
+      salesUnitSettings,
       stockMovements,
       cart,
 

@@ -693,6 +693,40 @@ export const expirySettings = createTable(
 );
 
 /**
+ * Sales Unit Settings per business
+ */
+export const salesUnitSettings = createTable(
+  "sales_unit_settings",
+  {
+    id: text("id").primaryKey(),
+    businessId: text("business_id")
+      .notNull()
+      .references(() => businesses.id, { onDelete: "cascade" }),
+
+    // Sales unit mode: "Fixed" or "Varying"
+    salesUnitMode: text("sales_unit_mode", {
+      enum: ["Fixed", "Varying"],
+    })
+      .notNull()
+      .default("Varying"),
+
+    // Fixed sales unit (only used when mode is "Fixed")
+    fixedSalesUnit: text("fixed_sales_unit", {
+      enum: ["PIECE", "KG", "GRAM", "LITRE", "ML", "PACK"],
+    })
+      .notNull()
+      .default("KG"),
+
+    ...timestampColumns,
+  },
+  (table) => [
+    index("sales_unit_settings_business_idx").on(table.businessId),
+    // Ensure one settings record per business
+    unique("sales_unit_settings_business_unique").on(table.businessId),
+  ]
+);
+
+/**
  * Expiry Notifications Log
  */
 export const expiryNotifications = createTable(
@@ -2038,6 +2072,16 @@ export const expirySettingsRelations = relations(expirySettings, ({ one }) => ({
   }),
 }));
 
+export const salesUnitSettingsRelations = relations(
+  salesUnitSettings,
+  ({ one }) => ({
+    business: one(businesses, {
+      fields: [salesUnitSettings.businessId],
+      references: [businesses.id],
+    }),
+  })
+);
+
 export const expiryNotificationsRelations = relations(
   expiryNotifications,
   ({ one }) => ({
@@ -2561,6 +2605,9 @@ export type Supplier = InferSelectModel<typeof suppliers>;
 export type NewSupplier = InferInsertModel<typeof suppliers>;
 export type ExpirySetting = InferSelectModel<typeof expirySettings>;
 export type NewExpirySetting = InferInsertModel<typeof expirySettings>;
+
+export type SalesUnitSetting = InferSelectModel<typeof salesUnitSettings>;
+export type NewSalesUnitSetting = InferInsertModel<typeof salesUnitSettings>;
 export type ExpiryNotification = InferSelectModel<typeof expiryNotifications>;
 export type NewExpiryNotification = InferInsertModel<
   typeof expiryNotifications
