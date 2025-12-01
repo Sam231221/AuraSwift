@@ -33,8 +33,8 @@ import type {
 import type { Product } from "@/types/domain";
 import { toast } from "sonner";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('product-batch-management-view');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("product-batch-management-view");
 
 interface BatchManagementViewProps {
   onBack: () => void;
@@ -520,7 +520,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={onBack}
+                onClick={() => setCurrentView("dashboard")}
                 className="w-fit"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
@@ -537,8 +537,8 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <Button
+                onClick={onBack}
                 variant="outline"
-                onClick={() => setCurrentView("dashboard")}
                 className="w-full sm:w-auto"
               >
                 Dashboard
