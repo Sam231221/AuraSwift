@@ -5,7 +5,7 @@ export const cartAPI = {
   // Cart Session Operations
   createSession: (sessionData: {
     cashierId: string;
-    shiftId: string;
+    shiftId?: string | null; // Optional for admin/owner mode
     businessId: string;
     stationId?: string;
   }) => ipcRenderer.invoke("cart:createSession", sessionData),

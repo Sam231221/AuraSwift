@@ -161,9 +161,7 @@ const createReceiptData = (
     change,
     paymentMethods: [
       {
-        type: skipPaymentValidation
-          ? "card"
-          : paymentMethod?.type || "cash",
+        type: skipPaymentValidation ? "card" : paymentMethod?.type || "cash",
         amount: skipPaymentValidation
           ? total
           : paymentMethod?.type === "cash"
@@ -585,17 +583,23 @@ export function usePayment({
 
           // Create transaction
           // shiftId is optional - null for admin/owner mode, required for cashier/manager
-          const shiftId = requiresShift && shiftIdForTransaction ? shiftIdForTransaction.id : null;
+          const shiftId =
+            requiresShift && shiftIdForTransaction
+              ? shiftIdForTransaction.id
+              : null;
           const transactionResponse =
-            await window.transactionAPI.createFromCart({
-              cartSessionId: cartSession.id,
-              shiftId: shiftId || undefined, // Pass undefined instead of empty string for admin mode
-              businessId: businessId!,
-              paymentMethod: backendPaymentMethod,
-              cashAmount: finalCashAmount,
-              cardAmount: finalCardAmount,
-              receiptNumber,
-            });
+            await window.transactionAPI.createFromCart(
+              sessionToken, // Pass sessionToken as first argument
+              {
+                cartSessionId: cartSession.id,
+                shiftId: shiftId || undefined, // Pass undefined instead of empty string for admin mode
+                businessId: businessId!,
+                paymentMethod: backendPaymentMethod,
+                cashAmount: finalCashAmount,
+                cardAmount: finalCardAmount,
+                receiptNumber,
+              }
+            );
 
           if (!transactionResponse.success) {
             const errorMessage =
@@ -705,7 +709,10 @@ export function usePayment({
    */
   const handlePayment = useCallback(
     async (method: PaymentMethod["type"]) => {
-      setPaymentMethod({ type: method, amount: method === "cash" ? total : total });
+      setPaymentMethod({
+        type: method,
+        amount: method === "cash" ? total : total,
+      });
 
       if (method === "cash") {
         setCashAmount(total);

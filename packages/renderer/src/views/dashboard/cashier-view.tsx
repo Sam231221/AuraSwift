@@ -1,10 +1,14 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { DashboardLayout } from "@/layouts/dashboard-layout";
 import { ViewTransitionContainer } from "@/components";
 import { useViewNavigation, useViewMap } from "@/shared/hooks";
 
 import { useAuth } from "@/shared/hooks";
+
+import { getRoleDisplayName, getUserDisplayName } from "@/shared/utils/auth";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 
 import {
   CASHIER_VIEWS,

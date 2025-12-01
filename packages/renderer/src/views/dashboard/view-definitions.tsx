@@ -60,7 +60,10 @@ export function createAdminViewDefinitions(
       <UserRoleAssignmentView onBack={() => navigateTo("dashboard")} />
     ),
     newTransaction: (
-      <NewTransactionView onBack={() => navigateTo("dashboard")} />
+      <NewTransactionView
+        onBack={() => navigateTo("dashboard")}
+        embeddedInDashboard={true}
+      />
     ),
     cashierManagement: (
       <CashierManagementView onBack={() => navigateTo("dashboard")} />
@@ -84,7 +87,10 @@ export function createCashierViewDefinitions(
       />
     ),
     newTransaction: (
-      <NewTransactionView onBack={() => navigateTo("dashboard")} />
+      <NewTransactionView
+        onBack={() => navigateTo("dashboard")}
+        embeddedInDashboard={true}
+      />
     ),
   };
 }
@@ -111,7 +117,10 @@ export function createManagerViewDefinitions(
       <StaffSchedulesView onBack={() => navigateTo("dashboard")} />
     ),
     newTransaction: (
-      <NewTransactionView onBack={() => navigateTo("dashboard")} />
+      <NewTransactionView
+        onBack={() => navigateTo("dashboard")}
+        embeddedInDashboard={true}
+      />
     ),
   };
 }

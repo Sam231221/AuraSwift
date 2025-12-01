@@ -9,6 +9,10 @@ import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/shared/hooks/use-auth";
 import type { Shift } from "@/types/domain/shift";
 import { getLogger } from "@/shared/utils/logger";
+import {
+  getUserRoleName,
+  userRequiresShift,
+} from "@/shared/utils/rbac-helpers";
 
 const logger = getLogger("use-sales-mode");
 
@@ -42,44 +46,56 @@ export function useSalesMode(): SalesMode {
       }
 
       try {
-        // Check if mode is stored in auth store (from login response)
-        const storedMode = await window.authStore.get("salesMode");
-        const storedRequiresShift = await window.authStore.get("requiresShift");
+        // Use RBAC system to determine role and shift requirements
+        const roleName = getUserRoleName(user);
+        const requiresShiftForUser = userRequiresShift(user);
 
-        if (
-          storedMode &&
-          (storedMode === "admin" || storedMode === "cashier")
-        ) {
-          setMode(storedMode);
-          setRequiresShift(storedRequiresShift === "true");
-          logger.info(
-            `[useSalesMode] Mode detected from store: ${storedMode}, requiresShift: ${storedRequiresShift}`
-          );
+        // Determine mode based on role
+        // Admin/Owner roles = admin mode (no shift required)
+        // Cashier/Manager/Supervisor roles = cashier mode (shift required)
+        let detectedMode: "admin" | "cashier";
+        let detectedRequiresShift: boolean;
+
+        if (roleName === "admin" || roleName === "owner") {
+          detectedMode = "admin";
+          detectedRequiresShift = false;
         } else {
-          // Fallback: Check user's shiftRequired field
-          // This is a temporary fallback until we have an API endpoint
-          const userShiftRequired = (user as any).shiftRequired;
-          if (userShiftRequired === false) {
-            setMode("admin");
-            setRequiresShift(false);
+          // Cashier mode for all other roles (cashier, manager, supervisor)
+          detectedMode = "cashier";
+          // According to TransactionManager: Cashiers/Managers MUST have an active shift
+          // Use userRequiresShift helper which checks shiftRequired field if available,
+          // or defaults based on role. For managers, always require shift.
+          if (roleName === "manager") {
+            // Managers always require shifts (per TransactionManager requirement)
+            detectedRequiresShift = true;
           } else {
-            setMode("cashier");
-            setRequiresShift(true);
+            // Use the helper function for other roles (cashier, supervisor)
+            detectedRequiresShift = requiresShiftForUser;
           }
-          logger.info(
-            `[useSalesMode] Mode detected from user field: ${mode}, requiresShift: ${requiresShift}`
-          );
         }
 
-        // Load active shift if required
-        if (requiresShift && user.id) {
+        setMode(detectedMode);
+        setRequiresShift(detectedRequiresShift);
+
+        logger.info(
+          `[useSalesMode] Mode detected from RBAC - Role: ${roleName}, Mode: ${detectedMode}, requiresShift: ${detectedRequiresShift}`
+        );
+
+        // Clear shift if shift is no longer required
+        if (!detectedRequiresShift) {
+          setActiveShift(null);
+        } else if (user.id) {
+          // Load active shift if required
           try {
             const shiftResponse = await window.shiftAPI.getActive(user.id);
             if (shiftResponse.success && shiftResponse.data) {
               setActiveShift(shiftResponse.data as Shift);
+            } else {
+              setActiveShift(null);
             }
           } catch (error) {
             logger.error("[useSalesMode] Error loading active shift:", error);
+            setActiveShift(null);
           }
         }
       } catch (error) {

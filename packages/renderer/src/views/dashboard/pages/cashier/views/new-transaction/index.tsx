@@ -65,6 +65,7 @@ import type { PrinterConfig } from "@/types/features/printer";
 // Utils
 import { isWeightedProduct } from "./utils/product-helpers";
 import { getUserRoleName } from "@/shared/utils/rbac-helpers";
+import { autoSelectBatches } from "./utils/batch-selection";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("index");
@@ -74,9 +75,18 @@ const DOUBLE_CLICK_DELAY = 300;
 
 interface NewTransactionViewProps {
   onBack: () => void;
+  /**
+   * Whether this view is embedded within a DashboardLayout.
+   * When true, hides redundant layout elements like admin mode indicator.
+   * @default false
+   */
+  embeddedInDashboard?: boolean;
 }
 
-export function NewTransactionView({ onBack }: NewTransactionViewProps) {
+export function NewTransactionView({
+  onBack,
+  embeddedInDashboard = false,
+}: NewTransactionViewProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -100,6 +110,18 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
   ] = useState<Product | null>(null);
   const [pendingWeightForAgeVerification, setPendingWeightForAgeVerification] =
     useState<number | undefined>(undefined);
+  const [
+    pendingBatchDataForAgeVerification,
+    setPendingBatchDataForAgeVerification,
+  ] = useState<{
+    batchId: string;
+    batchNumber: string;
+    expiryDate: Date;
+  } | null>(null);
+  // Track age verification state per product to prevent race conditions
+  const [ageVerifiedForProduct, setAgeVerifiedForProduct] = useState<
+    Record<string, boolean>
+  >({});
   const [pendingGenericProduct, setPendingGenericProduct] =
     useState<Product | null>(null);
   const [showScaleDisplay, setShowScaleDisplay] = useState(false);
@@ -112,6 +134,8 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     pendingQuantityForBatchSelection,
     setPendingQuantityForBatchSelection,
   ] = useState<number>(1);
+  const [pendingWeightForBatchSelection, setPendingWeightForBatchSelection] =
+    useState<number | undefined>(undefined);
 
   // Receipt printing flow
   const { isShowingStatus, startPrintingFlow, handleSkipReceipt } =
@@ -225,39 +249,153 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
         return;
       }
 
+      // Check if product requires batch tracking (expiry checking)
+      const requiresBatchTracking = product.requiresBatchTracking === true;
+
       // Check if product requires age verification
       const requiresAgeVerification =
         product.ageRestrictionLevel && product.ageRestrictionLevel !== "NONE";
 
       if (isWeightedProduct(product)) {
+        // For weighted products, check age verification FIRST (before scale display)
+        if (requiresAgeVerification && weight === undefined) {
+          // Age verification required and no weight yet - show age verification modal FIRST
+          setPendingProductForAgeVerification(product);
+          setShowAgeVerificationModal(true);
+          // After age verification, the scale display will be shown
+          return; // Exit early - scale display will be shown after age verification
+        }
+
+        // Age verification either not required or already completed
         if (weight !== undefined && weight > 0) {
-          // Weight provided, check age verification
-          if (requiresAgeVerification) {
-            setPendingWeightForAgeVerification(weight);
-            setPendingProductForAgeVerification(product);
-            setShowAgeVerificationModal(true);
-            weightInput.resetWeightInput();
+          // Weight provided, proceed with batch selection
+          // Check if age verification was already completed for this product
+          const ageVerified = ageVerifiedForProduct[product.id] || false;
+
+          if (requiresBatchTracking) {
+            // Each cart addition = 1 item (quantity = 1, regardless of weight value)
+            // Check if batch has enough quantity (1 item) available
+            const batchResult = await autoSelectBatches(
+              product,
+              1, // Check batch has >= 1 item available (quantity check, not weight)
+              false // Don't allow partial - need exactly 1 item
+            );
+
+            if (batchResult.success && batchResult.primaryBatch) {
+              // Batch has enough quantity (>= 1) - add 1 item to cart
+              // Cart item: quantity = 1 (for batch deduction), weight = weight value (for pricing only)
+              await cart.addToCart(
+                product,
+                weight, // Weight value (stored in item.weight, used for pricing only)
+                undefined,
+                ageVerified,
+                undefined,
+                batchResult.primaryBatch
+              );
+
+              // Show success message
+              toast.success(`Added ${product.name} to cart`);
+
+              weightInput.resetWeightInput();
+              // Clear age verification for this product after use
+              setAgeVerifiedForProduct((prev) => {
+                const next = { ...prev };
+                delete next[product.id];
+                return next;
+              });
+              setShowScaleDisplay(false);
+            } else if (batchResult.shouldShowModal) {
+              // Show batch selection modal for manual selection
+              setPendingWeightForBatchSelection(weight);
+              setPendingProductForBatchSelection(product);
+              setPendingQuantityForBatchSelection(weight);
+              setShowBatchSelectionModal(true);
+              weightInput.resetWeightInput();
+              setShowScaleDisplay(false);
+            } else {
+              // No batches available - show error
+              toast.error(
+                batchResult.error || "No batches available for this product"
+              );
+              weightInput.resetWeightInput();
+              setShowScaleDisplay(false);
+            }
           } else {
-            await cart.addToCart(product, weight);
+            // No batch tracking, add directly (age verification already completed if required)
+            await cart.addToCart(product, weight, undefined, ageVerified);
             weightInput.resetWeightInput();
+            // Clear age verification for this product after use
+            setAgeVerifiedForProduct((prev) => {
+              const next = { ...prev };
+              delete next[product.id];
+              return next;
+            });
+            setShowScaleDisplay(false);
           }
         } else {
-          // No weight, set as selected for weight input
+          // No weight provided - show scale display
+          // Age verification already completed if required
           categoryPriceInput.resetPriceInput();
-          setShowScaleDisplay(true); // Show scale display by default for weighted products
+          setShowScaleDisplay(true);
           weightInput.setSelectedWeightProduct(product);
         }
       } else {
-        // Regular product
-        if (requiresAgeVerification) {
+        // Regular product (unit items)
+        if (requiresBatchTracking) {
+          // Each cart addition = 1 item
+          // Check if batch has enough quantity (1 unit) for this item
+          const batchResult = await autoSelectBatches(product, 1, false);
+
+          if (batchResult.success && batchResult.primaryBatch) {
+            // Check age verification if needed
+            if (requiresAgeVerification) {
+              setPendingProductForAgeVerification(product);
+              setPendingBatchDataForAgeVerification({
+                batchId: batchResult.primaryBatch.batchId,
+                batchNumber: batchResult.primaryBatch.batchNumber,
+                expiryDate: batchResult.primaryBatch.expiryDate,
+              });
+              setShowAgeVerificationModal(true);
+            } else {
+              // Add to cart with automatically selected batch
+              await cart.addToCart(
+                product,
+                undefined,
+                undefined,
+                false,
+                undefined,
+                batchResult.primaryBatch
+              );
+            }
+          } else if (batchResult.shouldShowModal) {
+            // Show batch selection modal for manual selection
+            setPendingProductForBatchSelection(product);
+            setPendingQuantityForBatchSelection(1);
+            setShowBatchSelectionModal(true);
+          } else {
+            // No batches available - show error
+            toast.error(
+              batchResult.error || "No batches available for this product"
+            );
+          }
+        } else if (requiresAgeVerification) {
+          // Then check age verification
           setPendingProductForAgeVerification(product);
           setShowAgeVerificationModal(true);
         } else {
+          // No batch tracking or age verification, add directly
           await cart.addToCart(product);
         }
       }
     },
-    [isOperationsDisabled, cart, weightInput, categoryPriceInput]
+    [
+      isOperationsDisabled,
+      salesMode.requiresShift,
+      ageVerifiedForProduct,
+      cart,
+      weightInput,
+      categoryPriceInput,
+    ]
   );
 
   // Handle generic item click
@@ -274,10 +412,10 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
       setPendingGenericProduct(product);
       setShowGenericPriceModal(true);
     },
-    [isOperationsDisabled]
+    [isOperationsDisabled, salesMode.requiresShift]
   );
 
-  // Handle age verification complete - creates audit record and adds item to cart
+  // Handle age verification complete - creates audit record and proceeds with next step
   const handleAgeVerificationComplete = useCallback(
     async (verificationData: AgeVerificationData) => {
       if (!pendingProductForAgeVerification) return;
@@ -302,43 +440,99 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                 "Failed to create age verification record:",
                 auditResponse.message
               );
-              // Continue with cart addition even if audit fails - we don't want to block sales
-              // The ageVerified flag on the cart item provides fallback tracking
+              // Continue even if audit fails - we don't want to block sales
             }
           }
 
-          // Add item to cart with ageVerified flag
-          if (pendingWeightForAgeVerification !== undefined) {
-            await cart.addToCart(
-              pendingProductForAgeVerification,
-              pendingWeightForAgeVerification,
-              undefined,
-              true
-            );
+          // Check if this is a weighted product
+          const isWeighted = isWeightedProduct(
+            pendingProductForAgeVerification
+          );
+
+          if (isWeighted && pendingWeightForAgeVerification === undefined) {
+            // Weighted product but no weight yet - show scale display after age verification
+            const productToWeigh = pendingProductForAgeVerification;
+            setShowAgeVerificationModal(false);
+            setPendingProductForAgeVerification(null);
+            // Mark that age verification is completed for this product
+            setAgeVerifiedForProduct((prev) => ({
+              ...prev,
+              [productToWeigh.id]: true,
+            }));
+            // Don't reset weight input - we'll use it for the scale display
+            categoryPriceInput.resetPriceInput();
+            setShowScaleDisplay(true);
+            weightInput.setSelectedWeightProduct(productToWeigh);
+            // Store age verification data for later use when adding to cart
+            // The age verification is already recorded, so we just need to mark it as verified
+            return; // Exit - scale display will handle the rest
           } else {
-            await cart.addToCart(
-              pendingProductForAgeVerification,
-              undefined,
-              undefined,
-              true
-            );
+            // Non-weighted product OR weighted product with weight already provided
+            // Add item to cart with ageVerified flag and batch data if available
+            if (pendingWeightForAgeVerification !== undefined) {
+              await cart.addToCart(
+                pendingProductForAgeVerification,
+                pendingWeightForAgeVerification,
+                undefined,
+                true,
+                undefined,
+                pendingBatchDataForAgeVerification || undefined
+              );
+            } else {
+              await cart.addToCart(
+                pendingProductForAgeVerification,
+                undefined,
+                undefined,
+                true,
+                undefined,
+                pendingBatchDataForAgeVerification || undefined
+              );
+            }
+
+            // Reset everything after adding to cart
+            setShowAgeVerificationModal(false);
+            setPendingProductForAgeVerification(null);
+            setPendingWeightForAgeVerification(undefined);
+            setPendingBatchDataForAgeVerification(null);
+            // Clear age verification for the product after use
+            if (pendingProductForAgeVerification) {
+              setAgeVerifiedForProduct((prev) => {
+                const next = { ...prev };
+                delete next[pendingProductForAgeVerification.id];
+                return next;
+              });
+            }
+            weightInput.resetWeightInput();
+            setShowScaleDisplay(false);
           }
         } catch (error) {
           logger.error("Error during age verification completion:", error);
           toast.error("Failed to complete age verification");
         }
+      } else {
+        // Age verification failed or cancelled
+        setShowAgeVerificationModal(false);
+        setPendingProductForAgeVerification(null);
+        setPendingWeightForAgeVerification(undefined);
+        setPendingBatchDataForAgeVerification(null);
+        // Clear age verification for the product after cancellation
+        if (pendingProductForAgeVerification) {
+          setAgeVerifiedForProduct((prev) => {
+            const next = { ...prev };
+            delete next[pendingProductForAgeVerification.id];
+            return next;
+          });
+        }
+        weightInput.resetWeightInput();
       }
-
-      setShowAgeVerificationModal(false);
-      setPendingProductForAgeVerification(null);
-      setPendingWeightForAgeVerification(undefined);
-      weightInput.resetWeightInput();
     },
     [
       pendingProductForAgeVerification,
       pendingWeightForAgeVerification,
+      pendingBatchDataForAgeVerification,
       cart,
       weightInput,
+      categoryPriceInput,
       user,
     ]
   );
@@ -361,41 +555,162 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
     async (batchData: SelectedBatchData) => {
       if (!pendingProductForBatchSelection) return;
 
-      // Add to cart with batch info (this will be used during checkout)
-      // Note: The batch info is stored in cart item and used during transaction creation
-      await cart.addToCart(pendingProductForBatchSelection);
+      const product = pendingProductForBatchSelection;
+      const isWeighted = isWeightedProduct(product);
+      const weight = pendingWeightForBatchSelection;
 
-      // TODO: When cart API supports batch info in addToCart, pass it here
-      // For now, the backend auto-selects using FEFO during transaction creation
+      // Check if age verification was already completed for this product
+      // (This happens when age verification was shown first, then scale, then batch selection)
+      const ageVerified = ageVerifiedForProduct[product.id] || false;
 
-      toast.success(
-        `Added ${pendingProductForBatchSelection.name} from batch ${batchData.batchNumber}`
-      );
+      // Check if product requires age verification after batch selection
+      const requiresAgeVerification =
+        product.ageRestrictionLevel && product.ageRestrictionLevel !== "NONE";
+
+      if (requiresAgeVerification && !ageVerified) {
+        // Age verification not yet completed - show age verification modal
+        // Store weight and batch data if it's a weighted product
+        if (isWeighted && weight !== undefined) {
+          setPendingWeightForAgeVerification(weight);
+        }
+        setPendingBatchDataForAgeVerification({
+          batchId: batchData.batchId,
+          batchNumber: batchData.batchNumber,
+          expiryDate: batchData.expiryDate,
+        });
+        setPendingProductForAgeVerification(product);
+        setShowAgeVerificationModal(true);
+      } else {
+        // Age verification already completed OR not required - add to cart with batch info
+        if (isWeighted && weight !== undefined) {
+          await cart.addToCart(
+            product,
+            weight,
+            undefined,
+            ageVerified, // Use the tracked age verification status
+            undefined,
+            {
+              batchId: batchData.batchId,
+              batchNumber: batchData.batchNumber,
+              expiryDate: batchData.expiryDate,
+            }
+          );
+        } else {
+          await cart.addToCart(
+            product,
+            undefined,
+            undefined,
+            ageVerified, // Use the tracked age verification status
+            undefined,
+            {
+              batchId: batchData.batchId,
+              batchNumber: batchData.batchNumber,
+              expiryDate: batchData.expiryDate,
+            }
+          );
+        }
+
+        toast.success(
+          `Added ${product.name}${
+            isWeighted && weight ? ` (${weight.toFixed(2)}kg)` : ""
+          } from batch ${batchData.batchNumber}`
+        );
+
+        // Clear age verification for this product after use
+        setAgeVerifiedForProduct((prev) => {
+          const next = { ...prev };
+          delete next[product.id];
+          return next;
+        });
+      }
 
       setShowBatchSelectionModal(false);
       setPendingProductForBatchSelection(null);
       setPendingQuantityForBatchSelection(1);
+      setPendingWeightForBatchSelection(undefined);
+      setShowScaleDisplay(false);
     },
-    [pendingProductForBatchSelection, cart]
+    [
+      pendingProductForBatchSelection,
+      pendingWeightForBatchSelection,
+      ageVerifiedForProduct,
+      cart,
+    ]
   );
 
-  // Handle auto-select batch (FEFO)
+  // Handle auto-select batch (FEFO) - This is now the default behavior, but kept for manual override
   const handleAutoSelectBatch = useCallback(async () => {
     if (!pendingProductForBatchSelection) return;
 
-    // Just add to cart - the backend will auto-select using FEFO
-    await cart.addToCart(pendingProductForBatchSelection);
+    const product = pendingProductForBatchSelection;
+    const isWeighted = isWeightedProduct(product);
+    const weight = pendingWeightForBatchSelection;
+
+    // Each cart addition = 1 item (quantity = 1, regardless of weight value)
+    // Check if batch has enough quantity (1 item) available
+    const batchResult = await autoSelectBatches(
+      product,
+      1, // Check batch has >= 1 item available (quantity check, not weight)
+      false // Don't allow partial - need exactly 1 item
+    );
+
+    if (batchResult.success && batchResult.primaryBatch) {
+      // Check if product requires age verification after batch selection
+      const requiresAgeVerification =
+        product.ageRestrictionLevel && product.ageRestrictionLevel !== "NONE";
+
+      if (requiresAgeVerification) {
+        // Store weight and batch data for age verification
+        if (isWeighted && weight !== undefined) {
+          setPendingWeightForAgeVerification(weight);
+        }
+        setPendingBatchDataForAgeVerification({
+          batchId: batchResult.primaryBatch.batchId,
+          batchNumber: batchResult.primaryBatch.batchNumber,
+          expiryDate: batchResult.primaryBatch.expiryDate,
+        });
+        setPendingProductForAgeVerification(product);
+        setShowAgeVerificationModal(true);
+      } else {
+        // Batch has enough quantity (>= 1) - add 1 item to cart
+        if (isWeighted && weight !== undefined) {
+          // For weighted items: quantity = 1 (for batch deduction), weight = weight value (for pricing only)
+          await cart.addToCart(
+            product,
+            weight, // Weight value (stored in item.weight, used for pricing only)
+            undefined,
+            false,
+            undefined,
+            batchResult.primaryBatch
+          );
+        } else {
+          // For unit items: quantity = 1 (will deduct 1 from batch during transaction)
+          await cart.addToCart(
+            product,
+            undefined, // Unit items don't have weight
+            undefined,
+            false,
+            undefined,
+            batchResult.primaryBatch
+          );
+        }
+      }
+    } else {
+      toast.error(batchResult.error || "No batches available for this product");
+    }
 
     setShowBatchSelectionModal(false);
     setPendingProductForBatchSelection(null);
     setPendingQuantityForBatchSelection(1);
-  }, [pendingProductForBatchSelection, cart]);
+    setPendingWeightForBatchSelection(undefined);
+  }, [pendingProductForBatchSelection, pendingWeightForBatchSelection, cart]);
 
   // Handle batch selection cancel
   const handleBatchSelectionCancel = useCallback(() => {
     setShowBatchSelectionModal(false);
     setPendingProductForBatchSelection(null);
     setPendingQuantityForBatchSelection(1);
+    setPendingWeightForBatchSelection(undefined);
   }, []);
 
   // Initialize cart session on mount
@@ -484,8 +799,8 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
         </>
       )}
 
-      {/* Admin Mode Indicator (optional - can be removed if not needed) */}
-      {!salesMode.requiresShift && (
+      {/* Admin Mode Indicator - hidden when embedded in dashboard layout */}
+      {!embeddedInDashboard && !salesMode.requiresShift && (
         <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-800">
           <div className="flex items-center justify-between">
             <span>Admin Mode: Direct sales access (no shift required)</span>
@@ -552,23 +867,92 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                         unitOfMeasure:
                           weightInput.selectedWeightProduct.salesUnit || "KG",
                       }}
-                      onWeightConfirmed={async (weight) => {
+                      onWeightConfirmed={async (weight, scaleReading) => {
                         const product = weightInput.selectedWeightProduct;
                         if (!product) return;
 
-                        if (
-                          product.ageRestrictionLevel &&
-                          product.ageRestrictionLevel !== "NONE"
-                        ) {
-                          setPendingWeightForAgeVerification(weight);
-                          setPendingProductForAgeVerification(product);
-                          setShowAgeVerificationModal(true);
-                          weightInput.resetWeightInput();
-                          setShowScaleDisplay(true); // Keep scale display for next item
+                        // Check if product requires batch tracking (expiry checking)
+                        const requiresBatchTracking =
+                          product.requiresBatchTracking === true;
+
+                        // Age verification should already be completed at this point
+                        // (it was shown first before the scale display)
+
+                        if (requiresBatchTracking) {
+                          // Each cart addition = 1 item (quantity = 1, regardless of weight value)
+                          // Check if batch has enough quantity (1 item) available
+                          const batchResult = await autoSelectBatches(
+                            product,
+                            1, // Check batch has >= 1 item available (quantity check, not weight)
+                            false // Don't allow partial - need exactly 1 item
+                          );
+
+                          if (batchResult.success && batchResult.primaryBatch) {
+                            // Batch has enough quantity (>= 1) - add 1 item to cart
+                            // Cart item: quantity = 1 (for batch deduction), weight = weight value (for pricing only)
+                            const ageVerified =
+                              ageVerifiedForProduct[product.id] || false;
+
+                            await cart.addToCart(
+                              product,
+                              weight, // Weight value (stored in item.weight, used for pricing only)
+                              undefined,
+                              ageVerified,
+                              undefined,
+                              batchResult.primaryBatch,
+                              scaleReading
+                            );
+
+                            // Show success message
+                            toast.success(`Added ${product.name} to cart`);
+
+                            weightInput.resetWeightInput();
+                            // Clear age verification for this product after use
+                            setAgeVerifiedForProduct((prev) => {
+                              const next = { ...prev };
+                              delete next[product.id];
+                              return next;
+                            });
+                            setShowScaleDisplay(false);
+                          } else if (batchResult.shouldShowModal) {
+                            // Show batch selection modal for manual selection
+                            setPendingWeightForBatchSelection(weight);
+                            setPendingProductForBatchSelection(product);
+                            setPendingQuantityForBatchSelection(weight);
+                            setShowBatchSelectionModal(true);
+                            weightInput.resetWeightInput();
+                            setShowScaleDisplay(false);
+                          } else {
+                            // No batches available - show error
+                            toast.error(
+                              batchResult.error ||
+                                "No batches available for this product"
+                            );
+                            weightInput.resetWeightInput();
+                            setShowScaleDisplay(false);
+                          }
                         } else {
-                          await cart.addToCart(product, weight);
+                          // No batch tracking, add directly with age verification (already completed)
+                          // Check if age verification was completed for this product
+                          const ageVerified =
+                            ageVerifiedForProduct[product.id] || false;
+                          await cart.addToCart(
+                            product,
+                            weight,
+                            undefined,
+                            ageVerified, // Use the tracked age verification status
+                            undefined,
+                            null,
+                            scaleReading || null
+                          );
                           weightInput.resetWeightInput();
-                          setShowScaleDisplay(true); // Keep scale display for next item
+                          // Clear age verification for this product after use
+                          setAgeVerifiedForProduct((prev) => {
+                            const next = { ...prev };
+                            delete next[product.id];
+                            return next;
+                          });
+                          setShowScaleDisplay(false);
                         }
                       }}
                       onCancel={() => {
@@ -626,7 +1010,7 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             cardReaderReady={true}
             onPaymentMethodSelect={payment.handlePayment}
             onCashAmountChange={payment.setCashAmount}
-            onCompleteTransaction={payment.completeTransaction}
+            onCompleteTransaction={() => payment.completeTransaction()}
             onCancel={() => {
               payment.setPaymentStep(false);
               payment.setPaymentMethod(null);
@@ -775,7 +1159,10 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
             setShowAgeVerificationModal(false);
             setPendingProductForAgeVerification(null);
             setPendingWeightForAgeVerification(undefined);
+            setPendingBatchDataForAgeVerification(null);
+            // Reset weight input but keep scale display visible for retry
             weightInput.resetWeightInput();
+            // Keep scale display visible so user can retry
           }}
           currentUser={
             user ? { id: user.id, role: getUserRoleName(user) } : null
@@ -805,6 +1192,12 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
           onAutoSelect={handleAutoSelectBatch}
           onCancel={handleBatchSelectionCancel}
           businessId={user.businessId}
+          cartItems={cart.cartItems.map((item) => ({
+            batchId: item.batchId,
+            itemType: item.itemType,
+            quantity: item.quantity,
+            weight: item.weight,
+          }))}
         />
       )}
 

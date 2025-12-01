@@ -40,7 +40,10 @@ interface ScaleDisplayProps {
     pricePerUnit?: number;
     unitOfMeasure?: string;
   } | null;
-  onWeightConfirmed?: (weight: number) => void;
+  onWeightConfirmed?: (
+    weight: number,
+    scaleReading?: { weight: number; stable: boolean }
+  ) => void;
   onCancel?: () => void;
   onManualEntryRequest?: () => void; // Callback to switch to inline manual entry form
   autoAddOnStable?: boolean;
@@ -171,7 +174,14 @@ export const ScaleDisplay: React.FC<ScaleDisplayProps> = ({
 
       setWeightConfirmed(true);
       if (onWeightConfirmed) {
-        onWeightConfirmed(weight);
+        // Pass scale reading metadata if available
+        const scaleReading = currentReading
+          ? {
+              weight: currentReading.weight,
+              stable: currentReading.stable,
+            }
+          : undefined;
+        onWeightConfirmed(weight, scaleReading);
       }
     }
   }, [

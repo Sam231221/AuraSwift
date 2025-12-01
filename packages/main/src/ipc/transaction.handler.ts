@@ -224,13 +224,11 @@ export function registerTransactionHandlers() {
 
             // Check if product requires batch tracking
             if (product.requiresBatchTracking) {
-              // Calculate quantity needed
-              let quantityNeeded: number;
-              if (item.itemType === "WEIGHT" && item.weight) {
-                quantityNeeded = item.weight;
-              } else {
-                quantityNeeded = item.quantity || 1;
-              }
+              // Calculate quantity needed (always use quantity field, not weight)
+              // For weighted items: quantity = 1 (each addition = 1 item)
+              // For unit items: quantity = number of units
+              // Weight is only used for pricing, not for batch operations
+              const quantityNeeded = item.quantity || 1;
 
               // If cart item already has batch info (pre-selected), use it
               if (item.batchId && item.batchNumber) {
@@ -415,13 +413,11 @@ export function registerTransactionHandlers() {
                 continue;
               }
 
-              // Calculate quantity to decrement
-              let quantityToDecrement: number;
-              if (item.itemType === "WEIGHT" && item.weight) {
-                quantityToDecrement = item.weight;
-              } else {
-                quantityToDecrement = item.quantity || 1;
-              }
+              // Calculate quantity to decrement (always use quantity field, not weight)
+              // For weighted items: quantity = 1 (each addition = 1 item)
+              // For unit items: quantity = number of units
+              // Weight is only used for pricing, not for batch operations
+              const quantityToDecrement = item.quantity || 1;
 
               // ============================================================
               // BATCH DEDUCTION (FEFO/FIFO)
@@ -872,7 +868,9 @@ export function registerTransactionHandlers() {
         }
         // Check if user has manager, admin, or owner role via RBAC
         const userRoles = db.userRoles.getActiveRolesByUser(manager.id);
-        const rolesWithDetails = db.userRoles.getRolesWithDetailsForUser(manager.id);
+        const rolesWithDetails = db.userRoles.getRolesWithDetailsForUser(
+          manager.id
+        );
         const hasManagerRole = rolesWithDetails.some((ur) =>
           ["manager", "admin", "owner"].includes(ur.role.name)
         );

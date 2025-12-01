@@ -272,7 +272,14 @@ export class TransactionManager {
               // Batch tracking
               batchId: item.batchId ?? null,
               batchNumber: item.batchNumber ?? null,
-              expiryDate: item.expiryDate ?? null,
+              expiryDate:
+                item.expiryDate != null
+                  ? typeof item.expiryDate === "number"
+                    ? new Date(item.expiryDate)
+                    : item.expiryDate instanceof Date
+                    ? item.expiryDate
+                    : null
+                  : null,
               // Age restriction tracking
               ageRestrictionLevel: item.ageRestrictionLevel ?? "NONE",
               ageVerified: item.ageVerified ?? false,

@@ -23,7 +23,7 @@ export type CartItemType = 'UNIT' | 'WEIGHT';
 export interface CartSession {
   id: string;
   cashierId: string;
-  shiftId: string;
+  shiftId: string | null; // Nullable for admin/owner mode
   businessId: string;
   stationId?: string;
   status: CartSessionStatus;
@@ -92,7 +92,7 @@ export interface CartItemWithProduct extends CartItem {
  */
 export interface CreateCartSessionRequest {
   cashierId: string;
-  shiftId: string;
+  shiftId?: string | null; // Optional for admin/owner mode
   businessId: string;
   stationId?: string;
 }

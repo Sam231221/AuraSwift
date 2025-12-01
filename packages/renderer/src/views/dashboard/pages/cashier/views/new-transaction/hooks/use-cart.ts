@@ -133,7 +133,16 @@ export function useCart({
       weight?: number,
       customPrice?: number,
       ageVerified: boolean = false,
-      sessionOverride?: CartSession | null
+      sessionOverride?: CartSession | null,
+      batchData?: {
+        batchId: string;
+        batchNumber: string;
+        expiryDate: Date;
+      } | null,
+      scaleReading?: {
+        weight: number;
+        stable: boolean;
+      } | null
     ) => {
       // Check if operations are disabled (no active shift but has scheduled shift)
       const operationsDisabled =
@@ -191,7 +200,7 @@ export function useCart({
         const latestCartItems =
           itemsResponse.success && itemsResponse.data
             ? (itemsResponse.data as CartItemWithProduct[])
-            : cartItems;
+            : [];
 
         // Update state with latest cart items to keep it in sync
         if (itemsResponse.success && itemsResponse.data) {
@@ -220,13 +229,17 @@ export function useCart({
 
         if (existingItem) {
           // Update existing item
+          // For weighted items: quantity = number of items (always increments by 1), weight = total weight
+          // For unit items: quantity = number of units (increments by 1)
           const newQuantity =
             existingItem.itemType === "UNIT"
               ? (existingItem.quantity || 0) + 1
+              : existingItem.itemType === "WEIGHT"
+              ? (existingItem.quantity || 0) + 1 // Each addition = 1 item
               : existingItem.quantity;
           const newWeight =
             existingItem.itemType === "WEIGHT"
-              ? (existingItem.weight || 0) + (weight || 0)
+              ? (existingItem.weight || 0) + (weight || 0) // Accumulate weight for pricing
               : existingItem.weight;
 
           // Recalculate totals for updated item
@@ -270,20 +283,35 @@ export function useCart({
             toast.error(errorMessage);
           }
         } else {
-          // Add new item
+          // Add new item to cart (1 item per addition, regardless of weight/price)
+          // For weighted items: quantity = 1 (count items), weight = actual weight (for batch deduction & pricing)
+          // For unit items: quantity = 1 (one unit to deduct from batch)
+          // Note: Transaction handler uses item.weight for weighted items and item.quantity for unit items
+          const itemQuantity =
+            itemType === "UNIT"
+              ? 1 // Each addition = 1 unit (will deduct 1 from batch)
+              : itemType === "WEIGHT"
+              ? 1 // Each addition = 1 item (quantity always 1, weight stored separately)
+              : undefined;
+
           const addResponse = await window.cartAPI.addItem({
             cartSessionId: currentSession.id,
             productId: product.id,
             itemName: product.name,
             itemType,
-            quantity: itemType === "UNIT" ? 1 : undefined,
+            quantity: itemQuantity,
             weight: itemType === "WEIGHT" ? weight ?? undefined : undefined,
             unitOfMeasure: salesUnit,
             unitPrice,
             totalPrice,
             taxAmount,
+            batchId: batchData?.batchId,
+            batchNumber: batchData?.batchNumber,
+            expiryDate: batchData?.expiryDate,
             ageRestrictionLevel: product.ageRestrictionLevel || "NONE",
             ageVerified,
+            scaleReadingWeight: scaleReading?.weight,
+            scaleReadingStable: scaleReading?.stable ?? true,
           });
 
           if (addResponse.success) {
@@ -316,14 +344,7 @@ export function useCart({
         toast.error(errorMessage);
       }
     },
-    [
-      cartSession,
-      cartItems,
-      userRole,
-      activeShift,
-      todaySchedule,
-      initializeCartSession,
-    ]
+    [cartSession, userRole, activeShift, todaySchedule, initializeCartSession]
   );
 
   /**
@@ -381,86 +402,37 @@ export function useCart({
       logger.info(`🛒 Adding category to cart: ${category.name} @ £${price}`);
 
       try {
-        // Check for existing category item
-        const itemsResponse = await window.cartAPI.getItems(currentSession.id);
-        const latestCartItems =
-          itemsResponse.success && itemsResponse.data
-            ? (itemsResponse.data as CartItemWithProduct[])
-            : cartItems;
+        // Always create a new row for category items since prices can differ each time
+        // This allows cashiers to add the same category multiple times with different prices
+        const addResponse = await window.cartAPI.addItem({
+          cartSessionId: currentSession.id,
+          categoryId: category.id,
+          itemName: category.name,
+          itemType: "UNIT",
+          quantity: 1,
+          unitOfMeasure: "each",
+          unitPrice,
+          totalPrice,
+          taxAmount,
+          ageRestrictionLevel: "NONE",
+          ageVerified: false,
+        });
 
-        // Update state with latest cart items
-        if (itemsResponse.success && itemsResponse.data) {
-          setCartItems(itemsResponse.data as CartItemWithProduct[]);
-        }
-
-        const existingItem = latestCartItems.find(
-          (item) => item.categoryId === category.id && item.itemType === "UNIT"
-        );
-
-        if (existingItem) {
-          // Update existing item
-          const newQuantity = (existingItem.quantity || 0) + 1;
-          const newSubtotal = unitPrice * newQuantity;
-          const newTaxAmount = newSubtotal * 0.08; // Default tax rate
-          const finalTotalPrice = newSubtotal + newTaxAmount;
-
-          const updateResponse = await window.cartAPI.updateItem(
-            existingItem.id,
-            {
-              quantity: newQuantity,
-              totalPrice: finalTotalPrice,
-              taxAmount: newTaxAmount,
-            }
+        if (addResponse.success) {
+          // Reload cart items
+          const itemsResponse = await window.cartAPI.getItems(
+            currentSession.id
           );
-
-          if (updateResponse.success) {
-            // Reload cart items
-            const itemsResponse = await window.cartAPI.getItems(
-              currentSession.id
-            );
-            if (itemsResponse.success && itemsResponse.data) {
-              setCartItems(itemsResponse.data as CartItemWithProduct[]);
-            }
-
-            toast.success(`Added ${category.name} (${newQuantity}x)`);
-          } else {
-            const errorMessage =
-              updateResponse.message || "Failed to update cart item";
-            logger.error("Failed to update cart item:", errorMessage);
-            toast.error(errorMessage);
+          if (itemsResponse.success && itemsResponse.data) {
+            setCartItems(itemsResponse.data as CartItemWithProduct[]);
           }
+
+          toast.success(`Added ${category.name} @ £${price.toFixed(2)}`);
         } else {
-          // Add new category item
-          const addResponse = await window.cartAPI.addItem({
-            cartSessionId: currentSession.id,
-            categoryId: category.id,
-            itemName: category.name,
-            itemType: "UNIT",
-            quantity: 1,
-            unitOfMeasure: "each",
-            unitPrice,
-            totalPrice,
-            taxAmount,
-            ageRestrictionLevel: "NONE",
-            ageVerified: false,
-          });
-
-          if (addResponse.success) {
-            // Reload cart items
-            const itemsResponse = await window.cartAPI.getItems(
-              currentSession.id
-            );
-            if (itemsResponse.success && itemsResponse.data) {
-              setCartItems(itemsResponse.data as CartItemWithProduct[]);
-            }
-
-            toast.success(`Added ${category.name}`);
-          } else {
-            const errorMessage =
-              addResponse.message || "Failed to add item to cart";
-            logger.error("Failed to add item to cart:", errorMessage);
-            toast.error(errorMessage);
-          }
+          const errorMessage =
+            addResponse.message || "Failed to add item to cart";
+          logger.error("Failed to add item to cart:", errorMessage);
+          toast.error(errorMessage);
         }
       } catch (error) {
         const errorMessage =
@@ -469,14 +441,7 @@ export function useCart({
         toast.error(errorMessage);
       }
     },
-    [
-      cartSession,
-      cartItems,
-      userRole,
-      activeShift,
-      todaySchedule,
-      initializeCartSession,
-    ]
+    [cartSession, userRole, activeShift, todaySchedule, initializeCartSession]
   );
 
   /**

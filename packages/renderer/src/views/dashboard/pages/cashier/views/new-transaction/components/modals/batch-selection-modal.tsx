@@ -6,7 +6,7 @@
  * (First-Expiry-First-Out) to encourage selling oldest stock first.
  */
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -30,8 +30,12 @@ import {
 import { toast } from "sonner";
 import type { Product } from "@/types/domain";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('batch-selection-modal');
+import { getLogger } from "@/shared/utils/logger";
+import {
+  isWeightedProduct,
+  getProductSalesUnit,
+} from "../../utils/product-helpers";
+const logger = getLogger("batch-selection-modal");
 
 /**
  * Batch data from the API
@@ -68,14 +72,19 @@ interface BatchSelectionModalProps {
   onAutoSelect: () => void; // Use automatic FEFO selection
   onCancel: () => void;
   businessId: string;
+  cartItems?: Array<{
+    batchId?: string;
+    itemType: "UNIT" | "WEIGHT";
+    quantity?: number;
+    weight?: number;
+  }>; // Cart items to check for already allocated quantities
 }
 
 /**
  * Calculate days until expiry
  */
 const getDaysUntilExpiry = (expiryDate: Date | string | number): number => {
-  const expiry =
-    expiryDate instanceof Date ? expiryDate : new Date(expiryDate);
+  const expiry = expiryDate instanceof Date ? expiryDate : new Date(expiryDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diffTime = expiry.getTime() - today.getTime();
@@ -97,13 +106,27 @@ const getExpiryStatusColor = (daysUntil: number): string => {
  * Format expiry date for display
  */
 const formatExpiryDate = (expiryDate: Date | string | number): string => {
-  const date =
-    expiryDate instanceof Date ? expiryDate : new Date(expiryDate);
+  const date = expiryDate instanceof Date ? expiryDate : new Date(expiryDate);
   return date.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
+};
+
+/**
+ * Format sales unit for display (lowercase, readable format)
+ */
+const formatSalesUnit = (salesUnit: string): string => {
+  const unitMap: Record<string, string> = {
+    KG: "kg",
+    GRAM: "g",
+    LITRE: "L",
+    ML: "ml",
+    PIECE: "pcs",
+    PACK: "pack",
+  };
+  return unitMap[salesUnit] || salesUnit.toLowerCase();
 };
 
 export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
@@ -114,6 +137,7 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
   onAutoSelect,
   onCancel,
   businessId: _businessId, // Prefixed to indicate intentionally unused (reserved for future use)
+  cartItems = [],
 }) => {
   const [batches, setBatches] = useState<BatchInfo[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -162,22 +186,67 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
     }
   };
 
+  // Calculate allocated quantity per batch from cart items
+  // Both weighted and unit products use quantity field for batch comparison
+  const allocatedByBatch = useMemo(() => {
+    const allocated: Record<string, number> = {};
+
+    cartItems.forEach((item) => {
+      if (!item.batchId) return;
+
+      if (!allocated[item.batchId]) {
+        allocated[item.batchId] = 0;
+      }
+
+      // Always use quantity for batch comparison (for both UNIT and WEIGHT items)
+      // For weighted items, quantity represents the batch quantity allocated (same as weight value)
+      // For unit items, quantity represents the number of units
+      if (item.quantity !== undefined && item.quantity !== null) {
+        allocated[item.batchId] += item.quantity;
+      }
+    });
+
+    return allocated;
+  }, [cartItems]);
+
   // Get selected batch details
   const selectedBatch = useMemo(
     () => batches.find((b) => b.id === selectedBatchId),
     [batches, selectedBatchId]
   );
 
-  // Check if selected batch has sufficient quantity
+  // Calculate available quantity (currentQuantity - already allocated in cart)
+  const getAvailableQuantity = useCallback(
+    (batchId: string, currentQuantity: number): number => {
+      const allocated = allocatedByBatch[batchId] || 0;
+      return Math.max(0, currentQuantity - allocated);
+    },
+    [allocatedByBatch]
+  );
+
+  // Check if selected batch has sufficient quantity (using available, not current)
   const hasSufficientQuantity = selectedBatch
-    ? selectedBatch.currentQuantity >= requestedQuantity
+    ? getAvailableQuantity(selectedBatch.id, selectedBatch.currentQuantity) >=
+      requestedQuantity
     : false;
 
-  // Calculate total available quantity across all batches
+  // Calculate total available quantity across all batches (accounting for cart allocations)
   const totalAvailable = useMemo(
-    () => batches.reduce((sum, b) => sum + b.currentQuantity, 0),
-    [batches]
+    () =>
+      batches.reduce(
+        (sum, b) => sum + getAvailableQuantity(b.id, b.currentQuantity),
+        0
+      ),
+    [batches, getAvailableQuantity]
   );
+
+  // Check if product is weighted and get appropriate label
+  const isWeighted = isWeightedProduct(product);
+  const salesUnit = getProductSalesUnit(product);
+  const displayUnit = formatSalesUnit(salesUnit);
+  const quantityLabel = isWeighted
+    ? `Weight needed: ${requestedQuantity} ${displayUnit}`
+    : `Qty needed: ${requestedQuantity}`;
 
   const handleConfirmSelection = () => {
     if (!selectedBatch) {
@@ -185,9 +254,17 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
       return;
     }
 
+    const availableQuantity = getAvailableQuantity(
+      selectedBatch.id,
+      selectedBatch.currentQuantity
+    );
+
     if (!hasSufficientQuantity) {
+      const unitLabel = isWeighted ? displayUnit : "units";
       toast.error(
-        `Selected batch only has ${selectedBatch.currentQuantity} units available`
+        `Selected batch only has ${availableQuantity.toFixed(
+          2
+        )} ${unitLabel} available`
       );
       return;
     }
@@ -231,9 +308,7 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
               >
                 {product.sku}
               </Badge>
-              <span className="text-xs text-slate-500">
-                Qty needed: {requestedQuantity}
-              </span>
+              <span className="text-xs text-slate-500">{quantityLabel}</span>
             </div>
           </div>
 
@@ -268,7 +343,7 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
                   Available Batches
                 </Label>
                 <span className="text-xs text-slate-500">
-                  Total: {totalAvailable} units
+                  Total: {totalAvailable} {isWeighted ? displayUnit : "units"}
                 </span>
               </div>
 
@@ -280,8 +355,11 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
                 {batches.map((batch) => {
                   const daysUntil = getDaysUntilExpiry(batch.expiryDate);
                   const isExpired = daysUntil < 0;
-                  const hasSufficient =
-                    batch.currentQuantity >= requestedQuantity;
+                  const availableQuantity = getAvailableQuantity(
+                    batch.id,
+                    batch.currentQuantity
+                  );
+                  const hasSufficient = availableQuantity >= requestedQuantity;
 
                   return (
                     <div
@@ -290,13 +368,11 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
                         selectedBatchId === batch.id
                           ? "border-blue-500 bg-blue-50"
                           : "border-slate-200 hover:border-slate-300"
-                      } ${
-                        !hasSufficient || isExpired
-                          ? "opacity-60"
-                          : ""
-                      }`}
+                      } ${!hasSufficient || isExpired ? "opacity-60" : ""}`}
                       onClick={() =>
-                        !isExpired && hasSufficient && setSelectedBatchId(batch.id)
+                        !isExpired &&
+                        hasSufficient &&
+                        setSelectedBatchId(batch.id)
                       }
                     >
                       <RadioGroupItem
@@ -331,8 +407,15 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
                                   : "text-red-600"
                               }
                             >
-                              {batch.currentQuantity} available
+                              {availableQuantity.toFixed(2)}{" "}
+                              {isWeighted ? displayUnit : ""} available
                               {!hasSufficient && " (insufficient)"}
+                              {allocatedByBatch[batch.id] > 0 && (
+                                <span className="text-xs text-slate-400 ml-1">
+                                  ({allocatedByBatch[batch.id].toFixed(2)} in
+                                  cart)
+                                </span>
+                              )}
                             </span>
                           </div>
 
@@ -421,4 +504,3 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
     </Dialog>
   );
 };
-
