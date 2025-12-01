@@ -113,16 +113,30 @@ export function calculateCategoryPrice(
 
 /**
  * Calculate cart totals from cart items
+ *
+ * Note: item.totalPrice already includes tax (subtotal + taxAmount),
+ * so we need to extract the true subtotal by subtracting taxAmount.
+ *
  * @param items - Array of cart items
- * @returns Object with subtotal, tax, and total
+ * @returns Object with subtotal (before tax), tax, and total (subtotal + tax)
  */
 export function calculateCartTotals(items: CartItemWithProduct[]): {
   subtotal: number;
   tax: number;
   total: number;
 } {
-  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-  const tax = items.reduce((sum, item) => sum + item.taxAmount, 0);
+  // Calculate true subtotal (before tax) by extracting tax from each item's totalPrice
+  const subtotal = items.reduce((sum, item) => {
+    // item.totalPrice = itemSubtotal + itemTaxAmount
+    // itemSubtotal = item.totalPrice - item.taxAmount
+    const itemSubtotal = item.totalPrice - (item.taxAmount || 0);
+    return sum + itemSubtotal;
+  }, 0);
+
+  // Sum all item tax amounts
+  const tax = items.reduce((sum, item) => sum + (item.taxAmount || 0), 0);
+
+  // Total is subtotal + tax
   const total = subtotal + tax;
 
   return {

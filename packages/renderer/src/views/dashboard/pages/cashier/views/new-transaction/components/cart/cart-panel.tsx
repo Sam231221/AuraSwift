@@ -38,6 +38,7 @@ export function CartPanel({
           tax={tax}
           total={total}
           itemCount={cartItems.length}
+          items={cartItems}
         />
       </CardContent>
     </div>
