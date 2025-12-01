@@ -982,6 +982,7 @@ export function NewTransactionView({
                   <WeightInputDisplay
                     selectedProduct={weightInput.selectedWeightProduct}
                     weightDisplayPrice={weightInput.weightDisplayPrice}
+                    businessId={user?.businessId}
                     onShowScaleDisplay={() => setShowScaleDisplay(true)}
                   />
                 )}

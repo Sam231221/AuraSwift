@@ -5,19 +5,34 @@
 import { Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Product } from "@/types/domain";
+import {
+  useSalesUnitSettings,
+  getEffectiveSalesUnit,
+} from "@/shared/hooks/use-sales-unit-settings";
+import { getProductSalesUnit } from "../../utils/product-helpers";
 
 interface WeightInputDisplayProps {
   selectedProduct: Product | null;
   weightDisplayPrice: string;
+  businessId: string | undefined;
   onShowScaleDisplay?: () => void;
 }
 
 export function WeightInputDisplay({
   selectedProduct,
   weightDisplayPrice,
+  businessId,
   onShowScaleDisplay,
 }: WeightInputDisplayProps) {
+  const salesUnitSettings = useSalesUnitSettings(businessId);
+
   if (!selectedProduct) return null;
+
+  const productSalesUnit = getProductSalesUnit(selectedProduct);
+  const effectiveSalesUnit = getEffectiveSalesUnit(
+    productSalesUnit,
+    salesUnitSettings
+  );
 
   return (
     <div className="mt-1 flex flex-col gap-2 p-2 sm:p-3 rounded bg-blue-50 border border-blue-200">
@@ -30,7 +45,7 @@ export function WeightInputDisplay({
       {/* Weight Display */}
       <div className="bg-white p-3 sm:p-4 rounded-lg text-center border border-blue-200">
         <div className="text-2xl sm:text-3xl font-bold text-slate-900">
-          {weightDisplayPrice} {selectedProduct.salesUnit || "PIECE"}
+          {weightDisplayPrice} {effectiveSalesUnit}
         </div>
       </div>
       {/* Button to switch back to scale */}
