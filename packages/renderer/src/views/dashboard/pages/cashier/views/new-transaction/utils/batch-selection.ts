@@ -3,7 +3,6 @@
  * Handles automatic batch selection using FEFO/FIFO rotation methods
  */
 
-import { toast } from "sonner";
 import type { Product } from "@/types/domain";
 import { getLogger } from "@/shared/utils/logger";
 
@@ -95,7 +94,9 @@ export async function autoSelectBatches(
           requestedQuantity,
           totalAvailable,
           shouldShowModal: true,
-          error: `Insufficient stock. Available: ${totalAvailable.toFixed(2)}, Requested: ${requestedQuantity.toFixed(2)}`,
+          error: `Insufficient stock. Available: ${totalAvailable.toFixed(
+            2
+          )}, Requested: ${requestedQuantity.toFixed(2)}`,
         };
       }
 
@@ -148,7 +149,9 @@ export async function autoSelectBatches(
           requestedQuantity,
           totalAvailable,
           shouldShowModal: true,
-          error: `Insufficient stock. Available: ${totalAvailable.toFixed(2)}, Requested: ${requestedQuantity.toFixed(2)}`,
+          error: `Insufficient stock. Available: ${totalAvailable.toFixed(
+            2
+          )}, Requested: ${requestedQuantity.toFixed(2)}`,
         };
       } else {
         // No batches at all
@@ -162,8 +165,7 @@ export async function autoSelectBatches(
   } catch (error) {
     logger.error("Batch auto-selection failed:", error);
 
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     const isInsufficientStock = errorMessage.includes("Insufficient stock");
 
     if (isInsufficientStock) {
@@ -266,9 +268,7 @@ export async function getAvailableBatches(product: Product): Promise<{
     logger.error("Failed to get available batches:", error);
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to load batches",
+      error: error instanceof Error ? error.message : "Failed to load batches",
     };
   }
 }
-
