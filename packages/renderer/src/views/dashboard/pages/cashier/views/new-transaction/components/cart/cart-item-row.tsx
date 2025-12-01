@@ -17,7 +17,7 @@ export function CartItemRow({ item, onRemove }: CartItemRowProps) {
     <tr className="border-b border-slate-200">
       <td className="text-center text-xs sm:text-sm" style={{ width: "100px" }}>
         {item.itemType === "WEIGHT" && item.weight
-          ? `${item.weight.toFixed(2)} ${item.unitOfMeasure || "kg"}`
+          ? `${item.weight.toFixed(2)}`
           : item.itemType === "UNIT" && item.quantity
           ? `${item.quantity}x`
           : "-"}
