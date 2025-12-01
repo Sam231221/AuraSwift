@@ -50,6 +50,10 @@ export class TimeTrackingReportManager {
       .limit(1)
       .all();
 
+    // Convert string dates to Date objects for comparison
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+
     // Get all shifts in date range
     const shifts = this.db
       .select({
@@ -69,8 +73,8 @@ export class TimeTrackingReportManager {
       .where(
         and(
           eq(schema.shifts.user_id, userId),
-          gte(schema.clockEvents.timestamp, startDate),
-          lte(schema.clockEvents.timestamp, endDate)
+          gte(schema.clockEvents.timestamp, startDateObj),
+          lte(schema.clockEvents.timestamp, endDateObj)
         )
       )
       .orderBy(desc(schema.clockEvents.timestamp))

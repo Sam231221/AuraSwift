@@ -7,7 +7,7 @@
 
 import type { DrizzleDB } from "../drizzle.js";
 import type { UserRole, NewUserRole, Role, User } from "../schema.js";
-import { eq, and, desc, sql, or } from "drizzle-orm";
+import { eq, and, desc, sql, or, isNull } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 import { getLogger } from "../../utils/logger.js";
@@ -181,7 +181,7 @@ export class UserRoleManager {
     if (!includeExpired) {
       conditions.push(
         or(
-          eq(schema.userRoles.expiresAt, null),
+          isNull(schema.userRoles.expiresAt),
           sql`${schema.userRoles.expiresAt} > ${new Date().getTime()}`
         )!
       );

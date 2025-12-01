@@ -1,4 +1,4 @@
-import type { Product, NewProduct, StockAdjustment } from "../schema.js";
+import type { Product, NewProduct } from "../schema.js";
 import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql, desc, asc } from "drizzle-orm";
 import * as schema from "../schema.js";
@@ -33,7 +33,7 @@ export class ProductManager {
   }
 
   async createProduct(
-    productData: Omit<Product, "id" | "createdAt" | "updatedAt">
+    productData: Omit<NewProduct, "id" | "createdAt" | "updatedAt">
   ): Promise<Product> {
     const productId = this.uuid.v4();
 
@@ -224,10 +224,25 @@ export class ProductManager {
     // Build sort order
     const sortColumn = pagination.sortBy || "name";
     const sortDirection = pagination.sortOrder || "asc";
+    // Map sort column names to actual schema columns
+    const columnMap: Record<string, any> = {
+      name: schema.products.name,
+      basePrice: schema.products.basePrice,
+      stockLevel: schema.products.stockLevel,
+      sku: schema.products.sku,
+      category: schema.products.categoryId,
+      status: schema.products.isActive,
+      createdAt: schema.products.createdAt,
+      updatedAt: schema.products.updatedAt,
+    };
+
+    const sortColumnRef =
+      columnMap[sortColumn] || schema.products.name;
+
     const orderByClause =
       sortDirection === "desc"
-        ? desc(schema.products[sortColumn as keyof typeof schema.products])
-        : asc(schema.products[sortColumn as keyof typeof schema.products]);
+        ? desc(sortColumnRef)
+        : asc(sortColumnRef);
 
     // Get paginated items
     const items = await this.drizzle
@@ -250,7 +265,7 @@ export class ProductManager {
 
   async updateProduct(
     id: string,
-    updates: Partial<Omit<Product, "id" | "createdAt" | "modifiers">>
+    updates: Partial<Omit<Product, "id" | "createdAt" | "updatedAt">>
   ): Promise<Product> {
     if (Object.keys(updates).length === 0) {
       return this.getProductById(id, true);
@@ -393,7 +408,7 @@ export class ProductManager {
   // Business Logic Methods (with validation and response wrapping)
 
   async createProductWithValidation(
-    productData: Omit<Product, "id" | "createdAt" | "updatedAt">
+    productData: Omit<NewProduct, "id" | "createdAt" | "updatedAt">
   ): Promise<ProductResponse> {
     try {
       // Validate weight-based product data

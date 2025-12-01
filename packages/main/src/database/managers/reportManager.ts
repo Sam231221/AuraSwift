@@ -48,7 +48,7 @@ export class ReportManager {
     const latestCount = this.db
       .select()
       .from(schema.cashDrawerCounts)
-      .where(eq(schema.cashDrawerCounts.shiftId, shiftId))
+      .where(eq(schema.cashDrawerCounts.shift_id, shiftId))
       .orderBy(desc(schema.cashDrawerCounts.timestamp))
       .limit(1)
       .get();
@@ -57,12 +57,16 @@ export class ReportManager {
       // Use actual counted amount
       const expectedAtCountTime = this.getExpectedCashForShiftDrizzle(shiftId);
       const variance =
-        latestCount.countedAmount - expectedAtCountTime.expectedAmount;
+        latestCount.counted_amount - expectedAtCountTime.expectedAmount;
 
       return {
-        amount: latestCount.countedAmount,
+        amount: latestCount.counted_amount,
         isEstimated: false,
-        lastCountTime: latestCount.timestamp,
+        lastCountTime: latestCount.timestamp instanceof Date 
+          ? latestCount.timestamp.toISOString() 
+          : typeof latestCount.timestamp === 'number'
+          ? new Date(latestCount.timestamp).toISOString()
+          : String(latestCount.timestamp),
         variance: variance,
       };
     } else {
@@ -139,12 +143,12 @@ export class ReportManager {
     });
 
     const expectedAmount =
-      shift.startingCash + cashSales - cashRefunds - cashVoids;
+      (shift.starting_cash || 0) + cashSales - cashRefunds - cashVoids;
 
     return {
       expectedAmount,
       breakdown: {
-        startingCash: shift.startingCash,
+        startingCash: shift.starting_cash || 0,
         cashSales,
         cashRefunds,
         cashVoids,
@@ -168,11 +172,11 @@ export class ReportManager {
 
     // Get linked schedule if exists
     let schedule: any = undefined;
-    if (shift.scheduleId) {
+    if (shift.schedule_id) {
       const scheduleResult = this.db
         .select()
         .from(schema.schedules)
-        .where(eq(schema.schedules.id, shift.scheduleId))
+        .where(eq(schema.schedules.id, shift.schedule_id))
         .get();
 
       if (scheduleResult) {
@@ -209,7 +213,7 @@ export class ReportManager {
     const cashDrawerCounts = this.db
       .select()
       .from(schema.cashDrawerCounts)
-      .where(eq(schema.cashDrawerCounts.shiftId, shiftId))
+      .where(eq(schema.cashDrawerCounts.shift_id, shiftId))
       .all();
 
     // Calculate totals using aggregation
@@ -226,15 +230,53 @@ export class ReportManager {
     const totalSales = salesStats?.totalSales ?? 0;
     const totalRefunds = salesStats?.totalRefunds ?? 0;
     const totalVoids = salesStats?.totalVoids ?? 0;
-    const cashVariance = shift.cashVariance ?? 0;
+
+    // Get clock events for shift start/end times
+    const clockIn = shift.clock_in_id
+      ? this.db
+          .select()
+          .from(schema.clockEvents)
+          .where(eq(schema.clockEvents.id, shift.clock_in_id))
+          .get()
+      : null;
+    const clockOut = shift.clock_out_id
+      ? this.db
+          .select()
+          .from(schema.clockEvents)
+          .where(eq(schema.clockEvents.id, shift.clock_out_id))
+          .get()
+      : null;
+
+    const actualStart = clockIn?.timestamp 
+      ? (clockIn.timestamp instanceof Date 
+          ? clockIn.timestamp 
+          : typeof clockIn.timestamp === 'number'
+          ? new Date(clockIn.timestamp)
+          : new Date(clockIn.timestamp as string))
+      : null;
+    const actualEnd = clockOut?.timestamp
+      ? (clockOut.timestamp instanceof Date
+          ? clockOut.timestamp
+          : typeof clockOut.timestamp === 'number'
+          ? new Date(clockOut.timestamp)
+          : new Date(clockOut.timestamp as string))
+      : null;
 
     // Calculate attendance variance if schedule exists
     let attendanceVariance;
-    if (schedule) {
-      const plannedStart = new Date(schedule.startTime);
-      const actualStart = new Date(shift.startTime);
-      const plannedEnd = schedule.endTime ? new Date(schedule.endTime) : null;
-      const actualEnd = shift.endTime ? new Date(shift.endTime) : null;
+    if (schedule && actualStart) {
+      const plannedStart = schedule.startTime instanceof Date
+        ? schedule.startTime
+        : typeof schedule.startTime === 'number'
+        ? new Date(schedule.startTime)
+        : new Date(schedule.startTime as string);
+      const plannedEnd = schedule.endTime
+        ? (schedule.endTime instanceof Date
+            ? schedule.endTime
+            : typeof schedule.endTime === 'number'
+            ? new Date(schedule.endTime)
+            : new Date(schedule.endTime as string))
+        : null;
 
       const earlyMinutes = Math.max(
         0,
@@ -247,9 +289,9 @@ export class ReportManager {
 
       attendanceVariance = {
         plannedStart: schedule.startTime,
-        actualStart: shift.startTime,
+        actualStart: actualStart,
         plannedEnd: schedule.endTime,
-        actualEnd: shift.endTime,
+        actualEnd: actualEnd,
         earlyMinutes: earlyMinutes > 0 ? Math.round(earlyMinutes) : undefined,
         lateMinutes: lateMinutes > 0 ? Math.round(lateMinutes) : undefined,
       };
@@ -263,7 +305,6 @@ export class ReportManager {
       totalSales,
       totalRefunds,
       totalVoids,
-      cashVariance,
       attendanceVariance,
     };
   }

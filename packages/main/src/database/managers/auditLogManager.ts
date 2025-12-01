@@ -28,10 +28,10 @@ export class AuditLogManager {
       .insert(schema.auditLogs)
       .values({
         id: logId,
-        userId: logData.userId,
+        user_id: logData.userId,
         action: logData.action,
         resource: logData.resource,
-        resourceId: logData.resourceId,
+        resource_id: logData.resourceId,
         details: logData.details ? JSON.stringify(logData.details) : null,
         timestamp: now, // Use Date object for timestamp_ms mode
       })
@@ -45,7 +45,7 @@ export class AuditLogManager {
     const results = this.db
       .select()
       .from(schema.auditLogs)
-      .where(eq(schema.auditLogs.userId, userId))
+      .where(eq(schema.auditLogs.user_id, userId))
       .orderBy(desc(schema.auditLogs.timestamp))
       .limit(limit)
       .all();
@@ -70,7 +70,7 @@ export class AuditLogManager {
       .where(
         and(
           eq(schema.auditLogs.resource, resource),
-          eq(schema.auditLogs.resourceId, resourceId)
+          eq(schema.auditLogs.resource_id, resourceId)
         )
       )
       .orderBy(desc(schema.auditLogs.timestamp))
@@ -97,13 +97,13 @@ export class AuditLogManager {
     // Build where conditions
     const conditions = [];
     if (options?.userId) {
-      conditions.push(eq(schema.auditLogs.userId, options.userId));
+      conditions.push(eq(schema.auditLogs.user_id, options.userId));
     }
     if (options?.resource) {
       conditions.push(eq(schema.auditLogs.resource, options.resource));
     }
     if (options?.resourceId) {
-      conditions.push(eq(schema.auditLogs.resourceId, options.resourceId));
+      conditions.push(eq(schema.auditLogs.resource_id, options.resourceId));
     }
     if (options?.action) {
       conditions.push(eq(schema.auditLogs.action, options.action));

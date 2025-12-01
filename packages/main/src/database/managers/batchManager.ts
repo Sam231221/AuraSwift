@@ -329,21 +329,26 @@ export class BatchManager {
 
     const totalItems = Number(countResult.count);
 
-    // Build sort order
+    // Build sort order with type-safe column mapping
     const sortColumn = pagination.sortBy || "expiryDate";
     const sortDirection = pagination.sortOrder || "asc";
+
+    // Map sort column names to actual schema columns
+    const columnMap: Record<string, any> = {
+      expiryDate: schema.productBatches.expiryDate,
+      createdAt: schema.productBatches.createdAt,
+      batchNumber: schema.productBatches.batchNumber,
+      status: schema.productBatches.status,
+      currentQuantity: schema.productBatches.currentQuantity,
+      initialQuantity: schema.productBatches.initialQuantity,
+      productId: schema.productBatches.productId,
+      businessId: schema.productBatches.businessId,
+    };
+
+    const sortColumnRef =
+      columnMap[sortColumn] || schema.productBatches.expiryDate;
     const orderByClause =
-      sortDirection === "desc"
-        ? desc(
-            schema.productBatches[
-              sortColumn as keyof typeof schema.productBatches
-            ]
-          )
-        : asc(
-            schema.productBatches[
-              sortColumn as keyof typeof schema.productBatches
-            ]
-          );
+      sortDirection === "desc" ? desc(sortColumnRef) : asc(sortColumnRef);
 
     // Get paginated items
     const items = await this.db

@@ -36,26 +36,43 @@ export class ShiftManager {
 
   /**
    * Create shift with transaction support for atomicity
+   * Note: Shifts require a clock_in_id (clock event) to be created first
+   * This method expects the shift data to match the schema (snake_case)
    */
-  createShift(shiftData: Omit<Shift, "id" | "createdAt" | "updatedAt">): Shift {
+  createShift(shiftData: {
+    user_id: string;
+    business_id: string;
+    clock_in_id: string;
+    schedule_id?: string | null;
+    terminal_id?: string | null;
+    starting_cash?: number | null;
+    status?: "active" | "ended" | "pending_review";
+    clock_out_id?: string | null;
+    notes?: string | null;
+  }): Shift {
     const shiftId = this.uuid.v4();
     const now = new Date();
 
     // Validate data before creating shift
-    if (!shiftData.cashierId) {
-      throw new Error("Cashier ID is required");
+    if (!shiftData.user_id) {
+      throw new Error("User ID is required");
     }
-    if (!shiftData.businessId) {
+    if (!shiftData.business_id) {
       throw new Error("Business ID is required");
     }
-    if (shiftData.startingCash < 0) {
-      throw new Error("Starting cash cannot be negative");
+    if (!shiftData.clock_in_id) {
+      throw new Error("Clock in ID is required");
     }
-    if (shiftData.startingCash > 100000) {
-      throw new Error("Starting cash exceeds maximum limit");
-    }
-    if (!shiftData.startTime) {
-      throw new Error("Start time is required");
+    if (
+      shiftData.starting_cash !== undefined &&
+      shiftData.starting_cash !== null
+    ) {
+      if (shiftData.starting_cash < 0) {
+        throw new Error("Starting cash cannot be negative");
+      }
+      if (shiftData.starting_cash > 100000) {
+        throw new Error("Starting cash exceeds maximum limit");
+      }
     }
 
     // Use transaction to ensure atomicity
@@ -63,22 +80,18 @@ export class ShiftManager {
       tx.insert(schema.shifts)
         .values({
           id: shiftId,
-          schedule_id: shiftData.scheduleId ?? null,
-          time_shift_id: (shiftData as any).timeShiftId ?? null, // Link to time shift
-          cashier_id: shiftData.cashierId,
-          business_id: shiftData.businessId,
-          deviceId: (shiftData as any).deviceId ?? null, // Device/terminal identifier
-          startTime: shiftData.startTime,
-          endTime: shiftData.endTime ?? null,
-          status: shiftData.status,
-          startingCash: shiftData.startingCash,
-          finalCashDrawer: shiftData.finalCashDrawer ?? null,
-          expectedCashDrawer: shiftData.expectedCashDrawer ?? null,
-          cashVariance: shiftData.cashVariance ?? null,
-          totalSales: shiftData.totalSales ?? 0,
-          totalTransactions: shiftData.totalTransactions ?? 0,
-          totalRefunds: shiftData.totalRefunds ?? 0,
-          totalVoids: shiftData.totalVoids ?? 0,
+          user_id: shiftData.user_id,
+          business_id: shiftData.business_id,
+          clock_in_id: shiftData.clock_in_id,
+          clock_out_id: shiftData.clock_out_id ?? null,
+          schedule_id: shiftData.schedule_id ?? null,
+          terminal_id: shiftData.terminal_id ?? null,
+          status: shiftData.status ?? "active",
+          starting_cash: shiftData.starting_cash ?? null,
+          total_sales: 0,
+          total_transactions: 0,
+          total_refunds: 0,
+          total_voids: 0,
           notes: shiftData.notes ?? null,
           createdAt: now,
           updatedAt: now,
@@ -88,12 +101,7 @@ export class ShiftManager {
       return shiftId;
     });
 
-    return {
-      ...shiftData,
-      id: result,
-      createdAt: now,
-      updatedAt: now,
-    };
+    return this.getShiftById(result);
   }
 
   /**
@@ -121,8 +129,8 @@ export class ShiftManager {
     return this.db
       .select()
       .from(schema.shifts)
-      .where(eq(schema.shifts.businessId, businessId))
-      .orderBy(desc(schema.shifts.startTime))
+      .where(eq(schema.shifts.business_id, businessId))
+      .orderBy(desc(schema.shifts.createdAt))
       .all() as Shift[];
   }
 
@@ -135,11 +143,11 @@ export class ShiftManager {
       .from(schema.shifts)
       .where(
         and(
-          eq(schema.shifts.cashierId, cashierId),
+          eq(schema.shifts.user_id, cashierId),
           eq(schema.shifts.status, "active")
         )
       )
-      .orderBy(desc(schema.shifts.startTime))
+      .orderBy(desc(schema.shifts.createdAt))
       .limit(1)
       .all();
 
@@ -147,7 +155,7 @@ export class ShiftManager {
   }
 
   /**
-   * Get active POS shifts by timeShiftId
+   * Get active shifts by shift ID (shifts table is the unified time shift table)
    */
   getActiveShiftsByTimeShift(timeShiftId: string): Shift[] {
     if (!timeShiftId) {
@@ -159,45 +167,40 @@ export class ShiftManager {
       .from(schema.shifts)
       .where(
         and(
-          eq(schema.shifts.timeShiftId, timeShiftId),
+          eq(schema.shifts.id, timeShiftId),
           eq(schema.shifts.status, "active")
         )
       )
-      .orderBy(desc(schema.shifts.startTime))
+      .orderBy(desc(schema.shifts.createdAt))
       .all() as Shift[];
   }
 
   /**
    * End shift with final calculations
+   * Note: clock_out_id should be set separately via time tracking manager
    */
   endShift(
     shiftId: string,
     endData: {
-      endTime: string;
-      finalCashDrawer: number;
-      expectedCashDrawer: number;
-      totalSales: number;
-      totalTransactions: number;
-      totalRefunds: number;
-      totalVoids: number;
+      clock_out_id?: string;
+      total_sales?: number;
+      total_transactions?: number;
+      total_refunds?: number;
+      total_voids?: number;
       notes?: string;
     }
   ): void {
-    const cashVariance = endData.finalCashDrawer - endData.expectedCashDrawer;
     const now = new Date();
 
     this.db
       .update(schema.shifts)
       .set({
-        endTime: endData.endTime,
+        clock_out_id: endData.clock_out_id ?? undefined,
         status: "ended",
-        finalCashDrawer: endData.finalCashDrawer,
-        expectedCashDrawer: endData.expectedCashDrawer,
-        cashVariance,
-        totalSales: endData.totalSales,
-        totalTransactions: endData.totalTransactions,
-        totalRefunds: endData.totalRefunds,
-        totalVoids: endData.totalVoids,
+        total_sales: endData.total_sales ?? undefined,
+        total_transactions: endData.total_transactions ?? undefined,
+        total_refunds: endData.total_refunds ?? undefined,
+        total_voids: endData.total_voids ?? undefined,
         notes: endData.notes ?? null,
         updatedAt: now,
       })
@@ -214,21 +217,37 @@ export class ShiftManager {
     yesterday.setDate(yesterday.getDate() - 1);
     yesterday.setHours(6, 0, 0, 0);
 
+    // Get shifts with clock events to filter by start time
     const shifts = this.db
-      .select()
+      .select({
+        shift: schema.shifts,
+        clockInTimestamp: schema.clockEvents.timestamp,
+      })
       .from(schema.shifts)
+      .leftJoin(
+        schema.clockEvents,
+        eq(schema.shifts.clock_in_id, schema.clockEvents.id)
+      )
       .where(
         and(
-          eq(schema.shifts.cashierId, cashierId),
-          eq(schema.shifts.status, "active"),
-          drizzleSql`${schema.shifts.startTime} >= ${yesterday.toISOString()}`
+          eq(schema.shifts.user_id, cashierId),
+          eq(schema.shifts.status, "active")
         )
       )
-      .orderBy(desc(schema.shifts.startTime))
-      .limit(1)
-      .all();
+      .orderBy(desc(schema.shifts.createdAt))
+      .all()
+      .filter((item) => {
+        if (!item.clockInTimestamp) return false;
+        const clockInMs =
+          typeof item.clockInTimestamp === "number"
+            ? item.clockInTimestamp
+            : item.clockInTimestamp instanceof Date
+            ? item.clockInTimestamp.getTime()
+            : new Date(item.clockInTimestamp as string).getTime();
+        return new Date(clockInMs) >= yesterday;
+      });
 
-    return shifts.length > 0 ? (shifts[0] as Shift) : null;
+    return shifts.length > 0 ? (shifts[0].shift as Shift) : null;
   }
 
   /**
@@ -340,7 +359,7 @@ export class ShiftManager {
           .set({
             status: "ended",
             notes: shift.notes ? `${shift.notes}; ${closeReason}` : closeReason,
-            updated_at: now,
+            updatedAt: now,
           })
           .where(eq(schema.shifts.id, shift.id))
           .run();
@@ -480,7 +499,7 @@ export class ShiftManager {
           .set({
             status: "ended",
             notes: shift.notes ? `${shift.notes}; ${closeReason}` : closeReason,
-            updated_at: now,
+            updatedAt: now,
           })
           .where(eq(schema.shifts.id, shift.id))
           .run();
@@ -549,16 +568,28 @@ export class ShiftManager {
       )
       .get();
 
-    // Get shift start time for average calculation
-    const shift = this.db
-      .select({ startTime: schema.shifts.startTime })
+    // Get shift start time from clock event for average calculation
+    const shiftWithClockIn = this.db
+      .select({
+        clockInTimestamp: schema.clockEvents.timestamp,
+      })
       .from(schema.shifts)
+      .leftJoin(
+        schema.clockEvents,
+        eq(schema.shifts.clock_in_id, schema.clockEvents.id)
+      )
       .where(eq(schema.shifts.id, shiftId))
       .get();
 
     let averagePerHour = 0;
-    if (shift) {
-      const shiftStart = new Date(shift.startTime);
+    if (shiftWithClockIn?.clockInTimestamp) {
+      const clockInMs =
+        typeof shiftWithClockIn.clockInTimestamp === "number"
+          ? shiftWithClockIn.clockInTimestamp
+          : shiftWithClockIn.clockInTimestamp instanceof Date
+          ? shiftWithClockIn.clockInTimestamp.getTime()
+          : new Date(shiftWithClockIn.clockInTimestamp as string).getTime();
+      const shiftStart = new Date(clockInMs);
       const hoursWorked = Math.max(
         (now.getTime() - shiftStart.getTime()) / (1000 * 60 * 60),
         0.1
@@ -606,10 +637,11 @@ export class ShiftManager {
       ? `${shift.notes} | Manager Reconciliation: ${reconciliationNote}`
       : reconciliationNote;
 
+    // Note: shifts table doesn't have finalCashDrawer field
+    // Cash drawer counts are stored in cash_drawer_counts table
     this.db
       .update(schema.shifts)
       .set({
-        finalCashDrawer: reconciliationData.actualCashDrawer,
         notes: updatedNotes,
         updatedAt: new Date(),
       })
@@ -626,13 +658,12 @@ export class ShiftManager {
       .from(schema.shifts)
       .where(
         and(
-          eq(schema.shifts.businessId, businessId),
+          eq(schema.shifts.business_id, businessId),
           eq(schema.shifts.status, "ended"),
-          drizzleSql`${schema.shifts.notes} LIKE '%Auto-ended%'`,
-          drizzleSql`${schema.shifts.notes} LIKE '%Requires manager approval%'`
+          drizzleSql`${schema.shifts.notes} LIKE '%Auto-ended%' OR ${schema.shifts.notes} LIKE '%Auto-closed%'`
         )
       )
-      .orderBy(desc(schema.shifts.endTime))
+      .orderBy(desc(schema.shifts.updatedAt))
       .all() as Shift[];
   }
 }

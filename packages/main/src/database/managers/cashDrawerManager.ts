@@ -19,21 +19,24 @@ export class CashDrawerManager {
     countData: Omit<CashDrawerCount, "id" | "createdAt">
   ): CashDrawerCount {
     const countId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     this.db
       .insert(schema.cashDrawerCounts)
       .values({
         id: countId,
-        shiftId: countData.shiftId,
-        businessId: countData.businessId,
-        countType: countData.countType,
-        expectedAmount: countData.expectedAmount,
-        countedAmount: countData.countedAmount,
+        shift_id: countData.shift_id,
+        business_id: countData.business_id,
+        count_type: countData.count_type,
+        expected_amount: countData.expected_amount,
+        counted_amount: countData.counted_amount,
         variance: countData.variance,
         notes: countData.notes ?? null,
-        countedBy: countData.countedBy,
-        timestamp: countData.timestamp,
+        counted_by: countData.counted_by,
+        timestamp:
+          countData.timestamp instanceof Date
+            ? countData.timestamp
+            : new Date(countData.timestamp),
         createdAt: now,
       })
       .run();
@@ -65,7 +68,7 @@ export class CashDrawerManager {
     return this.db
       .select()
       .from(schema.cashDrawerCounts)
-      .where(eq(schema.cashDrawerCounts.shiftId, shiftId))
+      .where(eq(schema.cashDrawerCounts.shift_id, shiftId))
       .orderBy(desc(schema.cashDrawerCounts.timestamp))
       .all() as CashDrawerCount[];
   }
@@ -77,7 +80,7 @@ export class CashDrawerManager {
     const count = this.db
       .select()
       .from(schema.cashDrawerCounts)
-      .where(eq(schema.cashDrawerCounts.shiftId, shiftId))
+      .where(eq(schema.cashDrawerCounts.shift_id, shiftId))
       .orderBy(desc(schema.cashDrawerCounts.timestamp))
       .limit(1)
       .get();
@@ -112,12 +115,15 @@ export class CashDrawerManager {
       // Use actual counted amount
       const expectedAtCountTime = this.getExpectedCashForShift(shiftId);
       const variance =
-        latestCount.countedAmount - expectedAtCountTime.expectedAmount;
+        latestCount.counted_amount - expectedAtCountTime.expectedAmount;
 
       return {
-        amount: latestCount.countedAmount,
+        amount: latestCount.counted_amount,
         isEstimated: false,
-        lastCountTime: latestCount.timestamp,
+        lastCountTime:
+          latestCount.timestamp instanceof Date
+            ? latestCount.timestamp.toISOString()
+            : new Date(latestCount.timestamp).toISOString(),
         variance: variance,
       };
     } else {
@@ -192,13 +198,13 @@ export class CashDrawerManager {
       }
     });
 
-    const expectedAmount =
-      shift.startingCash + cashSales - cashRefunds - cashVoids;
+    const startingCash = shift.starting_cash ?? 0;
+    const expectedAmount = startingCash + cashSales - cashRefunds - cashVoids;
 
     return {
       expectedAmount,
       breakdown: {
-        startingCash: shift.startingCash,
+        startingCash: startingCash,
         cashSales,
         cashRefunds,
         cashVoids,

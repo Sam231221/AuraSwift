@@ -7,11 +7,11 @@
 
 import type { DrizzleDB } from "../drizzle.js";
 import type { UserPermission, NewUserPermission } from "../schema.js";
-import { eq, and, desc, sql, or } from "drizzle-orm";
+import { eq, and, desc, sql, or, isNull } from "drizzle-orm";
 import * as schema from "../schema.js";
 
-import { getLogger } from '../../utils/logger.js';
-const logger = getLogger('userPermissionManager');
+import { getLogger } from "../../utils/logger.js";
+const logger = getLogger("userPermissionManager");
 
 export class UserPermissionManager {
   private db: DrizzleDB;
@@ -151,7 +151,7 @@ export class UserPermissionManager {
     if (!includeExpired) {
       conditions.push(
         or(
-          eq(schema.userPermissions.expiresAt, null),
+          isNull(schema.userPermissions.expiresAt),
           sql`${schema.userPermissions.expiresAt} > ${new Date().getTime()}`
         )!
       );
@@ -235,14 +235,14 @@ export class UserPermissionManager {
   /**
    * Grant temporary permission (with expiration)
    */
-  grantTemporaryPermission(
+  async grantTemporaryPermission(
     userId: string,
     permission: string,
     expiresAt: Date,
     grantedBy?: string,
     reason?: string
-  ): UserPermission {
-    return this.grantPermission(
+  ): Promise<UserPermission> {
+    return await this.grantPermission(
       userId,
       permission,
       grantedBy,

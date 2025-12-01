@@ -32,44 +32,41 @@ export class AuditManager {
     const auditId = this.uuid.v4();
     const now = new Date();
 
+    // Validate userId is provided
+    if (!data.userId) {
+      throw new Error("userId is required for audit log");
+    }
+
     this.db
       .insert(schema.auditLogs)
       .values({
         id: auditId,
         action: data.action,
         resource: data.entityType, // Store in resource for backward compatibility
-        resourceId: data.entityId, // Store in resourceId for backward compatibility
-        entityType: data.entityType,
-        entityId: data.entityId,
-        userId: data.userId,
+        resource_id: data.entityId, // Store in resource_id for backward compatibility
+        entity_type: data.entityType,
+        entity_id: data.entityId,
+        user_id: data.userId,
         details:
           typeof data.details === "string"
             ? data.details
             : JSON.stringify(data.details),
-        ipAddress: data.ipAddress ?? null,
-        terminalId: data.terminalId ?? null,
+        ip_address: data.ipAddress ?? null,
+        terminal_id: data.terminalId ?? null,
         timestamp: now, // Use Date object for timestamp_ms mode
         createdAt: now,
       })
       .run();
 
-    return {
-      id: auditId,
-      action: data.action,
-      resource: data.entityType, // Add resource for compatibility
-      resourceId: data.entityId, // Add resourceId for compatibility
-      entityType: data.entityType,
-      entityId: data.entityId,
-      userId: data.userId,
-      details:
-        typeof data.details === "string"
-          ? data.details
-          : JSON.stringify(data.details),
-      ipAddress: data.ipAddress ?? null,
-      terminalId: data.terminalId ?? null,
-      timestamp: now.toISOString(),
-      createdAt: now,
-    };
+    // Retrieve the created audit log to return proper type
+    const [created] = this.db
+      .select()
+      .from(schema.auditLogs)
+      .where(eq(schema.auditLogs.id, auditId))
+      .limit(1)
+      .all();
+
+    return created as schema.AuditLog;
   }
 
   /**
@@ -255,8 +252,8 @@ export class AuditManager {
       .from(schema.auditLogs)
       .where(
         and(
-          eq(schema.auditLogs.entityType, entityType),
-          eq(schema.auditLogs.entityId, entityId)
+          eq(schema.auditLogs.entity_type, entityType),
+          eq(schema.auditLogs.entity_id, entityId)
         )
       )
       .orderBy(desc(schema.auditLogs.timestamp))
@@ -271,7 +268,7 @@ export class AuditManager {
     return this.db
       .select()
       .from(schema.auditLogs)
-      .where(eq(schema.auditLogs.userId, userId))
+      .where(eq(schema.auditLogs.user_id, userId))
       .orderBy(desc(schema.auditLogs.timestamp))
       .limit(limit)
       .all() as schema.AuditLog[];
@@ -299,13 +296,15 @@ export class AuditManager {
     entityType?: string,
     limit: number = 100
   ): schema.AuditLog[] {
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
     const conditions = [
-      gte(schema.auditLogs.timestamp, startDate),
-      lte(schema.auditLogs.timestamp, endDate),
+      gte(schema.auditLogs.timestamp, startDateObj),
+      lte(schema.auditLogs.timestamp, endDateObj),
     ];
 
     if (entityType) {
-      conditions.push(eq(schema.auditLogs.entityType, entityType));
+      conditions.push(eq(schema.auditLogs.entity_type, entityType));
     }
 
     return this.db
@@ -329,7 +328,7 @@ export class AuditManager {
         auditLog: schema.auditLogs,
       })
       .from(schema.auditLogs)
-      .innerJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
+      .innerJoin(schema.users, eq(schema.auditLogs.user_id, schema.users.id))
       .where(
         and(
           eq(schema.users.businessId, businessId),
@@ -354,17 +353,19 @@ export class AuditManager {
     startDate: string,
     endDate: string
   ): schema.AuditLog[] {
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
     const results = this.db
       .select({
         auditLog: schema.auditLogs,
       })
       .from(schema.auditLogs)
-      .innerJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
+      .innerJoin(schema.users, eq(schema.auditLogs.user_id, schema.users.id))
       .where(
         and(
           eq(schema.users.businessId, businessId),
-          gte(schema.auditLogs.timestamp, startDate),
-          lte(schema.auditLogs.timestamp, endDate)
+          gte(schema.auditLogs.timestamp, startDateObj),
+          lte(schema.auditLogs.timestamp, endDateObj)
         )
       )
       .orderBy(desc(schema.auditLogs.timestamp))
@@ -379,11 +380,10 @@ export class AuditManager {
   async cleanupOldAuditLogs(daysToKeep: number = 365): Promise<number> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
-    const cutoffIso = cutoffDate.toISOString();
 
     const result = this.db
       .delete(schema.auditLogs)
-      .where(drizzleSql`${schema.auditLogs.timestamp} < ${cutoffIso}`)
+      .where(drizzleSql`${schema.auditLogs.timestamp} < ${cutoffDate.getTime()}`)
       .run();
 
     return result.changes || 0;

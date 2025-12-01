@@ -27,40 +27,87 @@ export class TimeTrackingManager {
    */
   async createClockEvent(data: {
     userId: string;
-    businessId: string; // ✅ REQUIRED: business_id is NOT NULL in schema
+    businessId: string;
     terminalId: string;
     locationId?: string;
-    scheduleId?: string; // ✅ NEW: Link to schedule
+    scheduleId?: string;
     type: "in" | "out";
     method?: "login" | "manual" | "auto" | "manager";
     geolocation?: string;
     ipAddress?: string;
     notes?: string;
+    auditManager?: any; // Optional audit manager for logging
   }): Promise<ClockEvent> {
     const eventId = this.uuid.v4();
     const now = new Date();
 
-    const clockEvent: ClockEvent = {
+    const clockEvent = {
       id: eventId,
-      userId: data.userId,
-      businessId: data.businessId, // ✅ REQUIRED: business_id is NOT NULL
-      terminalId: data.terminalId,
-      locationId: data.locationId ?? null,
-      scheduleId: data.scheduleId ?? null, // ✅ NEW: Link to schedule
+      user_id: data.userId,
+      business_id: data.businessId, // ✅ REQUIRED: business_id is NOT NULL
+      terminal_id: data.terminalId,
+      location_id: data.locationId ?? null,
+      schedule_id: data.scheduleId ?? null, // ✅ NEW: Link to schedule
       type: data.type,
-      timestamp: now.toISOString(),
+      timestamp: now, // Use Date object for timestamp_ms mode
       method: data.method || "manual",
-      status: "confirmed",
+      status: "confirmed" as const,
       geolocation: data.geolocation ?? null,
-      ipAddress: data.ipAddress ?? null,
+      ip_address: data.ipAddress ?? null,
       notes: data.notes ?? null,
       createdAt: now,
       updatedAt: now,
     };
 
+    // Validate clock event data
+    const { shiftDataValidator } = await import(
+      "../../utils/shiftDataValidator.js"
+    );
+    const validation = shiftDataValidator.validateClockEvent(clockEvent);
+    if (!validation.valid) {
+      const logger = (await import("../../utils/logger.js")).getLogger(
+        "timeTrackingManager"
+      );
+      logger.warn(
+        `[createClockEvent] Clock event validation warnings: ${validation.warnings.join(
+          ", "
+        )}`
+      );
+    }
+
     this.db.insert(schema.clockEvents).values(clockEvent).run();
 
-    return clockEvent;
+    // Retrieve the created event to return proper ClockEvent type
+    const [created] = this.db
+      .select()
+      .from(schema.clockEvents)
+      .where(eq(schema.clockEvents.id, eventId))
+      .limit(1)
+      .all();
+
+    // Audit log clock event
+    if (data.auditManager) {
+      try {
+        await data.auditManager.logClockEvent(
+          data.type === "in" ? "clock_in" : "clock_out",
+          created as ClockEvent,
+          data.userId,
+          data.terminalId,
+          data.ipAddress,
+          {
+            scheduleId: data.scheduleId,
+            method: data.method || "manual",
+          }
+        );
+      } catch (error) {
+        const logger = (await import("../../utils/logger.js")).getLogger(
+          "timeTrackingManager"
+        );
+        logger.error("[createClockEvent] Failed to audit log:", error);
+      }
+    }
+
+    return created as ClockEvent;
   }
 
   /**
@@ -84,7 +131,7 @@ export class TimeTrackingManager {
     return this.db
       .select()
       .from(schema.clockEvents)
-      .where(eq(schema.clockEvents.userId, userId))
+      .where(eq(schema.clockEvents.user_id, userId))
       .orderBy(desc(schema.clockEvents.timestamp))
       .limit(limit)
       .all() as ClockEvent[];
@@ -105,7 +152,7 @@ export class TimeTrackingManager {
       )
       .where(
         and(
-          eq(schema.clockEvents.userId, userId),
+          eq(schema.clockEvents.user_id, userId),
           eq(schema.clockEvents.type, "in"),
           drizzleSql`(${schema.shifts.clock_out_id} IS NULL OR ${schema.shifts.status} = 'active')`
         )
@@ -128,7 +175,7 @@ export class TimeTrackingManager {
     clockInId: string;
     scheduleId?: string;
     notes?: string;
-  }): Promise<TimeShift> {
+  }): Promise<Shift> {
     const shiftId = this.uuid.v4();
 
     this.db
@@ -144,39 +191,32 @@ export class TimeTrackingManager {
         total_hours: null,
         regular_hours: null,
         overtime_hours: null,
-        break_duration: null,
+        break_duration_seconds: 0, // Initialize to 0, will be calculated on shift completion
         notes: data.notes || null,
       })
       .run();
 
-    return {
-      id: shiftId,
-      userId: data.userId,
-      businessId: data.businessId,
-      clockInId: data.clockInId,
-      clockOutId: null,
-      scheduleId: data.scheduleId ?? null,
-      status: "active",
-      totalHours: null,
-      regularHours: null,
-      overtimeHours: null,
-      breakDuration: null,
-      notes: data.notes ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    // Retrieve the created shift to return proper Shift type
+    const [created] = this.db
+      .select()
+      .from(schema.shifts)
+      .where(eq(schema.shifts.id, shiftId))
+      .limit(1)
+      .all();
+
+    return created as Shift;
   }
 
   /**
    * Complete a shift by adding clock-out event
    */
-  async completeShift(shiftId: string, clockOutId: string): Promise<TimeShift> {
+  async completeShift(shiftId: string, clockOutId: string): Promise<Shift> {
     const shift = this.getShiftById(shiftId);
     if (!shift) {
       throw new Error("Shift not found");
     }
 
-    const clockIn = this.getClockEventById(shift.clockInId);
+    const clockIn = this.getClockEventById(shift.clock_in_id);
     const clockOut = this.getClockEventById(clockOutId);
 
     if (!clockIn || !clockOut) {
@@ -188,9 +228,21 @@ export class TimeTrackingManager {
     const endTime = new Date(clockOut.timestamp).getTime();
     const totalMinutes = (endTime - startTime) / (1000 * 60);
 
-    // Get total break duration
+    // Check for active breaks before completing shift
+    const activeBreak = this.getActiveBreak(shiftId);
+    if (activeBreak) {
+      throw new Error(
+        "Cannot clock out: active break in progress. Please end break first."
+      );
+    }
+
+    // Get total break duration (in seconds)
     const breaks = this.getBreaksByShift(shiftId);
-    const breakMinutes = breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
+    // Sum all completed breaks' duration_seconds
+    const breakSeconds = breaks
+      .filter((b) => b.status === "completed" && b.duration_seconds)
+      .reduce((sum, b) => sum + (b.duration_seconds || 0), 0);
+    const breakMinutes = breakSeconds / 60;
 
     // Calculate working hours (excluding breaks)
     const workingMinutes = totalMinutes - breakMinutes;
@@ -200,26 +252,85 @@ export class TimeTrackingManager {
     const regularHours = Math.min(totalHours, 8);
     const overtimeHours = Math.max(0, totalHours - 8);
 
+    const updatedShift = {
+      clock_out_id: clockOutId,
+      status: "ended" as const,
+      total_hours: totalHours,
+      regular_hours: regularHours,
+      overtime_hours: overtimeHours,
+      break_duration_seconds: breakSeconds,
+    };
+
+    // Validate shift status transition
+    const { shiftDataValidator } = await import(
+      "../../utils/shiftDataValidator.js"
+    );
+    const statusValidation = shiftDataValidator.validateShiftStatusTransition(
+      shift.status,
+      "ended"
+    );
+    if (!statusValidation.valid) {
+      throw new Error(
+        `Invalid shift status transition: ${statusValidation.errors.join(", ")}`
+      );
+    }
+
+    // Validate break duration matches sum of breaks
+    const breakDurationValidation =
+      shiftDataValidator.validateShiftBreakDuration(
+        { ...shift, ...updatedShift } as Shift,
+        breaks
+      );
+    if (breakDurationValidation.warnings.length > 0) {
+      const logger = (await import("../../utils/logger.js")).getLogger(
+        "timeTrackingManager"
+      );
+      logger.warn(
+        `[completeShift] Break duration validation warnings: ${breakDurationValidation.warnings.join(
+          ", "
+        )}`
+      );
+    }
+
     this.db
       .update(schema.shifts)
-      .set({
-        clock_out_id: clockOutId,
-        status: "completed",
-        total_hours: totalHours,
-        regular_hours: regularHours,
-        overtime_hours: overtimeHours,
-        break_duration: breakMinutes,
-      })
+      .set(updatedShift)
       .where(eq(schema.shifts.id, shiftId))
       .run();
 
-    return this.getShiftById(shiftId)!;
+    const completedShift = this.getShiftById(shiftId)!;
+
+    // Audit log shift completion
+    try {
+      const { getDatabase } = await import("../index.js");
+      const dbInstance = await getDatabase();
+      await dbInstance.audit.createAuditLog({
+        action: "shift_completed",
+        entityType: "shift",
+        entityId: shiftId,
+        userId: shift.user_id,
+        details: {
+          totalHours,
+          regularHours,
+          overtimeHours,
+          breakDurationSeconds: breakSeconds,
+          breakCount: breaks.filter((b) => b.status === "completed").length,
+        },
+      });
+    } catch (error) {
+      const logger = (await import("../../utils/logger.js")).getLogger(
+        "timeTrackingManager"
+      );
+      logger.error("[completeShift] Failed to audit log:", error);
+    }
+
+    return completedShift;
   }
 
   /**
    * Get shift by ID
    */
-  getShiftById(shiftId: string): TimeShift | undefined {
+  getShiftById(shiftId: string): Shift | undefined {
     const [shift] = this.db
       .select()
       .from(schema.shifts)
@@ -227,13 +338,13 @@ export class TimeTrackingManager {
       .limit(1)
       .all();
 
-    return shift as TimeShift | undefined;
+    return shift as Shift | undefined;
   }
 
   /**
    * Get active shift for user
    */
-  getActiveShift(userId: string): TimeShift | undefined {
+  getActiveShift(userId: string): Shift | undefined {
     const [shift] = this.db
       .select()
       .from(schema.shifts)
@@ -247,20 +358,20 @@ export class TimeTrackingManager {
       .limit(1)
       .all();
 
-    return shift as TimeShift | undefined;
+    return shift as Shift | undefined;
   }
 
   /**
    * Get all shifts for a user
    */
-  getShiftsByUser(userId: string, limit: number = 50): TimeShift[] {
+  getShiftsByUser(userId: string, limit: number = 50): Shift[] {
     return this.db
       .select()
       .from(schema.shifts)
       .where(eq(schema.shifts.user_id, userId))
-      .orderBy(desc(schema.shifts.created_at))
+      .orderBy(desc(schema.shifts.createdAt))
       .limit(limit)
-      .all() as TimeShift[];
+      .all() as Shift[];
   }
 
   /**
@@ -270,7 +381,9 @@ export class TimeTrackingManager {
     businessId: string,
     startDate: string,
     endDate: string
-  ): TimeShift[] {
+  ): Shift[] {
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
     const results = this.db
       .select({
         shift: schema.shifts,
@@ -283,14 +396,14 @@ export class TimeTrackingManager {
       .where(
         and(
           eq(schema.shifts.business_id, businessId),
-          gte(schema.clockEvents.timestamp, startDate),
-          lte(schema.clockEvents.timestamp, endDate)
+          gte(schema.clockEvents.timestamp, startDateObj),
+          lte(schema.clockEvents.timestamp, endDateObj)
         )
       )
       .orderBy(desc(schema.clockEvents.timestamp))
       .all();
 
-    return results.map((r) => r.shift) as TimeShift[];
+    return results.map((r) => r.shift) as Shift[];
   }
 
   // ============= Breaks =============
@@ -301,12 +414,29 @@ export class TimeTrackingManager {
   async startBreak(data: {
     shiftId: string;
     userId: string;
+    businessId: string; // Required for breaks table
     type?: "meal" | "rest" | "other";
     isPaid?: boolean;
     notes?: string;
   }): Promise<Break> {
     const breakId = this.uuid.v4();
-    const now = new Date().toISOString();
+    const now = new Date();
+
+    // Verify shift exists and is active
+    const shift = this.getShiftById(data.shiftId);
+    if (!shift) {
+      throw new Error("Shift not found");
+    }
+
+    // Validate shift belongs to user
+    if (shift.user_id !== data.userId) {
+      throw new Error("Cannot start break: Shift does not belong to this user");
+    }
+
+    // Validate shift is active
+    if (shift.status !== "active") {
+      throw new Error("Cannot start break: shift is not active");
+    }
 
     // Check if there's already an active break
     const activeBreak = this.getActiveBreak(data.shiftId);
@@ -314,21 +444,77 @@ export class TimeTrackingManager {
       throw new Error("There is already an active break for this shift");
     }
 
-    this.db
-      .insert(schema.breaks)
-      .values({
-        id: breakId,
-        shiftId: data.shiftId,
-        userId: data.userId,
-        type: data.type || "rest",
-        startTime: now,
-        endTime: null,
-        duration: null,
-        isPaid: data.isPaid || false,
-        status: "active",
-        notes: data.notes ?? null,
-      })
-      .run();
+    // Check break compliance requirements
+    const { breakComplianceValidator } = await import(
+      "../../utils/breakComplianceValidator.js"
+    );
+    const { getDatabase } = await import("../index.js");
+    const db = await getDatabase();
+    const compliance = await breakComplianceValidator.validateBreakStart(
+      shift as any,
+      data.type || "rest",
+      db
+    );
+
+    // Log warnings but don't block break
+    if (compliance.warnings.length > 0) {
+      const logger = (await import("../../utils/logger.js")).getLogger(
+        "timeTrackingManager"
+      );
+      logger.warn(
+        `[startBreak] Break compliance warnings for shift ${
+          data.shiftId
+        }: ${compliance.warnings.join(", ")}`
+      );
+    }
+
+    // Determine if break is required and minimum duration
+    const breakRequirement =
+      await breakComplianceValidator.checkBreakRequirement(shift as any, db);
+
+    const breakRecord = {
+      id: breakId,
+      shift_id: data.shiftId,
+      user_id: data.userId,
+      business_id: data.businessId,
+      type: data.type || "rest",
+      start_time: now,
+      end_time: null,
+      duration_seconds: null,
+      is_paid: data.isPaid || false,
+      status: "active" as const,
+      is_required: breakRequirement.requiresBreak,
+      required_reason: breakRequirement.requiresBreak
+        ? breakRequirement.reason
+        : null,
+      minimum_duration_seconds: breakRequirement.minimumDurationSeconds,
+      notes: data.notes ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Validate break data before inserting
+    const { shiftDataValidator } = await import(
+      "../../utils/shiftDataValidator.js"
+    );
+    const validation = shiftDataValidator.validateBreak(breakRecord as Break);
+    if (!validation.valid) {
+      throw new Error(
+        `Break validation failed: ${validation.errors.join(", ")}`
+      );
+    }
+    if (validation.warnings.length > 0) {
+      const logger = (await import("../../utils/logger.js")).getLogger(
+        "timeTrackingManager"
+      );
+      logger.warn(
+        `[startBreak] Break validation warnings: ${validation.warnings.join(
+          ", "
+        )}`
+      );
+    }
+
+    this.db.insert(schema.breaks).values(breakRecord).run();
 
     // Retrieve the created break
     const [created] = this.db
@@ -337,6 +523,29 @@ export class TimeTrackingManager {
       .where(eq(schema.breaks.id, breakId))
       .limit(1)
       .all();
+
+    // Audit log break start
+    try {
+      await db.audit.createAuditLog({
+        action: "break_started",
+        entityType: "break",
+        entityId: breakId,
+        userId: data.userId,
+        details: {
+          shiftId: data.shiftId,
+          breakType: data.type || "rest",
+          isRequired: breakRequirement.requiresBreak,
+          requiredReason: breakRequirement.reason,
+          minimumDurationSeconds: breakRequirement.minimumDurationSeconds,
+          complianceWarnings: compliance.warnings,
+        },
+      });
+    } catch (error) {
+      const logger = (await import("../../utils/logger.js")).getLogger(
+        "timeTrackingManager"
+      );
+      logger.error("[startBreak] Failed to audit log:", error);
+    }
 
     return created as Break;
   }
@@ -354,22 +563,117 @@ export class TimeTrackingManager {
       throw new Error("Break is not active");
     }
 
-    const now = new Date().toISOString();
-    const startTime = new Date(breakRecord.startTime).getTime();
-    const endTime = new Date(now).getTime();
-    const duration = Math.floor((endTime - startTime) / (1000 * 60)); // Duration in minutes
+    // Get shift for compliance validation
+    const shift = this.getShiftById(breakRecord.shift_id);
+    if (!shift) {
+      throw new Error("Shift not found for break");
+    }
+
+    const now = new Date();
+    // Handle both Date and number (timestamp_ms) formats
+    const startTimeMs =
+      typeof breakRecord.start_time === "number"
+        ? breakRecord.start_time
+        : breakRecord.start_time instanceof Date
+        ? breakRecord.start_time.getTime()
+        : new Date(breakRecord.start_time as string).getTime();
+    const endTimeMs = now.getTime();
+    const duration_seconds = Math.floor((endTimeMs - startTimeMs) / 1000); // Duration in seconds
+
+    // Validate break compliance
+    const { breakComplianceValidator } = await import(
+      "../../utils/breakComplianceValidator.js"
+    );
+    const compliance = breakComplianceValidator.validateBreakEnd(
+      breakRecord,
+      shift as any
+    );
+
+    // Log violations and warnings
+    const logger = (await import("../../utils/logger.js")).getLogger(
+      "timeTrackingManager"
+    );
+    if (compliance.violations.length > 0) {
+      logger.warn(
+        `[endBreak] Break compliance violations for break ${breakId}: ${compliance.violations.join(
+          ", "
+        )}`
+      );
+    }
+    if (compliance.warnings.length > 0) {
+      logger.info(
+        `[endBreak] Break compliance warnings for break ${breakId}: ${compliance.warnings.join(
+          ", "
+        )}`
+      );
+    }
+
+    // Determine if break was too short
+    const isShort =
+      breakRecord.is_required &&
+      breakRecord.minimum_duration_seconds &&
+      duration_seconds < breakRecord.minimum_duration_seconds;
+
+    const updatedBreak = {
+      end_time: now,
+      duration_seconds,
+      status: "completed" as const,
+      is_short: isShort ? true : isShort === false ? false : null,
+    };
+
+    // Validate updated break data
+    const { shiftDataValidator } = await import(
+      "../../utils/shiftDataValidator.js"
+    );
+    const updatedBreakRecord = {
+      ...breakRecord,
+      ...updatedBreak,
+    } as Break;
+    const validation = shiftDataValidator.validateBreak(updatedBreakRecord);
+    if (!validation.valid) {
+      throw new Error(
+        `Break validation failed: ${validation.errors.join(", ")}`
+      );
+    }
+    if (validation.warnings.length > 0) {
+      logger.warn(
+        `[endBreak] Break validation warnings: ${validation.warnings.join(
+          ", "
+        )}`
+      );
+    }
 
     this.db
       .update(schema.breaks)
-      .set({
-        endTime: now,
-        duration,
-        status: "completed",
-      })
+      .set(updatedBreak)
       .where(eq(schema.breaks.id, breakId))
       .run();
 
-    return this.getBreakById(breakId)!;
+    const finalBreak = this.getBreakById(breakId)!;
+
+    // Audit log break end
+    try {
+      const { getDatabase } = await import("../index.js");
+      const db = await getDatabase();
+      await db.audit.createAuditLog({
+        action: "break_ended",
+        entityType: "break",
+        entityId: breakId,
+        userId: breakRecord.user_id,
+        details: {
+          shiftId: breakRecord.shift_id,
+          breakType: breakRecord.type,
+          durationSeconds: duration_seconds,
+          isShort,
+          complianceViolations: compliance.violations,
+          complianceWarnings: compliance.warnings,
+        },
+      });
+    } catch (error) {
+      logger.error("[endBreak] Failed to audit log:", error);
+    }
+
+    return finalBreak;
   }
 
   /**
@@ -387,7 +691,7 @@ export class TimeTrackingManager {
 
     return {
       ...result,
-      isPaid: Boolean(result.isPaid),
+      is_paid: Boolean(result.is_paid),
     } as Break;
   }
 
@@ -400,7 +704,7 @@ export class TimeTrackingManager {
       .from(schema.breaks)
       .where(
         and(
-          eq(schema.breaks.shiftId, shiftId),
+          eq(schema.breaks.shift_id, shiftId),
           eq(schema.breaks.status, "active")
         )
       )
@@ -411,7 +715,7 @@ export class TimeTrackingManager {
 
     return {
       ...result,
-      isPaid: Boolean(result.isPaid),
+      is_paid: Boolean(result.is_paid),
     } as Break;
   }
 
@@ -422,13 +726,13 @@ export class TimeTrackingManager {
     const results = this.db
       .select()
       .from(schema.breaks)
-      .where(eq(schema.breaks.shiftId, shiftId))
-      .orderBy(schema.breaks.startTime)
+      .where(eq(schema.breaks.shift_id, shiftId))
+      .orderBy(schema.breaks.start_time)
       .all();
 
     return results.map((result) => ({
       ...result,
-      isPaid: Boolean(result.isPaid),
+      is_paid: Boolean(result.is_paid),
     })) as Break[];
   }
 
@@ -439,14 +743,14 @@ export class TimeTrackingManager {
     const results = this.db
       .select()
       .from(schema.breaks)
-      .where(eq(schema.breaks.userId, userId))
-      .orderBy(desc(schema.breaks.startTime))
+      .where(eq(schema.breaks.user_id, userId))
+      .orderBy(desc(schema.breaks.start_time))
       .limit(limit)
       .all();
 
     return results.map((result) => ({
       ...result,
-      isPaid: Boolean(result.isPaid),
+      is_paid: Boolean(result.is_paid),
     })) as Break[];
   }
 
@@ -457,6 +761,7 @@ export class TimeTrackingManager {
    */
   async requestTimeCorrection(data: {
     userId: string;
+    businessId: string;
     clockEventId?: string;
     shiftId?: string;
     correctionType: "clock_time" | "break_time" | "manual_entry";
@@ -466,30 +771,30 @@ export class TimeTrackingManager {
     requestedBy: string;
   }): Promise<TimeCorrection> {
     const correctionId = this.uuid.v4();
-    const now = new Date().toISOString();
 
-    // Calculate time difference in minutes
-    let timeDifference = 0;
+    // Calculate time difference in seconds
+    let timeDifferenceSeconds = 0;
     if (data.originalTime) {
       const original = new Date(data.originalTime).getTime();
       const corrected = new Date(data.correctedTime).getTime();
-      timeDifference = Math.floor((corrected - original) / (1000 * 60));
+      timeDifferenceSeconds = Math.floor((corrected - original) / 1000);
     }
 
     this.db
       .insert(schema.timeCorrections)
       .values({
         id: correctionId,
-        userId: data.userId,
-        clockEventId: data.clockEventId ?? null,
-        shiftId: data.shiftId ?? null,
-        correctionType: data.correctionType,
-        originalTime: data.originalTime ?? null,
-        correctedTime: data.correctedTime,
-        timeDifference,
+        user_id: data.userId,
+        business_id: data.businessId,
+        clock_event_id: data.clockEventId ?? null,
+        shift_id: data.shiftId ?? null,
+        correction_type: data.correctionType,
+        original_time: data.originalTime ? new Date(data.originalTime) : null,
+        corrected_time: new Date(data.correctedTime),
+        time_difference_seconds: timeDifferenceSeconds,
         reason: data.reason,
-        requestedBy: data.requestedBy,
-        approvedBy: null,
+        requested_by: data.requestedBy,
+        approved_by: null,
         status: "pending",
       })
       .run();
@@ -528,19 +833,19 @@ export class TimeTrackingManager {
       .update(schema.timeCorrections)
       .set({
         status,
-        approvedBy,
+        approved_by: approvedBy,
       })
       .where(eq(schema.timeCorrections.id, correctionId))
       .run();
 
     // If approved, apply the correction
-    if (approved && correction.clockEventId) {
+    if (approved && correction.clock_event_id) {
       this.db
         .update(schema.clockEvents)
         .set({
-          timestamp: correction.correctedTime,
+          timestamp: correction.corrected_time,
         })
-        .where(eq(schema.clockEvents.id, correction.clockEventId))
+        .where(eq(schema.clockEvents.id, correction.clock_event_id))
         .run();
     }
 
@@ -572,7 +877,7 @@ export class TimeTrackingManager {
       .from(schema.timeCorrections)
       .innerJoin(
         schema.users,
-        eq(schema.timeCorrections.userId, schema.users.id)
+        eq(schema.timeCorrections.user_id, schema.users.id)
       )
       .where(
         and(
@@ -596,7 +901,7 @@ export class TimeTrackingManager {
     return this.db
       .select()
       .from(schema.timeCorrections)
-      .where(eq(schema.timeCorrections.userId, userId))
+      .where(eq(schema.timeCorrections.user_id, userId))
       .orderBy(desc(schema.timeCorrections.createdAt))
       .limit(limit)
       .all() as TimeCorrection[];
@@ -612,7 +917,7 @@ export class TimeTrackingManager {
     const warnings: string[] = [];
 
     // Check for multiple clock-ins without clock-out
-    const activeShift = this.getActiveShift(clockEvent.userId);
+    const activeShift = this.getActiveShift(clockEvent.user_id);
     if (clockEvent.type === "in" && activeShift) {
       violations.push("User already has an active shift without clock-out");
     }
@@ -625,16 +930,16 @@ export class TimeTrackingManager {
     // Check for rapid clock events (potential buddy punching)
     const thirtySecondsAgo = new Date(
       new Date(clockEvent.timestamp).getTime() - 30000
-    ).toISOString();
+    );
 
     const recentEvents = this.db
       .select()
       .from(schema.clockEvents)
       .where(
         and(
-          eq(schema.clockEvents.terminalId, clockEvent.terminalId),
+          eq(schema.clockEvents.terminal_id, clockEvent.terminal_id),
           gte(schema.clockEvents.timestamp, thirtySecondsAgo),
-          drizzleSql`${schema.clockEvents.userId} != ${clockEvent.userId}`
+          drizzleSql`${schema.clockEvents.user_id} != ${clockEvent.user_id}`
         )
       )
       .all();
@@ -692,8 +997,8 @@ export class TimeTrackingManager {
     userId: string,
     managerId: string,
     reason: string
-  ): Promise<{ clockEvent: ClockEvent; shift: TimeShift }> {
-    const activeShift = this.getShiftById(userId);
+  ): Promise<{ clockEvent: ClockEvent; shift: Shift }> {
+    const activeShift = this.getActiveShift(userId);
     if (!activeShift) {
       throw new Error("No active shift found for user");
     }
@@ -701,7 +1006,7 @@ export class TimeTrackingManager {
     // Create clock-out event with manager method
     const clockOutEvent = await this.createClockEvent({
       userId,
-      businessId: activeShift.businessId, // ✅ REQUIRED: Get from shift
+      businessId: activeShift.business_id, // ✅ REQUIRED: Get from shift
       terminalId: "manager_override",
       type: "out",
       method: "manager",

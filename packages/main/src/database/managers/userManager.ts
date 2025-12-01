@@ -82,6 +82,7 @@ export class UserManager {
         businessName: schema.users.businessName,
         primaryRoleId: schema.users.primaryRoleId,
         shiftRequired: schema.users.shiftRequired,
+        activeRoleContext: schema.users.activeRoleContext,
         createdAt: schema.users.createdAt,
         updatedAt: schema.users.updatedAt,
         isActive: schema.users.isActive,
@@ -98,7 +99,10 @@ export class UserManager {
 
     if (!user) return null;
 
-    return user as User;
+    return {
+      ...user,
+      activeRoleContext: user.activeRoleContext ?? null,
+    } as User;
   }
 
   getUserById(id: string): User | null {
@@ -116,6 +120,7 @@ export class UserManager {
         businessName: schema.users.businessName,
         primaryRoleId: schema.users.primaryRoleId,
         shiftRequired: schema.users.shiftRequired,
+        activeRoleContext: schema.users.activeRoleContext,
         createdAt: schema.users.createdAt,
         updatedAt: schema.users.updatedAt,
         isActive: schema.users.isActive,
@@ -130,7 +135,10 @@ export class UserManager {
 
     if (!user) return null;
 
-    return user as User;
+    return {
+      ...user,
+      activeRoleContext: user.activeRoleContext ?? null,
+    } as User;
   }
 
   getUserWithBusiness(userId: string) {
@@ -175,6 +183,7 @@ export class UserManager {
         businessName: schema.users.businessName,
         primaryRoleId: schema.users.primaryRoleId,
         shiftRequired: schema.users.shiftRequired,
+        activeRoleContext: schema.users.activeRoleContext,
         createdAt: schema.users.createdAt,
         updatedAt: schema.users.updatedAt,
         isActive: schema.users.isActive,
@@ -217,7 +226,10 @@ export class UserManager {
         user.lastName
       }), role: ${user.roleName || "none"}`
     );
-    return user as User;
+    return {
+      ...user,
+      activeRoleContext: user.activeRoleContext ?? null,
+    } as User;
   }
 
   async authenticateUserByUsernamePin(
@@ -409,7 +421,6 @@ export class UserManager {
           businessName: userData.businessName,
           businessId,
           isActive: true,
-          loginAttempts: 0,
           address: "",
         })
         .run();
@@ -746,17 +757,88 @@ export class UserManager {
 
         // Auto clock-in if shift is required (cashier/manager mode)
         if (shiftRequirement.requiresShift) {
-          // ✅ NEW: Find active schedule
-          const schedule = this.scheduleManager?.findActiveScheduleForClockIn(
-            user.id
+          // Get business ID first (needed for validation)
+          const userWithBusiness = this.getUserWithBusiness(user.id);
+          if (!userWithBusiness?.businessId) {
+            logger.error(`[login] User ${user.id} has no business ID`);
+            return {
+              success: false,
+              message: "User business not found. Please contact administrator.",
+              code: "BUSINESS_NOT_FOUND",
+              requiresShift: true,
+            };
+          }
+
+          // Validate schedule using scheduleValidator (includes timing validation)
+          const { scheduleValidator } = await import(
+            "../../utils/scheduleValidator.js"
+          );
+          const scheduleValidation = await scheduleValidator.validateClockIn(
+            user.id,
+            userWithBusiness.businessId,
+            db
           );
 
+          // Audit log schedule validation
+          try {
+            await db.audit.createAuditLog({
+              action: scheduleValidation.canClockIn
+                ? "schedule_validation_passed"
+                : "schedule_validation_failed",
+              entityType: "user",
+              entityId: user.id,
+              userId: user.id,
+              details: {
+                canClockIn: scheduleValidation.canClockIn,
+                requiresApproval: scheduleValidation.requiresApproval,
+                reason: scheduleValidation.reason,
+                warnings: scheduleValidation.warnings,
+                scheduleId: scheduleValidation.schedule?.id,
+              },
+              ipAddress: data.ipAddress,
+              terminalId: data.terminalId,
+            });
+          } catch (error) {
+            logger.error(
+              "[login] Failed to audit log schedule validation:",
+              error
+            );
+          }
+
+          if (!scheduleValidation.canClockIn) {
+            // If requires approval, we can still proceed but log warning
+            if (scheduleValidation.requiresApproval) {
+              logger.warn(
+                `[login] Schedule validation warnings for user ${
+                  user.id
+                }: ${scheduleValidation.warnings.join(", ")}`
+              );
+              // Continue but user should be aware of the warnings
+            } else {
+              // Critical issue - block login
+              logger.warn(
+                `[login] Schedule validation failed for user ${user.id}: ${scheduleValidation.reason}`
+              );
+              return {
+                success: false,
+                message:
+                  scheduleValidation.reason ||
+                  "Cannot clock in: Schedule validation failed. Please contact your manager.",
+                code: "SCHEDULE_VALIDATION_FAILED",
+                requiresShift: true,
+                warning: scheduleValidation.warnings.join(", "),
+              };
+            }
+          }
+
+          const schedule = scheduleValidation.schedule;
           if (!schedule) {
             return {
               success: false,
               message:
-                "No scheduled shift found. You cannot clock in at this time.",
+                "No scheduled shift found. You cannot clock in at this time. Please contact your manager to create a schedule.",
               code: "NO_SCHEDULED_SHIFT",
+              requiresShift: true,
             };
           }
 
@@ -765,25 +847,21 @@ export class UserManager {
 
           if (!activeShift) {
             try {
-              // Get business ID first
-              const userWithBusiness = this.getUserWithBusiness(user.id);
-              if (!userWithBusiness?.businessId) {
-                throw new Error("User business not found");
-              }
-
-              // Create clock-in event linked to schedule
+              // Create clock-in event linked to schedule (with audit logging)
+              const { getDatabase } = await import("../index.js");
+              const dbInstance = await getDatabase();
               clockEvent = await this.timeTrackingManager.createClockEvent({
                 userId: user.id,
                 businessId: userWithBusiness.businessId, // ✅ REQUIRED
                 terminalId: data.terminalId || "unknown",
-                scheduleId: schedule.id, // ✅ NEW: Link to schedule
+                scheduleId: schedule.id, // ✅ Link to schedule
                 type: "in",
                 method: "login",
                 ipAddress: data.ipAddress,
+                auditManager: dbInstance.audit, // Pass audit manager for logging
               });
 
-              // Create time shift
-              // Create shift linked to schedule
+              // Create time shift linked to schedule
               timeShift = await this.timeTrackingManager.createShift({
                 userId: user.id,
                 businessId: userWithBusiness.businessId,
@@ -798,14 +876,28 @@ export class UserManager {
                 `[login] Auto clock-in successful for scheduled shift ${schedule.id}`
               );
             } catch (error) {
-              logger.error("Auto clock-in failed:", error);
-              // Don't fail login if clock-in fails
+              logger.error(
+                `[login] Auto clock-in failed for user ${user.id}:`,
+                error
+              );
+              // CRITICAL: Fail login if clock-in fails (user cannot work without shift)
+              return {
+                success: false,
+                message:
+                  error instanceof Error
+                    ? `Failed to clock in: ${error.message}`
+                    : "Failed to clock in. Please try again or contact your manager.",
+                code: "CLOCK_IN_FAILED",
+                requiresShift: true,
+                clockInError:
+                  error instanceof Error ? error.message : "Unknown error",
+              };
             }
           } else {
             // User already has active shift
             timeShift = activeShift;
             logger.info(
-              `[login] User ${user.id} already has active TimeShift ${activeShift.id}`
+              `[login] User ${user.id} already has active shift ${activeShift.id}`
             );
           }
         }
@@ -944,6 +1036,8 @@ export class UserManager {
             }
 
             // Create clock-out event linked to schedule (if shift has one)
+            const { getDatabase } = await import("../index.js");
+            const dbInstance = await getDatabase();
             const clockOutEvent =
               await this.timeTrackingManager.createClockEvent({
                 userId: user.id,
@@ -953,6 +1047,7 @@ export class UserManager {
                 type: "out",
                 method: "logout",
                 ipAddress: options?.ipAddress,
+                auditManager: dbInstance.audit, // Pass audit manager for logging
               });
 
             // Complete shift
