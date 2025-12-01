@@ -75,3 +75,63 @@ export function getUserRoleName(user: User): string {
 export function getUserDisplayName(user: User): string {
   return `${user.firstName} ${user.lastName}`;
 }
+
+/**
+ * Auth Context Type - Defines the authentication context interface
+ */
+export interface AuthContextType {
+  user: User | null;
+  login: (
+    username: string,
+    pin: string,
+    rememberMe?: boolean
+  ) => Promise<{ success: boolean; message: string; errors?: string[] }>;
+  register: (userData: {
+    email?: string;
+    username: string;
+    pin: string;
+    firstName: string;
+    lastName: string;
+    businessName: string;
+    role: "cashier" | "manager" | "admin";
+  }) => Promise<{ success: boolean; message: string; errors?: string[] }>;
+  registerBusiness: (userData: {
+    email?: string;
+    username: string;
+    pin: string;
+    firstName: string;
+    lastName: string;
+    businessName: string;
+    avatar?: string;
+    businessAvatar?: string;
+  }) => Promise<{ success: boolean; message: string; errors?: string[] }>;
+  createUser: (userData: {
+    businessId: string;
+    username: string;
+    pin: string;
+    email?: string;
+    firstName: string;
+    lastName: string;
+    role: "cashier" | "manager";
+    avatar?: string;
+    address?: string;
+  }) => Promise<{ success: boolean; message: string; errors?: string[] }>;
+  logout: (options?: { clockOut?: boolean }) => Promise<{
+    needsClockOutWarning?: boolean;
+  }>;
+  clockIn: (
+    userId: string,
+    businessId: string
+  ) => Promise<{
+    success: boolean;
+    message?: string;
+  }>;
+  clockOut: (userId: string) => Promise<{
+    success: boolean;
+    message?: string;
+  }>;
+  getActiveShift: (userId: string) => Promise<any>;
+  isLoading: boolean;
+  error: string | null;
+  isInitializing: boolean;
+}
