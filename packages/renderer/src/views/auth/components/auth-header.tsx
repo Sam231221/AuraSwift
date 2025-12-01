@@ -1,5 +1,6 @@
 import { BatteryFull, Bell, Store, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
+import { getAppVersion } from "@/shared/utils/version";
 
 // Header component for banner and time
 export function AuthHeader() {
@@ -24,12 +25,16 @@ export function AuthHeader() {
           <Store className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-base sm:text-xl font-bold text-foreground truncate">
-            AuraSwift
-          </h1>
-          <p className="text-[10px] sm:text-[12px] text-muted-foreground truncate">
-            Point of Sale System
-          </p>
+          <div className="relative inline-block">
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-foreground truncate">
+              AuraSwift
+            </h1>
+            <span className="absolute -bottom-0.6 -right-1 sm:-right-2 z-10 inline-flex items-center px-1 sm:px-1.5 py-0.5 rounded-md bg-primary/12 border border-primary/25 shadow-sm">
+              <span className="text-[8px] sm:text-[9px] font-semibold text-primary leading-none tracking-tight">
+                v{getAppVersion()}
+              </span>
+            </span>
+          </div>
         </div>
       </div>
       {/* Center: Store/Terminal Name - Hidden on small screens */}

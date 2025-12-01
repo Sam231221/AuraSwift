@@ -2,7 +2,7 @@ import { TrendingUp, Users, CreditCard, BarChart3 } from "lucide-react";
 
 export function AuthHeroSection() {
   return (
-    <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/5 via-accent/10 to-secondary/5 relative overflow-hidden">
+    <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
       <div className="absolute inset-0 bg-[url('/modern-retail-store-interior-with-sleek-pos-system.jpg')] bg-cover bg-center opacity-10" />
 
       <div className="relative z-10 flex flex-col justify-center px-8 xl:px-12 py-12 xl:py-16">
@@ -23,7 +23,9 @@ export function AuthHeroSection() {
                 <TrendingUp className="w-4 h-4 xl:w-5 xl:h-5 text-accent-foreground" />
               </div>
               <div>
-                <h3 className="text-sm xl:text-base font-semibold mb-1">Sales Analytics</h3>
+                <h3 className="text-sm xl:text-base font-semibold mb-1">
+                  Sales Analytics
+                </h3>
                 <p className="text-xs xl:text-sm text-muted-foreground">
                   Real-time insights and reporting
                 </p>
@@ -35,7 +37,9 @@ export function AuthHeroSection() {
                 <Users className="w-4 h-4 xl:w-5 xl:h-5 text-accent-foreground" />
               </div>
               <div>
-                <h3 className="text-sm xl:text-base font-semibold mb-1">Customer Management</h3>
+                <h3 className="text-sm xl:text-base font-semibold mb-1">
+                  Customer Management
+                </h3>
                 <p className="text-xs xl:text-sm text-muted-foreground">
                   Build lasting relationships
                 </p>
@@ -47,7 +51,9 @@ export function AuthHeroSection() {
                 <CreditCard className="w-4 h-4 xl:w-5 xl:h-5 text-accent-foreground" />
               </div>
               <div>
-                <h3 className="text-sm xl:text-base font-semibold mb-1">Payment Processing</h3>
+                <h3 className="text-sm xl:text-base font-semibold mb-1">
+                  Payment Processing
+                </h3>
                 <p className="text-xs xl:text-sm text-muted-foreground">
                   Secure, fast transactions
                 </p>
@@ -59,7 +65,9 @@ export function AuthHeroSection() {
                 <BarChart3 className="w-4 h-4 xl:w-5 xl:h-5 text-accent-foreground" />
               </div>
               <div>
-                <h3 className="text-sm xl:text-base font-semibold mb-1">Inventory Control</h3>
+                <h3 className="text-sm xl:text-base font-semibold mb-1">
+                  Inventory Control
+                </h3>
                 <p className="text-xs xl:text-sm text-muted-foreground">
                   Smart stock management
                 </p>

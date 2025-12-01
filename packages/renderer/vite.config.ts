@@ -3,6 +3,19 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { visualizer } from "rollup-plugin-visualizer";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+
+// Read version from root package.json
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootPackageJson = JSON.parse(
+  readFileSync(path.resolve(__dirname, "../../package.json"), "utf-8")
+);
+const appVersion = rootPackageJson.version || "0.0.0";
+
+// Set the version as an environment variable for Vite to pick up
+// Vite automatically exposes process.env.VITE_* variables as import.meta.env.VITE_*
+process.env.VITE_APP_VERSION = appVersion;
 
 // https://vite.dev/config/
 export default defineConfig({
