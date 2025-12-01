@@ -845,9 +845,9 @@ export const cartSessions = createTable(
     cashierId: text("cashier_id")
       .notNull()
       .references(() => users.id),
-    shiftId: text("shift_id")
-      .notNull()
-      .references(() => shifts.id),
+    shiftId: text("shift_id").references(() => shifts.id, {
+      onDelete: "set null",
+    }), // Nullable for admin/owner mode
     businessId: text("business_id")
       .notNull()
       .references(() => businesses.id),

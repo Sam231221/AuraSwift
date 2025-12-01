@@ -27,7 +27,7 @@ export class CartManager {
     await this.db.insert(schema.cartSessions).values({
       id: sessionId,
       cashierId: sessionData.cashierId,
-      shiftId: sessionData.shiftId || "",
+      shiftId: sessionData.shiftId || null,
       businessId: sessionData.businessId,
       terminal_id: sessionData.terminal_id || null,
       status: "ACTIVE",
