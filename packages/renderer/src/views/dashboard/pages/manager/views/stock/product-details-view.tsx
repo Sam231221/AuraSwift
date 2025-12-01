@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ImageIcon,
   Scale,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   Select,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Pagination } from "@/components/ui/pagination";
 import type { Product } from "@/types/domain";
+import { ImportBookerModal } from "./components/import-booker-modal";
 
 interface Category {
   id: string;
@@ -72,6 +74,8 @@ interface ProductDetailsViewProps {
   }) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
+
+  onProductsImported: () => void;
 }
 
 const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
@@ -99,7 +103,9 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
   onShowFieldsChange,
   onPageChange,
   onPageSizeChange,
+  onProductsImported,
 }) => {
+  const [importModalOpen, setImportModalOpen] = useState(false);
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
@@ -124,7 +130,14 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
             </p>
           </div>
         </div>
-
+        <Button
+          variant="outline"
+          className="w-full sm:w-auto"
+          onClick={() => setImportModalOpen(true)}
+        >
+          <FileSpreadsheet className="w-4 h-4 mr-3" />
+          <span className="text-sm sm:text-base">Import from Booker</span>
+        </Button>
         <Button onClick={onAddProduct} className="w-full sm:w-auto">
           <Plus className="w-4 h-4 mr-2" />
           Add Product
@@ -279,7 +292,8 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                   {products.map((product) => {
                     const categoryId = product.categoryId;
                     const usesScale = product.usesScale || false;
-                    const pricePerKg = product.pricePerKg || product.basePrice || 0;
+                    const pricePerKg =
+                      product.pricePerKg || product.basePrice || 0;
                     const basePrice = product.basePrice || 0;
                     const salesUnit = product.salesUnit || "KG";
 
@@ -348,7 +362,8 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                             <div className="flex items-center space-x-2">
                               <span
                                 className={`font-medium ${
-                                  (product.stockLevel || 0) <= (product.minStockLevel || 0)
+                                  (product.stockLevel || 0) <=
+                                  (product.minStockLevel || 0)
                                     ? "text-red-600"
                                     : (product.stockLevel || 0) <=
                                       (product.minStockLevel || 0) * 2
@@ -366,7 +381,8 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                                 Adjust
                               </Button>
                             </div>
-                            {(product.stockLevel || 0) <= (product.minStockLevel || 0) && (
+                            {(product.stockLevel || 0) <=
+                              (product.minStockLevel || 0) && (
                               <div className="text-xs text-red-600 mt-1">
                                 Low Stock!
                               </div>
@@ -430,6 +446,13 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
           </>
         )}
       </div>
+      {/* Import from Booker Modal */}
+      <ImportBookerModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        importType="product"
+        onSuccess={onProductsImported}
+      />
     </div>
   );
 };

@@ -12,8 +12,8 @@ import ProductFormDrawer from "./components/product-form-drawer";
 import BatchManagementView from "./product-batch-management-view";
 import StockMovementHistoryView from "./stock-movement-history-view";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('manage-product-view');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("manage-product-view");
 import type {
   Category,
   VatCategory,
@@ -85,7 +85,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   // Computed values for dashboard
   const lowStockProducts = allProducts.filter(
-    (p) => p.isActive && p.stockLevel !== undefined && p.minStockLevel !== undefined && p.stockLevel <= p.minStockLevel
+    (p) =>
+      p.isActive &&
+      p.stockLevel !== undefined &&
+      p.minStockLevel !== undefined &&
+      p.stockLevel <= p.minStockLevel
   );
 
   // Load paginated products
@@ -349,10 +353,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               onAddProduct={openAddProductDrawer}
               onRestockProduct={handleAdjustStockClick}
               onManageBatches={() => setCurrentView("batchManagement")}
-              onProductsImported={() => {
-                loadProducts();
-                loadAllProducts();
-              }}
             />
           ) : currentView === "categoryManagement" ? (
             <ManageCategoriesView
@@ -398,6 +398,10 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
               onPageSizeChange={(size) => {
                 setPageSize(size);
                 setCurrentPage(1);
+              }}
+              onProductsImported={() => {
+                loadProducts();
+                loadAllProducts();
               }}
             />
           )}

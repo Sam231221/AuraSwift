@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -10,10 +10,8 @@ import {
   TrendingDown,
   Tag,
   PackageCheck,
-  FileSpreadsheet,
 } from "lucide-react";
 import type { Product } from "@/types/domain";
-import { ImportBookerModal } from "./components/import-booker-modal";
 
 interface Category {
   id: string;
@@ -36,7 +34,6 @@ interface ProductDashboardViewProps {
   onAddProduct: () => void;
   onRestockProduct: (product: Product) => void;
   onManageBatches?: () => void;
-  onProductsImported?: () => void;
 }
 
 const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
@@ -49,9 +46,7 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
 
   onRestockProduct,
   onManageBatches,
-  onProductsImported,
 }) => {
-  const [importModalOpen, setImportModalOpen] = useState(false);
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
@@ -65,7 +60,9 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-4">
-          <Button onClick={onBack} className="w-full sm:w-auto">Go to dashboard</Button>
+          <Button onClick={onBack} className="w-full sm:w-auto">
+            Go to dashboard
+          </Button>
 
           <Button variant="outline" size="sm" className="w-full sm:w-auto">
             <Settings className="w-4 h-4 mr-2" />
@@ -111,7 +108,9 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {categories.length}
               </p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">Menu categories</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                Menu categories
+              </p>
             </div>
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center">
               <MenuSquare className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
@@ -122,11 +121,15 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm text-gray-600">Low Stock Items</p>
+              <p className="text-xs sm:text-sm text-gray-600">
+                Low Stock Items
+              </p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {lowStockProducts.length}
               </p>
-              <p className="text-xs sm:text-sm text-orange-600 mt-1">Need restocking</p>
+              <p className="text-xs sm:text-sm text-orange-600 mt-1">
+                Need restocking
+              </p>
             </div>
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
               <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
@@ -147,7 +150,9 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
                     ).toFixed(2)
                   : "0.00"}
               </p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">Across all items</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                Across all items
+              </p>
             </div>
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
@@ -187,16 +192,9 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
               onClick={onManageBatches}
             >
               <PackageCheck className="w-4 h-4 mr-3" />
-              <span className="text-sm sm:text-base">Batch & Expiry Management</span>
-            </Button>
-
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => setImportModalOpen(true)}
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-3" />
-              <span className="text-sm sm:text-base">Import from Booker</span>
+              <span className="text-sm sm:text-base">
+                Batch & Expiry Management
+              </span>
             </Button>
           </div>
         </div>
@@ -217,7 +215,9 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
                   className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2 sm:p-3 bg-orange-50 rounded"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate">{product.name}</p>
+                    <p className="font-medium text-sm truncate">
+                      {product.name}
+                    </p>
                     <p className="text-xs text-gray-600">
                       {product.stockLevel} left (min: {product.minStockLevel})
                     </p>
@@ -241,14 +241,6 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
           )}
         </div>
       </div>
-
-      {/* Import from Booker Modal */}
-      <ImportBookerModal
-        open={importModalOpen}
-        onOpenChange={setImportModalOpen}
-        importType="product"
-        onSuccess={onProductsImported}
-      />
     </div>
   );
 };
