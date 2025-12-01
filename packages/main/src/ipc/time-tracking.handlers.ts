@@ -66,6 +66,31 @@ export function registerTimeTrackingHandlers() {
             db
           );
 
+          // Audit log schedule validation
+          try {
+            await db.audit.createAuditLog({
+              action: scheduleValidation.canClockIn
+                ? "schedule_validation_passed"
+                : "schedule_validation_failed",
+              entityType: "user",
+              entityId: data.userId,
+              userId: data.userId,
+              details: {
+                canClockIn: scheduleValidation.canClockIn,
+                requiresApproval: scheduleValidation.requiresApproval,
+                reason: scheduleValidation.reason,
+                warnings: scheduleValidation.warnings,
+                scheduleId: scheduleValidation.schedule?.id,
+                context: "clock_in_ipc",
+              },
+            });
+          } catch (error) {
+            logger.error(
+              "[timeTracking:clockIn] Failed to audit log schedule validation:",
+              error
+            );
+          }
+
           if (!scheduleValidation.canClockIn) {
             if (!scheduleValidation.requiresApproval) {
               // No schedule or critical issue - block clock-in
@@ -96,6 +121,7 @@ export function registerTimeTrackingHandlers() {
       const clockEvent = await db.timeTracking.createClockEvent({
         ...data,
         type: "in",
+        auditManager: db.audit, // Pass audit manager for logging
       });
 
       // Check if shift should be created
@@ -177,7 +203,8 @@ export function registerTimeTrackingHandlers() {
       if (!activeShift) {
         return {
           success: false,
-          message: "No active shift found. Cannot clock out without an active shift.",
+          message:
+            "No active shift found. Cannot clock out without an active shift.",
           code: "NO_ACTIVE_SHIFT",
         };
       }
@@ -263,7 +290,9 @@ export function registerTimeTrackingHandlers() {
       const validation = await db.timeTracking.validateClockEvent(clockEvent);
       if (!validation.valid && validation.violations.length > 0) {
         logger.warn(
-          `[ClockOut] Clock-out validation violations: ${validation.violations.join(", ")}`
+          `[ClockOut] Clock-out validation violations: ${validation.violations.join(
+            ", "
+          )}`
         );
         // Log but don't block - violations are warnings, not blockers
       }
@@ -330,7 +359,21 @@ export function registerTimeTrackingHandlers() {
   ipcMain.handle("timeTracking:startBreak", async (event, data) => {
     try {
       if (!db) db = await getDatabase();
-      const breakRecord = await db.timeTracking.startBreak(data);
+
+      // Get shift to retrieve businessId
+      const shift = db.timeTracking.getShiftById(data.shiftId);
+      if (!shift) {
+        return {
+          success: false,
+          message: "Shift not found",
+          code: "SHIFT_NOT_FOUND",
+        };
+      }
+
+      const breakRecord = await db.timeTracking.startBreak({
+        ...data,
+        businessId: shift.businessId,
+      });
       return {
         success: true,
         break: breakRecord,

@@ -31,6 +31,7 @@ export function registerTransactionHandlers() {
         const user = auth.user!;
 
         // Validate transaction requirements using TransactionValidator
+        // This will automatically find active shift if shiftId not provided and shift is required
         const validation = await transactionValidator.validateTransaction(
           user,
           transactionData.shiftId || null,
@@ -43,6 +44,17 @@ export function registerTransactionHandlers() {
             message: validation.errors.join(", "),
             code: validation.code || "VALIDATION_ERROR",
           };
+        }
+
+        // If shift is required but shiftId not provided, get active shift and add it to transactionData
+        if (validation.requiresShift && !transactionData.shiftId) {
+          const activeShift = db.timeTracking.getActiveShift(user.id);
+          if (activeShift) {
+            transactionData.shiftId = activeShift.id;
+            logger.info(
+              `[createTransaction] Auto-assigned active shift ${activeShift.id} to transaction for user ${user.id}`
+            );
+          }
         }
 
         const transaction = await db.transactions.createTransaction(

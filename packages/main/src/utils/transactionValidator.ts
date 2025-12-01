@@ -54,23 +54,38 @@ export class TransactionValidator {
 
       // 2. Validate based on requirement
       if (shiftRequirement.requiresShift) {
-        // Shift is required - must have valid shift
-        if (!shiftId) {
-          logger.warn(
-            `[validateTransaction] Shift required but shiftId is null for user ${user.id}`
+        // Shift is required - must have valid active shift
+        let actualShiftId = shiftId;
+
+        // If shiftId not provided, try to get active shift for user
+        if (!actualShiftId) {
+          logger.info(
+            `[validateTransaction] Shift required but shiftId not provided, checking for active shift for user ${user.id}`
           );
-          return {
-            valid: false,
-            requiresShift: true,
-            shiftValid: false,
-            errors: ["Shift is required for your role to create transactions"],
-            code: "SHIFT_REQUIRED",
-          };
+          const activeShift = db.timeTracking.getActiveShift(user.id);
+          if (!activeShift) {
+            logger.warn(
+              `[validateTransaction] Shift required but no active shift found for user ${user.id}`
+            );
+            return {
+              valid: false,
+              requiresShift: true,
+              shiftValid: false,
+              errors: [
+                "You must have an active shift to make sales. Please clock in first.",
+              ],
+              code: "NO_ACTIVE_SHIFT",
+            };
+          }
+          actualShiftId = activeShift.id;
+          logger.info(
+            `[validateTransaction] Found active shift ${actualShiftId} for user ${user.id}`
+          );
         }
 
         // Validate shift exists and is active
         const shiftValidation = await this.validateShiftForTransaction(
-          shiftId,
+          actualShiftId,
           user.id,
           db
         );
@@ -91,7 +106,7 @@ export class TransactionValidator {
         }
 
         logger.info(
-          `[validateTransaction] ✅ Shift validation passed for shift ${shiftId}`
+          `[validateTransaction] ✅ Shift validation passed for shift ${actualShiftId}`
         );
         return {
           valid: true,
