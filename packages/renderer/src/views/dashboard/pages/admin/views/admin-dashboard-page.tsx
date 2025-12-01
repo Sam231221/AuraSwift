@@ -39,9 +39,9 @@ const AdminDashboardPage = ({
 }) => {
   const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
   const [isEmptyDialogOpen, setIsEmptyDialogOpen] = useState(false);
-  const [isBackingUp, setIsBackingUp] = useState(false);
-  const [isEmptying, setIsEmptying] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
+  const [_isBackingUp, setIsBackingUp] = useState(false);
+  const [_isEmptying, setIsEmptying] = useState(false);
+  const [_isImporting, setIsImporting] = useState(false);
 
   // Backup/Export Database Handler
   const handleBackupDatabase = async () => {

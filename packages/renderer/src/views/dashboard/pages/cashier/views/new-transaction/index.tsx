@@ -64,7 +64,7 @@ import type { PrinterConfig } from "@/types/features/printer";
 
 // Utils
 import { isWeightedProduct } from "./utils/product-helpers";
-import { userHasAnyRole, getUserRoleName } from "@/shared/utils/rbac-helpers";
+import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("index");
@@ -546,11 +546,11 @@ export function NewTransactionView({ onBack }: NewTransactionViewProps) {
                         id: weightInput.selectedWeightProduct.id,
                         name: weightInput.selectedWeightProduct.name,
                         productType: "WEIGHTED",
-                        basePrice: weightInput.selectedWeightProduct.price,
+                        basePrice: weightInput.selectedWeightProduct.basePrice,
                         pricePerUnit:
-                          weightInput.selectedWeightProduct.pricePerUnit,
+                          weightInput.selectedWeightProduct.pricePerKg,
                         unitOfMeasure:
-                          weightInput.selectedWeightProduct.unit || "kg",
+                          weightInput.selectedWeightProduct.salesUnit || "KG",
                       }}
                       onWeightConfirmed={async (weight) => {
                         const product = weightInput.selectedWeightProduct;

@@ -63,14 +63,17 @@ export const useExpiryAlerts = ({
   }, [batches, expirySettings]);
 
   const loadNotifications = useCallback(async () => {
-    if (!businessId || !window.expiryNotificationsAPI) {
+    // Check if expiryNotificationsAPI exists (it may not be implemented yet)
+    const expiryAPI = (window as any).expiryNotificationsAPI;
+    
+    if (!businessId || !expiryAPI) {
       setNotifications([]);
       return;
     }
 
     try {
       setLoading(true);
-      const response = await window.expiryNotificationsAPI.get(
+      const response = await expiryAPI.get(
         businessId,
         "PENDING,SENT"
       );

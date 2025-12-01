@@ -9,7 +9,7 @@ import {
   logAction,
 } from "../utils/authHelpers.js";
 import { invalidateUserPermissionCache } from "../utils/rbacHelpers.js";
-import { PERMISSIONS } from "@app/shared/constants/permissions.js";
+import { PERMISSIONS } from "@app/shared/constants/permissions";
 import {
   checkRateLimit,
   recordFailedAttempt,
@@ -276,15 +276,15 @@ export function registerAuthHandlers() {
         };
       }
 
-      // Get session by refresh token
-      const session = db.sessions.getSessionByRefreshToken(refreshToken);
+      // Get session by token (refresh tokens not used in desktop EPOS)
+      const session = db.sessions.getSessionByToken(refreshToken);
 
       if (!session) {
-        logger.warn("[refreshToken] Invalid or expired refresh token");
+        logger.warn("[refreshToken] Invalid or expired token");
         return {
           success: false,
-          message: "Invalid or expired refresh token",
-          code: "REFRESH_TOKEN_INVALID",
+          message: "Invalid or expired token",
+          code: "TOKEN_INVALID",
         };
       }
 
@@ -306,15 +306,12 @@ export function registerAuthHandlers() {
           code: "USER_INACTIVE",
         };
       }
-
-      // Refresh the access token
-      const refreshedSession = db.sessions.refreshAccessToken(refreshToken, 1); // 1 hour access token
-
-      if (!refreshedSession) {
+      
+      if (!session) {
         return {
           success: false,
-          message: "Failed to refresh token",
-          code: "REFRESH_FAILED",
+          message: "Invalid or expired token",
+          code: "TOKEN_INVALID",
         };
       }
 
@@ -327,15 +324,14 @@ export function registerAuthHandlers() {
       } = user;
 
       logger.debug(
-        `[refreshToken] Token refreshed successfully for user ${user.id}`
+        `[refreshToken] Token validated successfully for user ${user.id}`
       );
 
       return {
         success: true,
-        message: "Token refreshed successfully",
+        message: "Token validated successfully",
         user: userWithoutSecrets as User,
-        token: refreshedSession.token, // New access token
-        refreshToken: refreshedSession.refreshToken, // Same refresh token
+        token: session.token, // Return the same token
       };
     } catch (error) {
       logger.error("Token refresh IPC error:", error);

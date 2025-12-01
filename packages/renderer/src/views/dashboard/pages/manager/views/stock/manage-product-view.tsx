@@ -85,7 +85,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   // Computed values for dashboard
   const lowStockProducts = allProducts.filter(
-    (p) => p.isActive && p.stockLevel <= p.minStockLevel
+    (p) => p.isActive && p.stockLevel !== undefined && p.minStockLevel !== undefined && p.stockLevel <= p.minStockLevel
   );
 
   // Load paginated products

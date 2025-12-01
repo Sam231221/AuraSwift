@@ -69,7 +69,16 @@ export function ViewRoleUsersDialog({
     logger.info("[ViewRoleUsersDialog] Loading users for role:", role.id);
     const result = await getUsersByRole(role.id);
     if (result) {
-      setUsers(result as UserRole[]);
+      // Map the result to UserRole format
+      const mappedUsers: UserRole[] = result.map((item: any) => ({
+        id: item.userRole?.id || "",
+        userId: item.user?.id || "",
+        roleId: role.id,
+        assignedAt: item.userRole?.assignedAt || Date.now(),
+        isActive: item.userRole?.isActive ?? true,
+        user: item.user,
+      }));
+      setUsers(mappedUsers);
     }
   };
 

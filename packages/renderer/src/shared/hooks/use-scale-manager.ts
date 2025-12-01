@@ -130,7 +130,7 @@ export function useScaleManager(config?: ScaleConfig) {
           if (readingListenerRef.current) {
             readingListenerRef.current();
           }
-          readingListenerRef.current = window.scaleAPI.onReading((reading) => {
+          readingListenerRef.current = window.scaleAPI.onReading((reading: ScaleReading) => {
             setCurrentReading(reading);
             setScaleStatus((prev) => ({
               ...prev,

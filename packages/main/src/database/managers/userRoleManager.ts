@@ -314,11 +314,11 @@ export class UserRoleManager {
   /**
    * Replace all user roles with new set (atomic operation)
    */
-  replaceUserRoles(
+  async replaceUserRoles(
     userId: string,
     roleIds: string[],
     assignedBy?: string
-  ): UserRole[] {
+  ): Promise<UserRole[]> {
     // Get existing roles
     const existingRoles = this.getActiveRolesByUser(userId, true);
 
@@ -334,7 +334,7 @@ export class UserRoleManager {
     // Assign new roles
     const newRoles: UserRole[] = [];
     for (const roleId of roleIds) {
-      const newRole = this.assignRole(userId, roleId, assignedBy);
+      const newRole = await this.assignRole(userId, roleId, assignedBy);
       newRoles.push(newRole);
     }
 
@@ -344,13 +344,13 @@ export class UserRoleManager {
   /**
    * Set temporary role (with expiration)
    */
-  assignTemporaryRole(
+  async assignTemporaryRole(
     userId: string,
     roleId: string,
     expiresAt: Date,
     assignedBy?: string
-  ): UserRole {
-    return this.assignRole(userId, roleId, assignedBy, expiresAt);
+  ): Promise<UserRole> {
+    return await this.assignRole(userId, roleId, assignedBy, expiresAt);
   }
 
   /**

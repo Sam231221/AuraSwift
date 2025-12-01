@@ -32,8 +32,12 @@ export const filterProducts = (
     const matchesStock =
       filterStock === "all" ||
       (filterStock === "low" &&
+        product.stockLevel !== undefined &&
+        product.minStockLevel !== undefined &&
         product.stockLevel <= product.minStockLevel) ||
       (filterStock === "in_stock" &&
+        product.stockLevel !== undefined &&
+        product.minStockLevel !== undefined &&
         product.stockLevel > product.minStockLevel) ||
       (filterStock === "out_of_stock" && product.stockLevel === 0);
 
@@ -43,7 +47,7 @@ export const filterProducts = (
 
 export const getLowStockProducts = (products: Product[]): Product[] => {
   return Array.isArray(products)
-    ? products.filter((p) => p.stockLevel <= p.minStockLevel && p.isActive)
+    ? products.filter((p) => p.stockLevel !== undefined && p.minStockLevel !== undefined && p.stockLevel <= p.minStockLevel && p.isActive)
     : [];
 };
 

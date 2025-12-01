@@ -28,7 +28,7 @@ export function AuthUserSelection() {
         if (response.success && response.users) {
           // Map users and assign colors
           const cashierCount = { count: 0 };
-          const mappedUsers = response.users.map((user) => {
+          const mappedUsers = response.users.map((user: UserForLogin) => {
             const roleName = getUserRoleName(user);
             const color = getUserColor(roleName, cashierCount.count);
             if (roleName === "cashier") {

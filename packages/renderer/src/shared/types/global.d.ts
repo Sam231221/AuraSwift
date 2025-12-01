@@ -37,6 +37,13 @@ import type { APIResponse } from '../types/api/common';
 
 declare global {
   interface Window {
+    // Electron IPC access (for internal use only)
+    electron?: {
+      ipcRenderer: {
+        invoke: (channel: string, ...args: any[]) => Promise<any>;
+      };
+    };
+
     // Auth Store
     authStore: AuthStoreAPI;
 

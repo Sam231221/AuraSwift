@@ -37,6 +37,7 @@ import {
 import { UserAvatar } from "@/components/user-avatar";
 import { AvatarUpload } from "@/components/avatar-upload";
 import { useAuth } from "@/shared/hooks/use-auth";
+import type { User } from "@/types/domain";
 
 import {
   getUserRoleName,
@@ -133,8 +134,8 @@ export default function CashierManagementView({
       if (response.success && response.users) {
         // Filter out admin users and convert to StaffUser format
         const cashiers: StaffUser[] = response.users
-          .filter((u) => getUserRoleName(u) === "cashier")
-          .map((u) => ({
+          .filter((u: User) => getUserRoleName(u) === "cashier")
+          .map((u: User) => ({
             id: u.id,
             username: u.username || u.email || "",
             email: u.email ?? "", // Ensure email is always a string
@@ -144,7 +145,7 @@ export default function CashierManagementView({
             role: getUserRoleName(u) as "cashier",
             businessId: u.businessId,
             avatar: u.avatar,
-            address: (u as { address?: string }).address || "",
+            address: u.address || "",
             createdAt: u.createdAt || new Date().toISOString(),
             isActive: u.isActive !== undefined ? u.isActive : true,
           }));
@@ -626,6 +627,11 @@ function CreateCashierDialog({
     onSubmit: async (data) => {
       if (!businessId) {
         throw new Error("Business ID not found");
+      }
+
+      // Type guard: create form has username and pin fields
+      if (!("username" in data) || !("pin" in data)) {
+        throw new Error("Invalid form data");
       }
 
       const userData = {

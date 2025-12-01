@@ -215,13 +215,15 @@ export class BreakComplianceValidator {
           : new Date(breakRecord.start_time as string).getTime();
 
       const endTimeMs =
-        typeof breakRecord.end_time === "number"
+        breakRecord.end_time === null || breakRecord.end_time === undefined
+          ? Date.now()
+          : typeof breakRecord.end_time === "number"
           ? breakRecord.end_time
           : breakRecord.end_time instanceof Date
           ? breakRecord.end_time.getTime()
           : new Date(breakRecord.end_time as string).getTime();
 
-      const durationSeconds = Math.floor((endTimeMs - startTimeMs) / 1000);
+      const durationSeconds = Math.floor((endTimeMs - startTimeMs) / 1000) || 0;
 
       // Check minimum duration if break was required
       if (breakRecord.is_required && breakRecord.minimum_duration_seconds) {

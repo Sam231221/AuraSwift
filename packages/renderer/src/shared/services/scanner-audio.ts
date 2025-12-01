@@ -4,6 +4,9 @@
  * Based on real supermarket POS requirements
  */
 
+import { getLogger } from '@/shared/utils/logger';
+const logger = getLogger('scanner-audio');
+
 export class ScannerAudio {
   private static audioContext: AudioContext | null = null;
   private static isEnabled = true;

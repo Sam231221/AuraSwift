@@ -123,7 +123,7 @@ export async function initApp(initConfig: AppInitConfig) {
                   // Create clock-out event
                   const clockOutEvent = await db.timeTracking.createClockEvent({
                     userId: cashierId,
-                    businessId: timeShift.businessId, // ✅ REQUIRED: Get from shift
+                    businessId: timeShift.business_id, // ✅ REQUIRED: Get from shift
                     terminalId: "system",
                     type: "out",
                     method: "auto",

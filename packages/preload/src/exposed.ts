@@ -1,7 +1,7 @@
 import * as exports from "./index.js";
 import { contextBridge } from "electron";
 
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 // Polyfill btoa for Electron preload context if not available
 if (typeof btoa === "undefined") {

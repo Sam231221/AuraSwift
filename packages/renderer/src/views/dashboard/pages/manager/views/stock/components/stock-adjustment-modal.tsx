@@ -162,7 +162,7 @@ const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
     }
 
     // Prevent negative stock
-    if (adjustmentType === "remove" && quantityNum > product.stockLevel) {
+    if (adjustmentType === "remove" && product.stockLevel !== undefined && quantityNum > product.stockLevel) {
       toast.error(
         `Cannot remove ${quantityNum} items. Only ${product.stockLevel} in stock.`
       );

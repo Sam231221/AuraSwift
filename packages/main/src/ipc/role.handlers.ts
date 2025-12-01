@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
 import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
-import { PERMISSIONS } from "@app/shared/constants/permissions.js";
+import { PERMISSIONS } from "@app/shared/constants/permissions";
 import {
   logAction,
   validateSession,

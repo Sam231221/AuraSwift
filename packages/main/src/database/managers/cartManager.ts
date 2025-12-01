@@ -29,7 +29,7 @@ export class CartManager {
       cashierId: sessionData.cashierId,
       shiftId: sessionData.shiftId || "",
       businessId: sessionData.businessId,
-      stationId: sessionData.stationId || null,
+      terminal_id: sessionData.terminal_id || null,
       status: "ACTIVE",
       totalAmount: 0,
       taxAmount: 0,

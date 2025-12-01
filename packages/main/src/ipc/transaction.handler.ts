@@ -5,7 +5,7 @@ import {
   logAction,
   validateSessionAndPermission,
 } from "../utils/authHelpers.js";
-import { PERMISSIONS } from "@app/shared/constants/permissions.js";
+import { PERMISSIONS } from "@app/shared/constants/permissions";
 import { transactionValidator } from "../utils/transactionValidator.js";
 const logger = getLogger("transactionHandlers");
 
@@ -871,8 +871,9 @@ export function registerTransactionHandlers() {
           };
         }
         // Check if user has manager, admin, or owner role via RBAC
-        const userRoles = db.userRoles.getUserRole(manager.id, undefined, true);
-        const hasManagerRole = userRoles.some((ur: any) =>
+        const userRoles = db.userRoles.getActiveRolesByUser(manager.id);
+        const rolesWithDetails = db.userRoles.getRolesWithDetailsForUser(manager.id);
+        const hasManagerRole = rolesWithDetails.some((ur) =>
           ["manager", "admin", "owner"].includes(ur.role.name)
         );
         if (!hasManagerRole) {

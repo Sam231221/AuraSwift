@@ -84,7 +84,7 @@ export function ImportBookerModal({
   useEffect(() => {
     if (!open) return;
 
-    const unsubscribe = window.importAPI.onProgress((progressData) => {
+    const unsubscribe = window.importAPI.onProgress((progressData: ImportProgress) => {
       setProgress(progressData);
     });
 

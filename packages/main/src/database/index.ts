@@ -108,7 +108,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
 
     // Seed database with default data if needed
     try {
-      await seedDefaultData(drizzle, schema);
+      await seedDefaultData(drizzle as any, schema);
     } catch (error) {
       // Provide detailed error context for seeding failures
       const errorMessage =

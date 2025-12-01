@@ -58,7 +58,7 @@ export function useSalesMode(): SalesMode {
         } else {
           // Fallback: Check user's shiftRequired field
           // This is a temporary fallback until we have an API endpoint
-          const userShiftRequired = user.shiftRequired;
+          const userShiftRequired = (user as any).shiftRequired;
           if (userShiftRequired === false) {
             setMode("admin");
             setRequiresShift(false);

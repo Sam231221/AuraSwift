@@ -13,7 +13,7 @@ import type {
   OfficePrinter,
   PrintJobConfig,
   PrintJobStatus,
-  PrintOptions,
+  OfficePrintOptions,
   PrinterHealth,
   PrintMetrics,
 } from "../../types/officePrinter";
@@ -169,7 +169,7 @@ export const useOfficePrinter = () => {
     async (
       documentPath: string,
       documentType: "pdf" | "image" | "text" | "raw" = "pdf",
-      options?: PrintOptions
+      options?: OfficePrintOptions
     ): Promise<{ success: boolean; jobId?: string; error?: string }> => {
       if (!selectedPrinter) {
         const error = "No printer selected";
@@ -445,7 +445,7 @@ export const usePrinterSelection = () => {
   } = useOfficePrinter();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [printOptions, setPrintOptions] = useState<PrintOptions>({
+  const [printOptions, setPrintOptions] = useState<OfficePrintOptions>({
     copies: 1,
     color: true,
     duplex: "simplex",

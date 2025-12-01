@@ -130,13 +130,13 @@ const mapProductToFormData = (
     name: product.name,
     description: product.description || "",
     basePrice:
-      (dbProduct.basePrice as number | undefined) ?? product.price ?? 0,
+      (dbProduct.basePrice as number | undefined) ?? 0,
     costPrice: product.costPrice || 0,
     sku: product.sku,
     barcode: (dbProduct.barcode as string | undefined) || "",
     plu: product.plu || "",
     image: product.image || "",
-    categoryId: (dbProduct.categoryId as string | undefined) || validCategory,
+    categoryId: (dbProduct.categoryId as string | undefined) || validCategory || "",
     productType:
       (dbProduct.productType as
         | "STANDARD"
@@ -154,10 +154,9 @@ const mapProductToFormData = (
         | undefined) ||
       ((dbProduct.usesScale as boolean | undefined) ? "KG" : "PIECE"),
     usesScale:
-      (dbProduct.usesScale as boolean | undefined) ??
-      Boolean(product.requiresWeight),
+      (dbProduct.usesScale as boolean | undefined) ?? false,
     pricePerKg:
-      (dbProduct.pricePerKg as number | undefined) ?? product.pricePerUnit ?? 0,
+      (dbProduct.pricePerKg as number | undefined) ?? 0,
     isGenericButton:
       (dbProduct.isGenericButton as boolean | undefined) || false,
     genericDefaultPrice:

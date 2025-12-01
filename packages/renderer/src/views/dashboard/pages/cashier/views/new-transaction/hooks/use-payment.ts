@@ -134,13 +134,24 @@ const createReceiptData = (
     businessId,
     businessName: userBusinessName || "AuraSwift POS",
     items: cartItems.map((item) => ({
-      id: item.productId || item.categoryId || item.id || "",
-      name: item.itemName || item.product?.name || "Unknown Item",
-      quantity: item.itemType === "UNIT" ? item.quantity || 1 : 1,
-      price: item.unitPrice,
-      total: item.totalPrice,
-      sku: item.product?.sku || "",
-      category: item.product?.category || "",
+      id: item.id || "",
+      transactionId: "", // Will be set when transaction is created
+      productId: item.productId || undefined,
+      categoryId: item.categoryId || undefined,
+      productName: item.itemName || item.product?.name || "Unknown Item",
+      itemType: item.itemType || "UNIT",
+      quantity: item.itemType === "UNIT" ? item.quantity || 1 : undefined,
+      weight: item.itemType === "WEIGHT" ? item.weight : undefined,
+      unitOfMeasure: item.unitOfMeasure,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+      taxAmount: item.taxAmount || 0,
+      batchId: item.batchId,
+      batchNumber: item.batchNumber,
+      expiryDate: item.expiryDate,
+      ageRestrictionLevel: item.ageRestrictionLevel,
+      ageVerified: item.ageVerified,
+      cartItemId: item.id,
     })),
     subtotal,
     tax,
@@ -152,16 +163,12 @@ const createReceiptData = (
       {
         type: skipPaymentValidation
           ? "card"
-          : paymentMethod?.type === "mobile"
-          ? "digital"
-          : paymentMethod?.type === "voucher" || paymentMethod?.type === "split"
-          ? "other"
           : paymentMethod?.type || "cash",
         amount: skipPaymentValidation
           ? total
           : paymentMethod?.type === "cash"
           ? cashAmount
-          : total,
+          : paymentMethod?.amount || total,
       },
     ],
     receiptNumber,
@@ -188,7 +195,7 @@ export function usePayment({
   isShowingStatus: _isShowingStatus, // Unused - kept for interface compatibility, will be used in future
   onResetPrintStatus,
   onCartSessionInit,
-  activeShift,
+  activeShift: _activeShift,
   requiresShift = true, // Default to true for backward compatibility
 }: UsePaymentProps) {
   const [paymentStep, setPaymentStep] = useState(false);
@@ -496,7 +503,7 @@ export function usePayment({
             effectiveRole || ""
           );
 
-          let activeShift: { id: string } | null = null;
+          let shiftIdForTransaction: { id: string } | null = null;
 
           if (shiftRequired) {
             // Get active shift - REQUIRED for cashiers/supervisors
@@ -526,13 +533,13 @@ export function usePayment({
               isProcessingRef.current = false;
               return;
             }
-            activeShift = shiftData as { id: string };
+            shiftIdForTransaction = shiftData as { id: string };
           } else {
             // Admin/Manager/Owner - shift is optional
             try {
               const shiftResponse = await window.shiftAPI.getActive(userId);
               if (shiftResponse.success && shiftResponse.data) {
-                activeShift = shiftResponse.data as { id: string };
+                shiftIdForTransaction = shiftResponse.data as { id: string };
               }
               // If no shift exists, that's OK for admin/manager
             } catch (error) {
@@ -578,7 +585,7 @@ export function usePayment({
 
           // Create transaction
           // shiftId is optional - null for admin/owner mode, required for cashier/manager
-          const shiftId = requiresShift && activeShift ? activeShift.id : null;
+          const shiftId = requiresShift && shiftIdForTransaction ? shiftIdForTransaction.id : null;
           const transactionResponse =
             await window.transactionAPI.createFromCart({
               cartSessionId: cartSession.id,
@@ -698,7 +705,7 @@ export function usePayment({
    */
   const handlePayment = useCallback(
     async (method: PaymentMethod["type"]) => {
-      setPaymentMethod({ type: method });
+      setPaymentMethod({ type: method, amount: method === "cash" ? total : total });
 
       if (method === "cash") {
         setCashAmount(total);
@@ -784,11 +791,11 @@ export function usePayment({
         cashierId: userId || "unknown",
         cashierName: completedTransactionData.cashierName || "Unknown",
         items: completedTransactionData.items.map((item) => ({
-          name: item.name,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          totalPrice: item.total,
-          sku: item.sku || "",
+          name: item.productName,
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          sku: item.productId || "",
         })),
         subtotal: completedTransactionData.subtotal,
         tax: completedTransactionData.tax,

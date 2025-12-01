@@ -645,7 +645,7 @@ export function registerShiftHandlers() {
 
       // Filter for today's schedules
       // Note: schedule.startTime is a number (milliseconds) from timestamp_ms column
-      const todaySchedules = schedules.filter((schedule) => {
+      const todaySchedules = schedules.filter((schedule: any) => {
         // Convert timestamp (milliseconds) to Date object
         const startTimeMs =
           typeof schedule.startTime === "number"
@@ -678,7 +678,7 @@ export function registerShiftHandlers() {
       // 1. Schedules that haven't ended yet (current or future)
       // 2. Among those, prefer the one that starts later (most recent)
       // 3. If all have ended, prefer the one that starts later (most recent)
-      const activeSchedules = todaySchedules.filter((schedule) => {
+      const activeSchedules = todaySchedules.filter((schedule: any) => {
         const endTimeMs = schedule.endTime
           ? typeof schedule.endTime === "number"
             ? schedule.endTime
@@ -695,7 +695,7 @@ export function registerShiftHandlers() {
 
       if (activeSchedules.length > 0) {
         // Return the one with the latest start time among active schedules
-        const mostRecentActive = activeSchedules.reduce((latest, current) => {
+        const mostRecentActive = activeSchedules.reduce((latest: any, current: any) => {
           const latestStart =
             typeof latest.startTime === "number"
               ? latest.startTime
@@ -717,7 +717,7 @@ export function registerShiftHandlers() {
       }
 
       // All schedules have ended - return the most recent one
-      const mostRecent = todaySchedules.reduce((latest, current) => {
+      const mostRecent = todaySchedules.reduce((latest: any, current: any) => {
         const latestStart =
           typeof latest.startTime === "number"
             ? latest.startTime
@@ -755,17 +755,17 @@ export function registerShiftHandlers() {
       );
 
       const stats = {
-        totalTransactions: transactions.filter((t) => t.status === "completed")
+        totalTransactions: transactions.filter((t: any) => t.status === "completed")
           .length,
         totalSales: transactions
-          .filter((t) => t.type === "sale" && t.status === "completed")
-          .reduce((sum, t) => sum + t.total, 0),
+          .filter((t: any) => t.type === "sale" && t.status === "completed")
+          .reduce((sum: number, t: any) => sum + t.total, 0),
         totalRefunds: Math.abs(
           transactions
-            .filter((t) => t.type === "refund" && t.status === "completed")
-            .reduce((sum, t) => sum + t.total, 0)
+            .filter((t: any) => t.type === "refund" && t.status === "completed")
+            .reduce((sum: number, t: any) => sum + t.total, 0)
         ),
-        totalVoids: transactions.filter((t) => t.status === "voided").length,
+        totalVoids: transactions.filter((t: any) => t.status === "voided").length,
       };
 
       return {

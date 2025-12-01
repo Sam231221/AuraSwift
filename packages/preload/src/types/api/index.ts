@@ -6,18 +6,18 @@
  * @module preload/types/api
  */
 
-export * from './auth';
-export * from './product';
-export * from './category';
-export * from './cart';
-export * from './transaction';
-export * from './shift';
-export * from './batch';
-export * from './supplier';
-export * from './expiry-settings';
-export * from './stock-movement';
-export * from './age-verification';
-export * from './import';
-export * from './system';
-export * from './rbac';
+export * from './auth.js';
+export * from './product.js';
+export * from './category.js';
+export * from './cart.js';
+export * from './transaction.js';
+export * from './shift.js';
+export * from './batch.js';
+export * from './supplier.js';
+export * from './expiry-settings.js';
+export * from './stock-movement.js';
+export * from './age-verification.js';
+export * from './import.js';
+export * from './system.js';
+export * from './rbac.js';
 

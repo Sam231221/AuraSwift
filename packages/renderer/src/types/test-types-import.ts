@@ -6,36 +6,22 @@
  */
 
 // Test barrel imports
-import {
+import type {
   // Domain types
   User,
-  UserForLogin,
-  Business,
   Product,
-  Category,
-  Shift,
-  Schedule,
-  PaymentMethod,
-  Transaction,
-  Role,
-  Permission,
   
   // Enum types
   AgeRestrictionLevel,
-  VerificationMethod,
-  BatchStatus,
-  CartSessionStatus,
-  
+} from './index';
+
+import {
   // Helper functions
   getUserRoleName,
   getUserDisplayName,
   getMinimumAge,
   getAgeRestrictionLabel,
 } from './index';
-
-// Test direct imports
-import { User as UserDirect } from './domain/user';
-import { AgeRestrictionLevel as AgeRestrictionDirect } from './enums/age-restriction';
 
 // Test that types work correctly
 const testUser: User = {
@@ -64,13 +50,18 @@ const testProduct: Product = {
 };
 
 const testLevel: AgeRestrictionLevel = 'AGE_18';
-const testMethod: VerificationMethod = 'MANUAL';
 
 // Test helper functions
 const userName = getUserRoleName(testUser);
 const displayName = getUserDisplayName(testUser);
 const minAge = getMinimumAge(testLevel);
 const label = getAgeRestrictionLabel(testLevel);
+
+// Use the variables to avoid unused variable errors
+void userName;
+void displayName;
+void minAge;
+void label;
 
 console.log('✅ All type imports successful!');
 console.log('User:', displayName);

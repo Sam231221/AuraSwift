@@ -30,7 +30,7 @@ export function WeightInputDisplay({
       {/* Weight Display */}
       <div className="bg-white p-3 sm:p-4 rounded-lg text-center border border-blue-200">
         <div className="text-2xl sm:text-3xl font-bold text-slate-900">
-          {weightDisplayPrice} {selectedProduct.unit || "units"}
+          {weightDisplayPrice} {selectedProduct.salesUnit || "PIECE"}
         </div>
       </div>
       {/* Button to switch back to scale */}
