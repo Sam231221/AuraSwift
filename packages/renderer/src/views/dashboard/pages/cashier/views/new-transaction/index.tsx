@@ -720,7 +720,16 @@ export function NewTransactionView({
 
   // Initialize cart session on mount
   useEffect(() => {
-    if (user && shift.activeShift) {
+    if (!user) return;
+
+    // For admin/owner mode (no shift required), initialize immediately
+    // For cashier/manager mode, wait for active shift
+    const shouldInitialize =
+      !salesMode.requiresShift ||
+      !!shift.activeShift ||
+      !!salesMode.activeShift;
+
+    if (shouldInitialize) {
       cart
         .initializeCartSession()
         .catch((error) =>
@@ -728,7 +737,7 @@ export function NewTransactionView({
         );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, shift.activeShift]);
+  }, [user, shift.activeShift, salesMode.requiresShift, salesMode.activeShift]);
 
   // Initialize printer on mount
   useEffect(() => {

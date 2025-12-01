@@ -33,7 +33,7 @@ export function ProductCard({
     <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
       <Button
         variant="outline"
-        className={`h-auto py-2 sm:py-3 lg:py-4 flex flex-col items-center w-full transition-all touch-manipulation ${
+        className={`h-auto min-h-[100px] sm:min-h-[120px] lg:min-h-[140px] py-2 sm:py-3 lg:py-4 flex flex-col items-center justify-start w-full transition-all touch-manipulation overflow-hidden ${
           isSelected
             ? "bg-blue-50 border-blue-300 hover:bg-blue-100"
             : "bg-white border-slate-200 hover:bg-slate-50"
@@ -44,7 +44,7 @@ export function ProductCard({
           await handleClick();
         }}
       >
-        <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-100 rounded-lg mb-1 sm:mb-2 flex items-center justify-center overflow-hidden shrink-0">
+        <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-slate-100 rounded-lg mb-1.5 sm:mb-2 flex items-center justify-center overflow-hidden shrink-0 flex-shrink-0">
           {product.image ? (
             <img
               src={product.image}
@@ -53,31 +53,33 @@ export function ProductCard({
             />
           ) : (
             <span className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-400">
-              {product.name.charAt(0)}
+              {product.name.charAt(0).toUpperCase()}
             </span>
           )}
         </div>
-        <span className="text-xs sm:text-sm font-medium text-slate-900 text-center line-clamp-2 mb-1">
+        <span className="text-xs sm:text-sm font-medium text-slate-900 text-center line-clamp-2 break-words leading-tight px-1 w-full min-w-0 overflow-hidden mb-1">
           {product.name}
         </span>
 
-        {product.usesScale && (
-          <Badge
-            variant="outline"
-            className="mt-1 text-[10px] sm:text-xs bg-blue-50"
-          >
-            <Scale className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1 shrink-0" />
-            Weighed
-          </Badge>
-        )}
-        {product.isGenericButton && (
-          <Badge
-            variant="outline"
-            className="mt-1 text-[10px] sm:text-xs bg-purple-50 text-purple-700 border-purple-200"
-          >
-            Generic
-          </Badge>
-        )}
+        <div className="flex flex-col items-center gap-0.5 sm:gap-1 mt-auto">
+          {product.usesScale && (
+            <Badge
+              variant="outline"
+              className="text-[10px] sm:text-xs bg-blue-50 border-blue-200 text-blue-700 whitespace-nowrap"
+            >
+              <Scale className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1 shrink-0" />
+              Weighed
+            </Badge>
+          )}
+          {product.isGenericButton && (
+            <Badge
+              variant="outline"
+              className="text-[10px] sm:text-xs bg-purple-50 text-purple-700 border-purple-200 whitespace-nowrap"
+            >
+              Generic
+            </Badge>
+          )}
+        </div>
       </Button>
     </motion.div>
   );
