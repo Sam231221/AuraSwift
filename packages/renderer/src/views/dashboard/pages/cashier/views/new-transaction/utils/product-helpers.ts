@@ -27,6 +27,9 @@ export function getProductPricePerKg(product: Product): number | null {
 
 /**
  * Get the sales unit for a product
+ * Note: This function returns the product's own sales unit.
+ * For the effective sales unit (considering fixed unit settings),
+ * use getEffectiveSalesUnit from use-sales-unit-settings hook.
  */
 export function getProductSalesUnit(product: Product): string {
   return product.salesUnit ?? "PIECE";

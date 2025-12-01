@@ -158,6 +158,9 @@ const baseProductSchema = z
   })
   .superRefine((data, ctx) => {
     // Weight-based product validations
+    // Note: When sales unit mode is "Fixed", the form component automatically
+    // sets the sales unit to the fixed unit from settings, so this validation
+    // will only trigger in "Varying" mode where users can select the unit.
     if (data.usesScale) {
       if (data.salesUnit === "PIECE") {
         ctx.addIssue({

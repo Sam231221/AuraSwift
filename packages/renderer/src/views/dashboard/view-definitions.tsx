@@ -11,6 +11,7 @@ import StaffSchedulesView from "@/views/dashboard/pages/manager/views/staff-sche
 import CashierManagementView from "@/views/dashboard/pages/manager/views/manage-cashier-view";
 import RoleManagementView from "@/views/dashboard/pages/admin/views/role-management-view";
 import UserRoleAssignmentView from "@/views/dashboard/pages/admin/views/user-role-assignment-view";
+import GeneralSettingsView from "@/views/dashboard/pages/admin/views/general-settings-view";
 
 export const ADMIN_VIEWS = [
   "dashboard",
@@ -21,6 +22,7 @@ export const ADMIN_VIEWS = [
   "cashierManagement",
   "productDashboard",
   "staffSchedules",
+  "generalSettings",
 ] as const;
 export const CASHIER_VIEWS = ["dashboard", "newTransaction"] as const;
 export const MANAGER_VIEWS = [
@@ -48,6 +50,7 @@ export function createAdminViewDefinitions(
         onManageCashiers={() => navigateTo("cashierManagement")}
         onManageProducts={() => navigateTo("productDashboard")}
         onStaffSchedules={() => navigateTo("staffSchedules")}
+        onGeneralSettings={() => navigateTo("generalSettings")}
       />
     ),
     userManagement: (
@@ -73,6 +76,9 @@ export function createAdminViewDefinitions(
     ),
     staffSchedules: (
       <StaffSchedulesView onBack={() => navigateTo("dashboard")} />
+    ),
+    generalSettings: (
+      <GeneralSettingsView onBack={() => navigateTo("dashboard")} />
     ),
   };
 }

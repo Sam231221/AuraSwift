@@ -9,15 +9,20 @@ import { useProductionScanner } from "@/features/barcode-scanner/use-production-
 import { ScannerAudio } from "@/shared/services/scanner-audio";
 import type { Product } from "@/types/domain";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('use-barcode-scanner');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("use-barcode-scanner");
 import {
   isWeightedProduct,
   getProductSalesUnit,
 } from "../utils/product-helpers";
+import {
+  useSalesUnitSettings,
+  getEffectiveSalesUnit,
+} from "@/shared/hooks/use-sales-unit-settings";
 
 interface UseBarcodeScannerProps {
   products: Product[];
+  businessId?: string;
   onProductFound: (product: Product, weight?: number) => Promise<void>;
   selectedWeightProduct: Product | null;
   weightInput: string;
@@ -36,6 +41,7 @@ interface UseBarcodeScannerProps {
  */
 export function useBarcodeScanner({
   products,
+  businessId,
   onProductFound,
   selectedWeightProduct,
   weightInput,
@@ -46,6 +52,7 @@ export function useBarcodeScanner({
   onClearCategorySelection,
   audioEnabled = true,
 }: UseBarcodeScannerProps) {
+  const salesUnitSettings = useSalesUnitSettings(businessId);
   const [barcodeInput, setBarcodeInput] = useState("");
 
   /**
@@ -95,7 +102,11 @@ export function useBarcodeScanner({
             onSetWeightInput("");
             onSetWeightDisplayPrice("0.00");
             onSetSelectedWeightProduct(product);
-            const unit = getProductSalesUnit(product);
+            const productSalesUnit = getProductSalesUnit(product);
+            const unit = getEffectiveSalesUnit(
+              productSalesUnit,
+              salesUnitSettings
+            );
             toast.warning(
               `⚖️ Weight required for ${product.name}. Enter weight in ${unit} and scan again.`
             );
@@ -122,6 +133,7 @@ export function useBarcodeScanner({
       onSetWeightInput,
       onSetWeightDisplayPrice,
       onClearCategorySelection,
+      salesUnitSettings,
     ]
   );
 
@@ -161,7 +173,11 @@ export function useBarcodeScanner({
           onSetWeightInput("");
           onSetWeightDisplayPrice("0.00");
           onSetSelectedWeightProduct(product);
-          const unit = getProductSalesUnit(product);
+          const productSalesUnit = getProductSalesUnit(product);
+          const unit = getEffectiveSalesUnit(
+            productSalesUnit,
+            salesUnitSettings
+          );
           toast.error(`Please enter weight in ${unit} for ${product.name}`);
         }
       } else {
@@ -180,6 +196,7 @@ export function useBarcodeScanner({
     onSetWeightInput,
     onSetWeightDisplayPrice,
     onClearCategorySelection,
+    salesUnitSettings,
   ]);
 
   // Initialize scanner hook
@@ -196,7 +213,9 @@ export function useBarcodeScanner({
   // Initialize audio on component mount
   useEffect(() => {
     if (audioEnabled) {
-      ScannerAudio.init().catch((error) => logger.warn('Failed to initialize scanner audio', error));
+      ScannerAudio.init().catch((error) =>
+        logger.warn("Failed to initialize scanner audio", error)
+      );
     }
   }, [audioEnabled]);
 

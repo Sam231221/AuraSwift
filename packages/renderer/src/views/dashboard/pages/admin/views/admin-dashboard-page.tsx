@@ -27,6 +27,7 @@ const AdminDashboardPage = ({
   onManageUsers,
   onManageProducts,
   onStaffSchedules,
+  onGeneralSettings,
 }: {
   onFront: () => void;
   onNewTransaction?: () => void;
@@ -36,6 +37,7 @@ const AdminDashboardPage = ({
   onManageCashiers?: () => void;
   onManageProducts?: () => void;
   onStaffSchedules?: () => void;
+  onGeneralSettings?: () => void;
 }) => {
   const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
   const [isEmptyDialogOpen, setIsEmptyDialogOpen] = useState(false);
@@ -261,6 +263,14 @@ const AdminDashboardPage = ({
         } else if (actionId === "empty-database") {
           handleEmptyDatabase();
         }
+        break;
+
+      case "system-settings":
+        if (actionId === "general-settings") {
+          logger.info("[handleActionClick] Calling onGeneralSettings()");
+          onGeneralSettings?.();
+        }
+        // Other settings actions (store-configuration, security-settings) can be handled when implemented
         break;
 
       default:

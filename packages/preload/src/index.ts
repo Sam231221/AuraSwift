@@ -26,6 +26,7 @@ import { batchesAPI } from "./api/batches.js";
 import { suppliersAPI } from "./api/suppliers.js";
 import { expirySettingsAPI } from "./api/expirySettings.js";
 import { expiryNotificationsAPI } from "./api/expiryNotifications.js";
+import { salesUnitSettingsAPI } from "./api/salesUnitSettings.js";
 import { stockMovementsAPI } from "./api/stockMovements.js";
 import { cartAPI } from "./api/cart.js";
 import { importAPI } from "./api/import.js";
@@ -58,6 +59,7 @@ contextBridge.exposeInMainWorld(
   "expiryNotificationsAPI",
   expiryNotificationsAPI
 );
+contextBridge.exposeInMainWorld("salesUnitSettingsAPI", salesUnitSettingsAPI);
 contextBridge.exposeInMainWorld("stockMovementsAPI", stockMovementsAPI);
 contextBridge.exposeInMainWorld("cartAPI", cartAPI);
 contextBridge.exposeInMainWorld("importAPI", importAPI);

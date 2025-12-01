@@ -35,6 +35,10 @@ import {
   isWeightedProduct,
   getProductSalesUnit,
 } from "../../utils/product-helpers";
+import {
+  useSalesUnitSettings,
+  getEffectiveSalesUnit,
+} from "@/shared/hooks/use-sales-unit-settings";
 const logger = getLogger("batch-selection-modal");
 
 /**
@@ -136,7 +140,7 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
   onSelect,
   onAutoSelect,
   onCancel,
-  businessId: _businessId, // Prefixed to indicate intentionally unused (reserved for future use)
+  businessId,
   cartItems = [],
 }) => {
   const [batches, setBatches] = useState<BatchInfo[]>([]);
@@ -241,8 +245,10 @@ export const BatchSelectionModal: React.FC<BatchSelectionModalProps> = ({
   );
 
   // Check if product is weighted and get appropriate label
+  const salesUnitSettings = useSalesUnitSettings(businessId);
   const isWeighted = isWeightedProduct(product);
-  const salesUnit = getProductSalesUnit(product);
+  const productSalesUnit = getProductSalesUnit(product);
+  const salesUnit = getEffectiveSalesUnit(productSalesUnit, salesUnitSettings);
   const displayUnit = formatSalesUnit(salesUnit);
   const quantityLabel = isWeighted
     ? `Weight needed: ${requestedQuantity} ${displayUnit}`

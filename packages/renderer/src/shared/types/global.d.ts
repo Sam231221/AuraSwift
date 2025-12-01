@@ -1,39 +1,40 @@
 /**
  * Global Window Interface Augmentation
- * 
+ *
  * This file augments the Window interface with all IPC APIs.
  * All type definitions are imported from /types/api for better organization.
- * 
+ *
  * @see /Users/admin/Documents/Developer/Electron/AuraSwift/packages/renderer/src/types/api
  */
 
-import type { AuthStoreAPI } from '../types/api/auth-store';
-import type { AuthAPI } from '../types/api/auth';
-import type { ProductAPI } from '../types/api/product';
-import type { CartAPI } from '../types/api/cart';
-import type { TransactionAPI } from '../types/api/transaction';
-import type { BatchAPI } from '../types/api/batch';
-import type { ShiftAPI } from '../types/api/shift';
-import type { CategoryAPI } from '../types/api/category';
-import type { RBACAPI } from '../types/api/rbac';
-import type { SupplierAPI } from '../types/api/supplier';
-import type { ExpirySettingsAPI } from '../types/api/expiry-settings';
-import type { StockMovementAPI } from '../types/api/stock-movement';
-import type { ScheduleAPI } from '../types/api/schedule';
-import type { RefundAPI } from '../types/api/refund';
-import type { VoidAPI } from '../types/api/void';
-import type { CashDrawerAPI } from '../types/api/cash-drawer';
-import type { TimeTrackingAPI } from '../types/api/time-tracking';
-import type { AgeVerificationAPI } from '../types/api/age-verification';
-import type { ImportAPI } from '../types/api/import';
-import type { PrinterAPI } from '../types/api/printer';
-import type { OfficePrinterAPI } from '../types/api/office-printer';
-import type { PaymentAPI } from '../types/api/payment';
-import type { ScaleAPI } from '../types/api/scale';
-import type { DatabaseAPI } from '../types/api/database';
-import type { PdfReceiptAPI } from '../types/api/pdf-receipt';
-import type { AppAPI } from '../types/api/app';
-import type { APIResponse } from '../types/api/common';
+import type { AuthStoreAPI } from "../types/api/auth-store";
+import type { AuthAPI } from "../types/api/auth";
+import type { ProductAPI } from "../types/api/product";
+import type { CartAPI } from "../types/api/cart";
+import type { TransactionAPI } from "../types/api/transaction";
+import type { BatchAPI } from "../types/api/batch";
+import type { ShiftAPI } from "../types/api/shift";
+import type { CategoryAPI } from "../types/api/category";
+import type { RBACAPI } from "../types/api/rbac";
+import type { SupplierAPI } from "../types/api/supplier";
+import type { ExpirySettingsAPI } from "../types/api/expiry-settings";
+import type { SalesUnitSettingsAPI } from "../types/api/sales-unit-settings";
+import type { StockMovementAPI } from "../types/api/stock-movement";
+import type { ScheduleAPI } from "../types/api/schedule";
+import type { RefundAPI } from "../types/api/refund";
+import type { VoidAPI } from "../types/api/void";
+import type { CashDrawerAPI } from "../types/api/cash-drawer";
+import type { TimeTrackingAPI } from "../types/api/time-tracking";
+import type { AgeVerificationAPI } from "../types/api/age-verification";
+import type { ImportAPI } from "../types/api/import";
+import type { PrinterAPI } from "../types/api/printer";
+import type { OfficePrinterAPI } from "../types/api/office-printer";
+import type { PaymentAPI } from "../types/api/payment";
+import type { ScaleAPI } from "../types/api/scale";
+import type { DatabaseAPI } from "../types/api/database";
+import type { PdfReceiptAPI } from "../types/api/pdf-receipt";
+import type { AppAPI } from "../types/api/app";
+import type { APIResponse } from "../types/api/common";
 
 declare global {
   interface Window {
@@ -62,6 +63,7 @@ declare global {
     batchesAPI: BatchAPI;
     supplierAPI: SupplierAPI;
     expirySettingsAPI: ExpirySettingsAPI;
+    salesUnitSettingsAPI: SalesUnitSettingsAPI;
     stockMovementAPI: StockMovementAPI;
 
     // Shift Management

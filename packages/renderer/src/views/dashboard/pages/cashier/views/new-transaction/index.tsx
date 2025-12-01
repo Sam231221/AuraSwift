@@ -66,6 +66,10 @@ import type { PrinterConfig } from "@/types/features/printer";
 import { isWeightedProduct } from "./utils/product-helpers";
 import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 import { autoSelectBatches } from "./utils/batch-selection";
+import {
+  useSalesUnitSettings,
+  getEffectiveSalesUnit,
+} from "@/shared/hooks/use-sales-unit-settings";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("index");
@@ -89,6 +93,7 @@ export function NewTransactionView({
 }: NewTransactionViewProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const salesUnitSettings = useSalesUnitSettings(user?.businessId);
 
   // Search query state
   const [searchQuery] = useState("");
@@ -864,8 +869,10 @@ export function NewTransactionView({
                         basePrice: weightInput.selectedWeightProduct.basePrice,
                         pricePerUnit:
                           weightInput.selectedWeightProduct.pricePerKg,
-                        unitOfMeasure:
+                        unitOfMeasure: getEffectiveSalesUnit(
                           weightInput.selectedWeightProduct.salesUnit || "KG",
+                          salesUnitSettings
+                        ),
                       }}
                       onWeightConfirmed={async (weight, scaleReading) => {
                         const product = weightInput.selectedWeightProduct;

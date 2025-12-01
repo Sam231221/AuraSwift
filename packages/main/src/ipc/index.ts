@@ -7,6 +7,7 @@ import { registerCashDrawerHandlers } from "./cash-drawer.handlers.js";
 import { registerCategoryHandlers } from "./category.handlers.js";
 import { registerDbHandlers } from "./db.handler.js";
 import { registerExpiryProductHandlers } from "./expiryProduct.handlers.js";
+import { registerSalesUnitSettingsHandlers } from "./sales-unit-settings.handlers.js";
 import { registerProductHandlers } from "./product.handlers.js";
 import { registerRoleHandlers } from "./role.handlers.js";
 import { registerShiftHandlers } from "./shift.handlers.js";
@@ -24,6 +25,7 @@ export function registerAllIpcHandlers() {
   registerCategoryHandlers();
   registerDbHandlers();
   registerExpiryProductHandlers();
+  registerSalesUnitSettingsHandlers();
   registerProductHandlers();
   registerRoleHandlers();
   registerShiftHandlers();

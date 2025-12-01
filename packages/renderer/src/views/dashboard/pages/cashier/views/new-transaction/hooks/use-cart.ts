@@ -23,6 +23,10 @@ import {
   isWeightedProduct,
   getProductSalesUnit,
 } from "../utils/product-helpers";
+import {
+  useSalesUnitSettings,
+  getEffectiveSalesUnit,
+} from "@/shared/hooks/use-sales-unit-settings";
 
 interface UseCartProps {
   userId: string | undefined;
@@ -44,6 +48,7 @@ export function useCart({
   activeShift,
   todaySchedule,
 }: UseCartProps) {
+  const salesUnitSettings = useSalesUnitSettings(businessId);
   const [cartSession, setCartSession] = useState<CartSession | null>(null);
   const [cartItems, setCartItems] = useState<CartItemWithProduct[]>([]);
   const [loadingCart, setLoadingCart] = useState(false);
@@ -175,7 +180,11 @@ export function useCart({
       }
 
       const isWeighted = isWeightedProduct(product);
-      const salesUnit = getProductSalesUnit(product);
+      const productSalesUnit = getProductSalesUnit(product);
+      const salesUnit = getEffectiveSalesUnit(
+        productSalesUnit,
+        salesUnitSettings
+      );
 
       // Validate weight for weighted items
       if (isWeighted && (!weight || weight <= 0)) {
@@ -344,7 +353,14 @@ export function useCart({
         toast.error(errorMessage);
       }
     },
-    [cartSession, userRole, activeShift, todaySchedule, initializeCartSession]
+    [
+      cartSession,
+      userRole,
+      activeShift,
+      todaySchedule,
+      initializeCartSession,
+      salesUnitSettings,
+    ]
   );
 
   /**

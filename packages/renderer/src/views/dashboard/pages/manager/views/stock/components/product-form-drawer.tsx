@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { AdaptiveFormField } from "@/features/adaptive-keyboard/adaptive-form-field";
 import { AdaptiveTextarea } from "@/features/adaptive-keyboard/adaptive-textarea";
 import { AdaptiveKeyboard } from "@/features/adaptive-keyboard/adaptive-keyboard";
+import type { KeyboardMode } from "@/features/adaptive-keyboard/keyboard-layouts";
 import { useKeyboardWithRHF } from "@/shared/hooks";
 import { cn } from "@/shared/utils/cn";
 import {
@@ -35,6 +36,8 @@ import { ImageIcon, Upload } from "lucide-react";
 import type { Product } from "@/types/domain";
 import type { Category, VatCategory } from "../hooks/use-product-data";
 import { useProductForm } from "../hooks/use-product-form";
+import { useSalesUnitSettings } from "@/shared/hooks/use-sales-unit-settings";
+import { SALES_UNIT_OPTIONS } from "@/types/domain/sales-unit";
 
 interface ProductFormDrawerProps {
   isOpen: boolean;
@@ -58,6 +61,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
   onUpdate,
 }) => {
   const [activeTab, setActiveTab] = useState<string>("basic");
+  const salesUnitSettings = useSalesUnitSettings(businessId);
 
   const { form, handleSubmit, isSubmitting, isEditMode } = useProductForm({
     product: editingProduct,
@@ -66,6 +70,12 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
     businessId,
     onSubmit: async (data) => {
       // Transform form data to API format
+      // If sales unit mode is Fixed, use the fixed unit from settings
+      const effectiveSalesUnit =
+        salesUnitSettings.mode === "Fixed"
+          ? salesUnitSettings.fixedUnit
+          : data.salesUnit || "PIECE";
+
       const productData = {
         name: data.name.trim(),
         description: (data.description || "").trim() || undefined,
@@ -77,7 +87,7 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
         image: (data.image || "").trim() || undefined,
         categoryId: data.categoryId,
         productType: data.productType || "STANDARD",
-        salesUnit: data.salesUnit || "PIECE",
+        salesUnit: effectiveSalesUnit,
         usesScale: data.usesScale || false,
         pricePerKg:
           data.usesScale && data.pricePerKg && data.pricePerKg > 0
@@ -205,6 +215,34 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
     },
     onSuccess: onClose,
   });
+
+  // Update sales unit when fixed mode is enabled or when switch is turned on
+  const usesScale = form.watch("usesScale");
+  const setSalesUnit = form.setValue;
+  useEffect(() => {
+    if (
+      salesUnitSettings.mode === "Fixed" &&
+      !salesUnitSettings.isLoading &&
+      usesScale
+    ) {
+      // Set the sales unit to the fixed unit from settings
+      setSalesUnit("salesUnit", salesUnitSettings.fixedUnit, {
+        shouldValidate: false,
+      });
+    }
+  }, [
+    salesUnitSettings.mode,
+    salesUnitSettings.fixedUnit,
+    salesUnitSettings.isLoading,
+    usesScale,
+    setSalesUnit,
+  ]);
+
+  // Helper function to format sales unit for display
+  const formatSalesUnitForDisplay = (unit: string): string => {
+    const unitOption = SALES_UNIT_OPTIONS.find((opt) => opt.value === unit);
+    return unitOption ? unitOption.label : unit;
+  };
 
   // Keyboard integration hook
   const keyboard = useKeyboardWithRHF({
@@ -521,35 +559,38 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
 
                 <TabsContent value="pricing" className="space-y-4 mt-6">
                   <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="basePrice"
-                      render={() => (
-                        <FormItem>
-                          <FormControl>
-                            <AdaptiveFormField
-                              {...form.register("basePrice")}
-                              label="Sale Price *"
-                              value={
-                                keyboard.formValues.basePrice?.toString() || ""
-                              }
-                              error={form.formState.errors.basePrice?.message}
-                              onFocus={() =>
-                                keyboard.handleFieldFocus("basePrice")
-                              }
-                              placeholder="0.00"
-                              disabled={isSubmitting}
-                              className={cn(
-                                keyboard.activeField === "basePrice" &&
-                                  "ring-2 ring-primary border-primary"
-                              )}
-                              readOnly
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {!form.watch("usesScale") && (
+                      <FormField
+                        control={form.control}
+                        name="basePrice"
+                        render={() => (
+                          <FormItem>
+                            <FormControl>
+                              <AdaptiveFormField
+                                {...form.register("basePrice")}
+                                label="Sale Price *"
+                                value={
+                                  keyboard.formValues.basePrice?.toString() ||
+                                  ""
+                                }
+                                error={form.formState.errors.basePrice?.message}
+                                onFocus={() =>
+                                  keyboard.handleFieldFocus("basePrice")
+                                }
+                                placeholder="0.00"
+                                disabled={isSubmitting}
+                                className={cn(
+                                  keyboard.activeField === "basePrice" &&
+                                    "ring-2 ring-primary border-primary"
+                                )}
+                                readOnly
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
                     <FormField
                       control={form.control}
@@ -686,11 +727,22 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                                   checked ? "WEIGHTED" : "STANDARD"
                                 );
                                 if (checked) {
-                                  form.setValue(
-                                    "pricePerKg",
-                                    form.getValues("basePrice") || 0
-                                  );
+                                  // When enabling weighted mode, copy basePrice to pricePerKg if pricePerKg is empty
+                                  const currentPricePerKg =
+                                    form.getValues("pricePerKg");
+                                  if (
+                                    !currentPricePerKg ||
+                                    currentPricePerKg === 0
+                                  ) {
+                                    form.setValue(
+                                      "pricePerKg",
+                                      form.getValues("basePrice") || 0
+                                    );
+                                  }
+                                  // Keep basePrice as fallback (required by schema)
+                                  // It will be hidden from UI but still stored
                                 } else {
+                                  // When disabling weighted mode, clear pricePerKg
                                   form.setValue("pricePerKg", 0);
                                 }
                               }}
@@ -712,43 +764,97 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                               <FormField
                                 control={form.control}
                                 name="salesUnit"
-                                render={({ field: salesUnitField }) => (
-                                  <FormItem>
-                                    <FormLabel>Sales Unit</FormLabel>
-                                    <Select
-                                      onValueChange={salesUnitField.onChange}
-                                      value={salesUnitField.value || "PIECE"}
-                                      disabled={isSubmitting}
-                                      onOpenChange={() =>
-                                        keyboard.handleCloseKeyboard()
-                                      }
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Select unit" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        <SelectItem value="KG">
-                                          Kilograms (KG)
-                                        </SelectItem>
-                                        <SelectItem value="GRAM">
-                                          Grams (GRAM)
-                                        </SelectItem>
-                                        <SelectItem value="LITRE">
-                                          Litres (LITRE)
-                                        </SelectItem>
-                                        <SelectItem value="ML">
-                                          Millilitres (ML)
-                                        </SelectItem>
-                                        <SelectItem value="PACK">
-                                          Pack (PACK)
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
+                                render={({ field: salesUnitField }) => {
+                                  const isFixedMode =
+                                    salesUnitSettings.mode === "Fixed" &&
+                                    !salesUnitSettings.isLoading;
+                                  const displayUnit = isFixedMode
+                                    ? salesUnitSettings.fixedUnit
+                                    : salesUnitField.value || "PIECE";
+
+                                  // Show loading state while settings are being fetched
+                                  if (salesUnitSettings.isLoading) {
+                                    return (
+                                      <FormItem>
+                                        <FormLabel>Sales Unit</FormLabel>
+                                        <FormControl>
+                                          <div className="flex items-center h-10 px-3 py-2 text-sm bg-muted rounded-md border border-input">
+                                            <span className="text-muted-foreground">
+                                              Loading settings...
+                                            </span>
+                                          </div>
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    );
+                                  }
+
+                                  return (
+                                    <FormItem>
+                                      <FormLabel>Sales Unit</FormLabel>
+                                      {isFixedMode ? (
+                                        <>
+                                          <FormControl>
+                                            <div className="flex items-center h-10 px-3 py-2 text-sm bg-muted rounded-md border border-input">
+                                              <span className="text-muted-foreground">
+                                                This product will be measured in{" "}
+                                                <span className="font-semibold text-foreground">
+                                                  {formatSalesUnitForDisplay(
+                                                    displayUnit
+                                                  )}
+                                                </span>
+                                              </span>
+                                              {/* Hidden input to maintain form state */}
+                                              <input
+                                                type="hidden"
+                                                {...salesUnitField}
+                                                value={displayUnit}
+                                              />
+                                            </div>
+                                          </FormControl>
+                                          <p className="text-xs text-muted-foreground">
+                                            Sales unit is fixed system-wide. To
+                                            change this, update the General
+                                            Settings.
+                                          </p>
+                                          <FormMessage />
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Select
+                                            onValueChange={
+                                              salesUnitField.onChange
+                                            }
+                                            value={displayUnit}
+                                            disabled={isSubmitting}
+                                            onOpenChange={() =>
+                                              keyboard.handleCloseKeyboard()
+                                            }
+                                          >
+                                            <FormControl>
+                                              <SelectTrigger>
+                                                <SelectValue placeholder="Select unit" />
+                                              </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                              {SALES_UNIT_OPTIONS.map(
+                                                (option) => (
+                                                  <SelectItem
+                                                    key={option.value}
+                                                    value={option.value}
+                                                  >
+                                                    {option.label}
+                                                  </SelectItem>
+                                                )
+                                              )}
+                                            </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                        </>
+                                      )}
+                                    </FormItem>
+                                  );
+                                }}
                               />
 
                               <FormField
@@ -760,7 +866,14 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                                       <AdaptiveFormField
                                         {...form.register("pricePerKg")}
                                         label={`Price per ${
-                                          form.watch("salesUnit") || "KG"
+                                          salesUnitSettings.mode === "Fixed" &&
+                                          !salesUnitSettings.isLoading
+                                            ? formatSalesUnitForDisplay(
+                                                salesUnitSettings.fixedUnit
+                                              )
+                                            : formatSalesUnitForDisplay(
+                                                form.watch("salesUnit") || "KG"
+                                              )
                                         }`}
                                         value={
                                           keyboard.formValues.pricePerKg?.toString() ||
@@ -1450,8 +1563,16 @@ const ProductFormDrawer: React.FC<ProductFormDrawerProps> = ({
                       keyboard.handleCloseKeyboard();
                     }}
                     initialMode={
-                      (keyboard.activeFieldConfig as any)?.keyboardMode ||
-                      "qwerty"
+                      keyboard.activeFieldConfig &&
+                      typeof keyboard.activeFieldConfig === "object" &&
+                      keyboard.activeFieldConfig !== null &&
+                      "keyboardMode" in keyboard.activeFieldConfig
+                        ? (
+                            keyboard.activeFieldConfig as {
+                              keyboardMode?: KeyboardMode;
+                            }
+                          ).keyboardMode ?? "qwerty"
+                        : "qwerty"
                     }
                     visible={keyboard.showKeyboard}
                     onClose={keyboard.handleCloseKeyboard}
