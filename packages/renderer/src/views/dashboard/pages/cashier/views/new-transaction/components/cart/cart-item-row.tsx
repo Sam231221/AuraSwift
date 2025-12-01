@@ -5,7 +5,7 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trash2 } from "lucide-react";
-import type { CartItemWithProduct } from "../../../../types/cart.types";
+import type { CartItemWithProduct } from "@/types";
 
 interface CartItemRowProps {
   item: CartItemWithProduct;
@@ -26,14 +26,6 @@ export function CartItemRow({ item, onRemove }: CartItemRowProps) {
         <span className="line-clamp-2">
           {item.product?.name || item.itemName || "Unknown Product"}
         </span>
-        {item.ageRestrictionLevel !== "NONE" && (
-          <Badge
-            variant="outline"
-            className="ml-1 sm:ml-2 text-[10px] sm:text-xs bg-orange-50 text-orange-700 border-orange-200"
-          >
-            {item.ageRestrictionLevel}
-          </Badge>
-        )}
       </td>
       <td className="text-center text-xs sm:text-sm" style={{ width: "120px" }}>
         £{item.unitPrice.toFixed(2)}
