@@ -11,8 +11,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { UserForLogin } from "@/types/domain";
-import { getDemoPin } from "./utils";
-import { ClockInOutButtons } from "./clock-in-out-buttons";
+import { getDemoPin } from "@/features/auth/components/utils";
+import { ClockInOutButtons } from "@/features/auth/components/clock-in-out-buttons";
 import { getLogger } from "@/shared/utils/logger";
 
 const logger = getLogger("pin-entry-screen");

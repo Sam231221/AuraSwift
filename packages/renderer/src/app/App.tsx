@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 
 import { ProtectedRoute, PublicRoute } from "@/components";
-import AuthPage from "@/views/auth";
+import { AuthPage } from "@/features/auth";
 import DashboardPage from "@/views/dashboard";
 
 export default function App() {

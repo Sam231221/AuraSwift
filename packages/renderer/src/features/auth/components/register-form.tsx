@@ -14,7 +14,7 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useRegisterForm } from "../hooks/use-register-form";
+import { useRegisterForm } from "@/features/auth/hooks/use-register-form";
 
 interface RegisterFormProps {
   onSubmit: (userData: {

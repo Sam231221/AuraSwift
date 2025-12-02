@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/shared/hooks";
 import { getUserRoleName } from "@/shared/utils/rbac-helpers";
-import { UserSelectionGrid } from "./user-selection-grid";
-import { PinEntryScreen } from "./pin-entry-screen";
-import { getUserColor } from "./utils";
+import { UserSelectionGrid } from "@/features/auth/components/user-selection-grid";
+import { PinEntryScreen } from "@/features/auth/components/pin-entry-screen";
+import { getUserColor } from "@/features/auth/components/utils";
 import type { UserForLogin } from "@/types/domain";
 
 import { getLogger } from '@/shared/utils/logger';

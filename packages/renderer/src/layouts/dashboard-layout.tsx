@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 import { Store, LogOut, User, Bell, Settings, Clock } from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
-import { ClockOutWarningDialog } from "@/views/auth/components/clock-out-warning-dialog";
+import { ClockOutWarningDialog } from "@/features/auth/components/clock-out-warning-dialog";
 import { userHasAnyRole } from "@/shared/utils/rbac-helpers";
 
 import { getLogger } from '@/shared/utils/logger';

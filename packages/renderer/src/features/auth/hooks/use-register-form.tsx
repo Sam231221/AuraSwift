@@ -1,23 +1,23 @@
 /**
- * Login Form Hook
- * 
- * Custom hook for managing login form state, validation, and submission
+ * Register Form Hook
+ *
+ * Custom hook for managing registration form state, validation, and submission
  * using React Hook Form with Zod validation.
  */
 
 import { useForm } from "react-hook-form";
 import { configuredZodResolver } from "@/shared/validation/resolvers";
 import {
-  loginSchema,
-  type LoginFormData,
-} from "../schemas/login-schema";
+  registerSchema,
+  type RegisterFormData,
+} from "@/features/auth/schemas/register-schema";
 import { toast } from "sonner";
 
-interface UseLoginFormOptions {
+interface UseRegisterFormOptions {
   /**
    * Callback when form is submitted successfully
    */
-  onSubmit: (data: LoginFormData) => Promise<void>;
+  onSubmit: (data: RegisterFormData) => Promise<void>;
 
   /**
    * Optional callback after successful submission
@@ -26,32 +26,37 @@ interface UseLoginFormOptions {
 }
 
 /**
- * Get default form values for login
+ * Get default form values for registration
  */
-const getDefaultValues = (): LoginFormData => ({
+const getDefaultValues = (): RegisterFormData => ({
+  email: "",
   username: "",
   pin: "",
-  rememberMe: false,
+  firstName: "",
+  lastName: "",
+  businessName: "",
+  avatar: "",
+  businessAvatar: "",
 });
 
 /**
- * Hook for managing login form
- * 
+ * Hook for managing register form
+ *
  * @example
  * ```tsx
- * const { form, handleSubmit, isSubmitting } = useLoginForm({
+ * const { form, handleSubmit, isSubmitting } = useRegisterForm({
  *   onSubmit: async (data) => {
- *     await login(data.username, data.pin, data.rememberMe);
+ *     await register(data);
  *   },
  * });
  * ```
  */
-export function useLoginForm({
+export function useRegisterForm({
   onSubmit,
   onSuccess,
-}: UseLoginFormOptions) {
-  const form = useForm<LoginFormData>({
-    resolver: configuredZodResolver(loginSchema),
+}: UseRegisterFormOptions) {
+  const form = useForm<RegisterFormData>({
+    resolver: configuredZodResolver(registerSchema),
     defaultValues: getDefaultValues(),
     mode: "onBlur", // Validate on blur for better UX
   });
@@ -59,10 +64,11 @@ export function useLoginForm({
   const handleSubmit = form.handleSubmit(async (data) => {
     try {
       await onSubmit(data);
+      toast.success("Account created successfully");
       onSuccess?.();
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Login failed";
+        error instanceof Error ? error.message : "Registration failed";
       toast.error(errorMessage);
     }
   });
@@ -74,4 +80,3 @@ export function useLoginForm({
     errors: form.formState.errors,
   };
 }
-

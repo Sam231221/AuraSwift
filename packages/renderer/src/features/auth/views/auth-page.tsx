@@ -3,7 +3,7 @@ import {
   AuthHeader,
   AuthHeroSection,
   AuthUserSelection,
-} from "@/views/auth/components";
+} from "@/features/auth/components";
 
 export default function AuthPage() {
   return (
@@ -17,3 +17,4 @@ export default function AuthPage() {
     </div>
   );
 }
+
