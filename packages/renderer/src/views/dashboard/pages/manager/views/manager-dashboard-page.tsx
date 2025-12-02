@@ -2,15 +2,9 @@ import { DashboardGrid, FEATURE_REGISTRY } from "@/features/dashboard";
 import { ManagerStatsCards } from "@/features/dashboard/components/stats-cards";
 
 const ManagerDashboardPage = ({
-  onStaffSchedules,
-  onManageProducts,
-  onManageCashiers,
-  onNewTransaction,
+  onActionClick,
 }: {
-  onStaffSchedules: () => void;
-  onManageProducts: () => void;
-  onManageCashiers: () => void;
-  onNewTransaction?: () => void;
+  onActionClick?: (featureId: string, actionId: string) => void;
 }) => {
   // Handle feature action clicks
   const handleActionClick = (featureId: string, actionId: string) => {
@@ -18,30 +12,13 @@ const ManagerDashboardPage = ({
       `[ManagerDashboard] handleActionClick: ${featureId} -> ${actionId}`
     );
 
-    switch (featureId) {
-      case "management-actions":
-        if (actionId === "new-sale") {
-          console.log("[ManagerDashboard] Calling onNewTransaction()");
-          onNewTransaction?.();
-        } else if (actionId === "manage-inventory") {
-          console.log("[ManagerDashboard] Calling onManageProducts()");
-          onManageProducts();
-        } else if (actionId === "manage-cashiers") {
-          console.log("[ManagerDashboard] Calling onManageCashiers()");
-          onManageCashiers();
-        } else if (actionId === "staff-schedules") {
-          console.log("[ManagerDashboard] Calling onStaffSchedules()");
-          onStaffSchedules();
-        }
-        // Other actions (void-transaction, apply-discount) can be handled when implemented
-        break;
-
-      default:
-        console.warn(
-          `[ManagerDashboard] Unhandled feature: ${featureId}, action: ${actionId}`
-        );
-        break;
+    // Use navigation handler if provided (for actions that map to views)
+    if (onActionClick) {
+      onActionClick(featureId, actionId);
     }
+
+    // Actions that map to views are handled by onActionClick (navigation handler)
+    // Only handle actions that don't map to views if needed
   };
 
   // Filter features for manager dashboard (exclude admin-only features)

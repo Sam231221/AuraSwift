@@ -14,7 +14,7 @@ const logger = getLogger("use-payment");
 import type {
   CartSession,
   CartItemWithProduct,
-} from "../../../types/cart.types";
+} from "@/types/features/cart";
 import {
   validateCashPayment,
   validateCart,

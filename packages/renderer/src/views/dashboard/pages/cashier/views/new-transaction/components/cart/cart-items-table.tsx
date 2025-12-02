@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
 import { CartItemRow } from "./cart-item-row";
-import type { CartItemWithProduct } from "../../../../types/cart.types";
+import type { CartItemWithProduct } from "@/types/features/cart";
 
 interface CartItemsTableProps {
   items: CartItemWithProduct[];

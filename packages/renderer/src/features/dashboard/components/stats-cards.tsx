@@ -1,25 +1,68 @@
 /**
  * StatsCards Component
- * 
+ *
  * Reusable stats cards component with permission-based visibility.
  * Displays key metrics based on user permissions.
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Users, Shield, AlertTriangle, Package, TrendingUp } from "lucide-react";
+import {
+  DollarSign,
+  Users,
+  Shield,
+  AlertTriangle,
+  Package,
+  TrendingUp,
+} from "lucide-react";
 import { useUserPermissions } from "../hooks/use-user-permissions";
 import { PERMISSIONS } from "@app/shared/constants/permissions";
 
 interface StatsCardsProps {
   className?: string;
 }
+const stats = [
+  {
+    id: "revenue",
+    title: "Total Revenue",
+    value: "$45,231.89",
+    change: "+20.1% from last month",
+    icon: DollarSign,
+    permission: PERMISSIONS.REPORTS_READ,
+  },
+  {
+    id: "users",
+    title: "Active Users",
+    value: "12",
+    change: "3 online now",
+    icon: Users,
+    permission: PERMISSIONS.USERS_MANAGE,
+  },
+  {
+    id: "health",
+    title: "System Health",
+    value: "99.9%",
+    change: "Uptime this month",
+    icon: Shield,
+    permission: PERMISSIONS.SETTINGS_MANAGE,
+  },
+  {
+    id: "alerts",
+    title: "Alerts",
+    value: "2",
+    change: "Require attention",
+    icon: AlertTriangle,
+    permission: PERMISSIONS.REPORTS_READ,
+  },
+];
 
 export function StatsCards({ className = "" }: StatsCardsProps) {
   const { hasPermission, isLoading } = useUserPermissions();
 
   if (isLoading) {
     return (
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 ${className}`}>
+      <div
+        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 ${className}`}
+      >
         {[1, 2, 3, 4].map((i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -36,41 +79,6 @@ export function StatsCards({ className = "" }: StatsCardsProps) {
     );
   }
 
-  const stats = [
-    {
-      id: "revenue",
-      title: "Total Revenue",
-      value: "$45,231.89",
-      change: "+20.1% from last month",
-      icon: DollarSign,
-      permission: PERMISSIONS.REPORTS_READ,
-    },
-    {
-      id: "users",
-      title: "Active Users",
-      value: "12",
-      change: "3 online now",
-      icon: Users,
-      permission: PERMISSIONS.USERS_MANAGE,
-    },
-    {
-      id: "health",
-      title: "System Health",
-      value: "99.9%",
-      change: "Uptime this month",
-      icon: Shield,
-      permission: PERMISSIONS.SETTINGS_MANAGE,
-    },
-    {
-      id: "alerts",
-      title: "Alerts",
-      value: "2",
-      change: "Require attention",
-      icon: AlertTriangle,
-      permission: PERMISSIONS.REPORTS_READ,
-    },
-  ];
-
   const visibleStats = stats.filter((stat) => hasPermission(stat.permission));
 
   if (visibleStats.length === 0) {
@@ -78,11 +86,16 @@ export function StatsCards({ className = "" }: StatsCardsProps) {
   }
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 ${className}`}>
+    <div
+      className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 ${className}`}
+    >
       {visibleStats.map((stat) => {
         const Icon = stat.icon;
         return (
-          <Card key={stat.id} className="shadow-sm hover:shadow-md transition-shadow">
+          <Card
+            key={stat.id}
+            className="shadow-sm hover:shadow-md transition-shadow"
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
@@ -91,7 +104,9 @@ export function StatsCards({ className = "" }: StatsCardsProps) {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stat.change}
+              </p>
             </CardContent>
           </Card>
         );
@@ -102,7 +117,7 @@ export function StatsCards({ className = "" }: StatsCardsProps) {
 
 /**
  * Manager Stats Cards
- * 
+ *
  * Specialized stats cards for manager dashboard.
  */
 export const ManagerStatsCards = ({ className = "" }: StatsCardsProps) => {
@@ -110,7 +125,9 @@ export const ManagerStatsCards = ({ className = "" }: StatsCardsProps) => {
 
   if (isLoading) {
     return (
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 ${className}`}>
+      <div
+        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 ${className}`}
+      >
         {[1, 2, 3, 4].map((i) => (
           <Card key={i} className="animate-pulse">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -169,18 +186,24 @@ export const ManagerStatsCards = ({ className = "" }: StatsCardsProps) => {
   }
 
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 ${className}`}>
+    <div
+      className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 ${className}`}
+    >
       {visibleStats.map((stat) => {
         const Icon = stat.icon;
         return (
           <Card key={stat.id}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
             </CardHeader>
             <CardContent>
               <div className="text-xl sm:text-2xl font-bold">{stat.value}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">{stat.change}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
+                {stat.change}
+              </p>
             </CardContent>
           </Card>
         );
@@ -188,4 +211,3 @@ export const ManagerStatsCards = ({ className = "" }: StatsCardsProps) => {
     </div>
   );
 };
-

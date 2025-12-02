@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
 import type { Product } from "@/types/domain";
+import { useNestedNavigation } from "@/navigation/hooks/use-nested-navigation";
+import { getNestedViews } from "@/navigation/registry/view-registry";
 
 import ManageCategoriesView from "@/views/dashboard/pages/manager/views/stock/manage-categories-view";
 import ProductDashboardView from "./product-dashboard-view";
@@ -28,14 +29,20 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 }) => {
   const { user } = useAuth();
 
-  // View state
-  const [currentView, setCurrentView] = useState<
-    | "productDashboard"
-    | "productManagement"
-    | "categoryManagement"
-    | "batchManagement"
-    | "stockMovementHistory"
-  >("productDashboard");
+  // Use nested navigation instead of local state
+  const { navigateTo, currentNestedViewId } =
+    useNestedNavigation("productManagement");
+
+  const nestedViews = getNestedViews("productManagement");
+  const defaultView = nestedViews.find((v) => v.id === "productDashboard");
+
+  // Map nested view IDs to the old view names for compatibility
+  const currentView = useMemo(() => {
+    if (!currentNestedViewId) {
+      return defaultView?.id || "productDashboard";
+    }
+    return currentNestedViewId;
+  }, [currentNestedViewId, defaultView]);
 
   // Track which product to filter batches by
   const [batchFilterProductId, setBatchFilterProductId] = useState<
@@ -167,7 +174,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     try {
       const response = await window.categoryAPI.getByBusiness(user.businessId);
       if (response.success && response.categories) {
-        setCategories(response.categories as any);
+        setCategories(response.categories as Category[]);
       }
     } catch (error) {
       logger.error("Error loading categories:", error);
@@ -183,7 +190,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         user.businessId
       );
       if (response.success && response.vatCategories) {
-        setVatCategories(response.vatCategories as any);
+        setVatCategories(response.vatCategories as VatCategory[]);
       }
     } catch (error) {
       logger.error("Error loading VAT categories:", error);
@@ -206,7 +213,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     if (currentPage !== 1) {
       setCurrentPage(1);
     }
-  }, [searchTerm, filterCategory, filterStock, filterStatus]);
+  }, [searchTerm, filterCategory, filterStock, filterStatus, currentPage]);
 
   // Reload categories when returning from category management
   useEffect(() => {
@@ -215,6 +222,13 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
       loadCategories();
     }
   }, [currentView, user?.businessId, loadCategories]);
+
+  // Initialize default view if none is selected
+  useEffect(() => {
+    if (!currentNestedViewId && defaultView) {
+      navigateTo(defaultView.id);
+    }
+  }, [currentNestedViewId, defaultView, navigateTo]);
 
   // Reset stock adjustment form when modal opens
   useEffect(() => {
@@ -304,21 +318,117 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     setIsDrawerOpen(true);
   }, []);
 
-  const handleSaveProduct = useCallback(
-    (_product: Product) => {
-      loadProducts(); // Reload to ensure consistency
-      loadAllProducts(); // Update dashboard stats
-    },
-    [loadProducts, loadAllProducts]
-  );
+  const handleSaveProduct = useCallback(() => {
+    loadProducts(); // Reload to ensure consistency
+    loadAllProducts(); // Update dashboard stats
+  }, [loadProducts, loadAllProducts]);
 
-  const handleUpdateProduct = useCallback(
-    (_productId: string, _updatedProduct: Product) => {
-      loadProducts(); // Reload to ensure consistency
-      loadAllProducts(); // Update dashboard stats
-    },
-    [loadProducts, loadAllProducts]
-  );
+  const handleUpdateProduct = useCallback(() => {
+    loadProducts(); // Reload to ensure consistency
+    loadAllProducts(); // Update dashboard stats
+  }, [loadProducts, loadAllProducts]);
+
+  // Create view components with proper props (must be before conditional return)
+  const viewComponents = useMemo(() => {
+    if (!user) return {};
+
+    const goToDashboard = () => navigateTo("productDashboard");
+
+    return {
+      productDashboard: (
+        <ProductDashboardView
+          products={allProducts}
+          categories={categories}
+          lowStockProducts={lowStockProducts}
+          onBack={onBack}
+          onManageProducts={() => navigateTo("productList")}
+          onManageCategories={() => navigateTo("categoryManagement")}
+          onAddProduct={openAddProductDrawer}
+          onRestockProduct={handleAdjustStockClick}
+          onManageBatches={() => navigateTo("batchManagement")}
+        />
+      ),
+      productList: (
+        <ProductDetailsView
+          products={products}
+          categories={categories}
+          loading={loading}
+          searchTerm={searchTerm}
+          filterCategory={filterCategory}
+          filterStock={filterStock}
+          filterStatus={filterStatus}
+          showFields={showFields}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          onBack={goToDashboard}
+          onAddProduct={openAddProductDrawer}
+          onEditProduct={handleEditProduct}
+          onDeleteProduct={handleDeleteProduct}
+          onAdjustStock={handleAdjustStockClick}
+          onSearchChange={setSearchTerm}
+          onCategoryFilterChange={setFilterCategory}
+          onStockFilterChange={(value: string) => setFilterStock(value)}
+          onStatusFilterChange={(value: string) => setFilterStatus(value)}
+          onShowFieldsChange={setShowFields}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+          onProductsImported={() => {
+            loadProducts();
+            loadAllProducts();
+          }}
+        />
+      ),
+      categoryManagement: <ManageCategoriesView onBack={goToDashboard} />,
+      batchManagement: (
+        <BatchManagementView
+          onBack={() => {
+            setBatchFilterProductId(undefined);
+            goToDashboard();
+          }}
+          initialProductId={batchFilterProductId}
+        />
+      ),
+      stockMovementHistory: <StockMovementHistoryView onBack={goToDashboard} />,
+    };
+  }, [
+    user,
+    navigateTo,
+    onBack,
+    allProducts,
+    categories,
+    lowStockProducts,
+    products,
+    loading,
+    searchTerm,
+    filterCategory,
+    filterStock,
+    filterStatus,
+    showFields,
+    currentPage,
+    totalPages,
+    pageSize,
+    totalItems,
+    openAddProductDrawer,
+    handleAdjustStockClick,
+    handleEditProduct,
+    handleDeleteProduct,
+    setSearchTerm,
+    setFilterCategory,
+    setFilterStock,
+    setFilterStatus,
+    setShowFields,
+    setCurrentPage,
+    setPageSize,
+    loadProducts,
+    loadAllProducts,
+    batchFilterProductId,
+    setBatchFilterProductId,
+  ]);
 
   if (!user) {
     return null;
@@ -326,87 +436,16 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   return (
     <>
-      {/* Main Content */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentView}
-          initial={{
-            x: currentView === "productDashboard" ? 300 : -300,
-            opacity: 0,
-          }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{
-            x: currentView === "productDashboard" ? -300 : 300,
-            opacity: 0,
-          }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="w-full"
-        >
-          {currentView === "productDashboard" ? (
-            <ProductDashboardView
-              products={allProducts}
-              categories={categories as any}
-              lowStockProducts={lowStockProducts}
-              onBack={onBack}
-              onManageProducts={() => setCurrentView("productManagement")}
-              onManageCategories={() => setCurrentView("categoryManagement")}
-              onAddProduct={openAddProductDrawer}
-              onRestockProduct={handleAdjustStockClick}
-              onManageBatches={() => setCurrentView("batchManagement")}
-            />
-          ) : currentView === "categoryManagement" ? (
-            <ManageCategoriesView
-              onBack={() => setCurrentView("productDashboard")}
-            />
-          ) : currentView === "batchManagement" ? (
-            <BatchManagementView
-              onBack={() => {
-                setBatchFilterProductId(undefined);
-                setCurrentView("productDashboard");
-              }}
-              initialProductId={batchFilterProductId}
-            />
-          ) : currentView === "stockMovementHistory" ? (
-            <StockMovementHistoryView
-              onBack={() => setCurrentView("productDashboard")}
-            />
-          ) : (
-            <ProductDetailsView
-              products={products}
-              categories={categories as any}
-              loading={loading}
-              searchTerm={searchTerm}
-              filterCategory={filterCategory}
-              filterStock={filterStock}
-              filterStatus={filterStatus}
-              showFields={showFields}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              totalItems={totalItems}
-              onBack={() => setCurrentView("productDashboard")}
-              onAddProduct={openAddProductDrawer}
-              onEditProduct={handleEditProduct}
-              onDeleteProduct={handleDeleteProduct}
-              onAdjustStock={handleAdjustStockClick}
-              onSearchChange={setSearchTerm}
-              onCategoryFilterChange={setFilterCategory}
-              onStockFilterChange={(value: string) => setFilterStock(value)}
-              onStatusFilterChange={(value: string) => setFilterStatus(value)}
-              onShowFieldsChange={setShowFields}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setCurrentPage(1);
-              }}
-              onProductsImported={() => {
-                loadProducts();
-                loadAllProducts();
-              }}
-            />
-          )}
-        </motion.div>
-      </AnimatePresence>
+      {/* Main Content - Use NestedViewContainer for navigation */}
+      <div className="w-full">
+        {currentView === "productDashboard" && viewComponents.productDashboard}
+        {currentView === "productList" && viewComponents.productList}
+        {currentView === "categoryManagement" &&
+          viewComponents.categoryManagement}
+        {currentView === "batchManagement" && viewComponents.batchManagement}
+        {currentView === "stockMovementHistory" &&
+          viewComponents.stockMovementHistory}
+      </div>
 
       {/* Stock Adjustment Modal */}
       <StockAdjustmentModal
@@ -431,8 +470,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         <ProductFormDrawer
           isOpen={isDrawerOpen}
           editingProduct={editingProduct}
-          categories={categories as any}
-          vatCategories={vatCategories as any}
+          categories={categories}
+          vatCategories={vatCategories as unknown as VatCategory[]}
           businessId={user.businessId}
           onClose={() => setIsDrawerOpen(false)}
           onSave={handleSaveProduct}

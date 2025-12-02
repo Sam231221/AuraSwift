@@ -6,7 +6,7 @@
 import { CardContent } from "@/components/ui/card";
 import { CartItemsTable } from "./cart-items-table";
 import { CartSummary } from "./cart-summary";
-import type { CartItemWithProduct } from "../../../../types/cart.types";
+import type { CartItemWithProduct } from "@/types/features/cart";
 
 interface CartPanelProps {
   cartItems: CartItemWithProduct[];

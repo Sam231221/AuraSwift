@@ -6,7 +6,7 @@
  */
 
 import { useMemo } from "react";
-import type { CartItemWithProduct } from "../../../../types/cart.types";
+import type { CartItemWithProduct } from "@/types/features/cart";
 
 interface CartSummaryProps {
   subtotal: number;

@@ -3,7 +3,7 @@
  */
 
 import type { Product } from "@/types/domain";
-import type { CartItemWithProduct } from "../../../types/cart.types";
+import type { CartItemWithProduct } from "@/types/features/cart";
 import {
   isWeightedProduct,
   getProductPrice,

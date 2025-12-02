@@ -16,12 +16,13 @@ import type { Product } from "@/types/domain";
 interface Category {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   businessId: string;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
+  isActive: boolean | null;
+  sortOrder: number | null;
+  createdAt: Date | string;
+  updatedAt: Date | string | null;
+  [key: string]: unknown; // Allow additional properties from database
 }
 
 interface ProductDashboardViewProps {

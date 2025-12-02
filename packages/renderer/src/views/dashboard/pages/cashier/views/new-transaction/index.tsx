@@ -176,7 +176,7 @@ export function NewTransactionView({
   // Shift hook (only used for cashier mode)
   const shift = useShift({
     userId: user?.id,
-    userRole: user?.role,
+    userRole: user ? getUserRoleName(user) : undefined,
     businessId: user?.businessId,
     onCartSessionInit: async () => {
       await cart.initializeCartSession();
@@ -188,7 +188,7 @@ export function NewTransactionView({
   const cart = useCart({
     userId: user?.id,
     businessId: user?.businessId,
-    userRole: user?.role,
+    userRole: user ? getUserRoleName(user) : undefined,
     activeShift: salesMode.activeShift || shift.activeShift, // Use salesMode activeShift if available
     todaySchedule: shift.todaySchedule,
   });

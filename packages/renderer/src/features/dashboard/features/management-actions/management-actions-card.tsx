@@ -1,6 +1,6 @@
 /**
  * Management Actions Feature Card
- * 
+ *
  * Dedicated component for the Management Actions feature.
  * Handles navigation injection for management operations.
  */
@@ -11,7 +11,6 @@ import type { FeatureConfig } from "../../types/feature-config";
 
 interface ManagementActionsCardProps {
   onNewSale?: () => void;
-  onVoidTransaction?: () => void;
   onApplyDiscount?: () => void;
   onManageInventory?: () => void;
   onManageCashiers?: () => void;
@@ -20,7 +19,6 @@ interface ManagementActionsCardProps {
 
 export function ManagementActionsCard({
   onNewSale,
-  onVoidTransaction,
   onApplyDiscount,
   onManageInventory,
   onManageCashiers,
@@ -38,9 +36,6 @@ export function ManagementActionsCard({
         switch (action.id) {
           case "new-sale":
             onNewSale?.();
-            break;
-          case "void-transaction":
-            onVoidTransaction?.();
             break;
           case "apply-discount":
             onApplyDiscount?.();
@@ -63,4 +58,3 @@ export function ManagementActionsCard({
 
   return <FeatureCard feature={featureWithHandlers} />;
 }
-

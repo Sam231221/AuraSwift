@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import type {
   CartSession,
   CartItemWithProduct,
-} from "../../../types/cart.types";
+} from "@/types/features/cart";
 import type { Product } from "@/types/domain";
 import type { Category } from "@/types/domain/category";
 

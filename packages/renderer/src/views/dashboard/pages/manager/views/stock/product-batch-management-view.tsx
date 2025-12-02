@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,6 +20,8 @@ import {
 import { useAuth } from "@/shared/hooks/use-auth";
 import { Pagination } from "@/components/ui/pagination";
 import { useExpiryAlerts } from "./hooks/use-expiry-alerts";
+import { useNestedNavigation } from "@/navigation/hooks/use-nested-navigation";
+import { getNestedViews } from "@/navigation/registry/view-registry";
 import BatchList from "./components/batch-list";
 import BatchFormDrawer from "./components/batch-form-drawer";
 import BatchAdjustmentModal from "./components/batch-adjustment-modal";
@@ -41,17 +43,52 @@ interface BatchManagementViewProps {
   initialProductId?: string;
 }
 
-type ViewMode = "dashboard" | "list" | "alerts" | "create";
-
 const BatchManagementView: React.FC<BatchManagementViewProps> = ({
   onBack,
   initialProductId,
 }) => {
   const { user } = useAuth();
 
-  const [currentView, setCurrentView] = useState<ViewMode>(
-    initialProductId ? "list" : "dashboard"
-  );
+  // Use nested navigation instead of local state
+  const { navigateTo, currentNestedViewId, currentNestedParams } =
+    useNestedNavigation("batchManagement");
+
+  const nestedViews = getNestedViews("batchManagement");
+  const defaultView = nestedViews.find((v) => v.id === "batchDashboard");
+
+  // Get productId from params if provided
+  const productIdFromParams = currentNestedParams?.productId as
+    | string
+    | undefined;
+  const effectiveProductId = productIdFromParams || initialProductId;
+
+  // Map nested view IDs to view modes for compatibility
+  const currentView = useMemo(() => {
+    if (!currentNestedViewId) {
+      // Default to dashboard or list based on initialProductId
+      return effectiveProductId ? "list" : "dashboard";
+    }
+
+    // Map nested view IDs to view modes
+    const viewMap: Record<string, "dashboard" | "list" | "alerts"> = {
+      batchDashboard: "dashboard",
+      batchList: "list",
+      expiryAlerts: "alerts",
+    };
+
+    return viewMap[currentNestedViewId] || "dashboard";
+  }, [currentNestedViewId, effectiveProductId]);
+
+  // Initialize default view if none is selected
+  useEffect(() => {
+    if (!currentNestedViewId && defaultView) {
+      const initialView = effectiveProductId ? "batchList" : "batchDashboard";
+      navigateTo(
+        initialView,
+        effectiveProductId ? { productId: effectiveProductId } : undefined
+      );
+    }
+  }, [currentNestedViewId, defaultView, navigateTo, effectiveProductId]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [editingBatch, setEditingBatch] = useState<ProductBatch | null>(null);
   const [isBatchFormOpen, setIsBatchFormOpen] = useState(false);
@@ -102,15 +139,16 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     loadProducts();
   }, [user?.businessId]);
 
-  // Auto-select product from initialProductId prop
+  // Auto-select product from initialProductId or params
   useEffect(() => {
-    if (initialProductId && products.length > 0) {
-      const product = products.find((p) => p.id === initialProductId);
+    const productId = effectiveProductId;
+    if (productId && products.length > 0) {
+      const product = products.find((p) => p.id === productId);
       if (product) {
         setSelectedProduct(product);
       }
     }
-  }, [initialProductId, products]);
+  }, [effectiveProductId, products]);
 
   // Load paginated batches
   const loadBatches = useCallback(async () => {
@@ -127,10 +165,10 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           sortOrder: "asc",
         },
         {
-          productId: selectedProduct?.id || initialProductId,
-          status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+          productId: selectedProduct?.id || effectiveProductId,
+          status: statusFilter !== "all" ? (statusFilter as string) : undefined,
           expiryStatus:
-            expiryFilter !== "all" ? (expiryFilter as any) : undefined,
+            expiryFilter !== "all" ? (expiryFilter as string) : undefined,
         }
       );
 
@@ -451,7 +489,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           batches={allBatches}
           expirySettings={expirySettings}
           businessId={user.businessId}
-          onViewBatches={() => setCurrentView("list")}
+          onViewBatches={() => navigateTo("batchList")}
           onReceiveBatch={handleCreateBatch}
           onGenerateReport={() => {
             toast.info("Report generation coming soon");
@@ -520,7 +558,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentView("dashboard")}
+                onClick={() => navigateTo("batchDashboard")}
                 className="w-fit"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
@@ -545,7 +583,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setCurrentView("alerts")}
+                onClick={() => navigateTo("expiryAlerts")}
                 className="w-full sm:w-auto"
               >
                 <AlertTriangle className="w-4 h-4 mr-2" />

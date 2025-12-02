@@ -9,10 +9,10 @@ interface Category {
   name: string;
   description?: string | null;
   businessId: string;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt?: string | null;
+  isActive: boolean | null;
+  sortOrder: number | null;
+  createdAt: Date | string;
+  updatedAt?: Date | string | null;
   image?: string | null;
   color?: string | null;
   parentId?: string | null;

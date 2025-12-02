@@ -19,16 +19,7 @@ import { getLogger } from "@/shared/utils/logger";
 
 const logger = getLogger("admin-dashboard-page");
 
-const AdminDashboardPage = ({
-  onFront,
-  onNewTransaction,
-  onNavigateToRoles,
-  onNavigateToUserRoles,
-  onManageUsers,
-  onManageProducts,
-  onStaffSchedules,
-  onGeneralSettings,
-}: {
+interface AdminDashboardPageProps {
   onFront: () => void;
   onNewTransaction?: () => void;
   onNavigateToRoles?: () => void;
@@ -38,7 +29,20 @@ const AdminDashboardPage = ({
   onManageProducts?: () => void;
   onStaffSchedules?: () => void;
   onGeneralSettings?: () => void;
-}) => {
+  onActionClick?: (featureId: string, actionId: string) => void;
+}
+
+const AdminDashboardPage = ({
+  onFront: _onFront,
+  onNewTransaction: _onNewTransaction,
+  onNavigateToRoles: _onNavigateToRoles,
+  onNavigateToUserRoles: _onNavigateToUserRoles,
+  onManageUsers: _onManageUsers,
+  onManageProducts: _onManageProducts,
+  onStaffSchedules: _onStaffSchedules,
+  onGeneralSettings: _onGeneralSettings,
+  onActionClick,
+}: AdminDashboardPageProps) => {
   const [isBackupDialogOpen, setIsBackupDialogOpen] = useState(false);
   const [isEmptyDialogOpen, setIsEmptyDialogOpen] = useState(false);
   const [_isBackingUp, setIsBackingUp] = useState(false);
@@ -214,46 +218,15 @@ const AdminDashboardPage = ({
       `[handleActionClick] Feature: ${featureId}, Action: ${actionId}`
     );
 
+    // Use navigation handler if provided (for actions that map to views)
+    if (onActionClick) {
+      onActionClick(featureId, actionId);
+    }
+
+    // Handle actions that don't map to views (modals, dialogs, etc.)
     switch (featureId) {
-      case "user-management":
-        if (actionId === "manage-users") {
-          logger.info("[handleActionClick] Calling onFront()");
-          onFront();
-        } else if (actionId === "role-permissions") {
-          logger.info("[handleActionClick] Calling onNavigateToRoles()");
-          onNavigateToRoles?.();
-        } else if (actionId === "user-role-assignment") {
-          logger.info("[handleActionClick] Calling onNavigateToUserRoles()");
-          onNavigateToUserRoles?.();
-        }
-        break;
-
-      case "management-actions":
-        if (actionId === "new-sale") {
-          logger.info("[handleActionClick] Calling onNewTransaction()");
-          onNewTransaction?.();
-        } else if (actionId === "manage-inventory") {
-          logger.info("[handleActionClick] Calling onManageProducts()");
-          onManageProducts?.();
-        } else if (actionId === "manage-users") {
-          logger.info("[handleActionClick] Calling onManageCashiers()");
-          onManageUsers?.();
-        } else if (actionId === "staff-schedules") {
-          logger.info("[handleActionClick] Calling onStaffSchedules()");
-          onStaffSchedules?.();
-        }
-        // Other actions (void-transaction, apply-discount) can be handled when implemented
-        break;
-
-      case "quick-actions":
-        if (actionId === "quick-new-sale") {
-          logger.info("[handleActionClick] Calling onNewTransaction()");
-          onNewTransaction?.();
-        } else if (actionId === "quick-manage-users") {
-          logger.info("[handleActionClick] Calling onFront()");
-          onFront();
-        }
-        break;
+      // Actions that map to views are handled by onActionClick (navigation handler)
+      // Only handle actions that don't map to views (modals, dialogs, etc.)
 
       case "database-management":
         if (actionId === "import-database") {
@@ -265,13 +238,7 @@ const AdminDashboardPage = ({
         }
         break;
 
-      case "system-settings":
-        if (actionId === "general-settings") {
-          logger.info("[handleActionClick] Calling onGeneralSettings()");
-          onGeneralSettings?.();
-        }
-        // Other settings actions (store-configuration, security-settings) can be handled when implemented
-        break;
+      // system-settings actions are handled by onActionClick (navigation handler)
 
       default:
         logger.warn(

@@ -27,12 +27,12 @@ import { ImportBookerModal } from "./components/import-booker-modal";
 interface Category {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   businessId: string;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-  updatedAt: string;
+  isActive: boolean | null;
+  sortOrder: number | null;
+  createdAt: Date | string;
+  updatedAt: Date | string | null;
 }
 
 interface ProductDetailsViewProps {

@@ -19,7 +19,6 @@ import {
   Upload,
   Download,
   Trash2,
-  CreditCard,
   Calendar,
   FileText,
 } from "lucide-react";
@@ -74,7 +73,7 @@ export const FEATURE_REGISTRY: FeatureConfig[] = [
   // ============================================================================
   {
     id: "management-actions",
-    title: "Management Actions",
+    title: "Inventory Actions",
     description: "Store operations and oversight",
     icon: Settings,
     permissions: [
@@ -95,13 +94,6 @@ export const FEATURE_REGISTRY: FeatureConfig[] = [
         variant: "default",
       },
       {
-        id: "void-transaction",
-        label: "Void Transaction",
-        icon: CreditCard,
-        onClick: () => {},
-        permissions: [PERMISSIONS.TRANSACTIONS_OVERRIDE],
-      },
-      {
         id: "apply-discount",
         label: "Apply Discount",
         icon: TrendingUp,
@@ -115,13 +107,7 @@ export const FEATURE_REGISTRY: FeatureConfig[] = [
         onClick: () => {},
         permissions: [PERMISSIONS.INVENTORY_MANAGE],
       },
-      {
-        id: "manage-users",
-        label: "Manage Users",
-        icon: Users,
-        onClick: () => {},
-        permissions: [PERMISSIONS.USERS_MANAGE],
-      },
+
       {
         id: "staff-schedules",
         label: "Staff Schedules",

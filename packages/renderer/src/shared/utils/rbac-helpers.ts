@@ -7,7 +7,7 @@
  * @module rbac-helpers
  */
 
-import type { User } from "../types/user";
+import type { User } from "@/types/domain/user";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("rbac-helpers");
@@ -99,7 +99,7 @@ export function getUserRoleDisplayName(
  * @example
  * ```tsx
  * if (userHasRole(user, "admin")) {
- *   return <AdminDashboard />;
+ *   return <DashboardPageWrapper />;
  * }
  * ```
  */
