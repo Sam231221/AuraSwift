@@ -31,6 +31,11 @@ export default defineConfig({
         brotliSize: true,
       }),
   ].filter(Boolean),
+  define: {
+    // Provide global and process for Node.js polyfills
+    global: "globalThis",
+    "process.env": "{}",
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -77,5 +82,11 @@ export default defineConfig({
       "@tanstack/react-query",
       "@reduxjs/toolkit",
     ],
+    esbuildOptions: {
+      // Provide Buffer polyfill
+      define: {
+        global: "globalThis",
+      },
+    },
   },
 });

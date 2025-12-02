@@ -9,9 +9,12 @@ import { useAuth } from "@/shared/hooks";
 import { getUserRoleName } from "@/shared/utils/rbac-helpers";
 import { DashboardLayout } from "@/layouts/dashboard-layout";
 import { getRoleDisplayName, getUserDisplayName } from "@/shared/utils/auth";
-import AdminDashboardPage from "@/views/dashboard/pages/admin/views/admin-dashboard-page";
-import CashierDashboardPage from "@/views/dashboard/pages/cashier/views/cashier-dashboard-page";
-import ManagerDashboardPage from "@/views/dashboard/pages/manager/views/manager-dashboard-page";
+import {
+  AdminDashboardView,
+  CashierDashboardView,
+  ManagerDashboardView,
+} from "@/features/dashboard";
+
 import { useNavigation } from "../hooks/use-navigation";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
 import { LoadingScreen } from "@/components/loading-screen";
@@ -36,7 +39,7 @@ export function DashboardPageWrapper() {
 
   // Dashboard navigation handler for feature actions
   const handleActionClick = useDashboardNavigation();
-  
+
   // Navigation helper
   const handleNavigate = (viewId: string) => {
     navigateTo(viewId);
@@ -49,7 +52,7 @@ export function DashboardPageWrapper() {
           title={`${roleDisplayName} Dashboard`}
           subtitle={`Welcome, ${userDisplayName}`}
         >
-          <AdminDashboardPage
+          <AdminDashboardView
             onFront={() => navigateTo("userManagement")}
             onActionClick={handleActionClick}
           />
@@ -62,9 +65,7 @@ export function DashboardPageWrapper() {
           title={`${roleDisplayName} Dashboard`}
           subtitle={`Welcome, ${userDisplayName}`}
         >
-          <ManagerDashboardPage
-            onActionClick={handleActionClick}
-          />
+          <ManagerDashboardView onActionClick={handleActionClick} />
         </DashboardLayout>
       );
 
@@ -74,7 +75,7 @@ export function DashboardPageWrapper() {
           title={`${roleDisplayName} Dashboard`}
           subtitle={`Welcome, ${userDisplayName}`}
         >
-          <CashierDashboardPage
+          <CashierDashboardView
             onNewTransaction={() => handleNavigate("newTransaction")}
           />
         </DashboardLayout>
@@ -93,4 +94,3 @@ export function DashboardPageWrapper() {
       );
   }
 }
-

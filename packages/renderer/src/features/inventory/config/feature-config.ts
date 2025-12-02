@@ -1,0 +1,226 @@
+/**
+ * Inventory Feature Configuration
+ *
+ * Central configuration for the inventory feature.
+ * This is used by the navigation system and dashboard.
+ *
+ * NOTE: This file will be updated as views are migrated to the new structure.
+ */
+
+import { Package } from "lucide-react";
+import { INVENTORY_PERMISSIONS } from "./permissions";
+import { INVENTORY_ROUTES } from "./navigation";
+import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
+import type { ViewConfig } from "@/navigation/types";
+
+// Import views from new location
+import ProductManagementView from "../views/product-management-view";
+import ManageCategoriesView from "../views/category-management-view";
+import BatchManagementView from "../views/batch-management-view";
+import StockMovementHistoryView from "../views/stock-movement-history-view";
+import ProductDashboardView from "../views/inventory-dashboard-view";
+import ProductDetailsView from "../views/product-details-view";
+import { ExpiryDashboardView } from "../views/expiry-dashboard-view";
+
+/**
+ * Inventory Feature Configuration for Dashboard
+ */
+export const inventoryFeature: FeatureConfig = {
+  id: "inventory",
+  title: "Inventory Management",
+  description: "Manage products, batches, and stock levels",
+  icon: Package,
+  permissions: [INVENTORY_PERMISSIONS.READ, INVENTORY_PERMISSIONS.MANAGE],
+  category: "management",
+  order: 1,
+  actions: [
+    {
+      id: "view-products",
+      label: "View Products",
+      icon: Package,
+      onClick: () => {}, // Will be injected by dashboard
+      permissions: [INVENTORY_PERMISSIONS.READ],
+    },
+    {
+      id: "manage-products",
+      label: "Manage Products",
+      icon: Package,
+      onClick: () => {},
+      permissions: [INVENTORY_PERMISSIONS.MANAGE],
+    },
+    {
+      id: "manage-batches",
+      label: "Manage Batches",
+      icon: Package,
+      onClick: () => {},
+      permissions: [INVENTORY_PERMISSIONS.MANAGE_BATCHES],
+    },
+    {
+      id: "manage-categories",
+      label: "Manage Categories",
+      icon: Package,
+      onClick: () => {},
+      permissions: [INVENTORY_PERMISSIONS.MANAGE_CATEGORIES],
+    },
+  ],
+};
+
+/**
+ * View Registry for Inventory Feature
+ *
+ * All views in the inventory feature are registered here.
+ * This is used by the navigation system.
+ *
+ * NOTE: These will be updated to use new view locations after migration.
+ */
+export const inventoryViews: Record<string, ViewConfig> = {
+  // Main product management view (will become inventory dashboard)
+  [INVENTORY_ROUTES.DASHBOARD]: {
+    id: INVENTORY_ROUTES.DASHBOARD,
+    level: "root",
+    component: ProductManagementView, // TODO: Replace with InventoryDashboardView after migration
+    metadata: {
+      title: "Inventory Dashboard",
+      description: "Overview of inventory status",
+    },
+    permissions: [INVENTORY_PERMISSIONS.READ],
+    requiresAuth: true,
+  },
+
+  // Product management (legacy route - will be mapped to new routes)
+  productManagement: {
+    id: "productManagement",
+    level: "root",
+    component: ProductManagementView,
+    metadata: {
+      title: "Product Management",
+      description: "Manage products and inventory",
+    },
+    permissions: [INVENTORY_PERMISSIONS.MANAGE],
+    roles: ["admin", "manager"],
+    requiresAuth: true,
+  },
+
+  // Nested views within Product Management
+  productDashboard: {
+    id: "productDashboard",
+    level: "nested",
+    parentId: "productManagement",
+    component: ProductDashboardView,
+    metadata: {
+      title: "Product Dashboard",
+      breadcrumb: "Dashboard",
+    },
+    permissions: [INVENTORY_PERMISSIONS.READ],
+    requiresAuth: true,
+  },
+
+  productList: {
+    id: "productList",
+    level: "nested",
+    parentId: "productManagement",
+    component: ProductManagementView, // Rendered internally
+    metadata: {
+      title: "Product List",
+      breadcrumb: "Products",
+    },
+    permissions: [INVENTORY_PERMISSIONS.READ],
+    requiresAuth: true,
+  },
+
+  productDetails: {
+    id: "productDetails",
+    level: "nested",
+    parentId: "productManagement",
+    component: ProductDetailsView,
+    metadata: {
+      title: "Product Details",
+      breadcrumb: "Details",
+    },
+    permissions: [INVENTORY_PERMISSIONS.READ],
+    requiresAuth: true,
+    defaultParams: { productId: null },
+  },
+
+  // Category management
+  categoryManagement: {
+    id: "categoryManagement",
+    level: "nested",
+    parentId: "productManagement",
+    component: ManageCategoriesView,
+    metadata: {
+      title: "Category Management",
+      breadcrumb: "Categories",
+    },
+    permissions: [INVENTORY_PERMISSIONS.MANAGE_CATEGORIES],
+    requiresAuth: true,
+  },
+
+  // Batch management
+  batchManagement: {
+    id: "batchManagement",
+    level: "nested",
+    parentId: "productManagement",
+    component: BatchManagementView,
+    metadata: {
+      title: "Batch Management",
+      breadcrumb: "Batches",
+    },
+    permissions: [INVENTORY_PERMISSIONS.READ],
+    requiresAuth: true,
+  },
+
+  // Nested views within Batch Management
+  batchDashboard: {
+    id: "batchDashboard",
+    level: "nested",
+    parentId: "batchManagement",
+    component: BatchManagementView, // Rendered internally
+    metadata: {
+      title: "Batch Dashboard",
+      breadcrumb: "Dashboard",
+    },
+    permissions: [INVENTORY_PERMISSIONS.READ],
+    requiresAuth: true,
+  },
+
+  batchList: {
+    id: "batchList",
+    level: "nested",
+    parentId: "batchManagement",
+    component: BatchManagementView, // Rendered internally
+    metadata: {
+      title: "Batch List",
+      breadcrumb: "All Batches",
+    },
+    permissions: [INVENTORY_PERMISSIONS.READ],
+    requiresAuth: true,
+  },
+
+  expiryAlerts: {
+    id: "expiryAlerts",
+    level: "nested",
+    parentId: "batchManagement",
+    component: ExpiryDashboardView,
+    metadata: {
+      title: "Expiry Alerts",
+      breadcrumb: "Alerts",
+    },
+    permissions: [INVENTORY_PERMISSIONS.READ],
+    requiresAuth: true,
+  },
+
+  // Stock movement history
+  stockMovementHistory: {
+    id: "stockMovementHistory",
+    level: "nested",
+    parentId: "productManagement",
+    component: StockMovementHistoryView,
+    metadata: {
+      title: "Stock Movement History",
+      breadcrumb: "History",
+    },
+    permissions: [INVENTORY_PERMISSIONS.VIEW_HISTORY],
+    requiresAuth: true,
+  },
+};

@@ -1,24 +1,8 @@
 /**
  * Dashboard Component
  *
- * Main dashboard entry point using the new navigation system.
- * Wraps the application with NavigationProvider and renders NavigationContainer.
+ * Main dashboard entry point - re-exports from features/dashboard.
+ * This file maintains backward compatibility with existing imports.
  */
 
-import { NavigationProvider, NavigationContainer } from "@/navigation";
-import { useAuth } from "@/shared/hooks";
-import { LoadingScreen } from "@/components/loading-screen";
-
-export default function Dashboard() {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading || !user) {
-    return <LoadingScreen />;
-  }
-
-  return (
-    <NavigationProvider initialView="dashboard">
-      <NavigationContainer />
-    </NavigationProvider>
-  );
-}
+export { DashboardView as default } from "@/features/dashboard";

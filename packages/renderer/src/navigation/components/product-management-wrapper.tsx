@@ -6,7 +6,7 @@
  */
 
 import { useNestedNavigation } from "../hooks/use-nested-navigation";
-import ProductManagementView from "@/views/dashboard/pages/manager/views/stock/manage-product-view";
+import ProductManagementView from "@/features/inventory/views/product-management-view";
 
 /**
  * Product Management Wrapper

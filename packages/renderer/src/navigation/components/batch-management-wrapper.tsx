@@ -6,7 +6,7 @@
  */
 
 import { useNestedNavigation } from "../hooks/use-nested-navigation";
-import BatchManagementView from "@/views/dashboard/pages/manager/views/stock/product-batch-management-view";
+import BatchManagementView from "@/features/inventory/views/batch-management-view";
 
 /**
  * Batch Management Wrapper

@@ -1,11 +1,16 @@
 /**
  * Dashboard Features
- * 
+ *
  * Central export for all dashboard-related features, components, and hooks.
  */
 
 // Components
-export { FeatureCard, DashboardGrid, StatsCards, ManagerStatsCards } from "./components";
+export {
+  FeatureCard,
+  DashboardGrid,
+  StatsCards,
+  ManagerStatsCards,
+} from "./components";
 
 // Feature Components
 export {
@@ -37,3 +42,10 @@ export type {
   FeatureCategory,
 } from "./types";
 
+// Views
+export {
+  DashboardView,
+  AdminDashboardView,
+  CashierDashboardView,
+  ManagerDashboardView,
+} from "./views";
