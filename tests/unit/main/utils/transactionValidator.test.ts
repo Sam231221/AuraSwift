@@ -40,6 +40,9 @@ describe("TransactionValidator", () => {
         getShiftById: vi.fn(),
         validateShiftOwnership: vi.fn(),
       },
+      timeTracking: {
+        getActiveShift: vi.fn(),
+      },
     } as any;
 
     vi.clearAllMocks();
@@ -72,6 +75,9 @@ describe("TransactionValidator", () => {
         reason: "Cashier role",
       });
 
+      // Mock timeTracking to return null (no active shift)
+      (mockDB.timeTracking!.getActiveShift as any).mockReturnValue(null);
+
       const result = await validator.validateTransaction(
         mockUser,
         null,
@@ -82,9 +88,9 @@ describe("TransactionValidator", () => {
       expect(result.requiresShift).toBe(true);
       expect(result.shiftValid).toBe(false);
       expect(result.errors).toContain(
-        "Shift is required for your role to create transactions"
+        "You must have an active shift to make sales. Please clock in first."
       );
-      expect(result.code).toBe("SHIFT_REQUIRED");
+      expect(result.code).toBe("NO_ACTIVE_SHIFT");
     });
 
     it("should return valid for cashier mode with active shift", async () => {
