@@ -274,6 +274,21 @@ export function registerDbHandlers() {
     }
   });
 
+  // App Version IPC Handler - Get application version
+  ipcMain.handle("app:getVersion", async () => {
+    try {
+      const { app: electronApp } = await import("electron");
+      return { success: true, version: electronApp.getVersion() };
+    } catch (error) {
+      logger.error("Error getting app version:", error);
+      return {
+        success: false,
+        version: "unknown",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  });
+
   // App Restart IPC Handler - Restart the application
   ipcMain.handle("app:restart", async () => {
     try {

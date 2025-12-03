@@ -31,6 +31,7 @@ import { stockMovementsAPI } from "./api/stockMovements.js";
 import { cartAPI } from "./api/cart.js";
 import { importAPI } from "./api/import.js";
 import { rbacAPI } from "./api/rbac.js";
+import "./api/updates.js";
 
 // Expose APIs to renderer process
 contextBridge.exposeInMainWorld("authStore", authStore);

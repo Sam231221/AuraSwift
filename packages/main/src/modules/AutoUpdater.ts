@@ -7,8 +7,8 @@ import electronUpdater, {
 } from "electron-updater";
 import { app, dialog, Notification, shell, BrowserWindow } from "electron";
 
-import { getLogger } from '../utils/logger.js';
-const logger = getLogger('AutoUpdater');
+import { getLogger } from "../utils/logger.js";
+const logger = getLogger("AutoUpdater");
 
 type DownloadNotification = Parameters<
   AppUpdater["checkForUpdatesAndNotify"]
@@ -333,9 +333,7 @@ export class AutoUpdater implements AppModule {
   ): void {
     // Input validation
     if (!info || !info.version) {
-      logger.error(
-        "Invalid update info provided to showUpdateAvailableDialog"
-      );
+      logger.error("Invalid update info provided to showUpdateAvailableDialog");
       return;
     }
 
@@ -447,6 +445,49 @@ export class AutoUpdater implements AppModule {
    */
   getLastError(): { message: string; timestamp: Date; type: string } | null {
     return this.#lastError;
+  }
+
+  /**
+   * Clear the last error
+   */
+  clearLastError(): void {
+    this.#lastError = null;
+  }
+
+  /**
+   * Set downloading state
+   */
+  setDownloading(isDownloading: boolean): void {
+    this.#isDownloading = isDownloading;
+    if (isDownloading) {
+      this.#downloadStartTime = Date.now();
+    }
+  }
+
+  /**
+   * Get pending update info (if available but not downloaded)
+   */
+  getPendingUpdateInfo(): UpdateInfo | null {
+    return this.#postponedUpdateInfo;
+  }
+
+  /**
+   * Postpone update (called from IPC)
+   */
+  postponeUpdate(updateInfo: UpdateInfo): void {
+    this.scheduleReminder(updateInfo);
+  }
+
+  /**
+   * Broadcast event to all windows
+   */
+  private broadcastToAllWindows(channel: string, ...args: any[]): void {
+    const allWindows = BrowserWindow.getAllWindows();
+    allWindows.forEach((window) => {
+      if (window && !window.isDestroyed()) {
+        window.webContents.send(channel, ...args);
+      }
+    });
   }
 
   /**
@@ -825,7 +866,17 @@ export class AutoUpdater implements AppModule {
       ) {
         return;
       }
-      this.showUpdateAvailableDialog(info, false);
+
+      // Broadcast to renderer for toast notification
+      this.broadcastToAllWindows("update:available", {
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseNotes: info.releaseNotes,
+        files: info.files,
+      });
+
+      // Keep dialog as fallback (can be removed later)
+      // this.showUpdateAvailableDialog(info, false);
     };
     updater.on("update-available", onUpdateAvailable);
     this.#updateListeners.push({
@@ -864,6 +915,16 @@ export class AutoUpdater implements AppModule {
         }
       }
 
+      // Broadcast progress to renderer for toast notification
+      if (progressInfo.total && progressInfo.transferred) {
+        this.broadcastToAllWindows("update:download-progress", {
+          percent: progressInfo.percent,
+          transferred: progressInfo.transferred,
+          total: progressInfo.total,
+          bytesPerSecond: progressInfo.bytesPerSecond || 0,
+        });
+      }
+
       // Log progress for debugging
       if (this.#logger) {
         this.#logger.info(
@@ -873,7 +934,7 @@ export class AutoUpdater implements AppModule {
         );
       }
 
-      // Show a notification at 50% completion (only once)
+      // Show a notification at 50% completion (only once) - optional
       if (
         !this.#hasShownProgressNotification &&
         progressInfo.percent > 50 &&
@@ -933,43 +994,31 @@ export class AutoUpdater implements AppModule {
       this.#postponeCount = 0;
 
       const newVersion = info.version;
-      const releaseNotes = this.formatReleaseNotes(info);
 
-      dialog
-        .showMessageBox({
-          type: "info",
+      // Cursor-style: Broadcast to renderer for toast notification
+      // No dialog - toast will handle the UI
+      this.broadcastToAllWindows("update:downloaded", {
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseNotes: info.releaseNotes,
+        files: info.files,
+      });
+
+      // Optional: Show system notification (non-blocking)
+      if (Notification.isSupported()) {
+        const notification = new Notification({
           title: "Update Ready",
-          message: `AuraSwift ${newVersion} is ready to install!`,
-          detail: `The new version has been downloaded successfully.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhat's New:\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${releaseNotes}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThe update will be installed when you restart AuraSwift.\n\nWould you like to restart and install now?`,
-          buttons: ["Restart Now", "Install on Next Restart"],
-          defaultId: 0,
-          cancelId: 1,
-          noLink: true,
-        })
-        .then((result) => {
-          if (result.response === 0) {
-            updater.quitAndInstall(false, true);
-          } else {
-            if (Notification.isSupported()) {
-              const notification = new Notification({
-                title: "Update Pending",
-                body: `AuraSwift ${newVersion} will be installed when you next restart the app.`,
-                silent: true,
-              });
-              notification.show();
-            }
-          }
-        })
-        .catch((error) => {
-          const errorMessage = this.formatErrorMessage(error);
-          if (this.#logger) {
-            this.#logger.error(
-              `Error showing update ready dialog: ${errorMessage}`
-            );
-          } else {
-            logger.error("Error showing update ready dialog:", error);
-          }
+          body: `AuraSwift ${newVersion} is ready to install. Click the notification to install now.`,
+          silent: false,
         });
+
+        notification.on("click", () => {
+          // Trigger install via IPC
+          this.broadcastToAllWindows("update:install-request");
+        });
+
+        notification.show();
+      }
     };
     updater.on("update-downloaded", onUpdateDownloaded);
     this.#updateListeners.push({
@@ -1005,6 +1054,13 @@ export class AutoUpdater implements AppModule {
         timestamp: new Date(),
         type: isDownloadError ? "download" : "check",
       };
+
+      // Broadcast error to renderer for toast notification
+      this.broadcastToAllWindows("update:error", {
+        message: errorMessage,
+        type: isDownloadError ? "download" : "check",
+        timestamp: new Date(),
+      });
 
       if (this.#logger) {
         this.#logger.error(

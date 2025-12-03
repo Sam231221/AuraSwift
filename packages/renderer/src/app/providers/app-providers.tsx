@@ -4,6 +4,12 @@ interface AppProvidersProps {
   children: React.ReactNode;
 }
 
+import { UpdateToastProvider } from "@/features/updates/context/UpdateToastContext";
+
 export function AppProviders({ children }: AppProvidersProps) {
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <AuthProvider>
+      <UpdateToastProvider>{children}</UpdateToastProvider>
+    </AuthProvider>
+  );
 }

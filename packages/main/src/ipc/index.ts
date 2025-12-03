@@ -14,6 +14,7 @@ import { registerShiftHandlers } from "./shift.handlers.js";
 import { registerSupplierHandlers } from "./supplier.handlers.js";
 import { registerTimeTrackingHandlers } from "./time-tracking.handlers.js";
 import { registerTransactionHandlers } from "./transaction.handler.js";
+import { registerUpdateHandlers } from "./update.handlers.js";
 
 export function registerAllIpcHandlers() {
   registerAgeVerificationHandlers();
@@ -32,4 +33,5 @@ export function registerAllIpcHandlers() {
   registerSupplierHandlers();
   registerTimeTrackingHandlers();
   registerTransactionHandlers();
+  registerUpdateHandlers();
 }

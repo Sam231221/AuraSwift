@@ -120,18 +120,21 @@ export const scaleAPI = {
   startReading: () => ipcRenderer.send("scale:start-reading"),
   stopReading: () => ipcRenderer.send("scale:stop-reading"),
   // Event listeners
-  onReading: (callback: (reading: {
-    weight: number;
-    stable: boolean;
-    unit: "g" | "kg" | "lb" | "oz";
-    timestamp: string;
-    rawReadings?: number[];
-  }) => void) => {
+  onReading: (
+    callback: (reading: {
+      weight: number;
+      stable: boolean;
+      unit: "g" | "kg" | "lb" | "oz";
+      timestamp: string;
+      rawReadings?: number[];
+    }) => void
+  ) => {
     ipcRenderer.on("scale:reading", (_event, reading) => callback(reading));
     return () => ipcRenderer.removeAllListeners("scale:reading");
   },
 };
 
 export const appAPI = {
+  getVersion: () => ipcRenderer.invoke("app:getVersion"),
   restart: () => ipcRenderer.invoke("app:restart"),
 };

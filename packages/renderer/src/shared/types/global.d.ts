@@ -34,6 +34,7 @@ import type { ScaleAPI } from "../types/api/scale";
 import type { DatabaseAPI } from "../types/api/database";
 import type { PdfReceiptAPI } from "../types/api/pdf-receipt";
 import type { AppAPI } from "../types/api/app";
+import type { UpdateAPI } from "../types/api/update";
 import type { APIResponse } from "../types/api/common";
 
 declare global {
@@ -96,6 +97,7 @@ declare global {
     databaseAPI: DatabaseAPI;
     pdfReceiptAPI: PdfReceiptAPI;
     appAPI: AppAPI;
+    updateAPI: UpdateAPI;
 
     // RBAC
     rbacAPI: RBACAPI;
