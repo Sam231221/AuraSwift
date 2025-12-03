@@ -7,7 +7,7 @@
 
 import { useAuth } from "@/shared/hooks";
 import { getUserRoleName } from "@/shared/utils/rbac-helpers";
-import { DashboardLayout } from "@/layouts/dashboard-layout";
+import { DashboardLayout } from "@/features/dashboard/components/dashboard-layout";
 import { getRoleDisplayName, getUserDisplayName } from "@/shared/utils/auth";
 import {
   AdminDashboardView,

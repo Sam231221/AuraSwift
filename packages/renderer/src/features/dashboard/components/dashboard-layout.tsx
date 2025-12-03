@@ -18,7 +18,6 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({
   children,
-
   subtitle,
 }: DashboardLayoutProps) {
   const { user, logout, isLoading } = useAuth();
@@ -178,3 +177,4 @@ export function DashboardLayout({
     </div>
   );
 }
+

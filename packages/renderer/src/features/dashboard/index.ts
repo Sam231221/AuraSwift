@@ -10,6 +10,7 @@ export {
   DashboardGrid,
   StatsCards,
   ManagerStatsCards,
+  DashboardLayout,
 } from "./components";
 
 // Widget Components
