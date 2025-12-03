@@ -23,12 +23,12 @@ import {
   TrendingDown,
   AlertTriangle,
 } from "lucide-react";
-import type { ProductBatch } from "../../types/batch.types";
+import type { ProductBatch } from "@/features/inventory/types/batch.types";
 import {
   formatExpiryDate,
   getExpiryStatus,
   getExpiryStatusColor,
-} from "../../utils/expiry-calculations";
+} from "@/features/inventory/utils/expiry-calculations";
 import { cn } from "@/shared/utils/cn";
 
 interface BatchListProps {

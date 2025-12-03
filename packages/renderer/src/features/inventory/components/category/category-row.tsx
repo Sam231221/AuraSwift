@@ -1,5 +1,8 @@
 import type React from "react";
-import type { CategoryRowProps, CategoryWithChildren } from "../../utils";
+import type {
+  CategoryRowProps,
+  CategoryWithChildren,
+} from "@/features/inventory/utils";
 import {
   ChevronDown,
   ChevronRight,

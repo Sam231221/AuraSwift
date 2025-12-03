@@ -22,6 +22,10 @@ import ProductDashboardView from "../views/inventory-dashboard-view";
 import ProductDetailsView from "../views/product-details-view";
 import { ExpiryDashboardView } from "../views/expiry-dashboard-view";
 
+// Import navigation wrappers
+import { ProductManagementWrapper } from "../wrappers/product-management-wrapper";
+import { BatchManagementWrapper } from "../wrappers/batch-management-wrapper";
+
 /**
  * Inventory Feature Configuration for Dashboard
  */
@@ -91,7 +95,7 @@ export const inventoryViews: Record<string, ViewConfig> = {
   productManagement: {
     id: "productManagement",
     level: "root",
-    component: ProductManagementView,
+    component: ProductManagementWrapper,
     metadata: {
       title: "Product Management",
       description: "Manage products and inventory",
@@ -161,7 +165,7 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: "batchManagement",
     level: "nested",
     parentId: "productManagement",
-    component: BatchManagementView,
+    component: BatchManagementWrapper,
     metadata: {
       title: "Batch Management",
       breadcrumb: "Batches",

@@ -7,7 +7,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AddUserForm } from "../forms/add-user-form";
-import type { UserCreateFormData } from "../../schemas/user-schema";
+import type { UserCreateFormData } from "@/features/users/schemas/user-schema";
 
 interface AddUserDialogProps {
   open: boolean;

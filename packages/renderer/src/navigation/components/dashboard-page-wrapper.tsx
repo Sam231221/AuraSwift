@@ -29,6 +29,10 @@ export function DashboardPageWrapper() {
   const { user, isLoading } = useAuth();
   const { navigateTo } = useNavigation();
 
+  // Dashboard navigation handler for feature actions
+  // Must be called before any early returns (React Hooks rule)
+  const handleActionClick = useDashboardNavigation();
+
   if (isLoading || !user) {
     return <LoadingScreen />;
   }
@@ -36,9 +40,6 @@ export function DashboardPageWrapper() {
   const role = getUserRoleName(user);
   const roleDisplayName = getRoleDisplayName(role);
   const userDisplayName = getUserDisplayName(user);
-
-  // Dashboard navigation handler for feature actions
-  const handleActionClick = useDashboardNavigation();
 
   // Navigation helper
   const handleNavigate = (viewId: string) => {

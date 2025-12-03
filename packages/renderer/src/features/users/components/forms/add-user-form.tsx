@@ -25,7 +25,7 @@ import { cn } from "@/shared/utils/cn";
 import {
   userCreateSchema,
   type UserCreateFormData,
-} from "../../schemas/user-schema";
+} from "@/features/users/schemas/user-schema";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { useRoles, type Role } from "@/features/rbac/hooks/useRoles";
 

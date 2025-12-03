@@ -15,7 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useCashPaymentForm } from "../../hooks/use-cash-payment-form";
+import { useCashPaymentForm } from "@/features/sales/hooks/use-cash-payment-form";
 
 interface CashPaymentFormProps {
   total: number;

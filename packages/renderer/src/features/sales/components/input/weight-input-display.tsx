@@ -9,7 +9,7 @@ import {
   useSalesUnitSettings,
   getEffectiveSalesUnit,
 } from "@/shared/hooks/use-sales-unit-settings";
-import { getProductSalesUnit } from "../../utils/product-helpers";
+import { getProductSalesUnit } from "@/features/sales/utils/product-helpers";
 
 interface WeightInputDisplayProps {
   selectedProduct: Product | null;

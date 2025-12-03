@@ -1,0 +1,70 @@
+/**
+ * {Feature} Feature Configuration
+ *
+ * Central configuration for the {feature} feature.
+ * This is used by the navigation system and dashboard.
+ */
+
+import { Icon } from "lucide-react";
+import { {FEATURE}_PERMISSIONS } from "./permissions";
+import { {FEATURE}_ROUTES } from "./navigation";
+import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
+import type { ViewConfig } from "@/navigation/types";
+
+// Import views
+import {Feature}View from "../views/{feature}-view";
+
+/**
+ * {Feature} Feature Configuration for Dashboard
+ */
+export const {feature}Feature: FeatureConfig = {
+  id: "{feature}",
+  title: "{Feature} Management",
+  description: "Manage {feature}",
+  icon: Icon,
+  permissions: [{FEATURE}_PERMISSIONS.MANAGE],
+  category: "management",
+  order: 0,
+  actions: [
+    {
+      id: "manage-{feature}",
+      label: "Manage {Feature}",
+      icon: Icon,
+      onClick: () => {}, // Will be injected by dashboard
+      permissions: [{FEATURE}_PERMISSIONS.MANAGE],
+    },
+  ],
+};
+
+/**
+ * {Feature} Views Registry
+ *
+ * All views for the {feature} feature are registered here.
+ * This is spread into the main VIEW_REGISTRY.
+ */
+export const {feature}Views: Record<string, ViewConfig> = {
+  [{FEATURE}_ROUTES.MANAGEMENT]: {
+    id: {FEATURE}_ROUTES.MANAGEMENT,
+    level: "root",
+    component: {Feature}View,
+    metadata: {
+      title: "{Feature} Management",
+      description: "Manage {feature}",
+    },
+    permissions: [{FEATURE}_PERMISSIONS.MANAGE],
+    requiresAuth: true,
+  },
+  // Legacy route for backward compatibility
+  {feature}Management: {
+    id: "{feature}Management",
+    level: "root",
+    component: {Feature}View,
+    metadata: {
+      title: "{Feature} Management",
+      description: "Manage {feature}",
+    },
+    permissions: [{FEATURE}_PERMISSIONS.MANAGE],
+    requiresAuth: true,
+  },
+};
+

@@ -1,0 +1,33 @@
+/**
+ * {Feature} Management View
+ *
+ * Main view for managing {feature}.
+ */
+
+interface {Feature}ViewProps {
+  onBack?: () => void;
+}
+
+export default function {Feature}View({ onBack }: {Feature}ViewProps) {
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">{Feature} Management</h1>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+          >
+            Back
+          </button>
+        )}
+      </div>
+      
+      {/* Add your view content here */}
+      <div>
+        <p>Implement {feature} management functionality here.</p>
+      </div>
+    </div>
+  );
+}
+

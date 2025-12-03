@@ -5,9 +5,9 @@
  * Handles navigation injection for advanced report actions.
  */
 
-import { FeatureCard } from "../../components/feature-card";
-import { getFeatureById } from "../../registry/feature-registry";
-import type { FeatureConfig } from "../../types/feature-config";
+import { FeatureCard } from "@/features/dashboard/components/feature-card";
+import { getFeatureById } from "@/features/dashboard/registry/feature-registry";
+import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 
 interface AdvancedReportsCardProps {
   onFinancialReports?: () => void;

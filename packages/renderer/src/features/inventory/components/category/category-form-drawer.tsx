@@ -39,7 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useCategoryForm } from "@/features/inventory/hooks/use-category-form";
 import type { Category } from "@/features/inventory/hooks/use-product-data";
 import type { VatCategory } from "@/features/inventory/hooks/use-product-data";
-import { buildCategoryTree } from "../../utils";
+import { buildCategoryTree } from "@/features/inventory/utils";
 
 interface CategoryFormDrawerProps {
   isOpen: boolean;

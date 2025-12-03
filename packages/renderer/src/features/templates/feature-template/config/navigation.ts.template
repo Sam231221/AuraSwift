@@ -1,0 +1,15 @@
+/**
+ * {Feature} Feature Navigation Routes
+ *
+ * Centralized route definitions for the {feature} feature.
+ * These routes are used for navigation throughout the feature.
+ */
+
+export const {FEATURE}_ROUTES = {
+  /** {Feature} management view */
+  MANAGEMENT: "{feature}:management",
+} as const;
+
+export type {Feature}Route =
+  (typeof {FEATURE}_ROUTES)[keyof typeof {FEATURE}_ROUTES];
+

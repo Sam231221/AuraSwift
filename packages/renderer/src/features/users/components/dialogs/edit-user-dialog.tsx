@@ -6,8 +6,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { EditUserForm } from "../forms/edit-user-form";
-import type { UserUpdateFormData } from "../../schemas/user-schema";
-import type { StaffUser } from "../../schemas/types";
+import type { UserUpdateFormData } from "@/features/users/schemas/user-schema";
+import type { StaffUser } from "@/features/users/schemas/types";
 
 interface EditUserDialogProps {
   open: boolean;

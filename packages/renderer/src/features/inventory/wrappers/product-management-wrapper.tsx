@@ -1,11 +1,13 @@
 /**
- * Product Management Wrapper
+ * Product Management Wrapper Component
  *
  * Wrapper component that provides shared state and navigation
  * for Product Management nested views.
+ *
+ * This wrapper lives in the inventory feature to keep features self-contained.
  */
 
-import { useNestedNavigation } from "../hooks/use-nested-navigation";
+import { useNestedNavigation } from "@/navigation/hooks/use-nested-navigation";
 import ProductManagementView from "@/features/inventory/views/product-management-view";
 
 /**

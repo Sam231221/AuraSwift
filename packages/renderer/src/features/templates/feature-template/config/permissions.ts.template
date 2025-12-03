@@ -1,0 +1,18 @@
+/**
+ * {Feature} Feature Permissions
+ *
+ * Centralized permission definitions for the {feature} feature.
+ * These permissions are used for RBAC throughout the feature.
+ */
+
+export const {FEATURE}_PERMISSIONS = {
+  /** Read {feature} */
+  READ: "{feature}:read",
+  
+  /** Manage {feature} */
+  MANAGE: "{feature}:manage",
+} as const;
+
+export type {Feature}Permission =
+  (typeof {FEATURE}_PERMISSIONS)[keyof typeof {FEATURE}_PERMISSIONS];
+

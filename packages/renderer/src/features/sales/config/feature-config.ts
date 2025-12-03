@@ -13,7 +13,7 @@ import type { ViewConfig } from "@/navigation/types";
 
 // Import views from new location
 import NewTransactionView from "../views/new-transaction-view";
-import CashierDashboardView from "../../dashboard/views/cashier-dashboard-view";
+import CashierDashboardView from "@/features/dashboard/views/cashier-dashboard-view";
 
 /**
  * Sales Feature Configuration for Dashboard

@@ -21,7 +21,7 @@ import { configuredZodResolver } from "@/shared/validation/resolvers";
 import {
   startShiftSchema,
   type StartShiftFormData,
-} from "../../schemas/shift-schema";
+} from "@/features/sales/schemas/shift-schema";
 
 interface StartShiftDialogProps {
   open: boolean;

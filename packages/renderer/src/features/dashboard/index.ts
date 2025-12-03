@@ -12,7 +12,7 @@ export {
   ManagerStatsCards,
 } from "./components";
 
-// Feature Components
+// Widget Components
 export {
   UserManagementCard,
   ManagementActionsCard,
@@ -21,7 +21,7 @@ export {
   SystemSettingsCard,
   DatabaseManagementCard,
   QuickActionsCard,
-} from "./features";
+} from "./widgets";
 
 // Hooks
 export { useUserPermissions, useFeatureVisibility } from "./hooks";

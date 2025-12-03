@@ -34,7 +34,7 @@ import { getLogger } from "@/shared/utils/logger";
 import {
   isWeightedProduct,
   getProductSalesUnit,
-} from "../../utils/product-helpers";
+} from "@/features/sales/utils/product-helpers";
 import {
   useSalesUnitSettings,
   getEffectiveSalesUnit,

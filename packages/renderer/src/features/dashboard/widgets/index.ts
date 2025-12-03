@@ -1,7 +1,7 @@
 /**
- * Dashboard Features
+ * Dashboard Widgets
  *
- * Central export for all individual feature components.
+ * Central export for all dashboard widget components.
  * These components wrap the base FeatureCard with navigation handlers.
  */
 

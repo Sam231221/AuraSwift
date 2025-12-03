@@ -25,8 +25,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { ProductBatch, Supplier } from "../../types/batch.types";
-import { generateBatchNumber } from "../../utils/expiry-calculations";
+import type {
+  ProductBatch,
+  Supplier,
+} from "@/features/inventory/types/batch.types";
+import { generateBatchNumber } from "@/features/inventory/utils/expiry-calculations";
 import type { Product } from "@/types/domain";
 import { useBatchForm } from "@/features/inventory/hooks/use-batch-form";
 import {
@@ -37,7 +40,7 @@ import { useKeyboardWithRHF } from "@/features/adaptive-keyboard/hooks/use-keybo
 import type {
   BatchFormData,
   BatchUpdateData,
-} from "../../schemas/batch-schema";
+} from "@/features/inventory/schemas/batch-schema";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("batch-form-drawer");

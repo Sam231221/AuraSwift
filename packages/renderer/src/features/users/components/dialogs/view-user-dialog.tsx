@@ -14,8 +14,8 @@ import {
   getUserRoleName,
   getUserRoleDisplayName,
 } from "@/shared/utils/rbac-helpers";
-import { getStaffDisplayName } from "../../utils/user-helpers";
-import type { StaffUser } from "../../schemas/types";
+import { getStaffDisplayName } from "@/features/users/utils/user-helpers";
+import type { StaffUser } from "@/features/users/schemas/types";
 
 interface ViewUserDialogProps {
   open: boolean;

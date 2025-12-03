@@ -7,7 +7,7 @@ import {
 
 import { ProtectedRoute, PublicRoute } from "@/components";
 import { AuthPage } from "@/features/auth";
-import DashboardPage from "@/views/dashboard";
+import { DashboardView } from "@/features/dashboard";
 
 export default function App() {
   return (
@@ -27,7 +27,7 @@ export default function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <DashboardPage />
+              <DashboardView />
             </ProtectedRoute>
           }
         />

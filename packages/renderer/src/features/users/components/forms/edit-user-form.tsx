@@ -28,8 +28,8 @@ import { cn } from "@/shared/utils/cn";
 import {
   userUpdateSchema,
   type UserUpdateFormData,
-} from "../../schemas/user-schema";
-import type { StaffUser } from "../../schemas/types";
+} from "@/features/users/schemas/user-schema";
+import type { StaffUser } from "@/features/users/schemas/types";
 import { useRoles, type Role } from "@/features/rbac/hooks/useRoles";
 
 import { getLogger } from "@/shared/utils/logger";
