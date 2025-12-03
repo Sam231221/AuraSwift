@@ -7,8 +7,8 @@ import { toast } from "sonner";
 import type { TransactionData } from "@/types/domain/transaction";
 import type { PrinterConfig } from "@/types/features/printer";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('use-thermal-printer');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("use-thermal-printer");
 
 export type PrintStatus =
   | "idle"

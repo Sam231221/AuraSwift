@@ -19,10 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type {
-  ScannerStatus,
-  ScanLog,
-} from "@/features/barcode-scanner/use-production-scanner";
+import type { ScannerStatus, ScanLog } from "@/services/hardware/scanner";
 
 interface ScannerStatusBarProps {
   scannerStatus: ScannerStatus;

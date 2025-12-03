@@ -11,7 +11,7 @@ import { useAuth } from "@/shared/hooks/use-auth";
 import {
   useReceiptPrintingFlow,
   useThermalPrinter,
-} from "../hooks/use-thermal-printer";
+} from "@/services/hardware/printer";
 import {
   useCart,
   useProducts,

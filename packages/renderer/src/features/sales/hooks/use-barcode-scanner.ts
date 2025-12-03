@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
-import { useProductionScanner } from "@/features/barcode-scanner/use-production-scanner";
+import { useProductionScanner } from "@/services/hardware/scanner";
 import { ScannerAudio } from "@/shared/services/scanner-audio";
 import type { Product } from "@/types/domain";
 

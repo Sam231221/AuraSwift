@@ -1177,7 +1177,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 Staffs Shifts
               </h1>
               <p className="text-sm sm:text-base text-slate-600">
-                Manage staff schedules and shifts
+                Manage staffs schedules and shifts
               </p>
             </div>
           </div>

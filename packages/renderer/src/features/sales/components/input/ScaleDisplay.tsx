@@ -24,7 +24,7 @@ import {
   RotateCcw,
   RefreshCw,
 } from "lucide-react";
-import { useScaleManager } from "@/shared/hooks/use-scale-manager";
+import { useScaleManager } from "@/services/hardware/scale";
 import { Progress } from "@/components/ui/progress";
 
 // =============================================================================

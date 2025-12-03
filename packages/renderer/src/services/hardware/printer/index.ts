@@ -1,0 +1,18 @@
+/**
+ * Thermal Printer Hardware Service
+ *
+ * Hardware integration for thermal receipt printers.
+ * Provides hooks for printer connection, status, and printing operations.
+ */
+
+export {
+  useThermalPrinter,
+  usePrinterSetup,
+  useReceiptPrintingFlow,
+} from "./hooks/use-thermal-printer";
+export type {
+  PrintStatus,
+  PrinterInfo,
+  PrintJob,
+} from "./types/printer.types";
+

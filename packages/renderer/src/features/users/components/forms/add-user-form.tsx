@@ -225,7 +225,7 @@ export function AddUserForm({
               <FormControl>
                 <AdaptiveFormField
                   {...form.register("email")}
-                  label="Email"
+                  label="Email *"
                   value={keyboard.formValues.email || ""}
                   error={form.formState.errors.email?.message}
                   onFocus={() => keyboard.handleFieldFocus("email")}
