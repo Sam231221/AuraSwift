@@ -23,14 +23,14 @@ interface ProductManagementViewProps {
 }
 
 const ProductManagementView: React.FC<ProductManagementViewProps> = ({
-  onBack,
+  onBack: _onBack,
 }) => {
   const { user } = useAuth();
 
   // Use nested navigation instead of local state
   const { navigateTo, currentNestedViewId } =
     useNestedNavigation("productManagement");
-  
+
   // Use main navigation to navigate to the main dashboard
   const { navigateTo: navigateToMainView } = useNavigation();
 
@@ -340,7 +340,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     if (!user) return {};
 
     const goToDashboard = () => navigateTo("productDashboard");
-    
+
     // Navigate to main dashboard (the one with stat cards and feature cards)
     const goToMainDashboard = () => {
       navigateToMainView("dashboard");
