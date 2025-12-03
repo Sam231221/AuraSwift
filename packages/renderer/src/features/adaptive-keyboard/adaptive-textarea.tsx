@@ -34,7 +34,6 @@ export const AdaptiveTextarea = forwardRef<
         onFocus={onFocus}
         {...props}
       />
-      {error && <p className="text-sm font-medium text-destructive">{error}</p>}
     </div>
   );
 });
