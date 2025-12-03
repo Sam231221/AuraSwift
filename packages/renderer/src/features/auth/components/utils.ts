@@ -18,16 +18,3 @@ export const getUserColor = (role: string, index: number): string => {
   return baseColor;
 };
 
-export const getDemoPin = (role: string): string => {
-  switch (role) {
-    case "admin":
-      return "1234";
-    case "manager":
-      return "5678";
-    case "cashier":
-      return "9999";
-    default:
-      return "0000";
-  }
-};
-

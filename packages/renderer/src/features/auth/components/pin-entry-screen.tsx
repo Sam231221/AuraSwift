@@ -11,7 +11,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { UserForLogin } from "@/types/domain";
-import { getDemoPin } from "@/features/auth/components/utils";
 import { ClockInOutButtons } from "@/features/auth/components/clock-in-out-buttons";
 import { getLogger } from "@/shared/utils/logger";
 
@@ -107,10 +106,6 @@ export function PinEntryScreen({
           <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-1">
             {user.firstName} {user.lastName}
           </h2>
-
-          <p className="text-orange-600 text-[10px] sm:text-xs font-medium mt-1 tracking-wide">
-            Demo Pin: {getDemoPin(user.roleName)}
-          </p>
         </div>
 
         {/* Shift/Schedule Information (for cashiers/managers) */}
