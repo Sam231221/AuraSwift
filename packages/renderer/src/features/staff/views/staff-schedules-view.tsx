@@ -616,11 +616,11 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
 
     return (
       <>
-        <DrawerHeader className="shrink-0">
-          <DrawerTitle className="text-2xl">
+        <DrawerHeader className="shrink-0 px-3 sm:px-4">
+          <DrawerTitle className="text-lg sm:text-xl md:text-2xl">
             {isEditMode ? "Edit Staff Schedule" : "Create New Schedule"}
           </DrawerTitle>
-          <DrawerDescription>
+          <DrawerDescription className="text-sm sm:text-base">
             {isEditMode
               ? "Update the schedule details below."
               : "Schedule a new staff shift for the POS system."}
@@ -629,8 +629,8 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
 
         <Form {...form}>
           <form onSubmit={handleSubmit} className="flex flex-col h-full">
-            <div className="px-4 pb-4 space-y-6 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-4 sm:space-y-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormField
                   control={form.control}
                   name="staffId"
@@ -766,6 +766,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                           )}
                         />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -969,6 +970,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                           )}
                         />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -992,11 +994,11 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               onClose={keyboard.handleCloseKeyboard}
             />
 
-            <DrawerFooter className="px-0 shrink-0 border-t bg-white">
+            <DrawerFooter className="px-3 sm:px-4 shrink-0 border-t bg-white gap-2 sm:gap-0">
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 w-full sm:w-auto text-sm sm:text-base"
               >
                 {isSubmitting
                   ? "Saving..."
@@ -1010,6 +1012,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                   variant="outline"
                   onClick={onClose}
                   disabled={isSubmitting}
+                  className="w-full sm:w-auto text-sm sm:text-base"
                 >
                   Cancel
                 </Button>
@@ -1155,126 +1158,144 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen p-3 sm:p-4 md:p-6">
+    <div className="w-full min-h-screen p-2 sm:p-3 md:p-4 lg:p-6 pb-6">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-7xl mx-auto"
       >
-        <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-center lg:space-y-0 mb-6 sm:mb-8">
-          <div className="flex items-center gap-2 sm:gap-4">
+        {/* Header Section - Optimized for narrow screens */}
+        <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6 lg:mb-8">
+          <div className="flex items-start gap-2 sm:gap-3">
             <Button
               onClick={onBack}
               variant="ghost"
               size="sm"
-              className="p-2"
+              className="p-1.5 sm:p-2 shrink-0"
               aria-label="Go back to previous page"
             >
               <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
-            <div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">
-                Staffs Shifts
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-slate-900 mb-0.5 sm:mb-1 lg:mb-2 break-word">
+                Cashier Shifts
               </h1>
-              <p className="text-sm sm:text-base text-slate-600">
-                Manage staffs schedules and shifts
+              <p className="text-xs sm:text-sm md:text-base text-slate-600 line-clamp-2">
+                Manage POS cashier schedules and shifts.
               </p>
             </div>
           </div>
 
-          <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-            <DrawerTrigger asChild>
-              <Button
-                onClick={() => openDrawer()}
-                className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 w-full lg:w-auto"
-                size="lg"
-                aria-label="Open schedule shift form"
-              >
-                <Plus
-                  className="w-4 h-4 sm:w-5 sm:h-5 mr-2"
-                  aria-hidden="true"
-                />
-                <span className="text-sm sm:text-base">Schedule Shift</span>
-              </Button>
-            </DrawerTrigger>
+          <div className="w-full">
+            <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+              <DrawerTrigger asChild>
+                <Button
+                  onClick={() => openDrawer()}
+                  className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 w-full sm:w-auto"
+                  size="sm"
+                  aria-label="Schedule Shift"
+                >
+                  <Plus
+                    className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="hidden sm:inline text-xs sm:text-sm md:text-base whitespace-nowrap">
+                    Schedule Shift
+                  </span>
+                </Button>
+              </DrawerTrigger>
 
-            <DrawerContent className="max-h-[90vh] flex flex-col">
-              <ScheduleFormContent
-                editingSchedule={editingSchedule}
-                selectedDate={selectedDate}
-                setSelectedDate={setSelectedDate}
-                isDatePickerOpen={isDatePickerOpen}
-                setIsDatePickerOpen={setIsDatePickerOpen}
-                cashiers={cashiers}
-                isLoadingCashiers={isLoadingCashiers}
-                businessId={businessId}
-                checkShiftOverlap={checkShiftOverlap}
-                canScheduleAll={canScheduleAll}
-                canScheduleCashiers={canScheduleCashiers}
-                onClose={closeDrawer}
-                onSuccess={(schedule) => {
-                  if (editingSchedule) {
-                    setSchedules(
-                      schedules.map((s) =>
-                        s.id === editingSchedule.id ? schedule : s
-                      )
-                    );
-                  } else {
-                    setSchedules([...schedules, schedule]);
-                  }
-                }}
-              />
-            </DrawerContent>
-          </Drawer>
+              <DrawerContent className="max-h-[90vh] flex flex-col overflow-hidden">
+                <ScheduleFormContent
+                  editingSchedule={editingSchedule}
+                  selectedDate={selectedDate}
+                  setSelectedDate={setSelectedDate}
+                  isDatePickerOpen={isDatePickerOpen}
+                  setIsDatePickerOpen={setIsDatePickerOpen}
+                  cashiers={cashiers}
+                  isLoadingCashiers={isLoadingCashiers}
+                  businessId={businessId}
+                  checkShiftOverlap={checkShiftOverlap}
+                  canScheduleAll={canScheduleAll}
+                  canScheduleCashiers={canScheduleCashiers}
+                  onClose={closeDrawer}
+                  onSuccess={(schedule) => {
+                    if (editingSchedule) {
+                      setSchedules(
+                        schedules.map((s) =>
+                          s.id === editingSchedule.id ? schedule : s
+                        )
+                      );
+                    } else {
+                      setSchedules([...schedules, schedule]);
+                    }
+                  }}
+                />
+              </DrawerContent>
+            </Drawer>
+          </div>
         </div>
 
         {/* Calendar View Toggle */}
-        <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
-          <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-center lg:space-y-0 mb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+        <div className="bg-white rounded-lg shadow-lg p-2 sm:p-3 md:p-4 lg:p-6 mb-3 sm:mb-4 md:mb-6">
+          <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:justify-between lg:items-center mb-3 sm:mb-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 sm:gap-x-4">
               <Button
                 variant="outline"
                 onClick={goToToday}
-                className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 w-full sm:w-auto"
+                className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 w-full sm:w-auto text-xs sm:text-sm"
                 aria-label="Go to today's date"
               >
                 Today
               </Button>
-              <div className="flex items-center justify-between sm:justify-start space-x-2">
+              <div className="flex items-center justify-between sm:justify-start gap-1 sm:gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={goToPreviousWeek}
+                  className="h-8 w-8 sm:h-9 sm:w-9"
                   aria-label="Go to previous week"
                 >
-                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                  <ChevronLeft
+                    className="h-3 w-3 sm:h-4 sm:w-4"
+                    aria-hidden="true"
+                  />
                 </Button>
-                <h2 className="text-base sm:text-lg md:text-xl font-semibold text-slate-800 px-2">
-                  {format(weekStart, "MMM d")} -{" "}
-                  {format(weekEnd, "MMM d, yyyy")}
+                <h2 className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl font-semibold text-slate-800 px-1 sm:px-2 text-center sm:text-left min-w-0 flex-1">
+                  <span className="inline sm:hidden">
+                    {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d")}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {format(weekStart, "MMM d")} -{" "}
+                    {format(weekEnd, "MMM d, yyyy")}
+                  </span>
                 </h2>
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={goToNextWeek}
+                  className="h-8 w-8 sm:h-9 sm:w-9"
                   aria-label="Go to next week"
                 >
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  <ChevronRight
+                    className="h-3 w-3 sm:h-4 sm:w-4"
+                    aria-hidden="true"
+                  />
                 </Button>
               </div>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex gap-2">
               <Button
                 variant={viewMode === "week" ? "default" : "outline"}
                 onClick={() => setViewMode("week")}
-                className="bg-emerald-600 text-white hover:bg-emerald-700 flex-1 sm:flex-none text-sm sm:text-base"
+                className="bg-emerald-600 text-white hover:bg-emerald-700 flex-1 sm:flex-none text-xs sm:text-sm md:text-base"
               >
                 Week View
               </Button>
               <Button
                 variant={viewMode === "day" ? "default" : "outline"}
                 onClick={() => setViewMode("day")}
-                className="flex-1 sm:flex-none text-sm sm:text-base"
+                className="flex-1 sm:flex-none text-xs sm:text-sm md:text-base"
               >
                 Day View
               </Button>
@@ -1282,12 +1303,12 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           </div>
 
           {/* Week Calendar */}
-          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 md:gap-2 mb-3 sm:mb-4 overflow-x-auto">
             {weekDays.map((day) => (
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "text-center p-1 sm:p-2 rounded-lg border transition-colors cursor-pointer",
+                  "text-center p-1 sm:p-1.5 md:p-2 rounded-md sm:rounded-lg border transition-colors cursor-pointer min-w-0",
                   isToday(day)
                     ? "bg-emerald-100 border-emerald-300 text-emerald-800 font-semibold"
                     : "bg-slate-50 border-slate-200",
@@ -1306,14 +1327,15 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                   }
                 }}
               >
-                <div className="text-xs sm:text-sm font-medium">
+                <div className="text-[10px] xs:text-xs sm:text-xs md:text-sm font-medium truncate">
                   {format(day, "EEE")}
                 </div>
-                <div className="text-base sm:text-lg font-semibold">
+                <div className="text-sm sm:text-base md:text-lg font-semibold">
                   {format(day, "d")}
                 </div>
-                <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1">
-                  {getSchedulesForDate(day).length} schedules
+                <div className="text-[9px] xs:text-[10px] sm:text-[10px] md:text-xs text-slate-500 mt-0.5 truncate">
+                  {getSchedulesForDate(day).length}{" "}
+                  {getSchedulesForDate(day).length === 1 ? "shift" : "shifts"}
                 </div>
               </div>
             ))}
@@ -1325,10 +1347,12 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full max-w-xs justify-center"
+                  className="w-full sm:max-w-xs justify-center text-xs sm:text-sm"
+                  size="sm"
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  Select Specific Date
+                  <CalendarIcon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline">Select Specific Date</span>
+                  <span className="xs:hidden">Select Date</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="center">
@@ -1344,24 +1368,26 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         </div>
 
         {/* Shifts for Selected Date */}
-        <div className="mb-4 sm:mb-6">
-          <h3 className="text-xl sm:text-2xl font-bold text-slate-800 mb-3 sm:mb-4">
+        <div className="mb-3 sm:mb-4 md:mb-6">
+          <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-slate-800 mb-2 sm:mb-3 md:mb-4 break-word">
             Shifts for {format(selectedDate, "MMMM d, yyyy")}
           </h3>
 
           <Button
             onClick={() => openDrawer(undefined, selectedDate)}
             variant="outline"
-            className="mb-4 border-emerald-300 text-emerald-700 hover:bg-emerald-50 w-full sm:w-auto text-sm sm:text-base"
+            className="mb-3 sm:mb-4 border-emerald-300 text-emerald-700 hover:bg-emerald-50 w-full sm:w-auto text-xs sm:text-sm md:text-base"
+            size="sm"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Shift for This Date
+            <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+            <span className="hidden xs:inline">Add Shift for This Date</span>
+            <span className="xs:hidden">Add Shift</span>
           </Button>
 
           {schedulesForSelectedDate.length === 0 ? (
-            <div className="text-center py-8 bg-white rounded-lg shadow">
-              <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">
+            <div className="text-center py-6 sm:py-8 bg-white rounded-lg shadow">
+              <CalendarIcon className="w-10 h-10 sm:w-12 sm:h-12 text-slate-300 mx-auto mb-3 sm:mb-4" />
+              <p className="text-sm sm:text-base text-slate-500 px-2">
                 No shifts scheduled for this date.
               </p>
             </div>
@@ -1370,7 +1396,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6"
+              className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:gap-6 xl:grid-cols-3"
             >
               <AnimatePresence>
                 {schedulesForSelectedDate.map((schedule) => {
@@ -1512,23 +1538,25 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         </div>
 
         {isLoadingSchedules ? (
-          <div className="text-center py-16">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-            <p className="text-slate-500">Loading schedules...</p>
+          <div className="text-center py-8 sm:py-12 md:py-16">
+            <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-b-2 border-emerald-600 mx-auto mb-3 sm:mb-4"></div>
+            <p className="text-sm sm:text-base text-slate-500">
+              Loading schedules...
+            </p>
           </div>
         ) : schedules.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-16"
+            className="text-center py-8 sm:py-12 md:py-16"
           >
-            <div className="text-slate-400 mb-4">
-              <CreditCard className="w-16 h-16 mx-auto" />
+            <div className="text-slate-400 mb-3 sm:mb-4">
+              <CreditCard className="w-12 h-12 sm:w-16 sm:h-16 mx-auto" />
             </div>
-            <h3 className="text-xl font-semibold text-slate-600 mb-2">
+            <h3 className="text-lg sm:text-xl font-semibold text-slate-600 mb-2 px-2">
               No shifts scheduled
             </h3>
-            <p className="text-slate-500">
+            <p className="text-sm sm:text-base text-slate-500 px-2">
               Click "Schedule Shift" to create your first cashier shift.
             </p>
           </motion.div>

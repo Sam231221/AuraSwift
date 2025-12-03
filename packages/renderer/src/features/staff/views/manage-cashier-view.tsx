@@ -725,6 +725,7 @@ function CreateCashierDialog({
                         error={form.formState.errors.firstName?.message}
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -746,6 +747,7 @@ function CreateCashierDialog({
                         error={form.formState.errors.lastName?.message}
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -770,6 +772,7 @@ function CreateCashierDialog({
                       error={form.formState.errors.email?.message}
                     />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -793,6 +796,7 @@ function CreateCashierDialog({
                       error={form.formState.errors.username?.message}
                     />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -816,6 +820,7 @@ function CreateCashierDialog({
                       error={form.formState.errors.address?.message}
                     />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -841,6 +846,7 @@ function CreateCashierDialog({
                       maxLength={6}
                     />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -1009,6 +1015,7 @@ function EditCashierDialog({
                         error={form.formState.errors.firstName?.message}
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1030,6 +1037,7 @@ function EditCashierDialog({
                         error={form.formState.errors.lastName?.message}
                       />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -1078,6 +1086,7 @@ function EditCashierDialog({
                       error={form.formState.errors.address?.message}
                     />
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )}
             />
