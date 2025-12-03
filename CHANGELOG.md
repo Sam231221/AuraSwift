@@ -2,6 +2,93 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.9.0](https://github.com/Sam231221/AuraSwift/compare/v1.8.0...v1.9.0) (2025-12-03)
+
+
+### chore
+
+* **.gitignore:** add 'bookerdata' to ignore list to prevent tracking of temporary files ([](https://github.com/Sam231221/AuraSwift/commit/ac241a43b4b6a810759905bbe4431121398e95e9))
+* **refactor:** Major code refactors ([](https://github.com/Sam231221/AuraSwift/commit/440bc2e7c091a8180857cdc7de0680469eba9fa6))
+* **auth:** refactor authentication components for improved user experience; introduce user selection grid and pin entry screen, and implement clock in/out functionality ([](https://github.com/Sam231221/AuraSwift/commit/6ef220458c469293cf6f1a94b0258198e463d5ee))
+* Refactor user authentication to utilize username and PIN instead of email and password; update registration and login schemas, forms, and related components for improved user experience and security. ([](https://github.com/Sam231221/AuraSwift/commit/0eb2557ec8e6ad2ff8bbea217d7fe013e924ef42))
+* Remove appStore module and implement new IPC handlers for various functionalities, including authentication, age verification, and role management, to streamline the codebase and enhance maintainability. ([](https://github.com/Sam231221/AuraSwift/commit/f0448a8b7fc2a947a34a4d3992e6a269748fe6fe))
+* Remove outdated authentication and review documents to streamline codebase and improve maintainability ([](https://github.com/Sam231221/AuraSwift/commit/dda1a5e7d3ce0dd733d0ce849788106eead5f0c6))
+
+
+### feat
+
+* **adaptive-keyboard:** add AdaptiveKeyboard Support for Category forms ([](https://github.com/Sam231221/AuraSwift/commit/e34f531013be5f7f96412eef07e41c7eb0bdcc0b))
+* **preload:** Add API type definitions to enhance IPC API structure and maintainability. ([](https://github.com/Sam231221/AuraSwift/commit/e0f6151271e0c5b2dacdb8f4ff5410640e08d07e))
+* **weight-input-display:** Add businessId prop to WeightInputDisplay and implement sales unit settings logic for effective sales unit display ([](https://github.com/Sam231221/AuraSwift/commit/f02cb87735fe9ac7ded29b2d234b27ce8e4a1fa0))
+* **tests:** Add comprehensive unit tests for transaction and schedule validation, including shift requirements and error handling ([](https://github.com/Sam231221/AuraSwift/commit/49eedbc4f0c50c380bcfb4b9cd9f22c4913eaf0d))
+* **dashboard:** Add DashboardLayout component for improved dashboard structure and user experience ([](https://github.com/Sam231221/AuraSwift/commit/5f7f0d20927ec3f5d3d3f5551d0d6ad5628ef01b))
+* **staff-schedules:** add FormMessage component to Create and Edit Cashier Dialogs; enhance layout and styling for better responsiveness ([](https://github.com/Sam231221/AuraSwift/commit/65cb612862bf9e51b7e9584210ec894db56d8b54))
+* **dashboard:** Add new dashboard views and components for admin, cashier, and manager; enhance inventory management features with new schemas and hooks ([](https://github.com/Sam231221/AuraSwift/commit/8fea2bf98f63d0f6ae9dff070d21f045fd48872f))
+* Add product status filtering to product details view and introduce documentation for cashier dashboard refactoring, product batching, and category data planning. ([](https://github.com/Sam231221/AuraSwift/commit/b3518320f7a56d8af1f75cf9bf6283bf13fe0c36))
+* **database:** Add Sales Unit Settings management; create schema, manager, and migration for sales unit settings table to enhance inventory configuration options ([](https://github.com/Sam231221/AuraSwift/commit/53cc9b7a8fbeccb89dc97f4a6c3059c7aad11c29))
+* **transaction-validator:** add timeTracking mock for active shift and update error messages for transaction validation ([](https://github.com/Sam231221/AuraSwift/commit/57dcecb5c389c7320e43ddde5c1ee33570a255a5))
+* **updates:** enhance auto-updater functionality by adding type safety for update results and improving update state management ([](https://github.com/Sam231221/AuraSwift/commit/8cd0f743578f15a62de973a6d84bc55e2180eeea))
+* **product-management:** Enhance navigation by integrating main dashboard access and updating back navigation functionality ([](https://github.com/Sam231221/AuraSwift/commit/9ffc97786d494473eb1a8dc644be6c9d06cb9e20))
+* **sales-unit-settings:** Enhance Sales Unit Settings API with detailed type definitions and update createOrUpdate method to use new settings data structure ([](https://github.com/Sam231221/AuraSwift/commit/4f81093edaeb4d947fac93fecc129f1ac984fa6e))
+* **audit-and-time-tracking:** enhance terminal ID validation in audit and time tracking managers; create default terminal if none exists ([](https://github.com/Sam231221/AuraSwift/commit/9f15b51b2feea2239c372d00a8f1391d99d77228))
+* **user-management:** enhance user management forms with improved layout, adaptive keyboard integration, and validation schemas; refactor dialog components for better usability ([](https://github.com/Sam231221/AuraSwift/commit/6dd5623b3b40260ba70d70e3d5d79d15e145f9c4))
+* **keyboard:** Implement an adaptive virtual keyboard system and user management ([](https://github.com/Sam231221/AuraSwift/commit/0ab2e03b0cd2145c5156a07371b7f60966f9d99e))
+* **batch-selection:** implement batch selection modal for products requiring batch tracking; enhance transaction handling with FEFO logic and integrate age verification audit records ([](https://github.com/Sam231221/AuraSwift/commit/c8e28b1f95051e1e99698fd30390fb2a5fc51cb7))
+* **booker-import:** implement Booker import functionality with IPC handlers, data parsing, and import management; add VAT category and import manager integration ([](https://github.com/Sam231221/AuraSwift/commit/e79f6457c0cd0599ecab43998dca99b67b9dd686))
+* **break-compliance:** Implement break compliance validation and shift data validation utilities ([](https://github.com/Sam231221/AuraSwift/commit/421833f40e9e87c5dacaedaecdb7fb4e9a4cb777))
+* **navigation:** Implement centralized navigation system with context, hooks, and components for hierarchical view management and RBAC support ([](https://github.com/Sam231221/AuraSwift/commit/db2109367f1c753cad15d42c1b24eee167415a3e))
+* **user-management:** implement comprehensive refactoring of user management view; introduce modular components, custom hooks, and validation schemas for improved maintainability and user experience ([](https://github.com/Sam231221/AuraSwift/commit/4df0a62aba1536b000a7f3627734566707c239e3))
+* Implement dual-mode sales support with role-based shift requirements ([](https://github.com/Sam231221/AuraSwift/commit/2318a0de7cdf6470fa94246f0ef2d7a1fc9f6152))
+* **pagination:** implement paginated retrieval for batches and products with filtering options; enhance API for batch and product management to support pagination and sorting ([](https://github.com/Sam231221/AuraSwift/commit/eeaf8954fef2d52c257235c860ec83908d5ab71d))
+* Implement product batching and enhance stock management with new batch adjustment and pagination features. ([](https://github.com/Sam231221/AuraSwift/commit/8177bd7bef083401415a78d3da0ffbc463590eeb))
+* **sales-unit-settings:** Implement sales unit settings management; add IPC handlers, API integration, and UI components for configuring sales unit preferences in the application ([](https://github.com/Sam231221/AuraSwift/commit/4c2056c24d66d1915bfa6826ac8a6a85bf9e0d35))
+* **updates:** implement update functionality with IPC handlers for checking, downloading, and installing updates; add toast notifications for update events ([](https://github.com/Sam231221/AuraSwift/commit/6000cba72e8621841d49a8cf25c483690dea891f))
+* **cashier-management:** integrate AdaptiveFormField and adaptive keyboard for enhanced input handling in cashier forms, including address field support and improved validation schemas ([](https://github.com/Sam231221/AuraSwift/commit/c398563779a2fe7f1601e16232716346791802eb))
+* **stock-adjustment-modal:** integrate AdaptiveFormField and adaptive keyboard for enhanced input handling in stock adjustments ([](https://github.com/Sam231221/AuraSwift/commit/f741c639f74eb2d6975461b144b02e195156928c))
+* **product-form:** integrate AdaptiveFormField and adaptive keyboard support for enhanced input handling and validation in product management form ([](https://github.com/Sam231221/AuraSwift/commit/8003add49b8ae75449a1cf5486d4b115a9cb1d79))
+* **versioning:** Integrate application versioning into the renderer; read version from package.json and display in header and footer components ([](https://github.com/Sam231221/AuraSwift/commit/d407d6077f65c53251ac52e766d2ee7638e020c8))
+* **main:** Integrate shared package for permission management; update imports and configurations across main package files to utilize centralized permission constants and types. ([](https://github.com/Sam231221/AuraSwift/commit/bad993d381a6f3d5c4c93ee22ae1a85ba03e5ea7))
+* **permissions:** introduce centralized permission constants and validation utilities for user roles; enhance session validation and permission checking mechanisms ([](https://github.com/Sam231221/AuraSwift/commit/303c40b9560ced150673e1f856ba9241e1c1a9a7))
+* **batch-management:** introduce coerced non-negative number and integer schemas ([](https://github.com/Sam231221/AuraSwift/commit/7b59ad2edc3c03a96ce0a973f2fb3a69f16f4458))
+* **dashboard:** Introduce dashboard feature components and hooks for user management, stats, and permissions; refactor existing components for improved structure and maintainability. ([](https://github.com/Sam231221/AuraSwift/commit/8ec6cbd41285dd9fdee3f298cc267446c21df6a3))
+* **shared:** Introduce shared package for centralized permission management, including constants and validation utilities; remove legacy permissions file from main package. ([](https://github.com/Sam231221/AuraSwift/commit/c53bf5e3ec503286e1c6422e712b06b120996808))
+* **stock:** Prevent category deletion if active subcategories exist, enhance category deletion confirmation UI, and add documentation for cashier dashboard refactoring and product data. ([](https://github.com/Sam231221/AuraSwift/commit/e5814d92dc5bbabc727f1b079f499bcf3da94ca7))
+* prevent category deletion with active subcategories, replace `window.confirm` with an `AlertDialog` for category deletion, and add new documentation for cashier dashboard refactoring and product management. ([](https://github.com/Sam231221/AuraSwift/commit/a10afafed259e4dd70580da048d12cd4cd51d0db))
+* **auth:** Refactor authentication feature by restructuring components and context; introduce new hooks and schemas for login and registration processes ([](https://github.com/Sam231221/AuraSwift/commit/ff5152b452abeccccd14dea31dec64b81968aec3))
+* **dashboard:** Refactor dashboard structure by introducing widget components and updating imports; add barcode scanner feature with public API ([](https://github.com/Sam231221/AuraSwift/commit/74f307eaa95dc69396a841ef5138972c89a38a98))
+* Refactor type imports across the renderer package to utilize centralized domain types, enhancing code maintainability and consistency. ([](https://github.com/Sam231221/AuraSwift/commit/9982a20d6d694c92ee85341763c7bf3db9391181))
+* **schedule-management:** update schedule form handling to improve reset logic and validation; refactor schemas for enhanced input validation and error handling ([](https://github.com/Sam231221/AuraSwift/commit/2775e750a65ffdd7360e1d3e6765ea7e486619ec))
+
+
+### fix
+
+* **cart:** Enhance batch selection logic and integrate automatic batch selection utilities; update transaction handling to support batch data and scale readings for improved inventory management ([](https://github.com/Sam231221/AuraSwift/commit/719fa5f3bc16852e137f06fefef158b0a87e0dcd))
+* **user-form:** fix email label typo ([](https://github.com/Sam231221/AuraSwift/commit/7a46edfb43d58b205ebf2167a3d160aaba53b68f))
+* **staff-schedules:** fix typo and dble field names ([](https://github.com/Sam231221/AuraSwift/commit/45fab608e8afdb6c35a84167dfe080d1f9df84b9))
+* **new-transaction:** Improve cart session initialization logic based on user role and sales mode ([](https://github.com/Sam231221/AuraSwift/commit/08dc08196d33032bfc3a32c02e992ed1a7aebf16))
+* **security:** Remove admin fallback feature to enhance security; implement strict RBAC enforcement for admin users ([](https://github.com/Sam231221/AuraSwift/commit/604a7e586c088f67785d263c46882e878055ef27))
+* **cart-item-row:** Remove unit of measure from weight display for cleaner output ([](https://github.com/Sam231221/AuraSwift/commit/c7c93cadb636f8e6ae7fcca68fb04e7372d69fcb))
+* **user-add-form:** Replace input fields with `AdaptiveFormField` and extend keyboard support to password fields. ([](https://github.com/Sam231221/AuraSwift/commit/3719e9f9da5be6ff0c5f2bd978367b0457e8a264))
+* **cart-summary:** update cart totals calculation to accurately reflect subtotal before tax ([](https://github.com/Sam231221/AuraSwift/commit/b5ea3867e7eab0d1dcdc23bbc6fa29bc890ab54d))
+
+
+### refactor
+
+* Clean up code formatting and improve component structure in product management views ([](https://github.com/Sam231221/AuraSwift/commit/1328c043bc494cda0aca4276aaea32e0521e5718))
+* **hardwares:** migrate barcode scanner feature to hardware services; update imports and remove deprecated code ([](https://github.com/Sam231221/AuraSwift/commit/9f8e14e795c64d12e55252901bb68e359b3652c5))
+* **auth:** remove demo PIN display and associated utility function from PinEntryScreen component ([](https://github.com/Sam231221/AuraSwift/commit/93cd82f56943dc98337a83dcc3ef720733101d2d))
+* **types:** Remove deprecated type definitions and migrate to new domain structure for user, product, and cart types ([](https://github.com/Sam231221/AuraSwift/commit/6efe6ab89a09087b78db9a55a546e8a025be1835))
+* **adaptive-keyboard:** remove error message display from AdaptiveFormField and AdaptiveTextarea components ([](https://github.com/Sam231221/AuraSwift/commit/af7e60968942a0a89ddde1f57cc427e1570788d4))
+* **cashier-view:** Remove unused imports and clean up code formatting; enhance error message handling in batch selection utility for better clarity ([](https://github.com/Sam231221/AuraSwift/commit/1e170e809a80a1b82e8412344dd0b261cfdd1517))
+* **cart-item-row:** Simplify import path for CartItemWithProduct type and remove age restriction badge rendering ([](https://github.com/Sam231221/AuraSwift/commit/fdec6808483c92c9fabf691306530aa263ddccce))
+* Standardize field naming conventions and improve type safety across various components ([](https://github.com/Sam231221/AuraSwift/commit/2f024a53efa1736d88fea1161cdff4383ab298dc))
+* **dashboard:** Streamline dashboard components and navigation; ([](https://github.com/Sam231221/AuraSwift/commit/5fa898022fb384761c26573ea1717d2b5b7fe138))
+* unused files from adaptive-keyboard exports ([](https://github.com/Sam231221/AuraSwift/commit/2d626c4422014a39ccf2a3e855023c89cb24ec8f))
+* **product-management:** update back navigation prop and clean up whitespace in ProductManagementView component ([](https://github.com/Sam231221/AuraSwift/commit/12c8c5c7d5271a7e85c38235724f992d140841ca))
+* Update button click handlers in product batch management view for improved navigation consistency ([](https://github.com/Sam231221/AuraSwift/commit/f5b86d8449cca068d1f86db7c051af14581c9567))
+* **database:** Update cart_sessions schema to allow nullable shiftId for improved flexibility; adjust related data handling in cartManager and add migration for schema changes ([](https://github.com/Sam231221/AuraSwift/commit/99b7b7b28020cb126ac0ba8fc95fb887988b1dd8))
+* **database:** Update database schema to use snake_case for field names; enhance data consistency across audit, cash drawer, and time tracking managers; implement utility for fixing break durations ([](https://github.com/Sam231221/AuraSwift/commit/901b44e57b461ed349497d4f112a57cdee3a9224))
+
 # [1.8.0](https://github.com/Sam231221/AuraSwift/compare/v1.7.1...v1.8.0) (2025-11-24)
 
 
