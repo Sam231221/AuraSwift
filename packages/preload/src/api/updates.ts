@@ -4,11 +4,7 @@
  */
 
 import { ipcRenderer, contextBridge } from "electron";
-import type {
-  UpdateInfo,
-  DownloadProgress,
-  UpdateError,
-} from "@app/shared/types/updates";
+import type { UpdateInfo, DownloadProgress, UpdateError } from "@app/shared";
 
 type UpdateAvailableCallback = (info: UpdateInfo) => void;
 type DownloadProgressCallback = (progress: DownloadProgress) => void;

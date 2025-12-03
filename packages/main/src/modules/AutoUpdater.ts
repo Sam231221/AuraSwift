@@ -80,6 +80,7 @@ export class AutoUpdater implements AppModule {
   #lastCheckResult: { version: string; timestamp: number } | null = null;
   #lastUserActivity: number = Date.now();
   #activityCheckInterval: NodeJS.Timeout | null = null;
+  #downloadedUpdateInfo: UpdateInfo | null = null;
 
   constructor({
     logger = null,
@@ -469,6 +470,20 @@ export class AutoUpdater implements AppModule {
    */
   getPendingUpdateInfo(): UpdateInfo | null {
     return this.#postponedUpdateInfo;
+  }
+
+  /**
+   * Get downloaded update info
+   */
+  getDownloadedUpdateInfo(): UpdateInfo | null {
+    return this.#downloadedUpdateInfo;
+  }
+
+  /**
+   * Check if update is downloaded and ready to install
+   */
+  isUpdateDownloaded(): boolean {
+    return this.#downloadedUpdateInfo !== null;
   }
 
   /**
@@ -980,6 +995,9 @@ export class AutoUpdater implements AppModule {
 
       // Phase 4.1: Clear download state after successful download
       this.#downloadState = null;
+
+      // Store downloaded update info
+      this.#downloadedUpdateInfo = info;
 
       if (this.#logger) {
         this.#logger.info(

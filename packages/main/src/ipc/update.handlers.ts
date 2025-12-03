@@ -4,6 +4,7 @@
  */
 
 import { ipcMain, BrowserWindow } from "electron";
+import type { UpdateCheckResult } from "electron-updater";
 import { getAutoUpdaterInstance } from "../index.js";
 import { getLogger } from "../utils/logger.js";
 
@@ -23,7 +24,8 @@ export function registerUpdateHandlers(): void {
         return { hasUpdate: false, error: "Auto-updater not available" };
       }
 
-      const result = await updaterInstance.runAutoUpdater();
+      const result =
+        (await updaterInstance.runAutoUpdater()) as UpdateCheckResult | null;
 
       if (result?.updateInfo) {
         // Update is available
@@ -81,24 +83,20 @@ export function registerUpdateHandlers(): void {
 
       const updater = updaterInstance.getAutoUpdater();
 
-      // Check if update is available
-      if (!updater.downloadedUpdateInfo) {
-        // Need to check and download
-        const result = await updaterInstance.runAutoUpdater();
+      // Check if update is already downloaded
+      // Note: We check if update is available first, then download
+      const checkResult =
+        (await updaterInstance.runAutoUpdater()) as UpdateCheckResult | null;
 
-        if (!result?.updateInfo) {
-          throw new Error("No update available to download");
-        }
-
-        // Start download
-        updaterInstance.setDownloading(true);
-        updater.downloadUpdate();
-
-        return { success: true };
-      } else {
-        // Update already downloaded
-        return { success: true, alreadyDownloaded: true };
+      if (!checkResult?.updateInfo) {
+        throw new Error("No update available to download");
       }
+
+      // Start download
+      updaterInstance.setDownloading(true);
+      updater.downloadUpdate();
+
+      return { success: true };
     } catch (error) {
       logger.error("Error downloading update:", error);
       const errorMessage =
@@ -133,7 +131,7 @@ export function registerUpdateHandlers(): void {
       const updater = updaterInstance.getAutoUpdater();
 
       // Check if update is downloaded
-      if (!updater.downloadedUpdateInfo) {
+      if (!updaterInstance.isUpdateDownloaded()) {
         throw new Error("Update not downloaded yet");
       }
 
@@ -180,9 +178,7 @@ export function registerUpdateHandlers(): void {
       }
 
       // Get current update info if available
-      const updater = updaterInstance.getAutoUpdater();
-      const updateInfo =
-        updater.downloadedUpdateInfo || updaterInstance.getPendingUpdateInfo();
+      const updateInfo = updaterInstance.getPendingUpdateInfo();
 
       if (updateInfo) {
         updaterInstance.postponeUpdate(updateInfo);
