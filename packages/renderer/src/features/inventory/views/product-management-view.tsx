@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
 import type { Product } from "@/types/domain";
 import { useNestedNavigation } from "@/navigation/hooks/use-nested-navigation";
+import { useNavigation } from "@/navigation/hooks/use-navigation";
 import { getNestedViews } from "@/navigation/registry/view-registry";
 
 import ManageCategoriesView from "./category-management-view";
@@ -29,6 +30,9 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   // Use nested navigation instead of local state
   const { navigateTo, currentNestedViewId } =
     useNestedNavigation("productManagement");
+  
+  // Use main navigation to navigate to the main dashboard
+  const { navigateTo: navigateToMainView } = useNavigation();
 
   const nestedViews = getNestedViews("productManagement");
   const defaultView = nestedViews.find((v) => v.id === "productDashboard");
@@ -336,6 +340,11 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     if (!user) return {};
 
     const goToDashboard = () => navigateTo("productDashboard");
+    
+    // Navigate to main dashboard (the one with stat cards and feature cards)
+    const goToMainDashboard = () => {
+      navigateToMainView("dashboard");
+    };
 
     return {
       productDashboard: (
@@ -343,7 +352,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           products={allProducts}
           categories={categories}
           lowStockProducts={lowStockProducts}
-          onBack={onBack}
+          onBack={goToMainDashboard}
           onManageProducts={() => navigateTo("productList")}
           onManageCategories={() => navigateTo("categoryManagement")}
           onAddProduct={openAddProductDrawer}
@@ -401,7 +410,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   }, [
     user,
     navigateTo,
-    onBack,
+    navigateToMainView,
     allProducts,
     categories,
     lowStockProducts,
