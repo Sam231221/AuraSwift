@@ -41,11 +41,62 @@ export class TimeTrackingManager {
     const eventId = this.uuid.v4();
     const now = new Date();
 
+    // Validate terminal exists, or get/create a default terminal for the business
+    let validTerminalId = data.terminalId;
+    const [existingTerminal] = this.db
+      .select({ id: schema.terminals.id })
+      .from(schema.terminals)
+      .where(eq(schema.terminals.id, data.terminalId))
+      .limit(1)
+      .all();
+
+    if (!existingTerminal) {
+      // Terminal doesn't exist - try to find any terminal for this business
+      const [businessTerminal] = this.db
+        .select({ id: schema.terminals.id })
+        .from(schema.terminals)
+        .where(eq(schema.terminals.business_id, data.businessId))
+        .limit(1)
+        .all();
+
+      if (businessTerminal) {
+        validTerminalId = businessTerminal.id;
+        const logger = (await import("../../utils/logger.js")).getLogger(
+          "timeTrackingManager"
+        );
+        logger.warn(
+          `[createClockEvent] Terminal ${data.terminalId} does not exist, using business terminal ${validTerminalId}`
+        );
+      } else {
+        // No terminals exist for this business - create a default one
+        const defaultTerminalId = this.uuid.v4();
+        this.db
+          .insert(schema.terminals)
+          .values({
+            id: defaultTerminalId,
+            business_id: data.businessId,
+            name: "Default Terminal",
+            type: "pos",
+            status: "active",
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+        validTerminalId = defaultTerminalId;
+        const logger = (await import("../../utils/logger.js")).getLogger(
+          "timeTrackingManager"
+        );
+        logger.info(
+          `[createClockEvent] Created default terminal ${validTerminalId} for business ${data.businessId}`
+        );
+      }
+    }
+
     const clockEvent = {
       id: eventId,
       user_id: data.userId,
       business_id: data.businessId, // ✅ REQUIRED: business_id is NOT NULL
-      terminal_id: data.terminalId,
+      terminal_id: validTerminalId,
       location_id: data.locationId ?? null,
       schedule_id: data.scheduleId ?? null, // ✅ NEW: Link to schedule
       type: data.type,

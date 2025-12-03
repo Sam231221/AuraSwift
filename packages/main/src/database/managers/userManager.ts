@@ -135,6 +135,56 @@ export class UserManager {
 
     if (!user) return null;
 
+    // If roleName is null/undefined, try to get it from userRoles table
+    // This handles cases where primaryRoleId exists but the role join failed,
+    // or where primaryRoleId is null but user has roles in userRoles table
+    if (!user.roleName && user.id) {
+      try {
+        // Get first active role for this user
+        const userRoleRecords = this.db
+          .select({
+            roleId: schema.userRoles.roleId,
+            roleName: schema.roles.name,
+          })
+          .from(schema.userRoles)
+          .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+          .where(
+            and(
+              eq(schema.userRoles.userId, user.id),
+              eq(schema.userRoles.isActive, true)
+            )
+          )
+          .limit(1)
+          .all();
+
+        if (userRoleRecords.length > 0) {
+          user.roleName = userRoleRecords[0].roleName;
+          // Also update primaryRoleId if it's null
+          if (!user.primaryRoleId) {
+            user.primaryRoleId = userRoleRecords[0].roleId;
+            // Update the database to fix this user
+            this.updateUser(user.id, {
+              primaryRoleId: userRoleRecords[0].roleId,
+            });
+            logger.info(
+              `[getUserById] Fixed missing primaryRoleId for user ${user.id}`
+            );
+          } else if (user.primaryRoleId !== userRoleRecords[0].roleId) {
+            // primaryRoleId exists but doesn't match the active role
+            // Log a warning but don't change it automatically
+            logger.warn(
+              `[getUserById] User ${user.id} has primaryRoleId ${user.primaryRoleId} but active role is ${userRoleRecords[0].roleId}`
+            );
+          }
+        }
+      } catch (error) {
+        logger.warn(
+          `[getUserById] Failed to lookup role for user ${user.id}:`,
+          error
+        );
+      }
+    }
+
     return {
       ...user,
       activeRoleContext: user.activeRoleContext ?? null,
@@ -221,10 +271,62 @@ export class UserManager {
       return null;
     }
 
+    // If roleName is null/undefined, try to get it from userRoles table
+    // This handles cases where primaryRoleId exists but the role join failed,
+    // or where primaryRoleId is null but user has roles in userRoles table
+    if (!user.roleName && user.id) {
+      try {
+        // Get first active role for this user
+        const userRoleRecords = this.db
+          .select({
+            roleId: schema.userRoles.roleId,
+            roleName: schema.roles.name,
+          })
+          .from(schema.userRoles)
+          .innerJoin(schema.roles, eq(schema.userRoles.roleId, schema.roles.id))
+          .where(
+            and(
+              eq(schema.userRoles.userId, user.id),
+              eq(schema.userRoles.isActive, true)
+            )
+          )
+          .limit(1)
+          .all();
+
+        if (userRoleRecords.length > 0) {
+          user.roleName = userRoleRecords[0].roleName;
+          // Also update primaryRoleId if it's null
+          if (!user.primaryRoleId) {
+            user.primaryRoleId = userRoleRecords[0].roleId;
+            // Update the database to fix this user
+            this.updateUser(user.id, {
+              primaryRoleId: userRoleRecords[0].roleId,
+            });
+            logger.info(
+              `[getUserByUsername] Fixed missing primaryRoleId for user ${user.id}`
+            );
+          } else if (user.primaryRoleId !== userRoleRecords[0].roleId) {
+            // primaryRoleId exists but doesn't match the active role
+            // Log a warning but don't change it automatically
+            logger.warn(
+              `[getUserByUsername] User ${user.id} has primaryRoleId ${user.primaryRoleId} but active role is ${userRoleRecords[0].roleId}`
+            );
+          }
+        }
+      } catch (error) {
+        logger.warn(
+          `[getUserByUsername] Failed to lookup role for user ${user.id}:`,
+          error
+        );
+      }
+    }
+
     logger.info(
       `[getUserByUsername] Found user: ${user.id} (${user.firstName} ${
         user.lastName
-      }), role: ${user.roleName || "none"}`
+      }), primaryRoleId: ${user.primaryRoleId || "null"}, role: ${
+        user.roleName || "none"
+      }`
     );
     return {
       ...user,
@@ -407,26 +509,7 @@ export class UserManager {
           .run();
       }
 
-      // 2. Create user (using RBAC system)
-      tx.insert(schema.users)
-        .values({
-          id: userId,
-          username: userData.username,
-          email: userData.email || null,
-          passwordHash: null,
-          pinHash: hashedPin,
-          salt: salt,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          businessName: userData.businessName,
-          businessId,
-          isActive: true,
-          address: "",
-        })
-        .run();
-
-      // 3. Assign role via RBAC userRoles table
-      // Find the role by name for this business
+      // 2. Find role first (needed for primaryRoleId)
       const [roleRecord] = tx
         .select()
         .from(schema.roles)
@@ -439,23 +522,42 @@ export class UserManager {
         .limit(1)
         .all();
 
-      if (roleRecord) {
-        // Assign the role to the user
-        tx.insert(schema.userRoles)
-          .values({
-            id: this.uuid.v4(),
-            userId: userId,
-            roleId: roleRecord.id,
-            assignedBy: null, // System assignment
-            assignedAt: now,
-            isActive: true,
-          })
-          .run();
-      } else {
-        logger.warn(
-          `Warning: No role found for '${userData.role}' in business ${businessId}. User created without role assignment.`
+      if (!roleRecord) {
+        throw new Error(
+          `Role '${userData.role}' not found for business ${businessId}`
         );
       }
+
+      // 3. Create user (using RBAC system) with primaryRoleId set
+      tx.insert(schema.users)
+        .values({
+          id: userId,
+          username: userData.username,
+          email: userData.email || null,
+          passwordHash: null,
+          pinHash: hashedPin,
+          salt: salt,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          businessName: userData.businessName,
+          businessId,
+          primaryRoleId: roleRecord.id, // Set primary role ID
+          isActive: true,
+          address: "",
+        })
+        .run();
+
+      // 4. Assign role via RBAC userRoles table
+      tx.insert(schema.userRoles)
+        .values({
+          id: this.uuid.v4(),
+          userId: userId,
+          roleId: roleRecord.id,
+          assignedBy: null, // System assignment
+          assignedAt: now,
+          isActive: true,
+        })
+        .run();
     });
 
     const user = this.getUserById(userId);
@@ -539,6 +641,8 @@ export class UserManager {
 
   getAllActiveUsers(): any[] {
     // Get all active users with their primary role from RBAC system
+    // Use a more complex query to handle cases where primaryRoleId is null
+    // by falling back to the first active role from userRoles table
     const usersWithRoles = this.db
       .select({
         id: schema.users.id,
@@ -562,9 +666,59 @@ export class UserManager {
       .orderBy(schema.users.firstName)
       .all();
 
+    // Post-process to fill in missing roleName for users with null primaryRoleId
+    // by looking up their first active role from userRoles table
+    const processedUsers = usersWithRoles.map((user: any) => {
+      // If roleName is null/undefined, try to get it from userRoles table
+      if (!user.roleName && user.id) {
+        try {
+          // Get first active role for this user
+          const userRoleRecords = this.db
+            .select({
+              roleId: schema.userRoles.roleId,
+              roleName: schema.roles.name,
+            })
+            .from(schema.userRoles)
+            .innerJoin(
+              schema.roles,
+              eq(schema.userRoles.roleId, schema.roles.id)
+            )
+            .where(
+              and(
+                eq(schema.userRoles.userId, user.id),
+                eq(schema.userRoles.isActive, true)
+              )
+            )
+            .limit(1)
+            .all();
+
+          if (userRoleRecords.length > 0) {
+            user.roleName = userRoleRecords[0].roleName;
+            // Also update primaryRoleId if it's null
+            if (!user.primaryRoleId) {
+              user.primaryRoleId = userRoleRecords[0].roleId;
+              // Update the database to fix this user
+              this.updateUser(user.id, {
+                primaryRoleId: userRoleRecords[0].roleId,
+              });
+              logger.info(
+                `[getAllActiveUsers] Fixed missing primaryRoleId for user ${user.id}`
+              );
+            }
+          }
+        } catch (error) {
+          logger.warn(
+            `[getAllActiveUsers] Failed to lookup role for user ${user.id}:`,
+            error
+          );
+        }
+      }
+      return user;
+    });
+
     // Return users with primary role information from RBAC system
     // No longer includes deprecated 'role' field - use primaryRole.name instead
-    return usersWithRoles;
+    return processedUsers;
   }
 
   async searchUsers(businessId: string, searchTerm: string): Promise<User[]> {
@@ -850,10 +1004,13 @@ export class UserManager {
               // Create clock-in event linked to schedule (with audit logging)
               const { getDatabase } = await import("../index.js");
               const dbInstance = await getDatabase();
+              // Use terminalId if provided, otherwise let createClockEvent handle it
+              // (it will find/create a default terminal for the business)
               clockEvent = await this.timeTrackingManager.createClockEvent({
                 userId: user.id,
                 businessId: userWithBusiness.businessId, // ✅ REQUIRED
-                terminalId: data.terminalId || "unknown",
+                terminalId:
+                  data.terminalId || `default-${userWithBusiness.businessId}`,
                 scheduleId: schedule.id, // ✅ Link to schedule
                 type: "in",
                 method: "login",

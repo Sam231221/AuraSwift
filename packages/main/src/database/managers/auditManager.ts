@@ -37,6 +37,28 @@ export class AuditManager {
       throw new Error("userId is required for audit log");
     }
 
+    // Validate terminalId exists if provided (to avoid foreign key constraint errors)
+    let validTerminalId: string | null = null;
+    if (data.terminalId) {
+      const [terminal] = this.db
+        .select({ id: schema.terminals.id })
+        .from(schema.terminals)
+        .where(eq(schema.terminals.id, data.terminalId))
+        .limit(1)
+        .all();
+
+      if (terminal) {
+        validTerminalId = data.terminalId;
+      } else {
+        // Terminal doesn't exist - log warning but continue without terminal_id
+        const { getLogger } = await import("../../utils/logger.js");
+        const logger = getLogger("auditManager");
+        logger.warn(
+          `[createAuditLog] Terminal ID ${data.terminalId} does not exist, omitting from audit log`
+        );
+      }
+    }
+
     this.db
       .insert(schema.auditLogs)
       .values({
@@ -52,7 +74,7 @@ export class AuditManager {
             ? data.details
             : JSON.stringify(data.details),
         ip_address: data.ipAddress ?? null,
-        terminal_id: data.terminalId ?? null,
+        terminal_id: validTerminalId,
         timestamp: now, // Use Date object for timestamp_ms mode
         createdAt: now,
       })
