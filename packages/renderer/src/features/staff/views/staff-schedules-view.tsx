@@ -775,7 +775,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                   name="startTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Time</FormLabel>
                       <FormControl>
                         <TimePicker
                           id="startTime"
@@ -794,7 +793,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                   name="endTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>End Time</FormLabel>
                       <FormControl>
                         <TimePicker
                           id="endTime"
@@ -1176,10 +1174,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             </Button>
             <div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-1 sm:mb-2">
-                Cashier Shifts
+                Staffs Shifts
               </h1>
               <p className="text-sm sm:text-base text-slate-600">
-                Manage POS cashier schedules and shifts
+                Manage staff schedules and shifts
               </p>
             </div>
           </div>
