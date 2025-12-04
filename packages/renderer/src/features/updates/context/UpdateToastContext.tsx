@@ -76,13 +76,19 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
   }, []);
 
   const activeToastIdRef = useRef<string | number | null>(null);
+  const updateAvailableToastIdRef = useRef<string | number | null>(null);
   const downloadProgressToastIdRef = useRef<string | number | null>(null);
+  const updateReadyToastIdRef = useRef<string | number | null>(null);
 
   // Use refs to store latest function versions to avoid dependency issues
-  const downloadUpdateRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const downloadUpdateRef = useRef<(() => Promise<void>) | undefined>(
+    undefined
+  );
   const installUpdateRef = useRef<(() => Promise<void>) | undefined>(undefined);
   const postponeUpdateRef = useRef<(() => void) | undefined>(undefined);
-  const checkForUpdatesRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const checkForUpdatesRef = useRef<(() => Promise<void>) | undefined>(
+    undefined
+  );
   const dismissErrorRef = useRef<(() => void) | undefined>(undefined);
 
   // Cleanup listeners on unmount
@@ -109,9 +115,25 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       setState("available");
       setUpdateInfo(info);
       setError(null);
-      
-      // Show toast
-      showUpdateAvailableToast(
+
+      // Dismiss any existing toasts (using fixed IDs for reliability)
+      toast.dismiss("update-available");
+      toast.dismiss("download-progress");
+      toast.dismiss("update-ready");
+
+      // Clear refs
+      if (updateAvailableToastIdRef.current) {
+        updateAvailableToastIdRef.current = null;
+      }
+      if (downloadProgressToastIdRef.current) {
+        downloadProgressToastIdRef.current = null;
+      }
+      if (updateReadyToastIdRef.current) {
+        updateReadyToastIdRef.current = null;
+      }
+
+      // Show toast and store its ID
+      updateAvailableToastIdRef.current = showUpdateAvailableToast(
         info,
         currentVersion,
         () => downloadUpdateRef.current?.(),
@@ -133,25 +155,25 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
     const handleDownloadProgress = (progressData: DownloadProgress) => {
       setState("downloading");
       setProgress(progressData);
-      
+
+      // Dismiss the "Update Available" toast when download starts (using fixed ID)
+      toast.dismiss("update-available");
+      if (updateAvailableToastIdRef.current) {
+        updateAvailableToastIdRef.current = null;
+      }
+
       // Update or show progress toast
       if (downloadProgressToastIdRef.current) {
         // Update existing toast
-        toast.custom(
-          () => (
-            <DownloadProgressToast
-              progress={progressData}
-            />
-          ),
-          {
-            id: downloadProgressToastIdRef.current,
-            duration: Infinity,
-            position: "top-right",
-          }
-        );
+        toast.custom(() => <DownloadProgressToast progress={progressData} />, {
+          id: downloadProgressToastIdRef.current,
+          duration: Infinity,
+          position: "top-right",
+        });
       } else {
         // Show new toast
-        downloadProgressToastIdRef.current = showDownloadProgressToast(progressData);
+        downloadProgressToastIdRef.current =
+          showDownloadProgressToast(progressData);
       }
     };
 
@@ -170,13 +192,27 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       setState("downloaded");
       setUpdateInfo(info);
       setProgress(null);
-      
-      // Dismiss progress toast and show ready toast
+
+      // Dismiss all existing toasts BEFORE showing new one (using fixed IDs)
+      // This ensures no overlapping toasts
+      toast.dismiss("update-available");
+      toast.dismiss("download-progress");
+      toast.dismiss("update-ready");
+
+      // Clear refs
+      if (updateAvailableToastIdRef.current) {
+        updateAvailableToastIdRef.current = null;
+      }
       if (downloadProgressToastIdRef.current) {
-        toast.dismiss(downloadProgressToastIdRef.current);
         downloadProgressToastIdRef.current = null;
       }
-      showUpdateReadyToast(
+      if (updateReadyToastIdRef.current) {
+        updateReadyToastIdRef.current = null;
+      }
+
+      // Show ready toast and store its ID
+      // Using fixed ID ensures it replaces any existing toast
+      updateReadyToastIdRef.current = showUpdateReadyToast(
         info,
         () => installUpdateRef.current?.(),
         () => postponeUpdateRef.current?.()
@@ -197,9 +233,20 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
     const handleError = (errorData: UpdateError) => {
       setState("error");
       setError(errorData);
-      
+
+      // Dismiss existing toasts when error occurs
+      if (errorData.type === "download" && downloadProgressToastIdRef.current) {
+        toast.dismiss(downloadProgressToastIdRef.current);
+        downloadProgressToastIdRef.current = null;
+      }
+      if (errorData.type === "check" && updateAvailableToastIdRef.current) {
+        toast.dismiss(updateAvailableToastIdRef.current);
+        updateAvailableToastIdRef.current = null;
+      }
+
       // Show error toast with retry option for download/check errors
-      const canRetry = errorData.type === "download" || errorData.type === "check";
+      const canRetry =
+        errorData.type === "download" || errorData.type === "check";
       showUpdateErrorToast(
         errorData,
         canRetry
@@ -295,6 +342,13 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       setPostponeCount((prev) => prev + 1);
       setState("idle");
       setUpdateInfo(null);
+
+      // Dismiss the update available toast (using fixed ID)
+      toast.dismiss("update-available");
+      if (updateAvailableToastIdRef.current) {
+        updateAvailableToastIdRef.current = null;
+      }
+
       toast.info("Update postponed. We'll remind you later.");
     } catch (err) {
       toast.error("Failed to postpone update");
@@ -365,7 +419,13 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
     postponeUpdateRef.current = postponeUpdate;
     checkForUpdatesRef.current = checkForUpdates;
     dismissErrorRef.current = dismissError;
-  }, [downloadUpdate, installUpdate, postponeUpdate, checkForUpdates, dismissError]);
+  }, [
+    downloadUpdate,
+    installUpdate,
+    postponeUpdate,
+    checkForUpdates,
+    dismissError,
+  ]);
 
   const value: UpdateContextValue = {
     state,

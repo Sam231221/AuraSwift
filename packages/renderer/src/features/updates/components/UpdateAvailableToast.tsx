@@ -24,27 +24,64 @@ export function UpdateAvailableToast({
 }: UpdateAvailableToastProps) {
   const [showNotes, setShowNotes] = useState(false);
 
-  const formatReleaseNotes = (notes?: string | string[]): string => {
+  const formatReleaseNotes = (notes?: string | string[] | unknown): string => {
     if (!notes) return "";
+
+    // Handle objects - try to extract meaningful content
+    if (typeof notes === "object" && !Array.isArray(notes)) {
+      // If it's an object, try to stringify it or extract a message property
+      if (notes && typeof notes === "object") {
+        const obj = notes as Record<string, unknown>;
+        // Try common properties that might contain release notes
+        if (typeof obj.message === "string") {
+          return obj.message;
+        }
+        if (typeof obj.content === "string") {
+          return obj.content;
+        }
+        if (typeof obj.body === "string") {
+          return obj.body;
+        }
+        // If no known property, try to stringify (but format nicely)
+        try {
+          const str = JSON.stringify(notes, null, 2);
+          // If it's a simple object with one property, extract it
+          const entries = Object.entries(obj);
+          if (entries.length === 1 && typeof entries[0][1] === "string") {
+            return entries[0][1];
+          }
+          return str;
+        } catch {
+          return "Release notes available on GitHub";
+        }
+      }
+      return "Release notes available on GitHub";
+    }
+
     if (Array.isArray(notes)) {
       return notes.join("\n");
     }
-    // Strip HTML tags if present
-    return notes.replace(/<[^>]*>/g, "").trim();
+
+    if (typeof notes === "string") {
+      // Strip HTML tags if present
+      return notes.replace(/<[^>]*>/g, "").trim();
+    }
+
+    return "Release notes available on GitHub";
   };
 
   const releaseNotes = formatReleaseNotes(updateInfo.releaseNotes);
   const hasNotes = releaseNotes.length > 0;
 
   return (
-    <div className="flex flex-col gap-3 w-full max-w-md">
+    <div className="flex flex-col gap-3 w-full max-w-md bg-card border-2 border-border rounded-lg shadow-xl p-4 backdrop-blur-sm">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5">
+        <div className="shrink-0 mt-0.5">
           <Gift className="h-5 w-5 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm leading-tight">
+          <h3 className="font-semibold text-sm leading-tight text-card-foreground">
             New update available
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
@@ -82,19 +119,11 @@ export function UpdateAvailableToast({
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1">
-        <Button
-          onClick={onDownload}
-          size="sm"
-          className="flex-1"
-        >
+        <Button onClick={onDownload} size="sm" className="flex-1">
           <Download className="h-4 w-4" />
           Download Now
         </Button>
-        <Button
-          onClick={onPostpone}
-          variant="ghost"
-          size="sm"
-        >
+        <Button onClick={onPostpone} variant="ghost" size="sm">
           <Clock className="h-4 w-4" />
           Later
         </Button>
@@ -130,7 +159,7 @@ export function showUpdateAvailableToast(
     {
       duration: Infinity, // Don't auto-dismiss
       position: "top-right",
+      id: "update-available", // Use fixed ID to replace any existing toast
     }
   );
 }
-

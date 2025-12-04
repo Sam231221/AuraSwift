@@ -36,7 +36,7 @@ export function DownloadProgressToast({
     }
     const remaining = progress.total - progress.transferred;
     const seconds = Math.ceil(remaining / progress.bytesPerSecond);
-    
+
     if (seconds < 60) {
       return `~${seconds}s remaining`;
     }
@@ -45,14 +45,14 @@ export function DownloadProgressToast({
   };
 
   return (
-    <div className="flex flex-col gap-3 w-full max-w-md">
+    <div className="flex flex-col gap-3 w-full max-w-md bg-card border-2 border-border rounded-lg shadow-xl p-4 backdrop-blur-sm">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <Download className="h-5 w-5 text-primary animate-pulse" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm leading-tight">
+          <h3 className="font-semibold text-sm leading-tight text-card-foreground">
             Downloading update...
           </h3>
         </div>
@@ -112,4 +112,3 @@ export function showDownloadProgressToast(
     }
   );
 }
-

@@ -20,14 +20,14 @@ export function UpdateReadyToast({
   onPostpone,
 }: UpdateReadyToastProps) {
   return (
-    <div className="flex flex-col gap-3 w-full max-w-md">
+    <div className="flex flex-col gap-3 w-full max-w-md bg-card border-2 border-border rounded-lg shadow-xl p-4 backdrop-blur-sm">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5">
+        <div className="shrink-0 mt-0.5">
           <CheckCircle2 className="h-5 w-5 text-green-500" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm leading-tight">
+          <h3 className="font-semibold text-sm leading-tight text-card-foreground">
             Update ready to install
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
@@ -88,6 +88,7 @@ export function showUpdateReadyToast(
     {
       duration: Infinity, // Don't auto-dismiss until action taken
       position: "top-right",
+      id: "update-ready", // Use fixed ID to replace any existing toast
     }
   );
 }
