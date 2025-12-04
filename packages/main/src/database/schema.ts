@@ -1014,7 +1014,7 @@ export const transactions = createTable("transactions", {
   tax: real("tax").notNull(),
   total: real("total").notNull(),
   paymentMethod: text("paymentMethod", {
-    enum: ["cash", "card", "mobile", "voucher", "split"],
+    enum: ["cash", "card", "mobile", "voucher", "split", "viva_wallet"],
   }).notNull(),
   cashAmount: real("cashAmount"),
   cardAmount: real("cardAmount"),
@@ -1043,6 +1043,9 @@ export const transactions = createTable("transactions", {
   ),
   discountAmount: real("discountAmount").default(0),
   appliedDiscounts: text("appliedDiscounts"),
+  // Viva Wallet transaction tracking
+  vivaWalletTransactionId: text("viva_wallet_transaction_id"),
+  vivaWalletTerminalId: text("viva_wallet_terminal_id"),
 });
 
 /**

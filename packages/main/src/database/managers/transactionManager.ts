@@ -86,6 +86,11 @@ export class TransactionManager {
       appliedDiscounts: transactionData.appliedDiscounts
         ? JSON.stringify(transactionData.appliedDiscounts)
         : null,
+      // Viva Wallet transaction tracking
+      vivaWalletTransactionId:
+        (transactionData as any).vivaWalletTransactionId ?? null,
+      vivaWalletTerminalId:
+        (transactionData as any).vivaWalletTerminalId ?? null,
     });
 
     const transaction = await this.getTransactionById(transactionId);
@@ -239,6 +244,11 @@ export class TransactionManager {
           refundMethod: null,
           managerApprovalId: null,
           isPartialRefund: false,
+          // Viva Wallet transaction tracking
+          vivaWalletTransactionId:
+            (transaction as any).vivaWalletTransactionId ?? null,
+          vivaWalletTerminalId:
+            (transaction as any).vivaWalletTerminalId ?? null,
         })
         .run();
 

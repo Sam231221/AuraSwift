@@ -10,7 +10,13 @@ export const transactionAPI = {
       subtotal: number;
       tax: number;
       total: number;
-      paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
+      paymentMethod:
+        | "cash"
+        | "card"
+        | "mobile"
+        | "voucher"
+        | "split"
+        | "viva_wallet";
       cashAmount?: number;
       cardAmount?: number;
       items: Array<{
@@ -36,10 +42,19 @@ export const transactionAPI = {
       cartSessionId: string;
       shiftId?: string; // Made optional for admin/manager
       businessId: string;
-      paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
+      paymentMethod:
+        | "cash"
+        | "card"
+        | "mobile"
+        | "voucher"
+        | "split"
+        | "viva_wallet";
       cashAmount?: number;
       cardAmount?: number;
       receiptNumber: string;
+      // Viva Wallet specific
+      vivaWalletTransactionId?: string;
+      vivaWalletTerminalId?: string;
     }
   ) => ipcRenderer.invoke("transactions:createFromCart", sessionToken, data),
 };

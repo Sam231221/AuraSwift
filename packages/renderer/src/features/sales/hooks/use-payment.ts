@@ -11,10 +11,7 @@ import type { TransactionData } from "@/types/domain/transaction";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("use-payment");
-import type {
-  CartSession,
-  CartItemWithProduct,
-} from "@/types/features/cart";
+import type { CartSession, CartItemWithProduct } from "@/types/features/cart";
 import {
   validateCashPayment,
   validateCart,
@@ -378,7 +375,8 @@ export function usePayment({
   const completeTransaction = useCallback(
     async (
       skipPaymentValidation = false,
-      actualPaymentMethod?: PaymentMethod["type"]
+      actualPaymentMethod?: PaymentMethod["type"],
+      vivaWalletTransactionId?: string
     ) => {
       // CRITICAL FIX #2: Race condition protection
       if (isProcessingRef.current) {
@@ -587,18 +585,30 @@ export function usePayment({
             requiresShift && shiftIdForTransaction
               ? shiftIdForTransaction.id
               : null;
+          // Prepare transaction data
+          const transactionData: any = {
+            cartSessionId: cartSession.id,
+            shiftId: shiftId || undefined, // Pass undefined instead of empty string for admin mode
+            businessId: businessId!,
+            paymentMethod: backendPaymentMethod,
+            cashAmount: finalCashAmount,
+            cardAmount: finalCardAmount,
+            receiptNumber,
+          };
+
+          // Add Viva Wallet transaction IDs if payment method is viva_wallet
+          if (
+            backendPaymentMethod === "viva_wallet" &&
+            vivaWalletTransactionId
+          ) {
+            transactionData.vivaWalletTransactionId = vivaWalletTransactionId;
+            // Terminal ID will be retrieved by backend from connected terminal
+          }
+
           const transactionResponse =
             await window.transactionAPI.createFromCart(
               sessionToken, // Pass sessionToken as first argument
-              {
-                cartSessionId: cartSession.id,
-                shiftId: shiftId || undefined, // Pass undefined instead of empty string for admin mode
-                businessId: businessId!,
-                paymentMethod: backendPaymentMethod,
-                cashAmount: finalCashAmount,
-                cardAmount: finalCardAmount,
-                receiptNumber,
-              }
+              transactionData
             );
 
           if (!transactionResponse.success) {
@@ -706,6 +716,7 @@ export function usePayment({
 
   /**
    * Handle payment method selection and process card payments
+   * Viva Wallet handles all contactless card payments
    */
   const handlePayment = useCallback(
     async (method: PaymentMethod["type"]) => {
@@ -719,13 +730,22 @@ export function usePayment({
         return;
       }
 
-      // Handle card/mobile payments
+      // Viva Wallet payment handling is done in payment panel component
+      // The transaction is initiated automatically when viva_wallet is selected
+      if (method === "viva_wallet") {
+        // Payment panel will handle transaction initiation
+        return;
+      }
+
+      // Handle legacy card/mobile payments (deprecated, use viva_wallet)
       if (method === "card" || method === "mobile") {
-        toast.error("Card payment is not available. Please use cash payment.");
+        toast.error(
+          "Card payment is now handled by Viva Wallet. Please select Card payment method."
+        );
         return;
       }
     },
-    [total, resetPaymentState, completeTransaction]
+    [total]
   );
 
   /**

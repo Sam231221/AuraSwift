@@ -20,6 +20,7 @@ import {
   pdfReceiptAPI,
   scaleAPI,
   appAPI,
+  vivaWalletAPI,
 } from "./api/system.js";
 import { ageVerificationAPI } from "./api/ageVerification.js";
 import { batchesAPI } from "./api/batches.js";
@@ -52,6 +53,7 @@ contextBridge.exposeInMainWorld("paymentAPI", paymentAPI);
 contextBridge.exposeInMainWorld("pdfReceiptAPI", pdfReceiptAPI);
 contextBridge.exposeInMainWorld("scaleAPI", scaleAPI);
 contextBridge.exposeInMainWorld("appAPI", appAPI);
+contextBridge.exposeInMainWorld("vivaWalletAPI", vivaWalletAPI);
 contextBridge.exposeInMainWorld("ageVerificationAPI", ageVerificationAPI);
 contextBridge.exposeInMainWorld("batchesAPI", batchesAPI);
 contextBridge.exposeInMainWorld("suppliersAPI", suppliersAPI);

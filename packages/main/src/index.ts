@@ -60,6 +60,9 @@ export async function initApp(initConfig: AppInitConfig) {
   // Initialize scale hardware service for weight measurement
   await import("./services/scaleService.js");
 
+  // Initialize Viva Wallet service for payment terminal integration
+  await import("./services/vivaWallet/index.js");
+
   // Initialize expiry notification service
   const { ExpiryNotificationService } = await import(
     "./services/expiryNotificationService.js"

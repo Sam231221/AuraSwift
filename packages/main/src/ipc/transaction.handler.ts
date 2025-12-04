@@ -358,6 +358,36 @@ export function registerTransactionHandlers() {
           `Creating transaction with ${transactionItems.length} items`
         );
 
+        // Extract Viva Wallet transaction IDs if payment method is viva_wallet
+        let vivaWalletTransactionId: string | undefined;
+        let vivaWalletTerminalId: string | undefined;
+
+        if (data.paymentMethod === "viva_wallet") {
+          // Get Viva Wallet transaction ID from data if provided
+          vivaWalletTransactionId = (data as any).vivaWalletTransactionId;
+
+          // Get connected terminal ID from Viva Wallet service
+          try {
+            const { vivaWalletService } = await import(
+              "../services/vivaWallet/index.js"
+            );
+            const connectedTerminal = vivaWalletService.getConnectedTerminal();
+            if (connectedTerminal) {
+              vivaWalletTerminalId = connectedTerminal.id;
+            }
+          } catch (error) {
+            logger.warn(
+              "Failed to get Viva Wallet terminal ID, continuing without it:",
+              error
+            );
+          }
+
+          logger.info("Viva Wallet transaction IDs:", {
+            transactionId: vivaWalletTransactionId,
+            terminalId: vivaWalletTerminalId,
+          });
+        }
+
         // Create transaction using createTransactionWithItems
         const transaction = await db.transactions.createTransactionWithItems({
           shiftId: data.shiftId,
@@ -382,6 +412,9 @@ export function registerTransactionHandlers() {
           discountAmount: 0,
           appliedDiscounts: null,
           items: transactionItems,
+          // Viva Wallet transaction tracking
+          vivaWalletTransactionId: vivaWalletTransactionId || null,
+          vivaWalletTerminalId: vivaWalletTerminalId || null,
         } as any);
 
         logger.info("Transaction created successfully:", transaction.id);
@@ -766,9 +799,114 @@ export function registerTransactionHandlers() {
         };
       }
 
+      // Get original transaction to check payment method and Viva Wallet integration
+      const originalTransaction = await db.transactions.getTransactionById(
+        refundData.originalTransactionId
+      );
+      if (!originalTransaction) {
+        return {
+          success: false,
+          message: "Original transaction not found",
+        };
+      }
+
+      // Check if this is a Viva Wallet refund
+      // Viva Wallet refunds apply when:
+      // 1. Refund method is "card" or "original" (with original being viva_wallet payment)
+      // 2. Original transaction was paid via viva_wallet
+      // 3. A Viva Wallet terminal is connected
+      const shouldAttemptVivaWalletRefund =
+        (refundData.refundMethod === "card" ||
+          (refundData.refundMethod === "original" &&
+            originalTransaction.paymentMethod === "viva_wallet")) &&
+        originalTransaction.paymentMethod === "viva_wallet";
+
+      let vivaWalletRefundTransactionId: string | undefined;
+      let vivaWalletTerminalTransactionId: string | undefined;
+
+      // Process Viva Wallet refund if applicable
+      if (shouldAttemptVivaWalletRefund) {
+        try {
+          // Dynamically import to avoid circular dependencies
+          const { vivaWalletService } = await import(
+            "../services/vivaWallet/index.js"
+          );
+          const connectedTerminal = vivaWalletService.getConnectedTerminal();
+
+          if (connectedTerminal) {
+            // Calculate refund total in minor units
+            const refundSubtotal = refundData.refundItems.reduce(
+              (sum: number, item: { refundAmount: number }) =>
+                sum + item.refundAmount,
+              0
+            );
+            const refundTax =
+              refundSubtotal *
+              (originalTransaction.tax / originalTransaction.subtotal);
+            const refundTotal = refundSubtotal + refundTax;
+            const refundAmountInMinorUnits = Math.round(refundTotal * 100);
+
+            // Get currency from original transaction (default to GBP)
+            const currency = "GBP"; // TODO: Store currency in transaction schema
+
+            // Use the stored Viva Wallet transaction ID from the original transaction
+            // This is stored in vivaWalletTransactionId field when the sale was completed
+            const originalTerminalTransactionId =
+              (originalTransaction as any).vivaWalletTransactionId ||
+              refundData.originalTransactionId; // Fallback to transaction ID if not stored
+
+            if (!(originalTransaction as any).vivaWalletTransactionId) {
+              logger.warn(
+                `Viva Wallet transaction ID not found for transaction ${refundData.originalTransactionId}, using transaction ID as fallback`
+              );
+            }
+
+            logger.info(
+              `Attempting Viva Wallet refund for transaction ${originalTerminalTransactionId}, amount: ${refundAmountInMinorUnits} ${currency}`
+            );
+
+            // Initiate refund through Viva Wallet service
+            const refundResult = await vivaWalletService.initiateRefund(
+              originalTerminalTransactionId,
+              refundAmountInMinorUnits,
+              currency
+            );
+
+            if (refundResult?.success && refundResult.transactionId) {
+              vivaWalletRefundTransactionId = refundResult.transactionId;
+              vivaWalletTerminalTransactionId =
+                refundResult.terminalTransactionId;
+              logger.info(
+                `Viva Wallet refund initiated successfully: ${vivaWalletRefundTransactionId} -> ${vivaWalletTerminalTransactionId}`
+              );
+            } else {
+              logger.warn(
+                `Failed to initiate Viva Wallet refund: ${
+                  refundResult?.error || "Unknown error"
+                }. Proceeding with database refund only.`
+              );
+              // Continue with refund transaction creation even if Viva Wallet refund fails
+              // This allows manual reconciliation later
+            }
+          } else {
+            logger.info(
+              "No Viva Wallet terminal connected. Proceeding with database refund only (card refund will need manual processing)."
+            );
+          }
+        } catch (vivaError) {
+          logger.error("Viva Wallet refund error:", vivaError);
+          // Continue with refund transaction creation even if Viva Wallet refund fails
+          // This ensures the refund is recorded in the database for audit purposes
+        }
+      }
+
       const refundTransaction = await db.transactions.createRefundTransaction(
         refundData
       );
+
+      // Store Viva Wallet refund transaction ID in metadata if available
+      // Note: This requires extending the transaction schema or using a separate tracking table
+      // For now, we'll log it for manual reconciliation if needed
 
       // Audit log the refund
       await logAction(
@@ -782,12 +920,18 @@ export function registerTransactionHandlers() {
           refundAmount: refundTransaction.total,
           refundMethod: refundData.refundMethod,
           isPartialRefund: refundData.isPartialRefund,
+          vivaWalletRefundTransactionId,
+          vivaWalletTerminalTransactionId,
         }
       );
 
       return {
         success: true,
         transaction: refundTransaction,
+        ...(vivaWalletRefundTransactionId && {
+          vivaWalletRefundTransactionId,
+          vivaWalletTerminalTransactionId,
+        }),
       };
     } catch (error) {
       logger.error("Create refund IPC error:", error);

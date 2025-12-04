@@ -30,6 +30,7 @@ import type { ImportAPI } from "../types/api/import";
 import type { PrinterAPI } from "../types/api/printer";
 import type { OfficePrinterAPI } from "../types/api/office-printer";
 import type { PaymentAPI } from "../types/api/payment";
+import type { VivaWalletAPI } from "../../types/api/viva-wallet";
 import type { ScaleAPI } from "../types/api/scale";
 import type { DatabaseAPI } from "../types/api/database";
 import type { PdfReceiptAPI } from "../types/api/pdf-receipt";
@@ -91,6 +92,7 @@ declare global {
     printerAPI: PrinterAPI;
     officePrinterAPI: OfficePrinterAPI;
     paymentAPI: PaymentAPI;
+    vivaWalletAPI: VivaWalletAPI;
     scaleAPI: ScaleAPI;
 
     // System APIs

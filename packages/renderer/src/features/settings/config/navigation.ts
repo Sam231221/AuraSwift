@@ -8,8 +8,9 @@
 export const SETTINGS_ROUTES = {
   /** General settings view */
   GENERAL: "settings:general",
+  /** Viva Wallet settings view */
+  VIVA_WALLET: "settings:viva-wallet",
 } as const;
 
 export type SettingsRoute =
   (typeof SETTINGS_ROUTES)[keyof typeof SETTINGS_ROUTES];
-

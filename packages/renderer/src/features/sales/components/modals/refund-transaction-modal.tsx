@@ -267,12 +267,102 @@ const RefundTransactionModal: React.FC<RefundModalProps> = ({
         cashierId: user.id,
       };
 
+      // Check if this might be a Viva Wallet refund (card payment)
+      // The backend will determine if Viva Wallet refund is applicable based on connected terminal
+      const mightBeVivaWalletRefund =
+        refundMethod === "card" ||
+        (refundMethod === "original" &&
+          originalTransaction.paymentMethod === "card");
+
+      let vivaWalletRefundTransactionId: string | undefined;
+
+      // Get session token for authentication
+      const sessionToken = await window.authStore.get("token");
+      if (!sessionToken) {
+        toast.error("Session expired. Please log in again.");
+        setIsProcessing(false);
+        setShowConfirmDialog(false);
+        return;
+      }
+
       const response = await window.refundAPI.createRefundTransaction(
+        sessionToken,
         refundData
       );
 
       if (response.success) {
-        toast.success("Refund processed successfully");
+        // Check if Viva Wallet refund was initiated (backend will include this if applicable)
+        if (
+          mightBeVivaWalletRefund &&
+          (response as any).vivaWalletRefundTransactionId
+        ) {
+          vivaWalletRefundTransactionId = (
+            response as any
+          ).vivaWalletRefundTransactionId;
+          
+          // Poll for refund status if Viva Wallet refund was initiated
+          if (window.vivaWalletAPI && vivaWalletRefundTransactionId) {
+            toast.info("Processing Viva Wallet refund, please wait...");
+            
+            // Poll for refund completion
+            const pollRefundStatus = async (): Promise<boolean> => {
+              const maxAttempts = 60; // Poll for up to 60 seconds (1 second intervals)
+              let attempts = 0;
+
+              while (attempts < maxAttempts) {
+                try {
+                  const statusResult =
+                    await window.vivaWalletAPI?.getTransactionStatus(
+                      vivaWalletRefundTransactionId!
+                    );
+
+                  if (statusResult?.success && statusResult.status) {
+                    const status = statusResult.status.status;
+
+                    if (status === "completed") {
+                      toast.success("Viva Wallet refund processed successfully");
+                      return true;
+                    } else if (status === "failed") {
+                      toast.error(
+                        statusResult.status.error?.message ||
+                          "Viva Wallet refund failed"
+                      );
+                      return false;
+                    } else if (status === "cancelled") {
+                      toast.warning("Viva Wallet refund was cancelled");
+                      return false;
+                    }
+                  }
+
+                  // Wait before next poll
+                  await new Promise((resolve) => setTimeout(resolve, 1000));
+                  attempts++;
+                } catch (error) {
+                  logger.error("Failed to poll refund status:", error);
+                  // Continue polling on error
+                  attempts++;
+                }
+              }
+
+              // Timeout - refund taking too long
+              toast.warning(
+                "Viva Wallet refund is taking longer than expected. Please check terminal status."
+              );
+              return false;
+            };
+
+            const refundComplete = await pollRefundStatus();
+            if (!refundComplete) {
+              // Refund failed or timed out, but database transaction was created
+              // User can manually reconcile later
+              logger.warn("Viva Wallet refund did not complete successfully");
+            }
+          }
+        } else {
+          // Regular refund (cash, store credit, or non-Viva Wallet card refund)
+          toast.success("Refund processed successfully");
+        }
+
         onRefundProcessed();
         onClose();
       } else {

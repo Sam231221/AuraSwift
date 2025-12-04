@@ -30,7 +30,13 @@ export interface CreateTransactionData {
   subtotal: number;
   tax: number;
   total: number;
-  paymentMethod: "cash" | "card" | "mobile" | "voucher" | "split";
+  paymentMethod:
+    | "cash"
+    | "card"
+    | "mobile"
+    | "voucher"
+    | "split"
+    | "viva_wallet";
   cashAmount?: number;
   cardAmount?: number;
   items: TransactionItem[];
@@ -38,6 +44,9 @@ export interface CreateTransactionData {
   customerId?: string;
   receiptNumber: string;
   timestamp: string;
+  // Viva Wallet specific
+  vivaWalletTransactionId?: string;
+  vivaWalletTerminalId?: string;
 }
 
 /**
@@ -66,4 +75,3 @@ export const transactionAPI = {
     return window.transactionAPI.getByShift(shiftId);
   },
 };
-

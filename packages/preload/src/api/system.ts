@@ -138,3 +138,30 @@ export const appAPI = {
   getVersion: () => ipcRenderer.invoke("app:getVersion"),
   restart: () => ipcRenderer.invoke("app:restart"),
 };
+
+export const vivaWalletAPI = {
+  // Terminal Discovery
+  discoverTerminals: () => ipcRenderer.invoke("viva:discover-terminals"),
+  connectTerminal: (terminalId: string) =>
+    ipcRenderer.invoke("viva:connect-terminal", terminalId),
+  disconnectTerminal: () => ipcRenderer.invoke("viva:disconnect-terminal"),
+  getTerminalStatus: () => ipcRenderer.invoke("viva:terminal-status"),
+
+  // Transactions
+  initiateSale: (amount: number, currency: string) =>
+    ipcRenderer.invoke("viva:initiate-sale", amount, currency),
+  initiateRefund: (originalTransactionId: string, amount: number, currency: string) =>
+    ipcRenderer.invoke("viva:initiate-refund", originalTransactionId, amount, currency),
+  cancelTransaction: (transactionId: string) =>
+    ipcRenderer.invoke("viva:cancel-transaction", transactionId),
+
+  // Status
+  getTransactionStatus: (transactionId: string) =>
+    ipcRenderer.invoke("viva:transaction-status", transactionId),
+
+  // Configuration
+  getConfig: () => ipcRenderer.invoke("viva:get-config"),
+  saveConfig: (config: any) => ipcRenderer.invoke("viva:save-config", config),
+  testConnection: (terminalId: string) =>
+    ipcRenderer.invoke("viva:test-connection", terminalId),
+};
