@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.11.0](https://github.com/Sam231221/AuraSwift/compare/v1.10.1...v1.11.0) (2025-12-04)
+
+
+### feat
+
+* **user-management:** implement user management drawers for adding, editing, and viewing staff members, enhancing UI with drawer components ([](https://github.com/Sam231221/AuraSwift/commit/c35878ecc4ce1292aa1e82b81c62c1588b64a584))
+* **viva-wallet:** integrate Viva Wallet service for payment processing, including terminal discovery, transaction management, and error handling ([](https://github.com/Sam231221/AuraSwift/commit/4304cbff7f426c6d43fd97e6b893e601a59e8468))
+
 ## [1.10.1](https://github.com/Sam231221/AuraSwift/compare/v1.10.0...v1.10.1) (2025-12-04)
 
 
