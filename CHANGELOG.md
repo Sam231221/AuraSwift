@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.10.0](https://github.com/Sam231221/AuraSwift/compare/v1.9.0...v1.10.0) (2025-12-04)
+
+
+### feat
+
+* **staff-schedules:** add Staff Schedules feature to the dashboard and update navigation mapping ([](https://github.com/Sam231221/AuraSwift/commit/dc29038e012b8881fe4bf3f8286e4d0b1fc47928))
+
+
+### fix
+
+* **staff-schedules:** fix typos in the views ([](https://github.com/Sam231221/AuraSwift/commit/8706c723b47d169736466c16c3b54083b4da1666))
+
 # [1.9.0](https://github.com/Sam231221/AuraSwift/compare/v1.8.0...v1.9.0) (2025-12-03)
 
 
