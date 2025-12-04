@@ -21,6 +21,7 @@ export function mapActionToView(
       "manage-users": "userManagement",
       "role-permissions": "roleManagement",
       "user-role-assignment": "userRoleAssignment",
+      "staff-schedules": "staffSchedules",
     },
     "management-actions": {
       "new-sale": "newTransaction",

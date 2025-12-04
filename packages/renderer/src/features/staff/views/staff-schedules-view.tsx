@@ -25,7 +25,6 @@ import {
   Drawer,
   DrawerClose,
   DrawerContent,
-  DrawerDescription,
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
@@ -616,15 +615,18 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
 
     return (
       <>
-        <DrawerHeader className="shrink-0 px-3 sm:px-4">
+        <DrawerHeader className="shrink-0 px-3 sm:px-4 border-b">
           <DrawerTitle className="text-lg sm:text-xl md:text-2xl">
             {isEditMode ? "Edit Staff Schedule" : "Create New Schedule"}
           </DrawerTitle>
         </DrawerHeader>
 
         <Form {...form}>
-          <form onSubmit={handleSubmit} className="flex flex-col h-full">
-            <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-4 sm:space-y-6 overflow-y-auto flex-1">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col h-full min-h-0"
+          >
+            <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-4 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormField
                   control={form.control}
@@ -1200,7 +1202,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
                 </Button>
               </DrawerTrigger>
 
-              <DrawerContent className="max-h-[90vh] flex flex-col overflow-hidden">
+              <DrawerContent className="h-[90vh] max-h-[90vh] flex flex-col">
                 <ScheduleFormContent
                   editingSchedule={editingSchedule}
                   selectedDate={selectedDate}

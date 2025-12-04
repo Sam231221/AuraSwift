@@ -65,6 +65,13 @@ export const FEATURE_REGISTRY: FeatureConfig[] = [
         onClick: () => {},
         permissions: [PERMISSIONS.USERS_MANAGE],
       },
+      {
+        id: "staff-schedules",
+        label: "Staff Schedules",
+        icon: Calendar,
+        onClick: () => {},
+        permissions: [PERMISSIONS.USERS_MANAGE],
+      },
     ],
   },
 
@@ -106,14 +113,6 @@ export const FEATURE_REGISTRY: FeatureConfig[] = [
         icon: Package,
         onClick: () => {},
         permissions: [PERMISSIONS.INVENTORY_MANAGE],
-      },
-
-      {
-        id: "staff-schedules",
-        label: "Staff Schedules",
-        icon: Calendar,
-        onClick: () => {},
-        permissions: [PERMISSIONS.USERS_MANAGE],
       },
     ],
   },
