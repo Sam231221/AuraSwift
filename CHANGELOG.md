@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.10.1](https://github.com/Sam231221/AuraSwift/compare/v1.10.0...v1.10.1) (2025-12-04)
+
+
+### fix
+
+* **updates:** enhance toast notifications with fixed IDs and improved layout for better user experience ([](https://github.com/Sam231221/AuraSwift/commit/9f03bcf3ee8301037fa8a6a3d71dc053252dccb3))
+* **category-form-drawer:** replace DrawerFooter with a fixed button section for improved layout and usability ([](https://github.com/Sam231221/AuraSwift/commit/b61e8394fe46a016985edec9ab97254a3cbc15ec))
+* **batch-adjustment-modal, batch-form-drawer:** restructure button sections for improved layout and usability ([](https://github.com/Sam231221/AuraSwift/commit/14389bee25562823e7427e8753665e39e3b9d8d8))
+* **product-form-drawer:** restructure product form layout for improved usability and organization ([](https://github.com/Sam231221/AuraSwift/commit/5fafca12c21424f28439e74047c2a9093584f6e0))
+
 # [1.10.0](https://github.com/Sam231221/AuraSwift/compare/v1.9.0...v1.10.0) (2025-12-04)
 
 
