@@ -358,6 +358,20 @@ export function registerTransactionHandlers() {
           `Creating transaction with ${transactionItems.length} items`
         );
 
+        // Get business to retrieve currency
+        let currency = "GBP"; // Default fallback
+        try {
+          const business = db.businesses.getBusinessById(data.businessId);
+          if (business?.currency) {
+            currency = business.currency;
+          }
+        } catch (error) {
+          logger.warn(
+            "Failed to get business currency, using default GBP:",
+            error
+          );
+        }
+
         // Extract Viva Wallet transaction IDs if payment method is viva_wallet
         let vivaWalletTransactionId: string | undefined;
         let vivaWalletTerminalId: string | undefined;
@@ -415,6 +429,8 @@ export function registerTransactionHandlers() {
           // Viva Wallet transaction tracking
           vivaWalletTransactionId: vivaWalletTransactionId || null,
           vivaWalletTerminalId: vivaWalletTerminalId || null,
+          // Currency for multi-currency support
+          currency: currency,
         } as any);
 
         logger.info("Transaction created successfully:", transaction.id);
@@ -846,8 +862,8 @@ export function registerTransactionHandlers() {
             const refundTotal = refundSubtotal + refundTax;
             const refundAmountInMinorUnits = Math.round(refundTotal * 100);
 
-            // Get currency from original transaction (default to GBP)
-            const currency = "GBP"; // TODO: Store currency in transaction schema
+            // Get currency from original transaction (stored in transaction record)
+            const currency = (originalTransaction as any).currency || "GBP"; // Fallback to GBP if not stored
 
             // Use the stored Viva Wallet transaction ID from the original transaction
             // This is stored in vivaWalletTransactionId field when the sale was completed

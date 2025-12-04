@@ -1046,6 +1046,8 @@ export const transactions = createTable("transactions", {
   // Viva Wallet transaction tracking
   vivaWalletTransactionId: text("viva_wallet_transaction_id"),
   vivaWalletTerminalId: text("viva_wallet_terminal_id"),
+  // Currency for multi-currency support
+  currency: text("currency").notNull().default("GBP"),
 });
 
 /**

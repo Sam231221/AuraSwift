@@ -91,6 +91,8 @@ export class TransactionManager {
         (transactionData as any).vivaWalletTransactionId ?? null,
       vivaWalletTerminalId:
         (transactionData as any).vivaWalletTerminalId ?? null,
+      // Currency for multi-currency support
+      currency: (transactionData as any).currency ?? "GBP",
     });
 
     const transaction = await this.getTransactionById(transactionId);
@@ -249,6 +251,8 @@ export class TransactionManager {
             (transaction as any).vivaWalletTransactionId ?? null,
           vivaWalletTerminalId:
             (transaction as any).vivaWalletTerminalId ?? null,
+          // Currency for multi-currency support
+          currency: (transaction as any).currency ?? "GBP",
         })
         .run();
 
