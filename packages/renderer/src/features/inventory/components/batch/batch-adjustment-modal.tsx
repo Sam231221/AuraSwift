@@ -163,13 +163,13 @@ const BatchAdjustmentModal: React.FC<BatchAdjustmentModalProps> = ({
       }}
     >
       <div
-        className={`bg-white rounded-xl shadow-2xl mx-4 flex flex-col transition-all duration-200 ${
+        className={`bg-white rounded-xl shadow-2xl mx-4 flex flex-col h-[90vh] max-h-[90vh] transition-all duration-200 ${
           showKeyboard ? "w-[700px] max-w-[95vw]" : "w-[500px] max-w-[90vw]"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b">
+        <div className="p-6 border-b shrink-0">
           <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
             <Edit3 className="w-5 h-5" />
             Adjust Batch Stock
@@ -243,8 +243,41 @@ const BatchAdjustmentModal: React.FC<BatchAdjustmentModalProps> = ({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-5">
+        {/* Fixed Buttons Section */}
+        <div className="border-b bg-background shrink-0">
+          <div className="p-6 flex gap-3">
+            <Button
+              type="button"
+              size="lg"
+              className="flex-1 h-12"
+              onClick={handleConfirm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting
+                ? "Processing..."
+                : `Confirm ${
+                    adjustmentType === "add"
+                      ? "Addition"
+                      : adjustmentType === "remove"
+                      ? "Removal"
+                      : "Adjustment"
+                  }`}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="flex-1 h-12"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
           {/* Adjustment Type Tabs */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Adjustment Type</Label>
@@ -373,7 +406,7 @@ const BatchAdjustmentModal: React.FC<BatchAdjustmentModalProps> = ({
 
         {/* Adaptive Keyboard */}
         {showKeyboard && (
-          <div className="border-t bg-background px-2 py-2">
+          <div className="border-t bg-background px-2 py-2 shrink-0">
             <div className="max-w-full overflow-hidden">
               <AdaptiveKeyboard
                 visible={showKeyboard}
@@ -387,37 +420,6 @@ const BatchAdjustmentModal: React.FC<BatchAdjustmentModalProps> = ({
             </div>
           </div>
         )}
-
-        {/* Action Buttons */}
-        <div className="p-6 border-t bg-gray-50/50 rounded-b-xl flex gap-3">
-          <Button
-            type="button"
-            size="lg"
-            className="flex-1 h-12"
-            onClick={handleConfirm}
-            disabled={isSubmitting}
-          >
-            {isSubmitting
-              ? "Processing..."
-              : `Confirm ${
-                  adjustmentType === "add"
-                    ? "Addition"
-                    : adjustmentType === "remove"
-                    ? "Removal"
-                    : "Adjustment"
-                }`}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="flex-1 h-12"
-            onClick={handleClose}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-        </div>
       </div>
     </div>
   );

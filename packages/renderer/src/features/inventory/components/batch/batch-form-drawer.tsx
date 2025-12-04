@@ -228,7 +228,32 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
 
         <Form {...form}>
           <form onSubmit={handleSubmit} className="flex flex-col h-full">
-            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+            {/* Fixed Buttons Section */}
+            <div className="border-b bg-background shrink-0">
+              <div className="flex space-x-2 px-6 pt-4 pb-4">
+                <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                  {isSubmitting
+                    ? "Saving..."
+                    : isEditMode
+                    ? "Update Batch"
+                    : "Create Batch"}
+                </Button>
+                <DrawerClose asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleClose}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                </DrawerClose>
+              </div>
+            </div>
+
+            {/* Scrollable Form Content */}
+            <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-6">
               {/* Product Selection */}
               <FormField
                 control={form.control}
@@ -591,38 +616,23 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             </div>
 
             {/* Adaptive Keyboard */}
-            <AdaptiveKeyboard
-              visible={keyboard.showKeyboard}
-              initialMode={
-                (keyboard.activeFieldConfig as any)?.keyboardMode || "qwerty"
-              }
-              onInput={keyboard.handleInput}
-              onBackspace={keyboard.handleBackspace}
-              onClear={keyboard.handleClear}
-              onEnter={keyboard.handleCloseKeyboard}
-              onClose={keyboard.handleCloseKeyboard}
-            />
-
-            <div className="flex space-x-2 pt-6 px-6 pb-6 border-t">
-              <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                {isSubmitting
-                  ? "Saving..."
-                  : isEditMode
-                  ? "Update Batch"
-                  : "Create Batch"}
-              </Button>
-              <DrawerClose asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={handleClose}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-              </DrawerClose>
-            </div>
+            {keyboard.showKeyboard && (
+              <div className="border-t bg-background px-2 py-2 shrink-0">
+                <div className="max-w-full overflow-hidden">
+                  <AdaptiveKeyboard
+                    visible={keyboard.showKeyboard}
+                    initialMode={
+                      (keyboard.activeFieldConfig as any)?.keyboardMode || "qwerty"
+                    }
+                    onInput={keyboard.handleInput}
+                    onBackspace={keyboard.handleBackspace}
+                    onClear={keyboard.handleClear}
+                    onEnter={keyboard.handleCloseKeyboard}
+                    onClose={keyboard.handleCloseKeyboard}
+                  />
+                </div>
+              </div>
+            )}
           </form>
         </Form>
       </DrawerContent>
