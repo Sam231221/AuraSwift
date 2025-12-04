@@ -92,7 +92,7 @@ import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("staff-schedules-view");
 
 // Using database interfaces with RBAC support
-interface Cashier {
+interface Staff {
   id: string;
   username: string;
   email: string;
@@ -146,7 +146,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
   );
 
   // State for cashiers - will be loaded from database
-  const [cashiers, setCashiers] = useState<Cashier[]>([]);
+  const [cashiers, setCashiers] = useState<Staff[]>([]);
 
   // State for schedules - will be loaded from database
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -179,7 +179,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         setIsLoadingCashiers(true);
         const response = await window.scheduleAPI.getCashierUsers(businessId);
         if (response.success && response.data) {
-          const allUsers = response.data as Cashier[];
+          const allUsers = response.data as Staff[];
           logger.info(
             `[loadCashiers] Received ${allUsers.length} users from API`
           );
@@ -473,7 +473,7 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
     setSelectedDate: (date: Date) => void;
     isDatePickerOpen: boolean;
     setIsDatePickerOpen: (open: boolean) => void;
-    cashiers: Cashier[];
+    cashiers: Staff[];
     isLoadingCashiers: boolean;
     businessId: string;
     checkShiftOverlap: (
@@ -620,11 +620,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
           <DrawerTitle className="text-lg sm:text-xl md:text-2xl">
             {isEditMode ? "Edit Staff Schedule" : "Create New Schedule"}
           </DrawerTitle>
-          <DrawerDescription className="text-sm sm:text-base">
-            {isEditMode
-              ? "Update the schedule details below."
-              : "Schedule a new staff shift for the POS system."}
-          </DrawerDescription>
         </DrawerHeader>
 
         <Form {...form}>
@@ -1178,10 +1173,10 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             </Button>
             <div className="min-w-0 flex-1">
               <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-slate-900 mb-0.5 sm:mb-1 lg:mb-2 break-word">
-                Cashier Shifts
+                Staff Shifts
               </h1>
               <p className="text-xs sm:text-sm md:text-base text-slate-600 line-clamp-2">
-                Manage POS cashier schedules and shifts.
+                Manage POS staff schedules and shifts.
               </p>
             </div>
           </div>
