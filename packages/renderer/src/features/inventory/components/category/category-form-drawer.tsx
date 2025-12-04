@@ -18,7 +18,6 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerClose,
-  DrawerFooter,
 } from "@/components/ui/drawer";
 import {
   Form,
@@ -158,6 +157,35 @@ export function CategoryFormDrawer({
 
         <Form {...form}>
           <form onSubmit={handleSubmit} className="flex flex-col h-full">
+            {/* Fixed Buttons Section */}
+            <div className="border-b bg-background sticky top-0 z-10">
+              <div className="flex space-x-2 px-6 pt-4 pb-4">
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? "Saving..."
+                    : isEditMode
+                    ? "Update Category"
+                    : "Add Category"}
+                </Button>
+                <DrawerClose asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={isSubmitting}
+                    onClick={onClose}
+                  >
+                    Cancel
+                  </Button>
+                </DrawerClose>
+              </div>
+            </div>
+
+            {/* Scrollable Form Content */}
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               <FormField
                 control={form.control}
@@ -429,27 +457,6 @@ export function CategoryFormDrawer({
                 </div>
               </div>
             )}
-
-            <DrawerFooter className="border-t">
-              <Button type="submit" disabled={isSubmitting} className="flex-1">
-                {isSubmitting
-                  ? "Saving..."
-                  : isEditMode
-                  ? "Update Category"
-                  : "Add Category"}
-              </Button>
-              <DrawerClose asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  disabled={isSubmitting}
-                  onClick={onClose}
-                >
-                  Cancel
-                </Button>
-              </DrawerClose>
-            </DrawerFooter>
           </form>
         </Form>
       </DrawerContent>
