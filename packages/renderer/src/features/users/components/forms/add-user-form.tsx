@@ -37,6 +37,7 @@ interface AddUserFormProps {
   onCancel: () => void;
   isLoading: boolean;
   isOpen?: boolean; // Dialog open state to close keyboard when dialog closes
+  showButtons?: boolean; // Whether to show buttons (for drawer mode)
 }
 
 export function AddUserForm({
@@ -44,6 +45,7 @@ export function AddUserForm({
   onCancel,
   isLoading,
   isOpen = true,
+  showButtons = true,
 }: AddUserFormProps) {
   const { user } = useAuth();
 
@@ -130,18 +132,44 @@ export function AddUserForm({
   return (
     <Form {...form}>
       <form
+        id="add-user-form"
         onSubmit={form.handleSubmit(handleSubmit, (errors) => {
           logger.error("Add form validation errors:", errors);
         })}
-        className="space-y-4"
+        className={showButtons ? "space-y-4" : "flex flex-col h-full"}
       >
-        {/* Form Errors */}
-        {form.formState.errors.root && (
-          <div className="text-sm text-red-500 p-2 bg-red-50 rounded">
-            {form.formState.errors.root.message}
+        {/* Fixed Buttons Section - Only in drawer mode */}
+        {!showButtons && (
+          <div className="border-b bg-background shrink-0">
+            <div className="flex space-x-2 px-6 pt-4 pb-4">
+              <Button type="submit" className="flex-1" disabled={isLoading}>
+                {isLoading ? "Creating..." : "Create Staff Member"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  keyboard.handleCloseKeyboard();
+                  onCancel();
+                }}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
-        {/* Avatar Upload */}
+
+        {/* Scrollable Form Content */}
+        <div className={showButtons ? "" : "p-6 overflow-y-auto flex-1 min-h-0 space-y-4"}>
+          {/* Form Errors */}
+          {form.formState.errors.root && (
+            <div className="text-sm text-red-500 p-2 bg-red-50 rounded">
+              {form.formState.errors.root.message}
+            </div>
+          )}
+          {/* Avatar Upload */}
         <FormField
           control={form.control}
           name="avatar"
@@ -380,51 +408,58 @@ export function AddUserForm({
             </FormItem>
           )}
         />
-
-        {/* Actions */}
-        <div
-          className={cn(
-            "flex flex-col sm:flex-row gap-2 sm:gap-2 pt-4",
-            keyboard.showKeyboard && "pb-[340px]"
-          )}
-        >
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="flex-1 text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
-          >
-            {isLoading ? "Creating..." : "Create Staff Member"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              keyboard.handleCloseKeyboard();
-              onCancel();
-            }}
-            className="flex-1 text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
-          >
-            Cancel
-          </Button>
         </div>
 
-        {/* Adaptive Keyboard - Positioned at bottom of form */}
-        {keyboard.showKeyboard && (
-          <div className="sticky bottom-0 left-0 right-0 z-50 mt-4 bg-background">
-            <AdaptiveKeyboard
-              onInput={keyboard.handleInput}
-              onBackspace={keyboard.handleBackspace}
-              onClear={keyboard.handleClear}
-              onEnter={() => {
-                // Move to next field or submit if last field
-                if (keyboard.activeField === "pin") {
-                  form.handleSubmit(handleSubmit)();
-                }
+        {/* Actions - Only show if showButtons is true */}
+        {showButtons && (
+          <div
+            className={cn(
+              "flex flex-col sm:flex-row gap-2 sm:gap-2 pt-4",
+              keyboard.showKeyboard && "pb-[340px]"
+            )}
+          >
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1 text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
+            >
+              {isLoading ? "Creating..." : "Create Staff Member"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                keyboard.handleCloseKeyboard();
+                onCancel();
               }}
-              initialMode={keyboard.activeFieldConfig?.keyboardMode || "qwerty"}
-              visible={keyboard.showKeyboard}
-              onClose={keyboard.handleCloseKeyboard}
-            />
+              className="flex-1 text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+
+        {/* Adaptive Keyboard */}
+        {keyboard.showKeyboard && (
+          <div className={cn(
+            showButtons ? "sticky bottom-0 left-0 right-0 z-50 mt-4 bg-background" : "border-t bg-background px-2 py-2 shrink-0"
+          )}>
+            <div className={showButtons ? "" : "max-w-full overflow-hidden"}>
+              <AdaptiveKeyboard
+                onInput={keyboard.handleInput}
+                onBackspace={keyboard.handleBackspace}
+                onClear={keyboard.handleClear}
+                onEnter={() => {
+                  // Move to next field or submit if last field
+                  if (keyboard.activeField === "pin") {
+                    form.handleSubmit(handleSubmit)();
+                  }
+                }}
+                initialMode={keyboard.activeFieldConfig?.keyboardMode || "qwerty"}
+                visible={keyboard.showKeyboard}
+                onClose={keyboard.handleCloseKeyboard}
+              />
+            </div>
           </div>
         )}
       </form>

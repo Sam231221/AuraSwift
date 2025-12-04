@@ -9,9 +9,9 @@ import {
   UserStatsCards,
   UserFilters,
   UserTable,
-  AddUserDialog,
-  EditUserDialog,
-  ViewUserDialog,
+  AddUserDrawer,
+  EditUserDrawer,
+  ViewUserDrawer,
 } from "../components";
 import {
   useStaffUsers,
@@ -159,18 +159,13 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
           </p>
         </div>
 
-        <AddUserDialog
-          open={isAddDialogOpen}
-          onOpenChange={setIsAddDialogOpen}
-          onSubmit={handleCreateUser}
-          isLoading={isCreating}
-          trigger={
-            <Button className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base shadow-sm">
-              <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-              Add Staff Member
-            </Button>
-          }
-        />
+        <Button
+          className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base shadow-sm"
+          onClick={openAddDialog}
+        >
+          <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+          Add Staff Member
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -196,9 +191,17 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
         onAddUser={openAddDialog}
       />
 
-      {/* Edit Dialog */}
+      {/* Add User Drawer */}
+      <AddUserDrawer
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={handleCreateUser}
+        isLoading={isCreating}
+      />
+
+      {/* Edit User Drawer */}
       {selectedUser && (
-        <EditUserDialog
+        <EditUserDrawer
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           user={selectedUser}
@@ -207,9 +210,9 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
         />
       )}
 
-      {/* View Dialog */}
+      {/* View User Drawer */}
       {selectedUser && (
-        <ViewUserDialog
+        <ViewUserDrawer
           open={isViewDialogOpen}
           onOpenChange={setIsViewDialogOpen}
           user={selectedUser}
