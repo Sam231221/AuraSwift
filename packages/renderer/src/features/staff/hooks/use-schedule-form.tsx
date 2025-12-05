@@ -15,8 +15,8 @@ import {
   type ScheduleUpdateData,
 } from "@/features/staff/schemas/schedule-schema";
 import { useFormNotification } from "@/shared/hooks/use-form-notification";
-// Optimized: Import individual function to reduce bundle size
-import { format } from "date-fns/format";
+// Optimized: Import individual function to reduce bundle size (date-fns v4 supports tree-shaking with named imports)
+import { format } from "date-fns";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("use-schedule-form");

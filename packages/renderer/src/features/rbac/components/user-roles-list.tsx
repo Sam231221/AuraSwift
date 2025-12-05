@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Trash2, Clock } from "lucide-react";
+// Optimized: Import individual function to reduce bundle size (date-fns v4 supports tree-shaking with named imports)
 import { format } from "date-fns";
 
 interface UserRole {

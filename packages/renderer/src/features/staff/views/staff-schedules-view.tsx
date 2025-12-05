@@ -75,15 +75,17 @@ import type {
   ScheduleFormData,
   ScheduleUpdateData,
 } from "../schemas/schedule-schema";
-// Optimized: Import individual functions to reduce bundle size
-import { format } from "date-fns/format";
-import { addWeeks } from "date-fns/addWeeks";
-import { startOfWeek } from "date-fns/startOfWeek";
-import { endOfWeek } from "date-fns/endOfWeek";
-import { eachDayOfInterval } from "date-fns/eachDayOfInterval";
-import { isSameDay } from "date-fns/isSameDay";
-import { isToday } from "date-fns/isToday";
-import { startOfDay } from "date-fns/startOfDay";
+// Optimized: Import individual functions to reduce bundle size (date-fns v4 supports tree-shaking with named imports)
+import {
+  format,
+  addWeeks,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameDay,
+  isToday,
+  startOfDay,
+} from "date-fns";
 import { TimePicker } from "@/components/time-picker";
 import { useScheduleForm } from "../hooks/use-schedule-form";
 
