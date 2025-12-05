@@ -10,6 +10,9 @@ export default /** @type import('electron-builder').Configuration */
     buildResources: 'buildResources',
   },
   generateUpdatesFilesForAllChannels: true,
+  // Enable differential updates (like Cursor) - only download changed files/blocks
+  // This reduces download size by 80-90% for most updates
+  differentialPackage: true,
   publish: {
     provider: 'github',
     owner: 'Sam231221',
