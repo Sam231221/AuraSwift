@@ -5,7 +5,6 @@
  */
 
 import { ipcMain } from "electron";
-import HID from "node-hid";
 
 // BBPOS WisePad 3 device identifiers
 const BBPOS_VENDOR_ID = 0x0b00; // Example vendor ID - replace with actual BBPOS ID
@@ -61,8 +60,11 @@ export interface ReaderEvent {
   timestamp: string;
 }
 
+// Type for dynamically imported HID module
+type HIDModule = typeof import("node-hid");
+
 export class PaymentService {
-  private cardReader: HID.HID | null = null;
+  private cardReader: InstanceType<HIDModule["HID"]> | null = null;
   private readerConfig: CardReaderConfig | null = null;
   private isReaderConnected = false;
   private currentPaymentIntent: {
@@ -162,6 +164,14 @@ export class PaymentService {
         this.isReaderConnected = true;
         this.paymentState.readerStatus = "ready";
         return { success: true };
+      }
+
+      // Dynamic import to handle missing dependency gracefully
+      const HID = await import("node-hid").catch(() => null);
+      if (!HID) {
+        throw new Error(
+          "node-hid not available. Please ensure the package is installed."
+        );
       }
 
       // Discover BBPOS WisePad 3 device
@@ -309,8 +319,12 @@ export class PaymentService {
   ): Promise<{ success: boolean; clientSecret?: string; error?: string }> {
     try {
       // Create a mock payment intent
-      const paymentIntentId = `pi_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      const clientSecret = `${paymentIntentId}_secret_${Math.random().toString(36).substring(2, 15)}`;
+      const paymentIntentId = `pi_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 9)}`;
+      const clientSecret = `${paymentIntentId}_secret_${Math.random()
+        .toString(36)
+        .substring(2, 15)}`;
 
       this.currentPaymentIntent = {
         id: paymentIntentId,
@@ -481,7 +495,9 @@ export class PaymentService {
       return {
         success: true,
         paymentIntent,
-        clientSecret: `${paymentIntentId}_secret_${Math.random().toString(36).substring(2, 15)}`,
+        clientSecret: `${paymentIntentId}_secret_${Math.random()
+          .toString(36)
+          .substring(2, 15)}`,
       };
     } catch (error) {
       this.paymentState.isProcessing = false;
@@ -541,6 +557,23 @@ export class PaymentService {
     }>;
   }> {
     try {
+      // Dynamic import to handle missing dependency gracefully
+      const HID = await import("node-hid").catch(() => null);
+      if (!HID) {
+        // Return simulated reader if node-hid is not available
+        return {
+          success: true,
+          readers: [
+            {
+              type: "simulated",
+              id: "sim-001",
+              name: "Simulated Card Reader",
+              connectionType: "usb",
+            },
+          ],
+        };
+      }
+
       const devices = HID.devices();
       const readers: Array<{
         type: string;
