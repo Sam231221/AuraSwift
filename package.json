@@ -24,7 +24,7 @@
   "scripts": {
     "build": "npm --workspace=packages/renderer run build && npm --workspace=packages/main run build && npm --workspace=packages/preload run build",
     "compile": "npm run build && electron-builder build --config electron-builder.mjs",
-    "postinstall": "electron-rebuild",
+    "postinstall": "electron-rebuild --only=better-sqlite3,node-hid,serialport,usb --arch=x64",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "node scripts/run-vitest.js",
