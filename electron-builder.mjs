@@ -65,7 +65,7 @@ export default /** @type import('electron-builder').Configuration */
     createDesktopShortcut: true,        // Create desktop shortcut
     createStartMenuShortcut: true,      // Create Start Menu shortcut
     shortcutName: 'AuraSwift',         // Shortcut name
-    deleteAppDataOnUninstall: false,    // Keep user data when uninstalling
+    deleteAppDataOnUninstall: true,    // Remove user data when uninstalling
     menuCategory: true,                 // Create program group in Start Menu
     runAfterFinish: true,              // Run app after installation completes
     installerIcon: 'buildResources/icon.ico',
