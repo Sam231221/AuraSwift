@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.15.0](https://github.com/Sam231221/AuraSwift/compare/v1.14.0...v1.15.0) (2025-12-05)
+
+
+### feat
+
+* **electron-builder:** enable differential updates to reduce download size by 80-90% ([](https://github.com/Sam231221/AuraSwift/commit/c3a4de0666a35f897814760f26d2a937e989d5e5))
+* **auto-updater:** improve update handling and add postpone count retrieval. ([](https://github.com/Sam231221/AuraSwift/commit/717e54295ab164c7f4c994b53284f224d3dee4b4))
+
+
+### fix
+
+* **electron-builder:** update differential updates note to reflect automatic enablement for NSIS and Squirrel targets in electron-builder 26.x ([](https://github.com/Sam231221/AuraSwift/commit/27482f6d4478660563b0f13ef28650c9384e9658))
+
 # [1.14.0](https://github.com/Sam231221/AuraSwift/compare/v1.13.0...v1.14.0) (2025-12-05)
 
 
