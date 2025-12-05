@@ -117,6 +117,12 @@ export default {
             label: "Windows NSIS Installer",
           },
           {
+            // CRITICAL: Blockmap files are required for differential updates
+            // electron-updater uses these to download only changed blocks
+            path: "dist/*.blockmap",
+            label: "NSIS Blockmap (Differential Updates)",
+          },
+          {
             path: "dist/squirrel-windows/*.nupkg",
             label: "Windows Squirrel Package (Auto-update)",
           },
