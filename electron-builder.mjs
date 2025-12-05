@@ -10,9 +10,8 @@ export default /** @type import('electron-builder').Configuration */
     buildResources: 'buildResources',
   },
   generateUpdatesFilesForAllChannels: true,
-  // Enable differential updates (like Cursor) - only download changed files/blocks
-  // This reduces download size by 80-90% for most updates
-  differentialPackage: true,
+  // Note: Differential updates are automatically enabled for NSIS and Squirrel targets
+  // in electron-builder 26.x. No explicit configuration needed.
   publish: {
     provider: 'github',
     owner: 'Sam231221',
