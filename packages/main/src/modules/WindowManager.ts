@@ -1,12 +1,18 @@
 import type { AppModule } from "../AppModule.js";
 import { ModuleContext } from "../ModuleContext.js";
-import { BrowserWindow, Menu, shell, app as electronApp } from "electron";
+import {
+  BrowserWindow,
+  Menu,
+  shell,
+  app as electronApp,
+  screen,
+} from "electron";
 import type { AppInitConfig } from "../AppInitConfig.js";
 import type { UpdateCheckResult } from "electron-updater";
 import { join } from "node:path";
 
-import { getLogger } from '../utils/logger.js';
-const logger = getLogger('WindowManager');
+import { getLogger } from "../utils/logger.js";
+const logger = getLogger("WindowManager");
 
 class WindowManager implements AppModule {
   readonly #preload: { path: string };
@@ -273,9 +279,24 @@ class WindowManager implements AppModule {
         ? join(process.cwd(), "buildResources", "icon.icns")
         : join(process.cwd(), "buildResources", "icon.ico");
 
+    // Get primary display dimensions for responsive window sizing
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } =
+      primaryDisplay.workAreaSize;
+
+    // Calculate default window size (90% of screen for better UX)
+    const defaultWidth = Math.floor(screenWidth * 0.9);
+    const defaultHeight = Math.floor(screenHeight * 0.9);
+
+    // Set minimum window size to ensure usability
+    const minWidth = 800;
+    const minHeight = 600;
+
     const browserWindow = new BrowserWindow({
-      width: 1100, // Increased window width
-      height: 600, // Optional: increase height for better layout
+      width: defaultWidth,
+      height: defaultHeight,
+      minWidth,
+      minHeight,
       show: false, // Use the 'ready-to-show' event to show the instantiated BrowserWindow.
       icon: iconPath, // Set the window icon
       title: "", // Set the window title
@@ -320,6 +341,7 @@ class WindowManager implements AppModule {
 
     // Ensure window shows when ready to prevent "main window not visible" test failures
     browserWindow.once("ready-to-show", () => {
+      browserWindow.maximize(); // Maximize window to full size by default
       browserWindow.show();
     });
 
