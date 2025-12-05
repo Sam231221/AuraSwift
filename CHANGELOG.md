@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.16.0](https://github.com/Sam231221/AuraSwift/compare/v1.15.0...v1.16.0) (2025-12-05)
+
+
+### chore
+
+* **fonts:** remove FONT_IMPLEMENTATION_STATUS.md and FONT_SETUP.md files; update hardware service documentation for clarity and consistency ([](https://github.com/Sam231221/AuraSwift/commit/b349b24e229c4cf653bd669b84c1002c9bea8831))
+* **dependencies:** remove unused dependencies from package-lock.json and package.json for cleaner project structure ([](https://github.com/Sam231221/AuraSwift/commit/8f1fa49bfb0905469302f18b3e42b887ab4c121e))
+
+
+### feat
+
+* **electron-builder:** add support for NSIS Blockmap files to enable differential updates ([](https://github.com/Sam231221/AuraSwift/commit/7ca6393bc8218a767fc7d131b6ea13982742eae4))
+* **ChromeDevToolsExtension:** implement lazy loading of devtools installer for production safety and improved performance ([](https://github.com/Sam231221/AuraSwift/commit/d11a996c295b00544af3ddcb1d6ce39b525c78d7))
+* **auto-updater:** log differential update status during download progress for better visibility ([](https://github.com/Sam231221/AuraSwift/commit/11ce357e4ba1c2aca41b9d82034aad6334e535d3))
+
+
+### fix
+
+* **electron-builder:** enable deletion of user data upon uninstallation for improved privacy ([](https://github.com/Sam231221/AuraSwift/commit/22a1299fa5e5285cbc5d1e4f7bc2987fefe3cac9))
+* **ChromeDevToolsExtension:** enhance type safety for installExtension function by using type assertions ([](https://github.com/Sam231221/AuraSwift/commit/8a11212df70e929dd3c6078edcfde908b883db36))
+
+
+### refactor
+
+* **date-fns:** optimize imports to reduce bundle size by utilizing named imports for better tree-shaking support ([](https://github.com/Sam231221/AuraSwift/commit/965d6d3b90647fcacae4f62f554642855f8fcdfa))
+* **dashboard:** replace console logging with logger utility for improved debugging and consistency across components ([](https://github.com/Sam231221/AuraSwift/commit/51e0b60702f963694dc8277314c8fd8c18576423))
+
 # [1.15.0](https://github.com/Sam231221/AuraSwift/compare/v1.14.0...v1.15.0) (2025-12-05)
 
 
