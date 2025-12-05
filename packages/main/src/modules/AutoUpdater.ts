@@ -49,6 +49,14 @@ export class AutoUpdater implements AppModule {
   // Phase 4.3: Update Check Debouncing
   #checkDebounceTimer: NodeJS.Timeout | null = null;
   readonly #DEBOUNCE_DELAY = 2000; // 2 seconds
+  // UI/Notification timing constants
+  readonly #TOAST_DISMISS_DELAY = 100; // 100ms delay for toast dismissal
+  readonly #INSTALL_TOAST_DURATION = 1000; // 1 second
+  readonly #INSTALL_DELAY = 500; // 500ms delay before install
+  readonly #PROGRESS_NOTIFICATION_THRESHOLD_MIN = 50; // Show notification at 50%
+  readonly #PROGRESS_NOTIFICATION_THRESHOLD_MAX = 55; // Hide notification after 55%
+  readonly #METRICS_ROLLING_WINDOW = 100; // Keep last 100 measurements
+  readonly #CACHE_HIT_RATE_WINDOW = 1000; // Use rolling window of 1000 checks for cache hit rate
   // Phase 5.1: Performance Metrics
   readonly #metrics: {
     checkCount: number;
@@ -385,10 +393,19 @@ export class AutoUpdater implements AppModule {
       })
       .then((result) => {
         if (result.response === 0) {
+          // Check if already downloading to prevent race conditions
+          if (this.#isDownloading) {
+            if (this.#logger) {
+              this.#logger.info(
+                "Download already in progress, skipping duplicate request"
+              );
+            }
+            return;
+          }
+
           this.#postponeCount = 0;
           this.#postponedUpdateInfo = null;
-          this.#isDownloading = true;
-          this.#downloadStartTime = Date.now();
+          this.setDownloading(true);
 
           const updater = this.getAutoUpdater();
           // Phase 4.1: Set version in download state before starting
@@ -415,7 +432,11 @@ export class AutoUpdater implements AppModule {
             notification.show();
           }
         } else if (result.response === 1) {
-          shell.openExternal(`${this.#GITHUB_RELEASES_URL}/tag/v${newVersion}`);
+          // Ensure version tag has 'v' prefix for GitHub URL
+          const versionTag = newVersion.startsWith("v")
+            ? newVersion
+            : `v${newVersion}`;
+          shell.openExternal(`${this.#GITHUB_RELEASES_URL}/tag/${versionTag}`);
 
           setTimeout(() => {
             this.showUpdateAvailableDialog(info, isReminder);
@@ -471,13 +492,24 @@ export class AutoUpdater implements AppModule {
   }
 
   /**
-   * Set downloading state
+   * Set downloading state (centralized state management)
+   * All isDownloading state changes should go through this method
    */
   setDownloading(isDownloading: boolean): void {
     this.#isDownloading = isDownloading;
     if (isDownloading) {
       this.#downloadStartTime = Date.now();
+    } else {
+      this.#downloadStartTime = null;
+      this.#hasShownProgressNotification = false;
     }
+  }
+
+  /**
+   * Get postpone count (for IPC exposure)
+   */
+  getPostponeCount(): number {
+    return this.#postponeCount;
   }
 
   /**
@@ -509,22 +541,33 @@ export class AutoUpdater implements AppModule {
   }
 
   /**
-   * Broadcast event to all windows
+   * Broadcast event to all windows with type safety
    */
-  private broadcastToAllWindows(channel: string, ...args: any[]): void {
+  private broadcastToAllWindows<T = unknown>(channel: string, data: T): void {
     const allWindows = BrowserWindow.getAllWindows();
     let sentCount = 0;
 
     allWindows.forEach((window) => {
       if (window && !window.isDestroyed()) {
         try {
-          window.webContents.send(channel, ...args);
+          window.webContents.send(channel, data);
           sentCount++;
         } catch (error) {
           // Silently handle errors - toast system will handle missing events
+          if (this.#logger) {
+            this.#logger.warn(
+              `Failed to send ${channel} to window: ${this.formatErrorMessage(
+                error
+              )}`
+            );
+          }
         }
       }
     });
+
+    if (this.#logger && sentCount === 0) {
+      this.#logger.warn(`No windows available to receive ${channel} event`);
+    }
   }
 
   /**
@@ -688,16 +731,18 @@ export class AutoUpdater implements AppModule {
     // Phase 4.3: Debounce rapid checks
     if (this.#checkDebounceTimer) {
       clearTimeout(this.#checkDebounceTimer);
+      this.#checkDebounceTimer = null;
     }
 
     return new Promise((resolve, reject) => {
       this.#checkDebounceTimer = setTimeout(async () => {
-        this.#checkDebounceTimer = null;
         try {
           const result = await this.performUpdateCheck();
           resolve(result);
         } catch (error) {
           reject(error);
+        } finally {
+          this.#checkDebounceTimer = null;
         }
       }, this.#DEBOUNCE_DELAY);
     });
@@ -730,9 +775,9 @@ export class AutoUpdater implements AppModule {
         }
         // Track cache hit
         this.trackCheckMetrics(0, true);
-        // Return cached result - no network request needed
-        // Note: We still need to check if update is available, so we'll do a lightweight check
-        // For now, we'll proceed with full check but could optimize further
+        // Return null to indicate cached result - no network request needed
+        // The cached result was already broadcast via update-available event if available
+        return null;
       }
     }
 
@@ -856,6 +901,7 @@ export class AutoUpdater implements AppModule {
 
   /**
    * Track check metrics (Phase 5.1)
+   * Uses rolling average to prevent overflow and maintain accuracy
    * @param duration - Check duration in milliseconds
    * @param cached - Whether the result was from cache
    */
@@ -863,20 +909,29 @@ export class AutoUpdater implements AppModule {
     this.#metrics.checkCount++;
     this.#metrics.checkDuration.push(duration);
 
-    // Update cache hit rate
-    if (cached) {
-      this.#metrics.cacheHitRate =
-        (this.#metrics.cacheHitRate * (this.#metrics.checkCount - 1) + 1) /
-        this.#metrics.checkCount;
-    } else {
-      this.#metrics.cacheHitRate =
-        (this.#metrics.cacheHitRate * (this.#metrics.checkCount - 1)) /
-        this.#metrics.checkCount;
+    // Keep only last N measurements to prevent memory growth
+    if (this.#metrics.checkDuration.length > this.#METRICS_ROLLING_WINDOW) {
+      this.#metrics.checkDuration.shift();
     }
 
-    // Keep only last 100 measurements
-    if (this.#metrics.checkDuration.length > 100) {
-      this.#metrics.checkDuration.shift();
+    // Update cache hit rate using rolling window approach
+    // This prevents overflow and maintains accuracy over time
+    const windowSize = Math.min(
+      this.#metrics.checkCount,
+      this.#CACHE_HIT_RATE_WINDOW
+    );
+    const recentChecks = this.#metrics.checkDuration.length;
+    const cacheHits = cached ? 1 : 0;
+
+    // Calculate rolling average: (old_rate * (window - 1) + new_value) / window
+    if (windowSize === 1) {
+      this.#metrics.cacheHitRate = cacheHits;
+    } else {
+      // Use a simple moving average for the rolling window
+      // This is more accurate than the previous approach for large numbers
+      const previousRate = this.#metrics.cacheHitRate;
+      this.#metrics.cacheHitRate =
+        (previousRate * (windowSize - 1) + cacheHits) / windowSize;
     }
   }
 
@@ -892,6 +947,14 @@ export class AutoUpdater implements AppModule {
     this.removeUpdateListeners(updater);
 
     const onUpdateAvailable = (info: UpdateInfo) => {
+      // Validate update info
+      if (!info || !info.version) {
+        if (this.#logger) {
+          this.#logger.warn("Received invalid update info, ignoring");
+        }
+        return;
+      }
+
       // Store the update info so it can be retrieved for postpone/download actions
       // If this is a different version than previously postponed, clear the postpone state
       if (
@@ -913,19 +976,34 @@ export class AutoUpdater implements AppModule {
         this.#postponedUpdateInfo = info;
       }
 
+      // Initialize download state with version for resume capability
+      if (!this.#downloadState) {
+        this.#downloadState = {
+          url: "",
+          downloadedBytes: 0,
+          totalBytes: 0,
+          version: info.version,
+        };
+      } else {
+        this.#downloadState.version = info.version;
+      }
+
       // Always broadcast to renderer for toast notification
       // The toast system uses a fixed ID ("update-available") which will replace
       // any existing toast, so it's safe to show even if previously postponed.
       // This ensures users are notified about available updates on app restart
       // or periodic checks, even if they postponed the update earlier.
-      const updateData = {
+      // Use UpdateInfo type directly to ensure type compatibility
+      this.broadcastToAllWindows<UpdateInfo>("update:available", {
         version: info.version,
         releaseDate: info.releaseDate,
         releaseNotes: info.releaseNotes,
         files: info.files,
-      };
-
-      this.broadcastToAllWindows("update:available", updateData);
+        path: info.path,
+        sha512: info.sha512,
+        releaseName: info.releaseName,
+        stagingPercentage: info.stagingPercentage,
+      });
 
       // Keep dialog as fallback (can be removed later)
       // this.showUpdateAvailableDialog(info, false);
@@ -936,7 +1014,14 @@ export class AutoUpdater implements AppModule {
       listener: onUpdateAvailable,
     });
 
-    const onUpdateNotAvailable = () => {};
+    const onUpdateNotAvailable = () => {
+      // Log that no update is available (useful for debugging)
+      if (this.#logger) {
+        this.#logger.info("No update available - app is up to date");
+      }
+      // Optionally broadcast to renderer if needed for UI feedback
+      // this.broadcastToAllWindows("update:not-available");
+    };
     updater.on("update-not-available", onUpdateNotAvailable);
     this.#updateListeners.push({
       event: "update-not-available",
@@ -969,7 +1054,12 @@ export class AutoUpdater implements AppModule {
 
       // Broadcast progress to renderer for toast notification
       if (progressInfo.total && progressInfo.transferred) {
-        this.broadcastToAllWindows("update:download-progress", {
+        this.broadcastToAllWindows<{
+          percent: number;
+          transferred: number;
+          total: number;
+          bytesPerSecond: number;
+        }>("update:download-progress", {
           percent: progressInfo.percent,
           transferred: progressInfo.transferred,
           total: progressInfo.total,
@@ -986,11 +1076,11 @@ export class AutoUpdater implements AppModule {
         );
       }
 
-      // Show a notification at 50% completion (only once) - optional
+      // Show a notification at progress threshold (only once) - optional
       if (
         !this.#hasShownProgressNotification &&
-        progressInfo.percent > 50 &&
-        progressInfo.percent < 55 &&
+        progressInfo.percent > this.#PROGRESS_NOTIFICATION_THRESHOLD_MIN &&
+        progressInfo.percent < this.#PROGRESS_NOTIFICATION_THRESHOLD_MAX &&
         Notification.isSupported()
       ) {
         this.#hasShownProgressNotification = true;
@@ -1011,8 +1101,7 @@ export class AutoUpdater implements AppModule {
     });
 
     const onUpdateDownloaded = (info: UpdateInfo) => {
-      this.#isDownloading = false;
-      this.#hasShownProgressNotification = false; // Reset for next download
+      this.setDownloading(false);
       const downloadDuration = this.#downloadStartTime
         ? Date.now() - this.#downloadStartTime
         : 0;
@@ -1025,7 +1114,10 @@ export class AutoUpdater implements AppModule {
       if (downloadDuration > 0) {
         this.#metrics.downloadCount++;
         this.#metrics.downloadDuration.push(downloadDuration);
-        if (this.#metrics.downloadDuration.length > 100) {
+        // Keep only last N measurements to prevent memory growth
+        if (
+          this.#metrics.downloadDuration.length > this.#METRICS_ROLLING_WINDOW
+        ) {
           this.#metrics.downloadDuration.shift();
         }
       }
@@ -1052,11 +1144,16 @@ export class AutoUpdater implements AppModule {
 
       // Cursor-style: Broadcast to renderer for toast notification
       // No dialog - toast will handle the UI
-      this.broadcastToAllWindows("update:downloaded", {
+      // Use UpdateInfo type directly to ensure type compatibility
+      this.broadcastToAllWindows<UpdateInfo>("update:downloaded", {
         version: info.version,
         releaseDate: info.releaseDate,
         releaseNotes: info.releaseNotes,
         files: info.files,
+        path: info.path,
+        sha512: info.sha512,
+        releaseName: info.releaseName,
+        stagingPercentage: info.stagingPercentage,
       });
 
       // Optional: Show system notification (non-blocking)
@@ -1069,7 +1166,7 @@ export class AutoUpdater implements AppModule {
 
         notification.on("click", () => {
           // Trigger install via IPC
-          this.broadcastToAllWindows("update:install-request");
+          this.broadcastToAllWindows<null>("update:install-request", null);
         });
 
         notification.show();
@@ -1082,13 +1179,11 @@ export class AutoUpdater implements AppModule {
     });
 
     const onError = (error: Error) => {
-      const errorMessage = error.message || String(error);
+      const errorMessage = this.formatErrorMessage(error);
 
       // Reset download state on error
       const wasDownloading = this.#isDownloading;
-      this.#isDownloading = false;
-      this.#hasShownProgressNotification = false; // Reset notification flag
-      this.#downloadStartTime = null;
+      this.setDownloading(false);
 
       // Phase 4.1: Keep download state for resume (don't clear on error)
       // The download state is preserved so user can retry and resume
@@ -1111,7 +1206,11 @@ export class AutoUpdater implements AppModule {
       };
 
       // Broadcast error to renderer for toast notification
-      this.broadcastToAllWindows("update:error", {
+      this.broadcastToAllWindows<{
+        message: string;
+        type: "download" | "check" | "install";
+        timestamp: Date;
+      }>("update:error", {
         message: errorMessage,
         type: isDownloadError ? "download" : "check",
         timestamp: new Date(),
@@ -1229,34 +1328,44 @@ export class AutoUpdater implements AppModule {
    * @param version - The version being downloaded
    */
   private downloadWithResume(updater: AppUpdater, version: string): void {
-    // Check for partial download to resume
-    if (
-      this.#downloadState &&
-      this.#downloadState.version === version &&
-      this.#downloadState.downloadedBytes > 0 &&
-      this.#downloadState.downloadedBytes < this.#downloadState.totalBytes
-    ) {
-      if (this.#logger) {
-        this.#logger.info(
-          `Resuming download: ${this.#downloadState.downloadedBytes}/${
-            this.#downloadState.totalBytes
-          } bytes (${Math.floor(
-            (this.#downloadState.downloadedBytes /
-              this.#downloadState.totalBytes) *
-              100
-          )}%)`
-        );
+    try {
+      // Check for partial download to resume
+      if (
+        this.#downloadState &&
+        this.#downloadState.version === version &&
+        this.#downloadState.downloadedBytes > 0 &&
+        this.#downloadState.downloadedBytes < this.#downloadState.totalBytes
+      ) {
+        if (this.#logger) {
+          this.#logger.info(
+            `Resuming download: ${this.#downloadState.downloadedBytes}/${
+              this.#downloadState.totalBytes
+            } bytes (${Math.floor(
+              (this.#downloadState.downloadedBytes /
+                this.#downloadState.totalBytes) *
+                100
+            )}%)`
+          );
+        }
+        // Note: electron-updater handles resume automatically via Squirrel
+        // We track state for logging and potential future manual resume
+      } else {
+        if (this.#logger) {
+          this.#logger.info("Starting new download");
+        }
       }
-      // Note: electron-updater handles resume automatically via Squirrel
-      // We track state for logging and potential future manual resume
-    } else {
-      if (this.#logger) {
-        this.#logger.info("Starting new download");
-      }
-    }
 
-    // Start/resume download
-    updater.downloadUpdate();
+      // Start/resume download
+      updater.downloadUpdate();
+    } catch (error) {
+      const errorMessage = this.formatErrorMessage(error);
+      this.#isDownloading = false;
+      if (this.#logger) {
+        this.#logger.error(`Failed to start download: ${errorMessage}`);
+      }
+      // Error will be handled by onError listener, but rethrow for caller awareness
+      throw error;
+    }
   }
 
   /**

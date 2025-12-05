@@ -116,6 +116,17 @@ export const updateAPI = {
   },
 
   /**
+   * Get postpone count (for renderer sync)
+   */
+  getPostponeCount: async (): Promise<{
+    success: boolean;
+    postponeCount: number;
+    error?: string;
+  }> => {
+    return await ipcRenderer.invoke("update:get-postpone-count");
+  },
+
+  /**
    * Remove all listeners for a specific channel
    */
   removeAllListeners: (channel: string) => {

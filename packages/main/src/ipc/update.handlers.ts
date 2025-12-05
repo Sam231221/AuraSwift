@@ -81,16 +81,26 @@ export function registerUpdateHandlers(): void {
         throw new Error("Auto-updater not available");
       }
 
-      const updater = updaterInstance.getAutoUpdater();
-
-      // Check if update is already downloaded
-      // Note: We check if update is available first, then download
-      const checkResult =
-        (await updaterInstance.runAutoUpdater()) as UpdateCheckResult | null;
-
-      if (!checkResult?.updateInfo) {
-        throw new Error("No update available to download");
+      // Check if already downloaded
+      if (updaterInstance.isUpdateDownloaded()) {
+        return { success: true, message: "Update already downloaded" };
       }
+
+      // Use pending update info if available (avoids redundant check)
+      let updateInfo = updaterInstance.getPendingUpdateInfo();
+
+      // Only check if no pending update info
+      if (!updateInfo) {
+        const checkResult =
+          (await updaterInstance.runAutoUpdater()) as UpdateCheckResult | null;
+
+        if (!checkResult?.updateInfo) {
+          throw new Error("No update available to download");
+        }
+        updateInfo = checkResult.updateInfo;
+      }
+
+      const updater = updaterInstance.getAutoUpdater();
 
       // Start download
       updaterInstance.setDownloading(true);
@@ -209,6 +219,29 @@ export function registerUpdateHandlers(): void {
       logger.error("Error dismissing update error:", error);
       return {
         success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  /**
+   * Get postpone count (for renderer sync)
+   */
+  ipcMain.handle("update:get-postpone-count", async () => {
+    try {
+      const updaterInstance = getAutoUpdaterInstance();
+      if (!updaterInstance) {
+        return { success: false, postponeCount: 0 };
+      }
+      return {
+        success: true,
+        postponeCount: updaterInstance.getPostponeCount(),
+      };
+    } catch (error) {
+      logger.error("Error getting postpone count:", error);
+      return {
+        success: false,
+        postponeCount: 0,
         error: error instanceof Error ? error.message : String(error),
       };
     }
