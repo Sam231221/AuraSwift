@@ -41,8 +41,7 @@ export interface ViewConfig {
   level: ViewLevel;
   /** Parent view ID for nested views */
   parentId?: string;
-  /** React component to render */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  /** React component to render - accepts components that can receive ViewComponentProps and additional props */
   component: ComponentType<any>;
   /** View metadata */
   metadata: ViewMetadata;
@@ -95,7 +94,7 @@ export interface NavigationContextValue {
  */
 export interface ViewComponentProps {
   /** Function to navigate back */
-  onBack?: () => void;
-  /** View parameters */
+  onBack: () => void;
+  /** View parameters - allows additional props to be passed */
   [key: string]: unknown;
 }

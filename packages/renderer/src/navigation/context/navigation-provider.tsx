@@ -5,12 +5,7 @@
  * Manages view history, current view, and nested navigation states.
  */
 
-import {
-  useState,
-  useCallback,
-  useMemo,
-  type ReactNode,
-} from "react";
+import { useState, useCallback, useMemo, type ReactNode } from "react";
 import { NavigationContext } from "./navigation-context";
 import type {
   NavigationState,
@@ -20,6 +15,12 @@ import { getView } from "../registry/view-registry";
 import { getLogger } from "@/shared/utils/logger";
 
 const logger = getLogger("navigation-provider");
+
+/**
+ * Maximum number of views to keep in navigation history
+ * Prevents unbounded memory growth from navigation history
+ */
+const MAX_HISTORY_LENGTH = 50;
 
 interface NavigationProviderProps {
   /** Child components */
@@ -71,7 +72,7 @@ export function NavigationProvider({
       setState((prev) => ({
         ...prev,
         currentView: viewId,
-        viewHistory: [...prev.viewHistory, viewId],
+        viewHistory: [...prev.viewHistory, viewId].slice(-MAX_HISTORY_LENGTH),
         viewParams: params || {},
       }));
     },
@@ -176,7 +177,9 @@ export function NavigationProvider({
                 ...prev.nestedViews,
                 [parentViewId]: {
                   currentView: viewId,
-                  viewHistory: [...currentNested.viewHistory, viewId],
+                  viewHistory: [...currentNested.viewHistory, viewId].slice(
+                    -MAX_HISTORY_LENGTH
+                  ),
                   viewParams: params || {},
                   nestedViews: {},
                 },
@@ -188,9 +191,7 @@ export function NavigationProvider({
           setState((prev) => {
             const nested = prev.nestedViews[parentViewId];
             if (!nested || nested.viewHistory.length <= 1) {
-              logger.warn(
-                `Cannot go back in nested view: ${parentViewId}`
-              );
+              logger.warn(`Cannot go back in nested view: ${parentViewId}`);
               return prev;
             }
 
@@ -261,4 +262,3 @@ export function NavigationProvider({
     </NavigationContext.Provider>
   );
 }
-

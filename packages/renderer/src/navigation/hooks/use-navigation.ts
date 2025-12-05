@@ -6,6 +6,7 @@
  */
 
 import { useCallback } from "react";
+import { toast } from "sonner";
 import { useNavigationContext } from "../context/navigation-context";
 import { getView, canAccessView } from "../registry/view-registry";
 import { useAuth } from "@/shared/hooks";
@@ -49,6 +50,7 @@ export function useNavigation() {
       const view = getView(viewId);
       if (!view) {
         logger.warn(`View not found: ${viewId}`);
+        toast.error("The requested page could not be found");
         return;
       }
 
@@ -61,11 +63,12 @@ export function useNavigation() {
           logger.warn(
             `Access denied to view: ${viewId} for user: ${user.id} (role: ${userRole})`
           );
-          // Optionally show a toast/notification here
+          toast.error("You don't have permission to access this page");
           return;
         }
       } else if (view.requiresAuth) {
         logger.warn(`View requires authentication: ${viewId}`);
+        toast.error("You must be logged in to access this page");
         return;
       }
 
@@ -85,4 +88,3 @@ export function useNavigation() {
     currentParams: context.state.viewParams,
   };
 }
-

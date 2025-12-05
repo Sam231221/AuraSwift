@@ -27,10 +27,8 @@ const logger = getLogger("navigation-container");
  * ```
  */
 export function NavigationContainer() {
-  const { currentViewId, currentParams } = useNavigation();
+  const { currentViewId, currentParams, goBack } = useNavigation();
   const view = getView(currentViewId);
-
-  const { goBack } = useNavigation();
 
   const viewComponent = useMemo(() => {
     if (!view) {
@@ -82,4 +80,3 @@ export function NavigationContainer() {
     />
   );
 }
-

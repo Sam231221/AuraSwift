@@ -48,6 +48,7 @@ export function NestedViewContainer({
     currentNestedViewId,
     currentNestedView,
     currentNestedParams,
+    goBack,
   } = useNestedNavigation(parentViewId);
 
   const viewId = currentNestedViewId || defaultViewId || "";
@@ -59,7 +60,7 @@ export function NestedViewContainer({
         const defaultView = getView(defaultViewId);
         if (defaultView && defaultView.parentId === parentViewId) {
           const Component = defaultView.component;
-          return <Component {...currentNestedParams} />;
+          return <Component {...currentNestedParams} onBack={goBack} />;
         }
       }
       return null;
@@ -81,7 +82,7 @@ export function NestedViewContainer({
 
     try {
       const Component = currentNestedView.component;
-      return <Component {...currentNestedParams} />;
+      return <Component {...currentNestedParams} onBack={goBack} />;
     } catch (error) {
       logger.error(`Error rendering nested view ${viewId}:`, error);
       return (
@@ -95,7 +96,7 @@ export function NestedViewContainer({
         </div>
       );
     }
-  }, [viewId, currentNestedView, currentNestedParams, parentViewId, defaultViewId]);
+  }, [viewId, currentNestedView, currentNestedParams, parentViewId, defaultViewId, goBack]);
 
   if (!viewId && !defaultViewId) {
     return null;

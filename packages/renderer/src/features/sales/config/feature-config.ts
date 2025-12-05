@@ -56,7 +56,22 @@ export const salesViews: Record<string, ViewConfig> = {
     requiresAuth: true,
     defaultParams: { embeddedInDashboard: true },
   },
-  // Legacy route for backward compatibility
+  /**
+   * Legacy route for backward compatibility
+   *
+   * @deprecated Use SALES_ROUTES.NEW_TRANSACTION instead
+   *
+   * This route is maintained for backward compatibility with existing code
+   * that references "newTransaction" directly. All new code should use
+   * SALES_ROUTES.NEW_TRANSACTION.
+   *
+   * Migration plan:
+   * 1. Search codebase for references to "newTransaction" view ID
+   * 2. Replace with SALES_ROUTES.NEW_TRANSACTION constant
+   * 3. Remove this legacy route after migration is complete
+   *
+   * Target removal: After all references are migrated (check with grep)
+   */
   newTransaction: {
     id: "newTransaction",
     level: "root",

@@ -7,10 +7,10 @@
 
 import { useNavigation } from "../hooks/use-navigation";
 import type { ComponentType } from "react";
+import type { ViewComponentProps } from "../types/navigation.types";
 
 interface ViewWrapperProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  component: ComponentType<any>;
+  component: ComponentType<ViewComponentProps>;
   embeddedInDashboard?: boolean;
 }
 
@@ -26,6 +26,7 @@ export function ViewWrapper({
 }: ViewWrapperProps) {
   const { goBack } = useNavigation();
 
-  return <Component onBack={goBack} embeddedInDashboard={embeddedInDashboard} />;
+  return (
+    <Component onBack={goBack} embeddedInDashboard={embeddedInDashboard} />
+  );
 }
-
