@@ -62,12 +62,6 @@ export default defineConfig({
             "@radix-ui/react-select",
             "@radix-ui/react-tabs",
           ],
-          // State management chunk
-          "state-vendor": [
-            "@reduxjs/toolkit",
-            "react-redux",
-            "@tanstack/react-query",
-          ],
         },
       },
     },
@@ -75,13 +69,7 @@ export default defineConfig({
   // Optimize dependencies
   optimizeDeps: {
     // Pre-bundle these dependencies for faster dev server
-    include: [
-      "react",
-      "react-dom",
-      "react-router-dom",
-      "@tanstack/react-query",
-      "@reduxjs/toolkit",
-    ],
+    include: ["react", "react-dom", "react-router-dom"],
     esbuildOptions: {
       // Provide Buffer polyfill
       define: {
