@@ -9,8 +9,18 @@ async function getDevToolsInstaller() {
 
   try {
     const installer = await import("electron-devtools-installer");
+    // Type assertion: installer.default is the installExtension function
+    // Convert through 'unknown' first to avoid type overlap issues
+    const installExtension = installer.default as unknown as (
+      extensionId: unknown
+    ) => Promise<string>;
+
+    if (typeof installExtension !== "function") {
+      return null;
+    }
+
     return {
-      installExtension: installer.default,
+      installExtension,
       extensions: {
         REDUX_DEVTOOLS: installer.REDUX_DEVTOOLS,
         VUEJS_DEVTOOLS: installer.VUEJS_DEVTOOLS,
