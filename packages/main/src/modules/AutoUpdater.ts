@@ -1029,6 +1029,21 @@ export class AutoUpdater implements AppModule {
     });
 
     const onDownloadProgress = (progressInfo: ProgressInfo) => {
+      // Log differential update status on first progress event
+      if (progressInfo.total && progressInfo.transferred === 0 && this.#logger) {
+        const totalMB = (progressInfo.total / (1024 * 1024)).toFixed(2);
+        // If total size is close to full installer size (>100MB), likely full download
+        // Differential updates are typically much smaller (<50MB for most changes)
+        const isLikelyFullDownload = progressInfo.total > 100 * 1024 * 1024;
+        this.#logger.info(
+          `Download started: ${totalMB} MB total${
+            isLikelyFullDownload
+              ? " (likely full installer - differential may not be available)"
+              : " (differential update)"
+          }`
+        );
+      }
+
       // Phase 4.1: Save download state for resume capability
       // Track download progress for potential resume
       // Note: electron-updater handles resume automatically, we track for logging
