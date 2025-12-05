@@ -41,6 +41,7 @@ const { scannerStatus, scanLog, manualScan } = useProductionScanner({
 Thermal receipt printer integration.
 
 **Hooks**:
+
 - `useThermalPrinter` - Main printer operations
 - `usePrinterSetup` - Printer setup dialog management
 - `useReceiptPrintingFlow` - Receipt printing flow
@@ -60,12 +61,7 @@ Scale device integration for weight-based products.
 ```tsx
 import { useScaleManager } from "@/services/hardware/scale";
 
-const {
-  scaleStatus,
-  currentReading,
-  connectToScale,
-  isConnected,
-} = useScaleManager();
+const { scaleStatus, currentReading, connectToScale, isConnected } = useScaleManager();
 ```
 
 ### Payment (`payment/`)
@@ -85,11 +81,7 @@ import { useScaleManager } from "@/services/hardware/scale";
 ### Central Export
 
 ```tsx
-import {
-  useProductionScanner,
-  useThermalPrinter,
-  useScaleManager,
-} from "@/services/hardware";
+import { useProductionScanner, useThermalPrinter, useScaleManager } from "@/services/hardware";
 ```
 
 ## Architecture
@@ -104,13 +96,12 @@ These services follow the **Hexagonal Architecture** pattern:
 ## Migration Notes
 
 This structure was migrated from:
+
 - `features/barcode-scanner/` → `services/hardware/scanner/`
 - `features/sales/hooks/use-thermal-printer.ts` → `services/hardware/printer/hooks/`
 - `shared/hooks/use-scale-manager.ts` → `services/hardware/scale/hooks/`
 
-For backward compatibility, some exports remain in:
-- `shared/hooks/index.ts` (deprecated - use `@/services/hardware` directly)
-- `features/sales/index.ts` (deprecated - use `@/services/hardware` directly)
+All hardware hooks should be imported directly from `@/services/hardware` or `@/services/hardware/{service}`.
 
 ## Best Practices
 
@@ -123,4 +114,3 @@ For backward compatibility, some exports remain in:
 
 - [Hardware Integration Architecture](../../features/docs/HARDWARE_INTEGRATION_ARCHITECTURE.md)
 - [Feature Structure Guide](../../features/docs/FEATURE_STRUCTURE.md)
-
