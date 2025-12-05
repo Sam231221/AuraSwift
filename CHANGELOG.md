@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.12.0](https://github.com/Sam231221/AuraSwift/compare/v1.11.0...v1.12.0) (2025-12-05)
+
+
+### feat
+
+* **transactions:** add multi-currency support by introducing a currency field in the transactions table and updating transaction handling logic to accommodate different currencies ([](https://github.com/Sam231221/AuraSwift/commit/9e4e1b01bbb733efa4eec5ecf8867cc542f1e217))
+* **navigation:** enhance navigation components by adding goBack functionality and improving legacy route documentation for better migration guidance ([](https://github.com/Sam231221/AuraSwift/commit/fee349342031a2cb5da2298d3ed9fde67cb989c2))
+* **auto-updater:** enhance update handling by resetting postpone state for new versions and ensuring toast notifications are always broadcasted ([](https://github.com/Sam231221/AuraSwift/commit/2b9421ebf5c213e52499d12da03b81241311685d))
+
 # [1.11.0](https://github.com/Sam231221/AuraSwift/compare/v1.10.1...v1.11.0) (2025-12-04)
 
 
