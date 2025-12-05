@@ -875,14 +875,32 @@ export class AutoUpdater implements AppModule {
     this.removeUpdateListeners(updater);
 
     const onUpdateAvailable = (info: UpdateInfo) => {
+      // Store the update info so it can be retrieved for postpone/download actions
+      // If this is a different version than previously postponed, clear the postpone state
       if (
         this.#postponedUpdateInfo &&
-        this.#postponedUpdateInfo.version === info.version
+        this.#postponedUpdateInfo.version !== info.version
       ) {
-        return;
+        // New version available, reset postpone state
+        this.#postponedUpdateInfo = null;
+        this.#postponeCount = 0;
+        if (this.#remindLaterTimeout) {
+          clearTimeout(this.#remindLaterTimeout);
+          this.#remindLaterTimeout = null;
+        }
+      }
+      
+      // Store current available update info (even if not postponed yet)
+      // This allows postpone/download actions to work
+      if (!this.#postponedUpdateInfo) {
+        this.#postponedUpdateInfo = info;
       }
 
-      // Broadcast to renderer for toast notification
+      // Always broadcast to renderer for toast notification
+      // The toast system uses a fixed ID ("update-available") which will replace
+      // any existing toast, so it's safe to show even if previously postponed.
+      // This ensures users are notified about available updates on app restart
+      // or periodic checks, even if they postponed the update earlier.
       this.broadcastToAllWindows("update:available", {
         version: info.version,
         releaseDate: info.releaseDate,
