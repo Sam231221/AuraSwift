@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.14.0](https://github.com/Sam231221/AuraSwift/compare/v1.13.0...v1.14.0) (2025-12-05)
+
+
+### feat
+
+* **window-manager:** enhance window sizing by calculating default dimensions based on primary display and setting minimum size for better usability ([](https://github.com/Sam231221/AuraSwift/commit/8155a0fd3d23f1b95b366e61923fc07e4193b1ce))
+* **auto-updater:** improve update listener setup and toast notification handling for better user experience ([](https://github.com/Sam231221/AuraSwift/commit/3f12fe96240451da7f78f44b1ba96389161133a9))
+
+
+### refactor
+
+* **fonts:** remove download script and add font files directly to the project, streamlining font integration for the Inter typeface ([](https://github.com/Sam231221/AuraSwift/commit/2a6b49ba735ee1472f3c23f008c7306be8554d9d))
+
 # [1.13.0](https://github.com/Sam231221/AuraSwift/compare/v1.12.0...v1.13.0) (2025-12-05)
 
 
