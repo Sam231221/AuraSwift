@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.13.0](https://github.com/Sam231221/AuraSwift/compare/v1.12.0...v1.13.0) (2025-12-05)
+
+
+### feat
+
+* **fonts:** implement Inter font with complete configuration, including @font-face declarations, Tailwind CSS integration, and documentation for setup and usage ([](https://github.com/Sam231221/AuraSwift/commit/cfa154f30472c507538317e7340c663f13156bd3))
+
 # [1.12.0](https://github.com/Sam231221/AuraSwift/compare/v1.11.0...v1.12.0) (2025-12-05)
 
 
