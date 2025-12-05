@@ -102,6 +102,21 @@ export class AutoUpdater implements AppModule {
       return;
     }
 
+    // Set up update listeners once when enabling (not on every check)
+    // This ensures listeners are always ready to receive update events
+    const updater = this.getAutoUpdater();
+    updater.logger = this.#logger || null;
+    updater.fullChangelog = true;
+    updater.autoDownload = false;
+    updater.autoInstallOnAppQuit = true;
+    updater.allowDowngrade = false;
+    updater.channel = "latest";
+    this.setupUpdateListeners(updater);
+
+    if (this.#logger) {
+      this.#logger.info("AutoUpdater enabled, listeners set up");
+    }
+
     // Delay initial check to allow app to fully initialize (Performance: Phase 1.1)
     setTimeout(() => {
       this.runAutoUpdater().catch((error) => {
@@ -498,9 +513,16 @@ export class AutoUpdater implements AppModule {
    */
   private broadcastToAllWindows(channel: string, ...args: any[]): void {
     const allWindows = BrowserWindow.getAllWindows();
+    let sentCount = 0;
+
     allWindows.forEach((window) => {
       if (window && !window.isDestroyed()) {
-        window.webContents.send(channel, ...args);
+        try {
+          window.webContents.send(channel, ...args);
+          sentCount++;
+        } catch (error) {
+          // Silently handle errors - toast system will handle missing events
+        }
       }
     });
   }
@@ -722,13 +744,8 @@ export class AutoUpdater implements AppModule {
     for (let attempt = 1; attempt <= this.#MAX_RETRIES; attempt++) {
       try {
         const updater = this.getAutoUpdater();
-        updater.logger = this.#logger || null;
-        updater.fullChangelog = true;
-        updater.autoDownload = false;
-        updater.autoInstallOnAppQuit = true;
-        updater.allowDowngrade = false;
-        updater.channel = "latest";
-        this.setupUpdateListeners(updater);
+        // Note: Listeners are set up once in enable(), not on every check
+        // Just configure updater settings here
 
         // Phase 2.1: Add timeout wrapper
         const checkPromise = updater.checkForUpdates();
@@ -889,7 +906,7 @@ export class AutoUpdater implements AppModule {
           this.#remindLaterTimeout = null;
         }
       }
-      
+
       // Store current available update info (even if not postponed yet)
       // This allows postpone/download actions to work
       if (!this.#postponedUpdateInfo) {
@@ -901,12 +918,14 @@ export class AutoUpdater implements AppModule {
       // any existing toast, so it's safe to show even if previously postponed.
       // This ensures users are notified about available updates on app restart
       // or periodic checks, even if they postponed the update earlier.
-      this.broadcastToAllWindows("update:available", {
+      const updateData = {
         version: info.version,
         releaseDate: info.releaseDate,
         releaseNotes: info.releaseNotes,
         files: info.files,
-      });
+      };
+
+      this.broadcastToAllWindows("update:available", updateData);
 
       // Keep dialog as fallback (can be removed later)
       // this.showUpdateAvailableDialog(info, false);

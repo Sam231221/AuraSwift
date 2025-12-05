@@ -24,7 +24,6 @@ import {
   showUpdateReadyToast,
   showUpdateErrorToast,
 } from "../components";
-import { DownloadProgressToast } from "../components/DownloadProgressToast";
 
 interface UpdateContextValue {
   state: UpdateState;
@@ -116,7 +115,7 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       setUpdateInfo(info);
       setError(null);
 
-      // Dismiss any existing toasts (using fixed IDs for reliability)
+      // Dismiss any existing toasts FIRST to prevent overlapping
       toast.dismiss("update-available");
       toast.dismiss("download-progress");
       toast.dismiss("update-ready");
@@ -132,19 +131,23 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
         updateReadyToastIdRef.current = null;
       }
 
-      // Show toast and store its ID
-      updateAvailableToastIdRef.current = showUpdateAvailableToast(
-        info,
-        currentVersion,
-        () => downloadUpdateRef.current?.(),
-        () => postponeUpdateRef.current?.()
-      );
+      // Small delay to ensure previous toast is fully dismissed
+      setTimeout(() => {
+        updateAvailableToastIdRef.current = showUpdateAvailableToast(
+          info,
+          currentVersion,
+          () => downloadUpdateRef.current?.(),
+          () => postponeUpdateRef.current?.()
+        );
+      }, 100);
     };
 
     window.updateAPI.onUpdateAvailable(handleUpdateAvailable);
 
     return () => {
-      window.updateAPI?.removeAllListeners("update:available");
+      if (window.updateAPI) {
+        window.updateAPI.removeAllListeners("update:available");
+      }
     };
   }, [currentVersion]);
 
@@ -156,31 +159,27 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       setState("downloading");
       setProgress(progressData);
 
-      // Dismiss the "Update Available" toast when download starts (using fixed ID)
+      // Dismiss other toasts first to prevent overlapping
       toast.dismiss("update-available");
+      toast.dismiss("update-ready");
       if (updateAvailableToastIdRef.current) {
         updateAvailableToastIdRef.current = null;
       }
-
-      // Update or show progress toast
-      if (downloadProgressToastIdRef.current) {
-        // Update existing toast
-        toast.custom(() => <DownloadProgressToast progress={progressData} />, {
-          id: downloadProgressToastIdRef.current,
-          duration: Infinity,
-          position: "top-right",
-        });
-      } else {
-        // Show new toast
-        downloadProgressToastIdRef.current =
-          showDownloadProgressToast(progressData);
+      if (updateReadyToastIdRef.current) {
+        updateReadyToastIdRef.current = null;
       }
+
+      // Always use the fixed ID to replace/update the same toast
+      downloadProgressToastIdRef.current =
+        showDownloadProgressToast(progressData);
     };
 
     window.updateAPI.onDownloadProgress(handleDownloadProgress);
 
     return () => {
-      window.updateAPI?.removeAllListeners("update:download-progress");
+      if (window.updateAPI) {
+        window.updateAPI.removeAllListeners("update:download-progress");
+      }
     };
   }, []);
 
@@ -193,8 +192,7 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       setUpdateInfo(info);
       setProgress(null);
 
-      // Dismiss all existing toasts BEFORE showing new one (using fixed IDs)
-      // This ensures no overlapping toasts
+      // Dismiss all existing toasts FIRST to prevent overlapping
       toast.dismiss("update-available");
       toast.dismiss("download-progress");
       toast.dismiss("update-ready");
@@ -210,19 +208,22 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
         updateReadyToastIdRef.current = null;
       }
 
-      // Show ready toast and store its ID
-      // Using fixed ID ensures it replaces any existing toast
-      updateReadyToastIdRef.current = showUpdateReadyToast(
-        info,
-        () => installUpdateRef.current?.(),
-        () => postponeUpdateRef.current?.()
-      );
+      // Small delay to ensure previous toast is fully dismissed
+      setTimeout(() => {
+        updateReadyToastIdRef.current = showUpdateReadyToast(
+          info,
+          () => installUpdateRef.current?.(),
+          () => postponeUpdateRef.current?.()
+        );
+      }, 100);
     };
 
     window.updateAPI.onUpdateDownloaded(handleUpdateDownloaded);
 
     return () => {
-      window.updateAPI?.removeAllListeners("update:downloaded");
+      if (window.updateAPI) {
+        window.updateAPI.removeAllListeners("update:downloaded");
+      }
     };
   }, []);
 
@@ -235,13 +236,17 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       setError(errorData);
 
       // Dismiss existing toasts when error occurs
-      if (errorData.type === "download" && downloadProgressToastIdRef.current) {
-        toast.dismiss(downloadProgressToastIdRef.current);
-        downloadProgressToastIdRef.current = null;
+      if (errorData.type === "download") {
+        toast.dismiss("download-progress");
+        if (downloadProgressToastIdRef.current) {
+          downloadProgressToastIdRef.current = null;
+        }
       }
-      if (errorData.type === "check" && updateAvailableToastIdRef.current) {
-        toast.dismiss(updateAvailableToastIdRef.current);
-        updateAvailableToastIdRef.current = null;
+      if (errorData.type === "check") {
+        toast.dismiss("update-available");
+        if (updateAvailableToastIdRef.current) {
+          updateAvailableToastIdRef.current = null;
+        }
       }
 
       // Show error toast with retry option for download/check errors
@@ -265,7 +270,9 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
     window.updateAPI.onUpdateError(handleError);
 
     return () => {
-      window.updateAPI?.removeAllListeners("update:error");
+      if (window.updateAPI) {
+        window.updateAPI.removeAllListeners("update:error");
+      }
     };
   }, []);
 
@@ -349,8 +356,10 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
         updateAvailableToastIdRef.current = null;
       }
 
-      toast.info("Update postponed. We'll remind you later.");
-    } catch (err) {
+      toast.info("Update postponed. We'll remind you later.", {
+        duration: 3000,
+      });
+    } catch {
       toast.error("Failed to postpone update");
     }
   }, []);
@@ -407,7 +416,7 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       if (state === "error") {
         setState("idle");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to dismiss error");
     }
   }, [state]);
