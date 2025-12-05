@@ -63,19 +63,6 @@ export const settingsViews: Record<string, ViewConfig> = {
     roles: ["admin"],
     requiresAuth: true,
   },
-  // Legacy route for backward compatibility
-  generalSettings: {
-    id: "generalSettings",
-    level: "root",
-    component: GeneralSettingsView,
-    metadata: {
-      title: "General Settings",
-      description: "System settings",
-    },
-    permissions: [SETTINGS_PERMISSIONS.MANAGE],
-    roles: ["admin"],
-    requiresAuth: true,
-  },
   [SETTINGS_ROUTES.VIVA_WALLET]: {
     id: SETTINGS_ROUTES.VIVA_WALLET,
     level: "root",

@@ -26,6 +26,37 @@ export const INVENTORY_ROUTES = {
 
   /** Product expiry dashboard view */
   EXPIRY_DASHBOARD: "inventory:expiry-dashboard",
+
+  // Legacy nested route constants (will be migrated to new structure)
+  /** Product management root view (legacy) */
+  PRODUCT_MANAGEMENT: "productManagement",
+
+  /** Product dashboard nested view */
+  PRODUCT_DASHBOARD: "productDashboard",
+
+  /** Product list nested view */
+  PRODUCT_LIST: "productList",
+
+  /** Product details nested view */
+  PRODUCT_DETAILS_NESTED: "productDetails",
+
+  /** Category management nested view */
+  CATEGORY_MANAGEMENT: "categoryManagement",
+
+  /** Batch management root view (legacy) */
+  BATCH_MANAGEMENT: "batchManagement",
+
+  /** Batch dashboard nested view */
+  BATCH_DASHBOARD: "batchDashboard",
+
+  /** Batch list nested view */
+  BATCH_LIST: "batchList",
+
+  /** Expiry alerts nested view */
+  EXPIRY_ALERTS: "expiryAlerts",
+
+  /** Stock movement history nested view */
+  STOCK_MOVEMENT_HISTORY: "stockMovementHistory",
 } as const;
 
 export type InventoryRoute =

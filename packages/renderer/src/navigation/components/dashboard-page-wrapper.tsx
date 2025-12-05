@@ -14,6 +14,8 @@ import {
   CashierDashboardView,
   ManagerDashboardView,
 } from "@/features/dashboard";
+import { USERS_ROUTES } from "@/features/users/config/navigation";
+import { SALES_ROUTES } from "@/features/sales/config/navigation";
 
 import { useNavigation } from "../hooks/use-navigation";
 import { useDashboardNavigation } from "../hooks/use-dashboard-navigation";
@@ -54,7 +56,7 @@ export function DashboardPageWrapper() {
           subtitle={`Welcome, ${userDisplayName}`}
         >
           <AdminDashboardView
-            onFront={() => navigateTo("userManagement")}
+            onFront={() => navigateTo(USERS_ROUTES.MANAGEMENT)}
             onActionClick={handleActionClick}
           />
         </DashboardLayout>
@@ -77,7 +79,9 @@ export function DashboardPageWrapper() {
           subtitle={`Welcome, ${userDisplayName}`}
         >
           <CashierDashboardView
-            onNewTransaction={() => handleNavigate("newTransaction")}
+            onNewTransaction={() =>
+              handleNavigate(SALES_ROUTES.NEW_TRANSACTION)
+            }
           />
         </DashboardLayout>
       );

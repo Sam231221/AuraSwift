@@ -112,6 +112,7 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
       });
     } else if (verificationMethod === "scan") {
       // TODO: Implement ID scanner integration
+      // Tracking: docs/TODO_TRACKING.md#4
       toast.info("ID scanner integration coming soon");
       // For now, allow manual entry
       if (!birthdate || !calculatedAge) {
@@ -197,6 +198,7 @@ export const AgeVerificationModal: React.FC<AgeVerificationModalProps> = ({
                 size="sm"
                 onClick={() => setVerificationMethod("scan")}
                 disabled={true} // TODO: Enable when ID scanner is integrated
+                // Tracking: docs/TODO_TRACKING.md#4
                 className="h-9 sm:h-10 text-xs sm:text-sm touch-manipulation"
               >
                 ID Scan

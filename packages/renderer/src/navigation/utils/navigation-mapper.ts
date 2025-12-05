@@ -5,8 +5,17 @@
  * Centralizes the mapping between dashboard feature actions and views.
  */
 
+import { USERS_ROUTES } from "@/features/users/config/navigation";
+import { RBAC_ROUTES } from "@/features/rbac/config/navigation";
+import { SALES_ROUTES } from "@/features/sales/config/navigation";
+import { STAFF_ROUTES } from "@/features/staff/config/navigation";
+import { SETTINGS_ROUTES } from "@/features/settings/config/navigation";
+
 /**
  * Map feature ID and action ID to view ID
+ *
+ * Uses route constants where available for type safety and maintainability.
+ * Legacy route names are automatically mapped by the view registry.
  *
  * @param featureId - Feature identifier
  * @param actionId - Action identifier
@@ -18,23 +27,23 @@ export function mapActionToView(
 ): string | undefined {
   const mapping: Record<string, Record<string, string>> = {
     "user-management": {
-      "manage-users": "userManagement",
-      "role-permissions": "roleManagement",
-      "user-role-assignment": "userRoleAssignment",
-      "staff-schedules": "staffSchedules",
+      "manage-users": USERS_ROUTES.MANAGEMENT,
+      "role-permissions": RBAC_ROUTES.ROLE_MANAGEMENT,
+      "user-role-assignment": RBAC_ROUTES.USER_ROLE_ASSIGNMENT,
+      "staff-schedules": STAFF_ROUTES.SCHEDULES,
     },
     "management-actions": {
-      "new-sale": "newTransaction",
-      "manage-inventory": "productManagement",
-      "manage-users": "userManagement",
-      "staff-schedules": "staffSchedules",
+      "new-sale": SALES_ROUTES.NEW_TRANSACTION,
+      "manage-inventory": "productManagement", // Legacy route - automatically mapped by route mapper
+      "manage-users": USERS_ROUTES.MANAGEMENT,
+      "staff-schedules": STAFF_ROUTES.SCHEDULES,
     },
     "quick-actions": {
-      "quick-new-sale": "newTransaction",
-      "quick-manage-users": "userManagement",
+      "quick-new-sale": SALES_ROUTES.NEW_TRANSACTION,
+      "quick-manage-users": USERS_ROUTES.MANAGEMENT,
     },
     "system-settings": {
-      "general-settings": "generalSettings",
+      "general-settings": SETTINGS_ROUTES.GENERAL,
     },
   };
 

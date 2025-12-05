@@ -66,6 +66,7 @@ export function useVivaWalletTransaction() {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleTransactionEvent = (_event: any, _data: any) => {
       // TODO: Implement event listener when IPC events are set up
+      // Tracking: docs/TODO_TRACKING.md#1
       // This function is reserved for future event-based status updates
       // Will use _transactionId to filter events for this specific transaction
     };
@@ -94,7 +95,10 @@ export function useVivaWalletTransaction() {
 
         logger.info(`Initiating transaction: ${amount} ${currency}`);
 
-        const result = await window.vivaWalletAPI.initiateSale(amount, currency);
+        const result = await window.vivaWalletAPI.initiateSale(
+          amount,
+          currency
+        );
 
         if (result.success && result.transactionId) {
           setTransactionStatus({
@@ -118,7 +122,9 @@ export function useVivaWalletTransaction() {
       } catch (error) {
         logger.error("Failed to initiate transaction:", error);
         const errorMessage =
-          error instanceof Error ? error.message : "Failed to initiate transaction";
+          error instanceof Error
+            ? error.message
+            : "Failed to initiate transaction";
         toast.error(errorMessage);
         setIsProcessing(false);
         return null;
@@ -138,7 +144,9 @@ export function useVivaWalletTransaction() {
 
     const poll = async () => {
       try {
-        const result = await window.vivaWalletAPI?.getTransactionStatus(transactionId);
+        const result = await window.vivaWalletAPI?.getTransactionStatus(
+          transactionId
+        );
 
         if (result?.success && result.status) {
           const status = result.status;
@@ -240,4 +248,3 @@ export function useVivaWalletTransaction() {
     stopPolling,
   };
 }
-

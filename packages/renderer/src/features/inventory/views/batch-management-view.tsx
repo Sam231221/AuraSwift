@@ -22,6 +22,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { useExpiryAlerts } from "@/features/inventory/hooks/use-expiry-alerts";
 import { useNestedNavigation } from "@/navigation/hooks/use-nested-navigation";
 import { getNestedViews } from "@/navigation/registry/view-registry";
+import { INVENTORY_ROUTES } from "../config/navigation";
 import BatchList from "@/features/inventory/components/batch/batch-list";
 import BatchFormDrawer from "@/features/inventory/components/batch/batch-form-drawer";
 import BatchAdjustmentModal from "@/features/inventory/components/batch/batch-adjustment-modal";
@@ -51,10 +52,12 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
 
   // Use nested navigation instead of local state
   const { navigateTo, currentNestedViewId, currentNestedParams } =
-    useNestedNavigation("batchManagement");
+    useNestedNavigation(INVENTORY_ROUTES.BATCH_MANAGEMENT);
 
-  const nestedViews = getNestedViews("batchManagement");
-  const defaultView = nestedViews.find((v) => v.id === "batchDashboard");
+  const nestedViews = getNestedViews(INVENTORY_ROUTES.BATCH_MANAGEMENT);
+  const defaultView = nestedViews.find(
+    (v) => v.id === INVENTORY_ROUTES.BATCH_DASHBOARD
+  );
 
   // Get productId from params if provided
   const productIdFromParams = currentNestedParams?.productId as
@@ -71,9 +74,9 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
 
     // Map nested view IDs to view modes
     const viewMap: Record<string, "dashboard" | "list" | "alerts"> = {
-      batchDashboard: "dashboard",
-      batchList: "list",
-      expiryAlerts: "alerts",
+      [INVENTORY_ROUTES.BATCH_DASHBOARD]: "dashboard",
+      [INVENTORY_ROUTES.BATCH_LIST]: "list",
+      [INVENTORY_ROUTES.EXPIRY_ALERTS]: "alerts",
     };
 
     return viewMap[currentNestedViewId] || "dashboard";
@@ -82,7 +85,9 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
   // Initialize default view if none is selected
   useEffect(() => {
     if (!currentNestedViewId && defaultView) {
-      const initialView = effectiveProductId ? "batchList" : "batchDashboard";
+      const initialView = effectiveProductId
+        ? INVENTORY_ROUTES.BATCH_LIST
+        : INVENTORY_ROUTES.BATCH_DASHBOARD;
       navigateTo(
         initialView,
         effectiveProductId ? { productId: effectiveProductId } : undefined
@@ -489,7 +494,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           batches={allBatches}
           expirySettings={expirySettings}
           businessId={user.businessId}
-          onViewBatches={() => navigateTo("batchList")}
+          onViewBatches={() => navigateTo(INVENTORY_ROUTES.BATCH_LIST)}
           onReceiveBatch={handleCreateBatch}
           onGenerateReport={() => {
             toast.info("Report generation coming soon");
@@ -558,7 +563,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigateTo("batchDashboard")}
+                onClick={() => navigateTo(INVENTORY_ROUTES.BATCH_DASHBOARD)}
                 className="w-fit"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
@@ -583,7 +588,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
               </Button>
               <Button
                 variant="outline"
-                onClick={() => navigateTo("expiryAlerts")}
+                onClick={() => navigateTo(INVENTORY_ROUTES.EXPIRY_ALERTS)}
                 className="w-full sm:w-auto"
               >
                 <AlertTriangle className="w-4 h-4 mr-2" />

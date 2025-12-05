@@ -63,19 +63,6 @@ export const staffViews: Record<string, ViewConfig> = {
     roles: ["admin", "manager"],
     requiresAuth: true,
   },
-  // Legacy route for backward compatibility
-  cashierManagement: {
-    id: "cashierManagement",
-    level: "root",
-    component: ManageCashierView,
-    metadata: {
-      title: "Cashier Management",
-      description: "Manage cashiers",
-    },
-    permissions: [STAFF_PERMISSIONS.MANAGE],
-    roles: ["admin", "manager"],
-    requiresAuth: true,
-  },
   [STAFF_ROUTES.SCHEDULES]: {
     id: STAFF_ROUTES.SCHEDULES,
     level: "root",
@@ -88,18 +75,4 @@ export const staffViews: Record<string, ViewConfig> = {
     roles: ["admin", "manager"],
     requiresAuth: true,
   },
-  // Legacy route for backward compatibility
-  staffSchedules: {
-    id: "staffSchedules",
-    level: "root",
-    component: StaffSchedulesView,
-    metadata: {
-      title: "Staff Schedules",
-      description: "Manage staff schedules",
-    },
-    permissions: [STAFF_PERMISSIONS.MANAGE],
-    roles: ["admin", "manager"],
-    requiresAuth: true,
-  },
 };
-

@@ -5,6 +5,7 @@ import type { Product } from "@/types/domain";
 import { useNestedNavigation } from "@/navigation/hooks/use-nested-navigation";
 import { useNavigation } from "@/navigation/hooks/use-navigation";
 import { getNestedViews } from "@/navigation/registry/view-registry";
+import { INVENTORY_ROUTES } from "../config/navigation";
 
 import ManageCategoriesView from "./category-management-view";
 import ProductDashboardView from "./inventory-dashboard-view";
@@ -28,19 +29,22 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const { user } = useAuth();
 
   // Use nested navigation instead of local state
-  const { navigateTo, currentNestedViewId } =
-    useNestedNavigation("productManagement");
+  const { navigateTo, currentNestedViewId } = useNestedNavigation(
+    INVENTORY_ROUTES.PRODUCT_MANAGEMENT
+  );
 
   // Use main navigation to navigate to the main dashboard
   const { navigateTo: navigateToMainView } = useNavigation();
 
-  const nestedViews = getNestedViews("productManagement");
-  const defaultView = nestedViews.find((v) => v.id === "productDashboard");
+  const nestedViews = getNestedViews(INVENTORY_ROUTES.PRODUCT_MANAGEMENT);
+  const defaultView = nestedViews.find(
+    (v) => v.id === INVENTORY_ROUTES.PRODUCT_DASHBOARD
+  );
 
   // Map nested view IDs to the old view names for compatibility
   const currentView = useMemo(() => {
     if (!currentNestedViewId) {
-      return defaultView?.id || "productDashboard";
+      return defaultView?.id || INVENTORY_ROUTES.PRODUCT_DASHBOARD;
     }
     return currentNestedViewId;
   }, [currentNestedViewId, defaultView]);
@@ -225,7 +229,10 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   // Reload categories when returning from category management
   useEffect(() => {
     setIsDrawerOpen(false);
-    if (currentView === "categoryManagement" && user?.businessId) {
+    if (
+      currentView === INVENTORY_ROUTES.CATEGORY_MANAGEMENT &&
+      user?.businessId
+    ) {
       loadCategories();
     }
   }, [currentView, user?.businessId, loadCategories]);
@@ -273,6 +280,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const handleAdjustStockClick = useCallback((product: Product) => {
     // Show quick adjustment modal for products
     // TODO: Check if product requires batch tracking once the field is added to schema
+    // Tracking: docs/TODO_TRACKING.md#2
     setStockAdjustmentProduct(product);
   }, []);
 
@@ -339,7 +347,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const viewComponents = useMemo(() => {
     if (!user) return {};
 
-    const goToDashboard = () => navigateTo("productDashboard");
+    const goToDashboard = () => navigateTo(INVENTORY_ROUTES.PRODUCT_DASHBOARD);
 
     // Navigate to main dashboard (the one with stat cards and feature cards)
     const goToMainDashboard = () => {
@@ -353,11 +361,13 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           categories={categories}
           lowStockProducts={lowStockProducts}
           onBack={goToMainDashboard}
-          onManageProducts={() => navigateTo("productList")}
-          onManageCategories={() => navigateTo("categoryManagement")}
+          onManageProducts={() => navigateTo(INVENTORY_ROUTES.PRODUCT_LIST)}
+          onManageCategories={() =>
+            navigateTo(INVENTORY_ROUTES.CATEGORY_MANAGEMENT)
+          }
           onAddProduct={openAddProductDrawer}
           onRestockProduct={handleAdjustStockClick}
-          onManageBatches={() => navigateTo("batchManagement")}
+          onManageBatches={() => navigateTo(INVENTORY_ROUTES.BATCH_MANAGEMENT)}
         />
       ),
       productList: (
@@ -450,12 +460,15 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     <>
       {/* Main Content - Use NestedViewContainer for navigation */}
       <div className="w-full">
-        {currentView === "productDashboard" && viewComponents.productDashboard}
-        {currentView === "productList" && viewComponents.productList}
-        {currentView === "categoryManagement" &&
+        {currentView === INVENTORY_ROUTES.PRODUCT_DASHBOARD &&
+          viewComponents.productDashboard}
+        {currentView === INVENTORY_ROUTES.PRODUCT_LIST &&
+          viewComponents.productList}
+        {currentView === INVENTORY_ROUTES.CATEGORY_MANAGEMENT &&
           viewComponents.categoryManagement}
-        {currentView === "batchManagement" && viewComponents.batchManagement}
-        {currentView === "stockMovementHistory" &&
+        {currentView === INVENTORY_ROUTES.BATCH_MANAGEMENT &&
+          viewComponents.batchManagement}
+        {currentView === INVENTORY_ROUTES.STOCK_MOVEMENT_HISTORY &&
           viewComponents.stockMovementHistory}
       </div>
 

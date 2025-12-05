@@ -9,6 +9,7 @@
 
 import { useNestedNavigation } from "@/navigation/hooks/use-nested-navigation";
 import BatchManagementView from "@/features/inventory/views/batch-management-view";
+import { INVENTORY_ROUTES } from "../config/navigation";
 
 /**
  * Batch Management Wrapper
@@ -16,8 +17,9 @@ import BatchManagementView from "@/features/inventory/views/batch-management-vie
  * Wraps BatchManagementView and provides nested navigation context.
  */
 export function BatchManagementWrapper() {
-  const { goBack, currentNestedParams } =
-    useNestedNavigation("batchManagement");
+  const { goBack, currentNestedParams } = useNestedNavigation(
+    INVENTORY_ROUTES.BATCH_MANAGEMENT
+  );
 
   // Get initial product ID from navigation params if provided
   const initialProductId = currentNestedParams?.productId as string | undefined;

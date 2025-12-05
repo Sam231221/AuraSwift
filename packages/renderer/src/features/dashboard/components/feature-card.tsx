@@ -1,15 +1,24 @@
 /**
  * FeatureCard Component
- * 
+ *
  * Base component for rendering dashboard feature cards.
  * Automatically handles permission-based visibility and action rendering.
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useFeatureVisibility } from "../hooks/use-feature-visibility";
 import { useUserPermissions } from "../hooks/use-user-permissions";
 import type { FeatureConfig } from "../types/feature-config";
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("feature-card");
 
 interface FeatureCardProps {
   feature: FeatureConfig;
@@ -31,12 +40,14 @@ export function FeatureCard({ feature }: FeatureCardProps) {
           <Icon className="w-5 h-5 shrink-0" />
           {feature.title}
         </CardTitle>
-        <CardDescription className="text-xs sm:text-sm">{feature.description}</CardDescription>
+        <CardDescription className="text-xs sm:text-sm">
+          {feature.description}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 flex-1">
         {feature.actions.map((action) => {
           const ActionIcon = action.icon;
-          
+
           // Check if user has permission for this specific action
           const hasActionPermission = action.permissions
             ? hasAnyPermission(action.permissions)
@@ -53,13 +64,13 @@ export function FeatureCard({ feature }: FeatureCardProps) {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log(`[FeatureCard] Button clicked: ${feature.id} -> ${action.id}`);
+                logger.debug(`Button clicked: ${feature.id} -> ${action.id}`);
                 // Call the action's onClick handler (injected by DashboardGrid with navigation)
                 // This handler calls onActionClick(featureId, actionId) which triggers navigation
                 if (action.onClick) {
                   action.onClick();
                 } else {
-                  console.warn(`[FeatureCard] No onClick handler for action: ${action.id}`);
+                  logger.warn(`No onClick handler for action: ${action.id}`);
                 }
               }}
               disabled={action.disabled}
@@ -73,4 +84,3 @@ export function FeatureCard({ feature }: FeatureCardProps) {
     </Card>
   );
 }
-

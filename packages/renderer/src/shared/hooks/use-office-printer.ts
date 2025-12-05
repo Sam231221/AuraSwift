@@ -6,8 +6,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('use-office-printer');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("use-office-printer");
 
 import type {
   OfficePrinter,
@@ -16,7 +16,7 @@ import type {
   OfficePrintOptions,
   PrinterHealth,
   PrintMetrics,
-} from "../../types/officePrinter";
+} from "@/types/features/printer/office";
 
 export type PrintState =
   | "idle"
@@ -203,8 +203,8 @@ export const useOfficePrinter = () => {
             orientation: "portrait",
             quality: "normal",
           },
-          createdBy: "current_user", // TODO: Get from auth context
-          businessId: "current_business", // TODO: Get from auth context
+          createdBy: "current_user", // TODO: Get from auth context - Tracking: docs/TODO_TRACKING.md#5
+          businessId: "current_business", // TODO: Get from auth context - Tracking: docs/TODO_TRACKING.md#5
         };
 
         const result = await window.officePrinterAPI.print(config);

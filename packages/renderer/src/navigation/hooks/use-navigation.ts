@@ -26,11 +26,13 @@ const logger = getLogger("use-navigation");
  *
  * @example
  * ```tsx
+ * import { USERS_ROUTES } from "@/features/users/config/navigation";
+ *
  * function MyComponent() {
  *   const { navigateTo, goBack, currentView } = useNavigation();
  *
  *   return (
- *     <button onClick={() => navigateTo("userManagement")}>
+ *     <button onClick={() => navigateTo(USERS_ROUTES.MANAGEMENT)}>
  *       Go to User Management
  *     </button>
  *   );

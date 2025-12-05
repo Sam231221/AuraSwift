@@ -83,6 +83,7 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.DASHBOARD,
     level: "root",
     component: ProductManagementView, // TODO: Replace with InventoryDashboardView after migration
+    // Tracking: docs/TODO_TRACKING.md#3
     metadata: {
       title: "Inventory Dashboard",
       description: "Overview of inventory status",
@@ -92,8 +93,8 @@ export const inventoryViews: Record<string, ViewConfig> = {
   },
 
   // Product management (legacy route - will be mapped to new routes)
-  productManagement: {
-    id: "productManagement",
+  [INVENTORY_ROUTES.PRODUCT_MANAGEMENT]: {
+    id: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     level: "root",
     component: ProductManagementWrapper,
     metadata: {
@@ -106,10 +107,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
   },
 
   // Nested views within Product Management
-  productDashboard: {
-    id: "productDashboard",
+  [INVENTORY_ROUTES.PRODUCT_DASHBOARD]: {
+    id: INVENTORY_ROUTES.PRODUCT_DASHBOARD,
     level: "nested",
-    parentId: "productManagement",
+    parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     component: ProductDashboardView,
     metadata: {
       title: "Product Dashboard",
@@ -119,10 +120,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
     requiresAuth: true,
   },
 
-  productList: {
-    id: "productList",
+  [INVENTORY_ROUTES.PRODUCT_LIST]: {
+    id: INVENTORY_ROUTES.PRODUCT_LIST,
     level: "nested",
-    parentId: "productManagement",
+    parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     component: ProductManagementView, // Rendered internally
     metadata: {
       title: "Product List",
@@ -132,10 +133,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
     requiresAuth: true,
   },
 
-  productDetails: {
-    id: "productDetails",
+  [INVENTORY_ROUTES.PRODUCT_DETAILS_NESTED]: {
+    id: INVENTORY_ROUTES.PRODUCT_DETAILS_NESTED,
     level: "nested",
-    parentId: "productManagement",
+    parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     component: ProductDetailsView,
     metadata: {
       title: "Product Details",
@@ -147,10 +148,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
   },
 
   // Category management
-  categoryManagement: {
-    id: "categoryManagement",
+  [INVENTORY_ROUTES.CATEGORY_MANAGEMENT]: {
+    id: INVENTORY_ROUTES.CATEGORY_MANAGEMENT,
     level: "nested",
-    parentId: "productManagement",
+    parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     component: ManageCategoriesView,
     metadata: {
       title: "Category Management",
@@ -161,10 +162,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
   },
 
   // Batch management
-  batchManagement: {
-    id: "batchManagement",
+  [INVENTORY_ROUTES.BATCH_MANAGEMENT]: {
+    id: INVENTORY_ROUTES.BATCH_MANAGEMENT,
     level: "nested",
-    parentId: "productManagement",
+    parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     component: BatchManagementWrapper,
     metadata: {
       title: "Batch Management",
@@ -175,10 +176,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
   },
 
   // Nested views within Batch Management
-  batchDashboard: {
-    id: "batchDashboard",
+  [INVENTORY_ROUTES.BATCH_DASHBOARD]: {
+    id: INVENTORY_ROUTES.BATCH_DASHBOARD,
     level: "nested",
-    parentId: "batchManagement",
+    parentId: INVENTORY_ROUTES.BATCH_MANAGEMENT,
     component: BatchManagementView, // Rendered internally
     metadata: {
       title: "Batch Dashboard",
@@ -188,10 +189,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
     requiresAuth: true,
   },
 
-  batchList: {
-    id: "batchList",
+  [INVENTORY_ROUTES.BATCH_LIST]: {
+    id: INVENTORY_ROUTES.BATCH_LIST,
     level: "nested",
-    parentId: "batchManagement",
+    parentId: INVENTORY_ROUTES.BATCH_MANAGEMENT,
     component: BatchManagementView, // Rendered internally
     metadata: {
       title: "Batch List",
@@ -201,10 +202,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
     requiresAuth: true,
   },
 
-  expiryAlerts: {
-    id: "expiryAlerts",
+  [INVENTORY_ROUTES.EXPIRY_ALERTS]: {
+    id: INVENTORY_ROUTES.EXPIRY_ALERTS,
     level: "nested",
-    parentId: "batchManagement",
+    parentId: INVENTORY_ROUTES.BATCH_MANAGEMENT,
     component: ExpiryDashboardView,
     metadata: {
       title: "Expiry Alerts",
@@ -215,10 +216,10 @@ export const inventoryViews: Record<string, ViewConfig> = {
   },
 
   // Stock movement history
-  stockMovementHistory: {
-    id: "stockMovementHistory",
+  [INVENTORY_ROUTES.STOCK_MOVEMENT_HISTORY]: {
+    id: INVENTORY_ROUTES.STOCK_MOVEMENT_HISTORY,
     level: "nested",
-    parentId: "productManagement",
+    parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     component: StockMovementHistoryView,
     metadata: {
       title: "Stock Movement History",

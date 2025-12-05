@@ -6,6 +6,8 @@
  */
 
 import type { ViewConfig } from "../types/navigation.types";
+import { mapLegacyRoute } from "./route-mapper";
+import { getLogger } from "@/shared/utils/logger";
 
 // Import feature views
 import { inventoryViews } from "@/features/inventory/config/feature-config";
@@ -17,6 +19,8 @@ import { salesViews } from "@/features/sales/config/feature-config";
 
 // Wrapper components that use navigation hook
 import { DashboardPageWrapper } from "../components/dashboard-page-wrapper";
+
+const logger = getLogger("view-registry");
 
 /**
  * Central View Registry
@@ -79,11 +83,31 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
 /**
  * Get view by ID
  *
- * @param viewId - View identifier
+ * Automatically maps legacy route names to new standardized routes.
+ * This provides backward compatibility during the migration period.
+ *
+ * @param viewId - View identifier (supports both legacy and new route names)
  * @returns View configuration or undefined
  */
 export function getView(viewId: string): ViewConfig | undefined {
-  return VIEW_REGISTRY[viewId];
+  // Map legacy route to new route if applicable
+  const mappedViewId = mapLegacyRoute(viewId);
+
+  // Return the view config, using mapped ID if different from original
+  const view = VIEW_REGISTRY[mappedViewId];
+
+  // If we mapped a legacy route, log a deprecation warning in development
+  if (
+    mappedViewId !== viewId &&
+    view &&
+    process.env.NODE_ENV === "development"
+  ) {
+    logger.warn(
+      `Deprecated route "${viewId}" has been mapped to "${mappedViewId}". Please update to use the new route constant.`
+    );
+  }
+
+  return view;
 }
 
 /**

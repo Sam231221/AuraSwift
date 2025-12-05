@@ -9,6 +9,7 @@
 
 import { useNestedNavigation } from "@/navigation/hooks/use-nested-navigation";
 import ProductManagementView from "@/features/inventory/views/product-management-view";
+import { INVENTORY_ROUTES } from "../config/navigation";
 
 /**
  * Product Management Wrapper
@@ -17,7 +18,7 @@ import ProductManagementView from "@/features/inventory/views/product-management
  * ProductManagementView will use nested navigation internally.
  */
 export function ProductManagementWrapper() {
-  const { goBack } = useNestedNavigation("productManagement");
+  const { goBack } = useNestedNavigation(INVENTORY_ROUTES.PRODUCT_MANAGEMENT);
 
   // ProductManagementView will handle its own state and use nested navigation
   // We pass navigation functions via context

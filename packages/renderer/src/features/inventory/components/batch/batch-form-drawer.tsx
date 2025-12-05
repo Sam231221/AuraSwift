@@ -25,10 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import type {
-  ProductBatch,
-  Supplier,
-} from "@/features/inventory/types/batch.types";
+import type { ProductBatch, Supplier } from "@/types/features/batches";
 import { generateBatchNumber } from "@/features/inventory/utils/expiry-calculations";
 import type { Product } from "@/types/domain";
 import { useBatchForm } from "@/features/inventory/hooks/use-batch-form";
@@ -231,7 +228,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
             {/* Fixed Buttons Section */}
             <div className="border-b bg-background shrink-0">
               <div className="flex space-x-2 px-6 pt-4 pb-4">
-                <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={isSubmitting}
+                >
                   {isSubmitting
                     ? "Saving..."
                     : isEditMode
@@ -622,7 +623,8 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                   <AdaptiveKeyboard
                     visible={keyboard.showKeyboard}
                     initialMode={
-                      (keyboard.activeFieldConfig as any)?.keyboardMode || "qwerty"
+                      (keyboard.activeFieldConfig as any)?.keyboardMode ||
+                      "qwerty"
                     }
                     onInput={keyboard.handleInput}
                     onBackspace={keyboard.handleBackspace}

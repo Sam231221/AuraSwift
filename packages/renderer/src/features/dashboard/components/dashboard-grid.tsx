@@ -1,6 +1,6 @@
 /**
  * DashboardGrid Component
- * 
+ *
  * Unified grid layout component for displaying dashboard features.
  * Automatically filters features based on user permissions and categories.
  */
@@ -10,6 +10,9 @@ import { FeatureCard } from "./feature-card";
 import { useUserPermissions } from "../hooks/use-user-permissions";
 import type { FeatureConfig } from "../types/feature-config";
 import type { FeatureCategory } from "../types/feature-config";
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("dashboard-grid");
 
 interface DashboardGridProps {
   features: FeatureConfig[];
@@ -29,11 +32,11 @@ export function DashboardGrid({
   // Memoize the action click handler to prevent unnecessary re-renders
   const handleActionClick = useCallback(
     (featureId: string, actionId: string) => {
-      console.log(`[DashboardGrid] Action clicked: ${featureId} -> ${actionId}`);
+      logger.debug(`Action clicked: ${featureId} -> ${actionId}`);
       if (onActionClick) {
         onActionClick(featureId, actionId);
       } else {
-        console.warn(`[DashboardGrid] No onActionClick handler provided`);
+        logger.warn(`No onActionClick handler provided`);
       }
     },
     [onActionClick]
@@ -43,7 +46,11 @@ export function DashboardGrid({
     return features
       .filter((feature) => {
         // Filter by category if specified
-        if (categories && categories.length > 0 && !categories.includes(feature.category)) {
+        if (
+          categories &&
+          categories.length > 0 &&
+          !categories.includes(feature.category)
+        ) {
           return false;
         }
 
@@ -63,7 +70,9 @@ export function DashboardGrid({
   if (visibleFeatures.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        <p className="text-sm">No features available based on your permissions.</p>
+        <p className="text-sm">
+          No features available based on your permissions.
+        </p>
       </div>
     );
   }
@@ -85,14 +94,8 @@ export function DashboardGrid({
           })),
         };
 
-        return (
-          <FeatureCard
-            key={feature.id}
-            feature={featureWithHandlers}
-          />
-        );
+        return <FeatureCard key={feature.id} feature={featureWithHandlers} />;
       })}
     </div>
   );
 }
-

@@ -70,7 +70,7 @@ export { default as StockAdjustmentModal } from "./components/shared/stock-adjus
 // ============================================================================
 // Types
 // ============================================================================
-// Batch types
+// Batch types - Re-export from new location for backward compatibility
 export type {
   ProductBatch,
   Supplier,
@@ -83,42 +83,44 @@ export type {
   ExpirySettingsResponse,
   ExpiryNotificationResponse,
   SupplierResponse,
-  BatchStatus,
   NotificationType,
   NotificationStatus,
   NotificationChannel,
   StockRotationMethod,
-} from "./types/batch.types";
+} from "@/types/features/batches";
 
-// Age restriction types
+// BatchStatus is now an enum - export from new location
+export type { BatchStatus } from "@/types/enums/batch-status";
+
+// Age restriction types - Re-export from new location for backward compatibility
 export type {
   AgeRestrictionLevel,
-  VerificationMethod,
   AgeRestrictionConfig,
+} from "@/types/enums/age-restriction";
+export { AGE_RESTRICTIONS } from "@/types/enums/age-restriction";
+
+// Verification method - exported from correct location
+export type { VerificationMethod } from "@/types/enums/verification-method";
+
+// Age verification types - exported from cart types
+export type {
   AgeVerificationData,
   AgeVerificationRecord,
-} from "./types/age-restriction.types";
-export { AGE_RESTRICTIONS } from "./types/age-restriction.types";
+} from "@/types/features/cart";
 
-// Import types
+// Import types - Re-export from new location for backward compatibility
 export type {
   ImportProgress,
   ImportResult,
   ImportOptions,
-} from "./types/import.types";
+} from "@/types/features/import";
 
 // ============================================================================
 // Utils
 // ============================================================================
 // Category utils
-export {
-  buildCategoryTree,
-  focusFirstErrorField,
-} from "./utils";
-export type {
-  CategoryWithChildren,
-  CategoryRowProps,
-} from "./utils";
+export { buildCategoryTree, focusFirstErrorField } from "./utils";
+export type { CategoryWithChildren, CategoryRowProps } from "./utils";
 
 // Product utils
 export {
@@ -180,14 +182,8 @@ export type {
 } from "./schemas/category-schema";
 
 // Batch schemas
-export {
-  batchCreateSchema,
-  batchUpdateSchema,
-} from "./schemas/batch-schema";
-export type {
-  BatchFormData,
-  BatchUpdateData,
-} from "./schemas/batch-schema";
+export { batchCreateSchema, batchUpdateSchema } from "./schemas/batch-schema";
+export type { BatchFormData, BatchUpdateData } from "./schemas/batch-schema";
 
 // ============================================================================
 // Wrappers

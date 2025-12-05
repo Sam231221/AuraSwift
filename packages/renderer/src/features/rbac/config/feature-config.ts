@@ -63,19 +63,6 @@ export const rbacViews: Record<string, ViewConfig> = {
     roles: ["admin"],
     requiresAuth: true,
   },
-  // Legacy route for backward compatibility
-  roleManagement: {
-    id: "roleManagement",
-    level: "root",
-    component: RoleManagementView,
-    metadata: {
-      title: "Role Management",
-      description: "Manage RBAC roles",
-    },
-    permissions: [RBAC_PERMISSIONS.MANAGE],
-    roles: ["admin"],
-    requiresAuth: true,
-  },
   [RBAC_ROUTES.USER_ROLE_ASSIGNMENT]: {
     id: RBAC_ROUTES.USER_ROLE_ASSIGNMENT,
     level: "root",
@@ -88,18 +75,4 @@ export const rbacViews: Record<string, ViewConfig> = {
     roles: ["admin"],
     requiresAuth: true,
   },
-  // Legacy route for backward compatibility
-  userRoleAssignment: {
-    id: "userRoleAssignment",
-    level: "root",
-    component: UserRoleAssignmentView,
-    metadata: {
-      title: "User Role Assignment",
-      description: "Assign roles to users",
-    },
-    permissions: [RBAC_PERMISSIONS.MANAGE],
-    roles: ["admin"],
-    requiresAuth: true,
-  },
 };
-

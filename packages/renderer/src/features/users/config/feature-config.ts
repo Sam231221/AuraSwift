@@ -55,18 +55,4 @@ export const usersViews: Record<string, ViewConfig> = {
     roles: ["admin"],
     requiresAuth: true,
   },
-  // Legacy route for backward compatibility
-  userManagement: {
-    id: "userManagement",
-    level: "root",
-    component: UserManagementView,
-    metadata: {
-      title: "User Management",
-      description: "Manage staff users",
-    },
-    permissions: [USERS_PERMISSIONS.MANAGE],
-    roles: ["admin"],
-    requiresAuth: true,
-  },
 };
-

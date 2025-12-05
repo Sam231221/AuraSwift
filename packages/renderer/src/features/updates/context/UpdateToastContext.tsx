@@ -24,6 +24,9 @@ import {
   showUpdateReadyToast,
   showUpdateErrorToast,
 } from "../components";
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("UpdateToastContext");
 
 interface UpdateContextValue {
   state: UpdateState;
@@ -66,7 +69,7 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
           }
         }
       } catch (error) {
-        console.error("Failed to fetch app version:", error);
+        logger.error("Failed to fetch app version:", error);
         // Keep default version on error
       }
     };

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import type { ProductBatch } from "@/features/inventory/types/batch.types";
+import type { ProductBatch } from "@/types/features/batches";
 import {
   AdaptiveKeyboard,
   AdaptiveFormField,

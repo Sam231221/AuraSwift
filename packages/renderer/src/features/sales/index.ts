@@ -24,12 +24,6 @@ export * from "./components";
 // ============================================================================
 export * from "./hooks";
 export { useSalesMode } from "./hooks/use-sales-mode";
-// Note: Thermal printer hooks are now in @/services/hardware/printer
-// Re-export for backward compatibility (deprecated - use @/services/hardware/printer directly)
-export {
-  useReceiptPrintingFlow,
-  useThermalPrinter,
-} from "@/services/hardware/printer";
 
 // ============================================================================
 // Views
