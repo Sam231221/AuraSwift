@@ -457,7 +457,7 @@ test.describe("React TypeScript Electron Vite POS Application", async () => {
     await page.waitForLoadState("load");
     await page.waitForTimeout(4000);
 
-    // Check if we're on the auth page (due to ProtectedRoute redirect)
+    // Check if we're on the auth page (due to AppShell redirect)
     const currentUrl = page.url();
     expect(currentUrl).toContain("#/auth");
 
