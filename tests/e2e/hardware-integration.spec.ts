@@ -19,7 +19,7 @@ test.describe("Hardware Integration Tests", () => {
 
   test.beforeAll(async () => {
     const isCI = process.env.CI === "true";
-    
+
     // Use Electron directly with the entry point (development/test mode)
     const executablePath = electronPath as unknown as string;
     const mainEntry = "packages/entry-point.mjs";
@@ -27,7 +27,7 @@ test.describe("Hardware Integration Tests", () => {
     if (!existsSync(mainEntry)) {
       throw new Error(
         `Entry point not found: ${mainEntry}\n` +
-        `Current working directory: ${process.cwd()}`
+          `Current working directory: ${process.cwd()}`
       );
     }
 
@@ -90,7 +90,7 @@ test.describe("Hardware Integration Tests", () => {
 
   test("Native modules are available through main process", async () => {
     const page = await electronApp.firstWindow();
-    
+
     // Wait for the app to fully initialize (database, services, etc.)
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(4000); // Give time for database initialization and service setup
@@ -117,7 +117,7 @@ test.describe("Hardware Integration Tests", () => {
 
   test("Hardware APIs are exposed", async () => {
     const page = await electronApp.firstWindow();
-    
+
     // Wait for the app to fully initialize
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(4000); // Give time for database initialization and service setup
@@ -135,7 +135,7 @@ test.describe("Hardware Integration Tests", () => {
 
   test("Printer API methods are available", async () => {
     const page = await electronApp.firstWindow();
-    
+
     // Wait for the app to fully initialize
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(4000); // Give time for database initialization and service setup
@@ -152,7 +152,7 @@ test.describe("Hardware Integration Tests", () => {
 
   test("Payment API methods are available", async () => {
     const page = await electronApp.firstWindow();
-    
+
     // Wait for the app to fully initialize
     await page.waitForLoadState("domcontentloaded");
     await page.waitForTimeout(4000); // Give time for database initialization and service setup
@@ -167,3 +167,4 @@ test.describe("Hardware Integration Tests", () => {
     expect(paymentMethods).toContain("processCardPayment");
   });
 });
+

@@ -9,6 +9,7 @@
 ### 📚 Documentation (5 files)
 
 1. **[Comprehensive Testing Plan](./docs/Testing/COMPREHENSIVE_TESTING_PLAN.md)** (450+ lines)
+
    - Complete testing strategy and philosophy
    - Infrastructure setup guides
    - Testing patterns and best practices
@@ -16,18 +17,21 @@
    - Implementation roadmap
 
 2. **[Quick Start Guide](./docs/Testing/QUICK_START_GUIDE.md)** (200+ lines)
+
    - Get started in 5 minutes
    - Common patterns and examples
    - Debugging tips
    - Troubleshooting guide
 
 3. **[Implementation Checklist](./docs/Testing/IMPLEMENTATION_CHECKLIST.md)** (300+ lines)
+
    - Phase-by-phase breakdown
    - Progress tracking
    - Detailed task lists
    - Timeline estimates
 
 4. **[Testing Strategy Summary](./docs/Testing/TESTING_STRATEGY_SUMMARY.md)** (250+ lines)
+
    - Executive overview
    - Quick reference
    - Success metrics
@@ -41,6 +45,7 @@
 ### ⚙️ Configuration Files (2 files)
 
 1. **`playwright.config.ts`** - Playwright E2E test configuration
+
    - Electron-optimized settings
    - Multiple reporters (HTML, JUnit, JSON)
    - Trace and screenshot capture
@@ -51,6 +56,7 @@
 ### 🧪 Test Infrastructure (8 files)
 
 1. **MSW Mock Handlers** (`tests/mocks/handlers.ts`)
+
    - Viva Wallet API mocks
    - Printer service mocks
    - Scanner API mocks
@@ -58,11 +64,13 @@
    - Error scenario handlers
 
 2. **MSW Server Setup** (`tests/mocks/server.ts`)
+
    - Node.js MSW server configuration
    - Auto-start/stop lifecycle
    - Handler reset between tests
 
 3. **Product Fixtures** (`tests/utils/fixtures/products.fixture.ts`)
+
    - `createMockProduct()`
    - `createMockProducts()`
    - `createAgeRestrictedProduct()`
@@ -72,6 +80,7 @@
    - Test barcode constants
 
 4. **Transaction Fixtures** (`tests/utils/fixtures/transactions.fixture.ts`)
+
    - `createMockTransaction()`
    - `createCashTransaction()`
    - `createCardTransaction()`
@@ -82,6 +91,7 @@
    - `createDiscountedTransaction()`
 
 5. **User Fixtures** (`tests/utils/fixtures/users.fixture.ts`)
+
    - `createMockUser()`
    - `createAdminUser()`
    - `createManagerUser()`
@@ -90,12 +100,14 @@
    - Test credentials constants
 
 6. **Render Helpers** (`tests/utils/render-helpers.tsx`)
+
    - Custom render with providers
    - QueryClient setup
    - MemoryRouter integration
    - Re-exports from RTL
 
 7. **Database Setup** (`tests/utils/db-setup.ts`)
+
    - `createTestDatabase()`
    - `cleanupTestDatabase()`
    - `seedTestDatabase()`
@@ -107,6 +119,7 @@
 ### 🧪 Example Tests (5 files)
 
 1. **Unit Test Example** (`tests/unit/renderer/features/sales/utils/cartCalculations.test.ts`)
+
    - Complete cart calculation logic with tests
    - Subtotal, tax, discount calculations
    - 40+ test cases
@@ -114,6 +127,7 @@
    - Error scenarios
 
 2. **Component Test Example** (`tests/components/features/sales/ProductCard.test.tsx`)
+
    - React component testing patterns
    - User interaction testing
    - Accessibility checks
@@ -121,17 +135,19 @@
    - 25+ test cases
 
 3. **E2E Page Objects** (`tests/e2e/page-objects/`)
+
    - `BasePage.ts` - Common page object functionality
    - `LoginPage.ts` - Login page interactions
    - Reusable methods and selectors
 
 4. **E2E Test Example** (`tests/e2e/auth.spec.ts`)
+
    - Complete authentication flow tests
    - Login/logout/session management
    - Security checks
    - 15+ test scenarios
 
-5. **Existing E2E** (`tests/e2e.spec.ts`) - Already exists, enhanced
+5. **Existing E2E** (`tests/e2e/app.spec.ts`) - Main app tests with shared fixtures
 
 ### 📊 Summary Statistics
 
@@ -161,12 +177,12 @@
 
 ### Technology Stack
 
-| Purpose | Tools |
-|---------|-------|
+| Purpose              | Tools                                |
+| -------------------- | ------------------------------------ |
 | **Unit & Component** | Vitest, React Testing Library, jsdom |
-| **E2E** | Playwright (Electron-specific) |
-| **API Mocking** | MSW (Mock Service Worker) |
-| **Coverage** | Vitest Coverage (v8) |
+| **E2E**              | Playwright (Electron-specific)       |
+| **API Mocking**      | MSW (Mock Service Worker)            |
+| **Coverage**         | Vitest Coverage (v8)                 |
 
 ---
 
@@ -193,36 +209,39 @@ npm run test:all                # All tests
 ### Write Your First Test
 
 **1. Unit Test**
+
 ```typescript
 // tests/unit/main/utils/myFunction.test.ts
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 
-describe('myFunction', () => {
-  it('should calculate correctly', () => {
+describe("myFunction", () => {
+  it("should calculate correctly", () => {
     expect(myFunction(2, 3)).toBe(5);
   });
 });
 ```
 
 **2. Component Test**
+
 ```typescript
 // tests/components/MyComponent.test.tsx
-import { render, screen, userEvent } from '../utils/render-helpers';
+import { render, screen, userEvent } from "../utils/render-helpers";
 
-it('should handle click', async () => {
+it("should handle click", async () => {
   const user = userEvent.setup();
   render(<MyComponent />);
-  await user.click(screen.getByRole('button'));
-  expect(screen.getByText('Clicked')).toBeInTheDocument();
+  await user.click(screen.getByRole("button"));
+  expect(screen.getByText("Clicked")).toBeInTheDocument();
 });
 ```
 
 **3. E2E Test**
+
 ```typescript
 // tests/e2e/my-feature.spec.ts
-import { test } from '../e2e.spec';
+import { test } from "./app.spec";
 
-test('should work', async ({ electronApp }) => {
+test("should work", async ({ electronApp }) => {
   const page = await electronApp.firstWindow();
   // Test logic
 });
@@ -280,7 +299,9 @@ AuraSwift/
 │       │   ├── BasePage.ts ✨
 │       │   └── LoginPage.ts ✨
 │       ├── auth.spec.ts ✨
-│       └── e2e.spec.ts (existing)
+│       ├── app.spec.ts (main app tests with shared fixtures)
+│       ├── auth.spec.ts
+│       └── hardware-integration.spec.ts
 │
 ├── playwright.config.ts ✨                  # Playwright config
 ├── vitest.config.ts (existing)              # Vitest config
@@ -340,12 +361,12 @@ AuraSwift/
 
 ## 🎯 Coverage Targets
 
-| Category | Minimum | Target | Status |
-|----------|---------|--------|--------|
-| Overall | 70% | 80% | 🎯 Ready |
-| Business Logic | 85% | 95% | 🎯 Ready |
-| Components | 75% | 85% | 🎯 Ready |
-| Utilities | 90% | 95% | 🎯 Ready |
+| Category       | Minimum | Target | Status   |
+| -------------- | ------- | ------ | -------- |
+| Overall        | 70%     | 80%    | 🎯 Ready |
+| Business Logic | 85%     | 95%    | 🎯 Ready |
+| Components     | 75%     | 85%    | 🎯 Ready |
+| Utilities      | 90%     | 95%    | 🎯 Ready |
 
 Current infrastructure supports achieving these targets.
 
@@ -356,15 +377,18 @@ Current infrastructure supports achieving these targets.
 ### Start Here (In Order)
 
 1. **[Quick Start Guide](./docs/Testing/QUICK_START_GUIDE.md)**
+
    - Get up and running in 5 minutes
    - Write your first test
 
 2. **[Example Tests](./tests/)**
+
    - `tests/unit/renderer/features/sales/utils/cartCalculations.test.ts`
    - `tests/components/features/sales/ProductCard.test.tsx`
    - `tests/e2e/auth.spec.ts`
 
 3. **[Comprehensive Testing Plan](./docs/Testing/COMPREHENSIVE_TESTING_PLAN.md)**
+
    - Deep dive into strategy
    - Best practices
    - Advanced patterns
@@ -380,11 +404,13 @@ Current infrastructure supports achieving these targets.
 ### Immediate (Week 1)
 
 1. **Review Documentation**
+
    - Read Quick Start Guide
    - Review example tests
    - Understand testing patterns
 
 2. **Setup CI/CD**
+
    - Create `.github/workflows/test.yml`
    - Configure test runners
    - Setup coverage reporting
@@ -397,12 +423,14 @@ Current infrastructure supports achieving these targets.
 ### Short-term (Weeks 2-4)
 
 1. **Write Unit Tests**
+
    - Start with critical business logic
    - Transaction calculations
    - Discount logic
    - RBAC helpers
 
 2. **Write Component Tests**
+
    - Critical UI components
    - Forms
    - Interactive elements
@@ -414,11 +442,13 @@ Current infrastructure supports achieving these targets.
 ### Medium-term (Weeks 5-8)
 
 1. **Integration Tests**
+
    - IPC communication
    - Database operations
    - Service interactions
 
 2. **E2E Critical Paths**
+
    - Login/logout
    - Complete sale
    - Product management
@@ -428,11 +458,13 @@ Current infrastructure supports achieving these targets.
 ### Long-term (Weeks 9-12)
 
 1. **Complete Test Suite**
+
    - All critical features covered
    - Integration tests complete
    - E2E smoke tests
 
 2. **Achieve 70%+ Coverage**
+
    - Meet minimum targets
    - CI enforces thresholds
 
@@ -446,12 +478,14 @@ Current infrastructure supports achieving these targets.
 ## 💡 Best Practices Implemented
 
 ### Code Organization
+
 - ✅ Clear separation of concerns
 - ✅ Reusable test utilities
 - ✅ Consistent naming conventions
 - ✅ Well-documented code
 
 ### Test Quality
+
 - ✅ Descriptive test names
 - ✅ AAA pattern (Arrange, Act, Assert)
 - ✅ Isolated tests
@@ -459,6 +493,7 @@ Current infrastructure supports achieving these targets.
 - ✅ Deterministic results
 
 ### Maintainability
+
 - ✅ DRY principle (fixtures, helpers)
 - ✅ Page object pattern (E2E)
 - ✅ Comprehensive documentation
@@ -469,6 +504,7 @@ Current infrastructure supports achieving these targets.
 ## 📊 Success Metrics
 
 ### Quantitative
+
 - ✅ Infrastructure complete
 - ✅ 20+ files created
 - ✅ 4,000+ lines of code/docs
@@ -476,6 +512,7 @@ Current infrastructure supports achieving these targets.
 - ⏳ <5min full suite (target)
 
 ### Qualitative
+
 - ✅ Clear documentation
 - ✅ Easy to understand
 - ✅ Production-ready patterns
@@ -487,18 +524,21 @@ Current infrastructure supports achieving these targets.
 ## 🆘 Support & Resources
 
 ### Documentation
+
 - 📚 [Comprehensive Testing Plan](./docs/Testing/COMPREHENSIVE_TESTING_PLAN.md)
 - 🚀 [Quick Start Guide](./docs/Testing/QUICK_START_GUIDE.md)
 - ✅ [Implementation Checklist](./docs/Testing/IMPLEMENTATION_CHECKLIST.md)
 - 📊 [Testing Strategy Summary](./docs/Testing/TESTING_STRATEGY_SUMMARY.md)
 
 ### External Resources
+
 - [Vitest Documentation](https://vitest.dev/)
 - [React Testing Library](https://testing-library.com/react)
 - [Playwright Documentation](https://playwright.dev/)
 - [MSW Documentation](https://mswjs.io/)
 
 ### Examples
+
 - Unit Test: `tests/unit/renderer/features/sales/utils/cartCalculations.test.ts`
 - Component Test: `tests/components/features/sales/ProductCard.test.tsx`
 - E2E Test: `tests/e2e/auth.spec.ts`
@@ -511,18 +551,21 @@ Current infrastructure supports achieving these targets.
 ### What You Got
 
 1. **Complete Testing Infrastructure** ✅
+
    - Vitest, Playwright, MSW all configured
    - Test utilities and helpers
    - Fixtures for test data
    - Page objects for E2E
 
 2. **Comprehensive Documentation** ✅
+
    - 1,500+ lines of documentation
    - Quick start to advanced patterns
    - Implementation checklist
    - Best practices guide
 
 3. **Working Examples** ✅
+
    - Unit test example
    - Component test example
    - E2E test example
@@ -561,4 +604,3 @@ npm run test:watch
 **Next Review**: Start implementing Phase 2 (Unit Tests)
 
 🎯 **Your testing infrastructure is production-ready!**
-

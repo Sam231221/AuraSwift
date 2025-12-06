@@ -14,6 +14,9 @@ process.env.PLAYWRIGHT_TEST = "true";
  * E2E Tests for AuraSwift POS System
  * Technology Stack: React 18 + TypeScript + Electron + Vite
  * Architecture: Main process, Preload scripts, Renderer (React)
+ * 
+ * This file contains the shared test fixtures and base app tests.
+ * Other E2E test files should import the test fixture from here.
  */
 
 // Declare the types of your fixtures.
@@ -810,3 +813,4 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
 
 // Export the test object so other E2E test files can use it
 export { test };
+

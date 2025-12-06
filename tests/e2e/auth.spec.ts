@@ -8,8 +8,8 @@
 import { expect } from "@playwright/test";
 import { LoginPage } from "./page-objects/LoginPage";
 
-// Use the existing E2E test fixtures from e2e.spec.ts
-import { test as electronTest } from "../e2e.spec";
+// Use the existing E2E test fixtures from app.spec.ts
+import { test as electronTest } from "./app.spec";
 
 electronTest.describe("Authentication Flow", () => {
   let loginPage: LoginPage;
