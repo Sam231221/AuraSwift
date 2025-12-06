@@ -300,6 +300,7 @@ class WindowManager implements AppModule {
       show: false, // Use the 'ready-to-show' event to show the instantiated BrowserWindow.
       icon: iconPath, // Set the window icon
       title: "", // Set the window title
+      frame: false, // Remove the title bar (minimize, maximize, close buttons)
       autoHideMenuBar: true, // Hide menu bar on Windows/Linux
       webPreferences: {
         nodeIntegration: false,
