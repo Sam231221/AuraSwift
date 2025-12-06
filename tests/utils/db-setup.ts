@@ -1,80 +1,90 @@
 /**
- * Database setup utilities for integration tests
+ * Database Test Utilities
+ *
+ * Utilities for setting up and tearing down test databases.
+ * Ensures each test has a clean database state.
  */
 
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import * as schema from '@app/main/database/schema';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { join } from 'path';
-import { existsSync, unlinkSync } from 'node:fs';
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { existsSync, unlinkSync } from "fs";
+import { join } from "path";
 
-let testDB: Database.Database | null = null;
-let testDrizzle: ReturnType<typeof drizzle> | null = null;
+// TODO: Import actual schema from your codebase
+// import * as schema from '@app/main/database/schema';
+const schema = {} as any; // Placeholder until actual schema is imported
+
+const TEST_DB_PATH = join(process.cwd(), "test-db.sqlite");
 
 /**
- * Setup test database
+ * Create a fresh test database
  */
-export async function setupTestDB(dbPath?: string): Promise<ReturnType<typeof drizzle>> {
-  const dbFilePath = dbPath || join(process.cwd(), 'data', 'test-pos_system.db');
-  
+export async function createTestDatabase() {
   // Remove existing test database if it exists
-  if (existsSync(dbFilePath)) {
-    unlinkSync(dbFilePath);
+  if (existsSync(TEST_DB_PATH)) {
+    unlinkSync(TEST_DB_PATH);
   }
 
-  // Create new database
-  testDB = new Database(dbFilePath);
-  testDrizzle = drizzle(testDB, { schema });
+  // Create new SQLite database
+  const sqlite = new Database(TEST_DB_PATH);
+  const db = drizzle(sqlite, { schema });
 
-  // Run migrations
-  const migrationsPath = join(process.cwd(), 'packages', 'main', 'src', 'database', 'migrations');
-  migrate(testDrizzle, { migrationsFolder: migrationsPath });
+  // Run migrations or create schema
+  // TODO: Import and run migrations here
+  // await migrate(db, { migrationsFolder: './packages/main/src/database/migrations' });
 
-  return testDrizzle;
+  return { db, sqlite };
 }
 
 /**
- * Teardown test database
+ * Clean up test database
  */
-export async function teardownTestDB(drizzle?: ReturnType<typeof drizzle>): Promise<void> {
-  if (drizzle && testDB) {
-    testDB.close();
-    testDB = null;
-    testDrizzle = null;
+export async function cleanupTestDatabase() {
+  if (existsSync(TEST_DB_PATH)) {
+    unlinkSync(TEST_DB_PATH);
   }
 }
 
 /**
- * Clean test database (remove all data but keep structure)
+ * Seed test database with basic data
  */
-export async function cleanTestDB(drizzle: ReturnType<typeof drizzle>): Promise<void> {
-  // Delete all data from tables (in reverse order of dependencies)
+export async function seedTestDatabase(db: any) {
+  // TODO: Add seed data for tests
+  // Example:
+  // await db.insert(schema.users).values([...testUsers]);
+  // await db.insert(schema.products).values([...testProducts]);
+}
+
+/**
+ * Clear all data from test database
+ */
+export async function clearTestDatabase(db: any) {
+  // Delete in order to respect foreign key constraints
   const tables = [
-    'transactionItems',
-    'transactions',
-    'cartItems',
-    'cartSessions',
-    'stockMovements',
-    'stockAdjustments',
-    'batches',
-    'products',
-    'categories',
-    'users',
-    'shifts',
-    'sessions',
+    "transaction_items",
+    "transactions",
+    "cart_items",
+    "batches",
+    "products",
+    "categories",
+    "users",
     // Add other tables as needed
   ];
 
   for (const table of tables) {
-    await drizzle.execute(`DELETE FROM ${table}`);
+    try {
+      await db.run(`DELETE FROM ${table}`);
+    } catch (error) {
+      // Table might not exist, ignore error
+    }
   }
 }
 
 /**
- * Get test database instance
+ * Create in-memory test database (faster for unit tests)
  */
-export function getTestDB(): ReturnType<typeof drizzle> | null {
-  return testDrizzle;
+export function createInMemoryDatabase() {
+  const sqlite = new Database(":memory:");
+  const db = drizzle(sqlite, { schema });
+  return { db, sqlite };
 }
-

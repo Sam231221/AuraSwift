@@ -263,6 +263,24 @@ test.describe("Vite Build & TypeScript Integration", async () => {
     const page = await electronApp.firstWindow();
     await page.waitForLoadState("load");
 
+    // Wait for body to be present
+    await page.waitForSelector("body", { timeout: 10000 });
+
+    // Wait for React root element to exist
+    await page.waitForSelector("#root", { timeout: 10000 });
+
+    // Wait for React root to be populated (React has mounted)
+    await page.waitForFunction(
+      () => {
+        const root = document.getElementById("root");
+        return root && root.children.length > 0;
+      },
+      { timeout: 15000 }
+    );
+
+    // Additional wait to ensure React has fully rendered
+    await page.waitForTimeout(1000);
+
     // Check that Vite has processed the assets correctly
     const viteAssetsLoaded = await page.evaluate(() => {
       // Check for CSS being loaded (Vite injects styles)
@@ -421,8 +439,23 @@ test.describe("React TypeScript Electron Vite POS Application", async () => {
     const page = await electronApp.firstWindow();
     await page.waitForLoadState("load");
 
-    // Wait for the React app to load with Vite
-    await page.waitForTimeout(3000);
+    // Wait for body to be present
+    await page.waitForSelector("body", { timeout: 10000 });
+
+    // Wait for React root element to exist
+    await page.waitForSelector("#root", { timeout: 10000 });
+
+    // Wait for React root to be populated (React has mounted)
+    await page.waitForFunction(
+      () => {
+        const root = document.getElementById("root");
+        return root && root.children.length > 0;
+      },
+      { timeout: 15000 }
+    );
+
+    // Additional wait to ensure React has fully rendered
+    await page.waitForTimeout(1000);
 
     // Check if the page has loaded (look for any content)
     const bodyVisible = await page.locator("body").isVisible();
@@ -445,32 +478,98 @@ test.describe("React TypeScript Electron Vite POS Application", async () => {
   }) => {
     const page = await electronApp.firstWindow();
     await page.waitForLoadState("load");
-    await page.waitForTimeout(3000);
+
+    // Wait for body and root
+    await page.waitForSelector("body", { timeout: 10000 });
+    await page.waitForSelector("#root", { timeout: 10000 });
+
+    // Wait for React to mount and router to initialize
+    await page.waitForFunction(
+      () => {
+        const root = document.getElementById("root");
+        return root && root.children.length > 0;
+      },
+      { timeout: 15000 }
+    );
+
+    // Wait for router to initialize and navigate (HashRouter)
+    // The router should set the hash route after React mounts
+    await page.waitForFunction(
+      () => {
+        // Check if hash exists in URL
+        const hash = window.location.hash;
+        // Also check if React Router has initialized by looking for navigation
+        return hash.length > 0 || window.location.href.includes("#");
+      },
+      { timeout: 10000 }
+    );
+
+    // Additional wait for router navigation
+    await page.waitForTimeout(1000);
 
     // Check that HashRouter is working - should redirect to /auth initially
     const currentUrl = page.url();
-    expect(currentUrl).toContain("#/auth");
+    const currentHash = await page.evaluate(() => window.location.hash);
+
+    // Check both URL and hash
+    expect(currentUrl.includes("#/auth") || currentHash.includes("/auth")).toBe(
+      true
+    );
   });
 
   test("Authentication page renders properly", async ({ electronApp }) => {
     const page = await electronApp.firstWindow();
     await page.waitForLoadState("load");
-    await page.waitForTimeout(4000);
+
+    // Wait for body and root
+    await page.waitForSelector("body", { timeout: 10000 });
+    await page.waitForSelector("#root", { timeout: 10000 });
+
+    // Wait for React to mount
+    await page.waitForFunction(
+      () => {
+        const root = document.getElementById("root");
+        return root && root.children.length > 0;
+      },
+      { timeout: 15000 }
+    );
+
+    // Wait for router to navigate to auth page
+    await page.waitForFunction(
+      () => {
+        const hash = window.location.hash;
+        return hash.includes("/auth");
+      },
+      { timeout: 10000 }
+    );
+
+    // Additional wait for auth page to render
+    await page.waitForTimeout(1000);
+
+    // Wait for auth page elements to be present (user selection or PIN entry)
+    await page.waitForSelector(
+      'text="Select User", text="Enter PIN", button, [role="button"]',
+      { timeout: 10000 }
+    );
 
     // Check if we're on the auth page (due to AppShell redirect)
     const currentUrl = page.url();
-    expect(currentUrl).toContain("#/auth");
+    const currentHash = await page.evaluate(() => window.location.hash);
 
-    // Verify auth page elements are present
+    // Check both URL and hash
+    expect(currentUrl.includes("#/auth") || currentHash.includes("/auth")).toBe(
+      true
+    );
+
+    // Verify auth page elements are present (user selection grid or PIN entry)
     const authPagePresent = await page.evaluate(() => {
-      // Look for common auth page elements
-      const hasFormElements =
-        document.querySelector('input[type="email"]') ||
-        document.querySelector('input[type="password"]') ||
-        document.querySelector("form") ||
-        document.querySelector('[role="button"]') ||
-        document.querySelector("button");
-      return !!hasFormElements;
+      // Look for auth page elements - user selection or PIN entry
+      const bodyText = document.body.textContent || "";
+      const hasUserSelection = bodyText.includes("Select User");
+      const hasPinEntry = bodyText.includes("Enter PIN");
+      const hasButtons = document.querySelector("button") !== null;
+
+      return !!(hasUserSelection || hasPinEntry || hasButtons);
     });
 
     expect(authPagePresent).toBe(true);
@@ -708,3 +807,6 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
     });
   });
 });
+
+// Export the test object so other E2E test files can use it
+export { test };
