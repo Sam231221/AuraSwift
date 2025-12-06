@@ -314,4 +314,28 @@ export function registerDbHandlers() {
       };
     }
   });
+
+  // App Quit IPC Handler - Close the application
+  ipcMain.handle("app:quit", async () => {
+    try {
+      const { app: electronApp } = await import("electron");
+
+      logger.info("Quitting application...");
+
+      // Close database connection before quit
+      const { closeDatabase } = await import("../database/index.js");
+      closeDatabase();
+
+      // Quit the application
+      electronApp.quit();
+
+      return { success: true };
+    } catch (error) {
+      logger.error("App quit error:", error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "Failed to quit app",
+      };
+    }
+  });
 }

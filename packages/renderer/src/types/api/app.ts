@@ -13,4 +13,5 @@ export interface AppAPI {
     error?: string;
   }>;
   restart: () => Promise<{ success: boolean; message?: string }>;
+  quit: () => Promise<{ success: boolean; message?: string }>;
 }
