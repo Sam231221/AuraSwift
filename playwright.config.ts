@@ -11,10 +11,10 @@ import { defineConfig, devices } from "@playwright/test";
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  // Test directory
+  // Test directory - all E2E tests are now in tests/e2e
   testDir: "./tests/e2e",
 
-  // Test file patterns
+  // Test file patterns - match .spec.ts files in e2e directory
   testMatch: /.*\.spec\.ts/,
 
   // Timeout for each test (60 seconds)

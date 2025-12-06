@@ -1,4 +1,15 @@
-name: Compile and test on Windows
+# Build and Compile Workflow for AuraSwift
+#
+# This workflow focuses on building and compiling the Electron application.
+# Testing is delegated to the test.yml workflow for better separation of concerns.
+#
+# Best Practices:
+# - Single responsibility: Build and compile only
+# - Reusable via workflow_call
+# - Calls test.yml for E2E tests on built application
+# - Cost optimization with conditional execution
+
+name: Build and Compile
 
 on:
   workflow_call:
@@ -14,6 +25,11 @@ on:
       distribution-channel:
         required: true
         type: string
+      skip-tests:
+        description: "Skip running tests after build"
+        required: false
+        type: boolean
+        default: false
 
 defaults:
   run:
@@ -38,6 +54,7 @@ env:
 jobs:
   # Quick typecheck job - runs in parallel with build
   typecheck:
+    name: Type Check
     runs-on: ubuntu-latest # Use faster/cheaper Linux for typecheck
     steps:
       - uses: actions/checkout@v5
@@ -79,10 +96,10 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck -ws --if-present
 
-  # Build and test job - Windows for native modules and building
+  # Build and compile job - Windows for native modules and building
   # Using windows-2022 instead of windows-latest for better Windows 10 Enterprise compatibility
-  # windows-latest now uses Windows Server 2025 which may have compatibility issues
-  build-and-test:
+  build:
+    name: Build Electron Application
     runs-on: windows-2022
     env:
       PYTHON: python
@@ -446,30 +463,8 @@ jobs:
           }
         shell: powershell
 
-      # Only install Playwright if tests exist (conditional)
-      - name: Check if tests exist
-        id: check-tests
-        run: |
-          if (Test-Path "tests") {
-            echo "tests-exist=true" >> $env:GITHUB_OUTPUT
-          } else {
-            echo "tests-exist=false" >> $env:GITHUB_OUTPUT
-          }
-        shell: powershell
-
-      - name: Install Playwright
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        run: npx playwright install --with-deps
-
-      - name: Debug build output structure
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        run: |
-          if (Test-Path "dist") { dir dist -Recurse } else { Write-Host "No dist directory found" }
-          if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { Write-Host "No executables found" }
-        shell: powershell
-
       - name: Pre-test hardware module verification
-        if: steps.check-tests.outputs.tests-exist == 'true'
+        if: ${{ !inputs.skip-tests }}
         run: |
           $testReady = $true
           $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
@@ -483,39 +478,6 @@ jobs:
           }
         shell: powershell
 
-      - name: Run main E2E tests
-        run: npm run test:all --if-present
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        env:
-          CI: true
-          NODE_ENV: test
-          ELECTRON_DISABLE_GPU: 1
-          ELECTRON_NO_SANDBOX: 1
-          PLAYWRIGHT_HEADLESS: 1
-          ELECTRON_ENABLE_LOGGING: 1
-          DEBUG: playwright:*
-          HARDWARE_SIMULATION_MODE: true
-          MOCK_PRINTER_ENABLED: true
-          MOCK_CARD_READER_ENABLED: true
-          MOCK_SCANNER_ENABLED: true
-          ELECTRON_UPDATER_DISABLED: 1
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
-
-      - name: Run hardware integration tests
-        run: npx playwright test ./tests/hardware-integration.spec.ts
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        env:
-          CI: true
-          NODE_ENV: test
-          ELECTRON_DISABLE_GPU: 1
-          ELECTRON_NO_SANDBOX: 1
-          PLAYWRIGHT_HEADLESS: 1
-          ELECTRON_ENABLE_LOGGING: 1
-          HARDWARE_SIMULATION_MODE: true
-          MOCK_PRINTER_ENABLED: true
-          MOCK_CARD_READER_ENABLED: true
-          MOCK_SCANNER_ENABLED: true
-
       - uses: actions/attest-build-provenance@v3
         with:
           subject-path: "dist/auraswift-*, dist/latest*.yml"
@@ -526,3 +488,15 @@ jobs:
           name: windows-${{inputs.distribution-channel}}
           path: dist
           retention-days: 7 # Reduce artifact retention to save storage costs
+
+  # Run E2E tests on the built application
+  # Delegates to test.yml workflow for proper separation of concerns
+  test-built-app:
+    name: Test Built Application
+    needs: build
+    if: ${{ !inputs.skip-tests }}
+    uses: ./.github/workflows/test.yml
+    with:
+      skip-unit: true # Only run E2E tests on built app
+      skip-e2e: false
+    secrets: inherit
