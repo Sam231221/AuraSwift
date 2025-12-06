@@ -27,8 +27,8 @@ export const INVENTORY_ROUTES = {
   /** Product expiry dashboard view */
   EXPIRY_DASHBOARD: "inventory:expiry-dashboard",
 
-  // Legacy nested route constants (will be migrated to new structure)
-  /** Product management root view (legacy) */
+  // Nested route constants for hierarchical views
+  /** Product management root view */
   PRODUCT_MANAGEMENT: "productManagement",
 
   /** Product dashboard nested view */
@@ -43,7 +43,7 @@ export const INVENTORY_ROUTES = {
   /** Category management nested view */
   CATEGORY_MANAGEMENT: "categoryManagement",
 
-  /** Batch management root view (legacy) */
+  /** Batch management root view */
   BATCH_MANAGEMENT: "batchManagement",
 
   /** Batch dashboard nested view */

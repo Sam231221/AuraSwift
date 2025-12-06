@@ -3,28 +3,14 @@
  *
  * Central configuration for the inventory feature.
  * This is used by the navigation system and dashboard.
- *
- * NOTE: This file will be updated as views are migrated to the new structure.
  */
 
 import { Package } from "lucide-react";
 import { INVENTORY_PERMISSIONS } from "./permissions";
 import { INVENTORY_ROUTES } from "./navigation";
+// eslint-disable-next-line no-restricted-imports
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
-
-// Import views from new location
-import ProductManagementView from "../views/product-management-view";
-import ManageCategoriesView from "../views/category-management-view";
-import BatchManagementView from "../views/batch-management-view";
-import StockMovementHistoryView from "../views/stock-movement-history-view";
-import ProductDashboardView from "../views/inventory-dashboard-view";
-import ProductDetailsView from "../views/product-details-view";
-import { ExpiryDashboardView } from "../views/expiry-dashboard-view";
-
-// Import navigation wrappers
-import { ProductManagementWrapper } from "../wrappers/product-management-wrapper";
-import { BatchManagementWrapper } from "../wrappers/batch-management-wrapper";
 
 /**
  * Inventory Feature Configuration for Dashboard
@@ -82,21 +68,26 @@ export const inventoryViews: Record<string, ViewConfig> = {
   [INVENTORY_ROUTES.DASHBOARD]: {
     id: INVENTORY_ROUTES.DASHBOARD,
     level: "root",
-    component: ProductManagementView, // TODO: Replace with InventoryDashboardView after migration
-    // Tracking: docs/TODO_TRACKING.md#3
+    componentLoader: () => import("../views/product-management-view"),
     metadata: {
       title: "Inventory Dashboard",
       description: "Overview of inventory status",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
+    preloadStrategy: "preload",
+    loadPriority: 9,
+    cacheable: true,
   },
 
-  // Product management (legacy route - will be mapped to new routes)
+  // Product management view
   [INVENTORY_ROUTES.PRODUCT_MANAGEMENT]: {
     id: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     level: "root",
-    component: ProductManagementWrapper,
+    componentLoader: () =>
+      import("../wrappers/product-management-wrapper").then((m) => ({
+        default: m.ProductManagementWrapper,
+      })),
     metadata: {
       title: "Product Management",
       description: "Manage products and inventory",
@@ -104,6 +95,9 @@ export const inventoryViews: Record<string, ViewConfig> = {
     permissions: [INVENTORY_PERMISSIONS.MANAGE],
     roles: ["admin", "manager"],
     requiresAuth: true,
+    preloadStrategy: "preload",
+    loadPriority: 8,
+    cacheable: true,
   },
 
   // Nested views within Product Management
@@ -111,33 +105,39 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.PRODUCT_DASHBOARD,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: ProductDashboardView,
+    componentLoader: () => import("../views/inventory-dashboard-view"),
     metadata: {
       title: "Product Dashboard",
       breadcrumb: "Dashboard",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
+    preloadStrategy: "preload",
+    loadPriority: 7,
+    cacheable: true,
   },
 
   [INVENTORY_ROUTES.PRODUCT_LIST]: {
     id: INVENTORY_ROUTES.PRODUCT_LIST,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: ProductManagementView, // Rendered internally
+    componentLoader: () => import("../views/product-management-view"),
     metadata: {
       title: "Product List",
       breadcrumb: "Products",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
+    preloadStrategy: "preload",
+    loadPriority: 6,
+    cacheable: true,
   },
 
   [INVENTORY_ROUTES.PRODUCT_DETAILS_NESTED]: {
     id: INVENTORY_ROUTES.PRODUCT_DETAILS_NESTED,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: ProductDetailsView,
+    componentLoader: () => import("../views/product-details-view"),
     metadata: {
       title: "Product Details",
       breadcrumb: "Details",
@@ -145,6 +145,9 @@ export const inventoryViews: Record<string, ViewConfig> = {
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
     defaultParams: { productId: null },
+    preloadStrategy: "prefetch",
+    loadPriority: 5,
+    cacheable: true,
   },
 
   // Category management
@@ -152,13 +155,16 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.CATEGORY_MANAGEMENT,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: ManageCategoriesView,
+    componentLoader: () => import("../views/category-management-view"),
     metadata: {
       title: "Category Management",
       breadcrumb: "Categories",
     },
     permissions: [INVENTORY_PERMISSIONS.MANAGE_CATEGORIES],
     requiresAuth: true,
+    preloadStrategy: "prefetch",
+    loadPriority: 4,
+    cacheable: true,
   },
 
   // Batch management
@@ -166,13 +172,19 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.BATCH_MANAGEMENT,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: BatchManagementWrapper,
+    componentLoader: () =>
+      import("../wrappers/batch-management-wrapper").then((m) => ({
+        default: m.BatchManagementWrapper,
+      })),
     metadata: {
       title: "Batch Management",
       breadcrumb: "Batches",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
+    preloadStrategy: "preload",
+    loadPriority: 6,
+    cacheable: true,
   },
 
   // Nested views within Batch Management
@@ -180,39 +192,51 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.BATCH_DASHBOARD,
     level: "nested",
     parentId: INVENTORY_ROUTES.BATCH_MANAGEMENT,
-    component: BatchManagementView, // Rendered internally
+    componentLoader: () => import("../views/batch-management-view"),
     metadata: {
       title: "Batch Dashboard",
       breadcrumb: "Dashboard",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
+    preloadStrategy: "preload",
+    loadPriority: 7,
+    cacheable: true,
   },
 
   [INVENTORY_ROUTES.BATCH_LIST]: {
     id: INVENTORY_ROUTES.BATCH_LIST,
     level: "nested",
     parentId: INVENTORY_ROUTES.BATCH_MANAGEMENT,
-    component: BatchManagementView, // Rendered internally
+    componentLoader: () => import("../views/batch-management-view"),
     metadata: {
       title: "Batch List",
       breadcrumb: "All Batches",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
+    preloadStrategy: "preload",
+    loadPriority: 6,
+    cacheable: true,
   },
 
   [INVENTORY_ROUTES.EXPIRY_ALERTS]: {
     id: INVENTORY_ROUTES.EXPIRY_ALERTS,
     level: "nested",
     parentId: INVENTORY_ROUTES.BATCH_MANAGEMENT,
-    component: ExpiryDashboardView,
+    componentLoader: () =>
+      import("../views/expiry-dashboard-view").then((m) => ({
+        default: m.ExpiryDashboardView,
+      })),
     metadata: {
       title: "Expiry Alerts",
       breadcrumb: "Alerts",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
+    preloadStrategy: "prefetch",
+    loadPriority: 3,
+    cacheable: true,
   },
 
   // Stock movement history
@@ -220,12 +244,15 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.STOCK_MOVEMENT_HISTORY,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: StockMovementHistoryView,
+    componentLoader: () => import("../views/stock-movement-history-view"),
     metadata: {
       title: "Stock Movement History",
       breadcrumb: "History",
     },
     permissions: [INVENTORY_PERMISSIONS.VIEW_HISTORY],
     requiresAuth: true,
+    preloadStrategy: "prefetch",
+    loadPriority: 3,
+    cacheable: true,
   },
 };

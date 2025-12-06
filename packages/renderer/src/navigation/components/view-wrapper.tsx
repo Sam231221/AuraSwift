@@ -3,30 +3,44 @@
  *
  * Generic wrapper component that adds navigation functionality
  * to views that expect onBack callback props.
+ * Now supports lazy loading with error boundaries.
  */
 
 import { useNavigation } from "../hooks/use-navigation";
-import type { ComponentType } from "react";
-import type { ViewComponentProps } from "../types/navigation.types";
+import { LazyComponentLoader } from "../utils/lazy-component-loader";
+import { ViewErrorBoundary } from "./view-error-boundary";
+import type { ViewConfig, ViewComponentProps } from "../types/navigation.types";
 
 interface ViewWrapperProps {
-  component: ComponentType<ViewComponentProps>;
+  config: ViewConfig;
+  params?: Record<string, unknown>;
+  onBack?: () => void;
   embeddedInDashboard?: boolean;
 }
 
 /**
- * View Wrapper
+ * View Wrapper Component
  *
- * Wraps a view component and provides navigation functionality
- * via the navigation hook, converting it to onBack prop.
+ * Wraps view components and handles lazy loading, error boundaries, and prop injection.
  */
 export function ViewWrapper({
-  component: Component,
+  config,
+  params = {},
+  onBack,
   embeddedInDashboard = false,
 }: ViewWrapperProps) {
-  const { goBack } = useNavigation();
+  const { goBack: navigationGoBack } = useNavigation();
+  const handleBack = onBack || navigationGoBack;
+
+  const props: ViewComponentProps = {
+    onBack: handleBack,
+    embeddedInDashboard,
+    ...params,
+  };
 
   return (
-    <Component onBack={goBack} embeddedInDashboard={embeddedInDashboard} />
+    <ViewErrorBoundary viewId={config.id}>
+      <LazyComponentLoader config={config} props={props} />
+    </ViewErrorBoundary>
   );
 }

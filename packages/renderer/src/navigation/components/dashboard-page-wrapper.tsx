@@ -27,16 +27,34 @@ import { LoadingScreen } from "@/components/loading-screen";
  * Renders role-specific dashboard pages using the navigation system.
  * All dashboard pages receive navigation functions via the navigation hook.
  */
-export function DashboardPageWrapper() {
-  const { user, isLoading } = useAuth();
+export default function DashboardPageWrapper() {
+  const { user, isInitializing } = useAuth();
   const { navigateTo } = useNavigation();
 
   // Dashboard navigation handler for feature actions
   // Must be called before any early returns (React Hooks rule)
   const handleActionClick = useDashboardNavigation();
 
-  if (isLoading || !user) {
+  // Only show loading during initial auth initialization
+  // Once initialized, if no user exists, it means they're not authenticated
+  // (route protection should prevent this, but we handle it gracefully)
+  if (isInitializing) {
     return <LoadingScreen />;
+  }
+
+  // If not initializing and no user, show unauthorized
+  // This shouldn't happen due to route protection, but provides safety
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Unauthorized</h2>
+          <p className="text-muted-foreground">
+            Please log in to access the dashboard.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const role = getUserRoleName(user);

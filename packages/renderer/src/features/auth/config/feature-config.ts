@@ -2,10 +2,11 @@
  * Auth Feature Configuration
  *
  * Central configuration for the auth feature including views, routes, and metadata.
+ * Uses ViewConfig structure with lazy loading support.
  */
 
 import { AUTH_ROUTES } from "./navigation";
-import AuthPage from "@/features/auth/views/auth-page";
+import type { ViewConfig } from "@/navigation/types";
 
 export const authFeature = {
   id: "auth",
@@ -14,12 +15,24 @@ export const authFeature = {
   category: "core",
 } as const;
 
-export const authViews = {
-  auth: {
-    path: AUTH_ROUTES.AUTH,
-    component: AuthPage,
-    title: "Authentication",
+/**
+ * Auth Views Registry
+ *
+ * All views for the auth feature are registered here.
+ * This is spread into the main VIEW_REGISTRY.
+ */
+export const authViews: Record<string, ViewConfig> = {
+  [AUTH_ROUTES.AUTH]: {
+    id: AUTH_ROUTES.AUTH,
+    level: "root",
+    componentLoader: () => import("@/features/auth/views/auth-page"),
+    metadata: {
+      title: "Authentication",
+      description: "User authentication and login",
+    },
     requiresAuth: false,
+    preloadStrategy: "eager",
+    loadPriority: 10,
+    cacheable: true,
   },
-} as const;
-
+};

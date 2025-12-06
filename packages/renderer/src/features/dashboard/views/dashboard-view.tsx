@@ -2,24 +2,14 @@
  * Dashboard View
  *
  * Main dashboard entry point using the new navigation system.
- * Wraps the application with NavigationProvider and renders NavigationContainer.
+ * Now just exports the dashboard page wrapper directly.
+ * NavigationProvider is handled at the App level.
+ *
+ * Note: Auth checks are handled by AppShell.
  */
 
-import { NavigationProvider, NavigationContainer } from "@/navigation";
-import { useAuth } from "@/shared/hooks";
-import { LoadingScreen } from "@/components/loading-screen";
+import DashboardPageWrapper from "@/navigation/components/dashboard-page-wrapper";
 
 export default function DashboardView() {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading || !user) {
-    return <LoadingScreen />;
-  }
-
-  return (
-    <NavigationProvider initialView="dashboard">
-      <NavigationContainer />
-    </NavigationProvider>
-  );
+  return <DashboardPageWrapper />;
 }
-

@@ -131,9 +131,7 @@ export function AddUserForm({
     <Form {...form}>
       <form
         id="add-user-form"
-        onSubmit={form.handleSubmit(handleSubmit, (errors) => {
-          // Form validation errors are handled by form state
-        })}
+        onSubmit={form.handleSubmit(handleSubmit)}
         className={showButtons ? "space-y-4" : "flex flex-col h-full"}
       >
         {/* Fixed Buttons Section - Only in drawer mode */}

@@ -11,10 +11,6 @@ import { STAFF_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
 
-// Import views from new location
-import ManageCashierView from "../views/manage-cashier-view";
-import StaffSchedulesView from "../views/staff-schedules-view";
-
 /**
  * Staff Feature Configuration for Dashboard
  */
@@ -54,7 +50,7 @@ export const staffViews: Record<string, ViewConfig> = {
   [STAFF_ROUTES.MANAGE_CASHIERS]: {
     id: STAFF_ROUTES.MANAGE_CASHIERS,
     level: "root",
-    component: ManageCashierView,
+    componentLoader: () => import("../views/manage-cashier-view"),
     metadata: {
       title: "Cashier Management",
       description: "Manage cashiers",
@@ -62,11 +58,14 @@ export const staffViews: Record<string, ViewConfig> = {
     permissions: [STAFF_PERMISSIONS.MANAGE],
     roles: ["admin", "manager"],
     requiresAuth: true,
+    preloadStrategy: "preload",
+    loadPriority: 7,
+    cacheable: true,
   },
   [STAFF_ROUTES.SCHEDULES]: {
     id: STAFF_ROUTES.SCHEDULES,
     level: "root",
-    component: StaffSchedulesView,
+    componentLoader: () => import("../views/staff-schedules-view"),
     metadata: {
       title: "Staff Schedules",
       description: "Manage staff schedules",
@@ -74,5 +73,8 @@ export const staffViews: Record<string, ViewConfig> = {
     permissions: [STAFF_PERMISSIONS.MANAGE],
     roles: ["admin", "manager"],
     requiresAuth: true,
+    preloadStrategy: "prefetch",
+    loadPriority: 5,
+    cacheable: true,
   },
 };

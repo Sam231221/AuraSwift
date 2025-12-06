@@ -43,25 +43,126 @@ export default defineConfig({
     },
   },
   build: {
-    // Enable minification for production
-    minify: "esbuild", // esbuild is faster than terser
-    // Report compressed size (disabled for faster builds, enable if needed)
-    reportCompressedSize: false,
-    // Chunk size warning limit (in KB)
-    chunkSizeWarningLimit: 1000,
+    // Electron: Enable minification for production (esbuild is fastest)
+    minify: "esbuild",
+    // Electron: Report sizes (helpful for monitoring, but no compression needed)
+    reportCompressedSize: false, // Not relevant for local files
+    // Electron: Source maps for production debugging (Electron apps benefit from source maps)
+    sourcemap: process.env.NODE_ENV === "development" ? "inline" : "hidden", // Hidden for production
+    // Electron: Target Electron's Chromium version for optimal performance
+    target: "esnext", // Electron uses modern Chromium
+    // CSS code splitting (beneficial for desktop apps)
+    cssCodeSplit: true,
+    // Electron: Larger chunks acceptable (local disk vs network)
+    // VS Code uses ~1MB chunks, we can be more lenient
+    chunkSizeWarningLimit: 1000, // Warn if chunk > 1MB (desktop app)
     rollupOptions: {
+      // Tree-shaking (critical for desktop apps - reduce memory footprint)
+      treeshake: {
+        moduleSideEffects: false,
+        preset: "recommended",
+        // Electron: More aggressive tree-shaking for desktop apps
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false,
+      },
       output: {
-        // Manual chunk splitting for better caching
-        manualChunks: {
-          // Vendor chunk for React and core libraries
-          vendor: ["react", "react-dom", "react-router-dom"],
-          // UI library chunk
-          "ui-vendor": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-select",
-            "@radix-ui/react-tabs",
-          ],
+        // Intelligent chunking strategy for optimal code-splitting
+        manualChunks: (id) => {
+          // Feature-based chunking (prioritize by size and usage)
+          const featurePatterns = [
+            { pattern: "/features/inventory/", name: "feature-inventory" },
+            { pattern: "/features/sales/", name: "feature-sales" },
+            { pattern: "/features/users/", name: "feature-users" },
+            { pattern: "/features/rbac/", name: "feature-rbac" },
+            { pattern: "/features/settings/", name: "feature-settings" },
+            { pattern: "/features/staff/", name: "feature-staff" },
+            { pattern: "/features/auth/", name: "feature-auth" },
+            { pattern: "/features/dashboard/", name: "feature-dashboard" },
+          ];
+
+          for (const { pattern, name } of featurePatterns) {
+            if (id.includes(pattern)) {
+              return name;
+            }
+          }
+
+          // Navigation system chunk
+          if (id.includes("/navigation/")) {
+            return "navigation";
+          }
+
+          // Shared utilities chunk
+          if (id.includes("/shared/")) {
+            return "shared";
+          }
+
+          // Vendor chunking strategy (optimize for caching)
+          if (id.includes("node_modules")) {
+            // React core (rarely changes, separate chunk)
+            if (id.includes("react") || id.includes("react-dom")) {
+              return "vendor-react";
+            }
+
+            // UI libraries (Radix UI - separate for better caching)
+            if (id.includes("@radix-ui")) {
+              return "vendor-ui-radix";
+            }
+
+            // Form libraries (often used together)
+            if (
+              id.includes("react-hook-form") ||
+              id.includes("zod") ||
+              id.includes("@hookform")
+            ) {
+              return "vendor-forms";
+            }
+
+            // State management
+            if (id.includes("zustand") || id.includes("jotai")) {
+              return "vendor-state";
+            }
+
+            // Large libraries (separate to prevent bloating main vendor)
+            if (
+              id.includes("date-fns") ||
+              id.includes("lodash") ||
+              id.includes("moment")
+            ) {
+              return "vendor-utils";
+            }
+
+            // Other vendors (group smaller libraries)
+            return "vendor";
+          }
+
+          return undefined; // Let Rollup handle other modules
+        },
+
+        // Better chunk naming for debugging
+        chunkFileNames: (chunkInfo) => {
+          const facadeModuleId = chunkInfo.facadeModuleId
+            ? chunkInfo.facadeModuleId
+                .split("/")
+                .pop()
+                ?.replace(/\.[^.]*$/, "")
+            : "chunk";
+          return `chunks/${facadeModuleId}-[hash].js`;
+        },
+
+        // Entry chunk naming
+        entryFileNames: "assets/[name]-[hash].js",
+
+        // Asset naming
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name?.split(".") || [];
+          const ext = info[info.length - 1];
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+            return `assets/images/[name]-[hash][extname]`;
+          }
+          if (/woff2?|eot|ttf|otf/i.test(ext)) {
+            return `assets/fonts/[name]-[hash][extname]`;
+          }
+          return `assets/[name]-[hash][extname]`;
         },
       },
     },
@@ -69,7 +170,7 @@ export default defineConfig({
   // Optimize dependencies
   optimizeDeps: {
     // Pre-bundle these dependencies for faster dev server
-    include: ["react", "react-dom", "react-router-dom"],
+    include: ["react", "react-dom"],
     esbuildOptions: {
       // Provide Buffer polyfill
       define: {

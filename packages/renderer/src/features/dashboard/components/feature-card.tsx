@@ -16,9 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useFeatureVisibility } from "../hooks/use-feature-visibility";
 import { useUserPermissions } from "../hooks/use-user-permissions";
 import type { FeatureConfig } from "../types/feature-config";
-import { getLogger } from "@/shared/utils/logger";
-
-const logger = getLogger("feature-card");
+// Logger removed - not currently used
 
 interface FeatureCardProps {
   feature: FeatureConfig;

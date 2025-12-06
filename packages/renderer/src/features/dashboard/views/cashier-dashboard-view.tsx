@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/shared/hooks";
-import { useNavigate } from "react-router-dom";
 
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("cashier-dashboard-page");
@@ -106,7 +105,6 @@ const CashierDashboardView = ({
   const [isLoading, setIsLoading] = useState(true);
 
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   // Load shift data function with smart updates to prevent flickering
   const loadShiftData = useCallback(
@@ -291,9 +289,9 @@ const CashierDashboardView = ({
       ? shiftStats.totalSales / shiftStats.totalTransactions
       : 0;
 
+  // Note: User check is now handled by AppShell - if we reach here, user should exist
   if (!user) {
-    navigate("/");
-    return null;
+    return null; // This shouldn't happen due to AppShell auth checks
   }
 
   if (isLoading) {

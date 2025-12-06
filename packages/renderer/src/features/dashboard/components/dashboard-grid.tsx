@@ -10,9 +10,7 @@ import { FeatureCard } from "./feature-card";
 import { useUserPermissions } from "../hooks/use-user-permissions";
 import type { FeatureConfig } from "../types/feature-config";
 import type { FeatureCategory } from "../types/feature-config";
-import { getLogger } from "@/shared/utils/logger";
-
-const logger = getLogger("dashboard-grid");
+// Logger removed - not currently used
 
 interface DashboardGridProps {
   features: FeatureConfig[];

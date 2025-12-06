@@ -31,18 +31,24 @@ export interface ViewMetadata {
 }
 
 /**
- * View configuration
- * Defines a view in the navigation system
+ * Preloading strategy for view components
+ * - 'none': No preloading (default)
+ * - 'prefetch': Prefetch on hover/focus (low priority)
+ * - 'preload': Preload when parent view loads (high priority)
+ * - 'eager': Load immediately (for critical views)
  */
-export interface ViewConfig {
+export type PreloadStrategy = "none" | "prefetch" | "preload" | "eager";
+
+/**
+ * Base view configuration properties
+ */
+interface BaseViewConfig {
   /** Unique view identifier */
   id: string;
   /** Hierarchy level of the view */
   level: ViewLevel;
   /** Parent view ID for nested views */
   parentId?: string;
-  /** React component to render - accepts components that can receive ViewComponentProps and additional props */
-  component: ComponentType<any>;
   /** View metadata */
   metadata: ViewMetadata;
   /** Required RBAC permissions (any of these) */
@@ -53,6 +59,65 @@ export interface ViewConfig {
   defaultParams?: Record<string, unknown>;
   /** Whether authentication is required */
   requiresAuth?: boolean;
+  /** Preloading strategy for performance optimization */
+  preloadStrategy?: PreloadStrategy;
+  /** Estimated bundle size in KB (for performance monitoring) */
+  estimatedSize?: number;
+  /** Priority for loading (1-10, higher = more important) */
+  loadPriority?: number;
+  /** Whether this view should be cached after loading */
+  cacheable?: boolean;
+}
+
+/**
+ * Static view configuration (for backward compatibility)
+ */
+interface StaticViewConfig extends BaseViewConfig {
+  type?: "static";
+  /** Static component (deprecated - use componentLoader) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  component: ComponentType<any>;
+  componentLoader?: never;
+}
+
+/**
+ * Lazy-loaded view configuration (recommended)
+ */
+interface LazyViewConfig extends BaseViewConfig {
+  type?: "lazy";
+  component?: never;
+  /**
+   * Lazy-loaded component loader function
+   * Returns a promise that resolves to a module with a default export
+   * This enables route-based code-splitting
+   *
+   * @example
+   * componentLoader: () => import("../views/product-management-view")
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  componentLoader: () => Promise<{ default: ComponentType<any> }>;
+}
+
+/**
+ * View configuration with advanced type safety
+ * Uses discriminated union for better type inference
+ */
+export type ViewConfig = StaticViewConfig | LazyViewConfig;
+
+/**
+ * Type guard to check if view config is lazy-loaded
+ */
+export function isLazyViewConfig(config: ViewConfig): config is LazyViewConfig {
+  return "componentLoader" in config && config.componentLoader !== undefined;
+}
+
+/**
+ * Type guard to check if view config is static
+ */
+export function isStaticViewConfig(
+  config: ViewConfig
+): config is StaticViewConfig {
+  return "component" in config && config.component !== undefined;
 }
 
 /**

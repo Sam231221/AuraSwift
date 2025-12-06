@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import { CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle } from "lucide-react";
@@ -93,7 +92,6 @@ export function NewTransactionView({
   embeddedInDashboard = false,
 }: NewTransactionViewProps) {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const salesUnitSettings = useSalesUnitSettings(user?.businessId);
 
   // Search query state
@@ -432,8 +430,23 @@ export function NewTransactionView({
     weightInput: weightInput.weightInput,
     weightDisplayPrice: weightInput.weightDisplayPrice,
     onSetSelectedWeightProduct: weightInput.setSelectedWeightProduct,
-    onSetWeightInput: weightInput.setWeightInput,
-    onSetWeightDisplayPrice: weightInput.setWeightDisplayPrice,
+    onSetWeightInput: (value: string) => {
+      // Barcode scanner only clears weight input (sets to empty string)
+      // Use clearWeightInput which handles both weightInput and weightDisplayPrice
+      if (value === "") {
+        weightInput.clearWeightInput();
+      }
+      // Note: Setting specific values is not supported by the hook API
+      // The barcode scanner only needs to clear, which is handled above
+    },
+    onSetWeightDisplayPrice: (value: string) => {
+      // Display price is managed internally by handleWeightInput
+      // Barcode scanner sets this to "0.00" when clearing, which clearWeightInput handles
+      // This callback accepts the value parameter to match the interface, but the hook manages it automatically
+      if (value === "0.00") {
+        weightInput.clearWeightInput();
+      }
+    },
     onClearCategorySelection: categoryPriceInput.resetPriceInput,
     audioEnabled: true,
   });
@@ -785,9 +798,9 @@ export function NewTransactionView({
   }, [payment.showReceiptOptions, isShowingStatus, handleSkipReceipt]);
 
   // Early returns
+  // Note: User check is now handled by AppShell - if we reach here, user should exist
   if (!user) {
-    navigate("/");
-    return null;
+    return null; // This shouldn't happen due to AppShell auth checks
   }
 
   // Show loading state while checking shift (only for cashier mode)

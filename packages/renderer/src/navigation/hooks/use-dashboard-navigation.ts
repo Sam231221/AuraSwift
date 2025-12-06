@@ -8,9 +8,7 @@
 import { useCallback } from "react";
 import { useNavigation } from "./use-navigation";
 import { mapActionToView } from "../utils/navigation-mapper";
-import { getLogger } from "@/shared/utils/logger";
-
-const logger = getLogger("use-dashboard-navigation");
+// Logger removed - not currently used
 
 /**
  * Hook for dashboard navigation

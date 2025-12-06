@@ -5,16 +5,21 @@
  * Manages view history, current view, and nested navigation states.
  */
 
-import { useState, useCallback, useMemo, type ReactNode } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  type ReactNode,
+} from "react";
 import { NavigationContext } from "./navigation-context";
 import type {
   NavigationState,
   NavigationContextValue,
 } from "../types/navigation.types";
 import { getView } from "../registry/view-registry";
-import { getLogger } from "@/shared/utils/logger";
-
-const logger = getLogger("navigation-provider");
+import { usePerformanceMetrics, exposeMetricsToDevTools } from "../utils";
+import { useBrowserHistory } from "../hooks/use-browser-history";
 
 /**
  * Maximum number of views to keep in navigation history
@@ -27,6 +32,8 @@ interface NavigationProviderProps {
   children: ReactNode;
   /** Initial view to display */
   initialView?: string;
+  /** Enable browser history integration (back/forward buttons) */
+  enableHistory?: boolean;
 }
 
 /**
@@ -48,6 +55,7 @@ interface NavigationProviderProps {
 export function NavigationProvider({
   children,
   initialView = "dashboard",
+  enableHistory = true,
 }: NavigationProviderProps) {
   const [state, setState] = useState<NavigationState>({
     currentView: initialView,
@@ -236,6 +244,17 @@ export function NavigationProvider({
     }),
     [state, navigateTo, goBack, goToRoot, canGoBack, getNestedNavigation]
   );
+
+  // Performance monitoring
+  usePerformanceMetrics();
+
+  // Expose metrics to DevTools in development
+  useEffect(() => {
+    exposeMetricsToDevTools();
+  }, []);
+
+  // Browser history integration (back/forward buttons)
+  useBrowserHistory(state, navigateTo, enableHistory);
 
   return (
     <NavigationContext.Provider value={value}>
