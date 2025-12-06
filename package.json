@@ -60,7 +60,9 @@
     "db:check": "drizzle-kit check",
     "db:introspect": "drizzle-kit introspect",
     "db:bridge": "node scripts/bridge-migration.mjs",
-    "migrate:rbac": "tsx packages/main/src/scripts/migrate-rbac.ts"
+    "migrate:rbac": "tsx packages/main/src/scripts/migrate-rbac.ts",
+    "analyze:packages": "node scripts/analyze-package-sizes.mjs",
+    "analyze:bundle": "cd packages/renderer && ANALYZE=true npm run build"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
