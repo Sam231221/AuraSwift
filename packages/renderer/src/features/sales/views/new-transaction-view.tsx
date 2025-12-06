@@ -20,6 +20,7 @@ import {
   useCategoryPriceInput,
   useShift,
   usePayment,
+  useBarcodeScanner,
 } from "../hooks";
 import { useSalesMode } from "../hooks/use-sales-mode";
 
@@ -419,6 +420,23 @@ export function NewTransactionView({
     },
     [isOperationsDisabled, salesMode.requiresShift]
   );
+
+  // Barcode scanner hook - handles keyboard events from barcode scanner
+  // This integrates with handleProductClick to ensure scanned products go through
+  // the same validation flow (age verification, scale, batch selection) as manual selection
+  useBarcodeScanner({
+    products: products.products,
+    businessId: user?.businessId,
+    onProductFound: handleProductClick,
+    selectedWeightProduct: weightInput.selectedWeightProduct,
+    weightInput: weightInput.weightInput,
+    weightDisplayPrice: weightInput.weightDisplayPrice,
+    onSetSelectedWeightProduct: weightInput.setSelectedWeightProduct,
+    onSetWeightInput: weightInput.setWeightInput,
+    onSetWeightDisplayPrice: weightInput.setWeightDisplayPrice,
+    onClearCategorySelection: categoryPriceInput.resetPriceInput,
+    audioEnabled: true,
+  });
 
   // Handle age verification complete - creates audit record and proceeds with next step
   const handleAgeVerificationComplete = useCallback(
@@ -1110,7 +1128,6 @@ export function NewTransactionView({
                 }
 
                 // Handle other numeric keypad input
-                logger.info("Numeric keypad input:", value);
               }}
               keysOverride={[
                 ["7", "8", "9", "Enter"],
