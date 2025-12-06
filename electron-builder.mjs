@@ -161,11 +161,12 @@ export default /** @type import('electron-builder').Configuration */
     ...await getListOfFilesFromEachWorkspace(),
   ],
   // Unpack native modules from asar (required for native .node files)
+  // Unpacking entire module directory ensures all dependencies are accessible
   asarUnpack: [
-    '**/better-sqlite3/**/*.node',
-    '**/node-hid/**/*.node',
-    '**/serialport/**/*.node',
-    '**/usb/**/*.node',
+    '**/better-sqlite3/**',
+    '**/node-hid/**',
+    '**/serialport/**',
+    '**/usb/**',
   ],
   // Include migrations as extraResources so they're accessible outside asar if needed
   // IMPORTANT: Include ALL files including meta/_journal.json and snapshot files

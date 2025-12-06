@@ -32,7 +32,7 @@ interface NavigationProviderProps {
   children: ReactNode;
   /** Initial view to display */
   initialView?: string;
-  /** Enable browser history integration (back/forward buttons) */
+  /** Enable browser history integration (back/forward buttons). Default: false for stability */
   enableHistory?: boolean;
 }
 
@@ -55,7 +55,7 @@ interface NavigationProviderProps {
 export function NavigationProvider({
   children,
   initialView = "dashboard",
-  enableHistory = true,
+  enableHistory = false,
 }: NavigationProviderProps) {
   const [state, setState] = useState<NavigationState>({
     currentView: initialView,

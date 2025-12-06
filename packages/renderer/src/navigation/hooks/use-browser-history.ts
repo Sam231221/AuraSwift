@@ -5,11 +5,9 @@
  * Enables back/forward buttons and deep linking support.
  */
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import type { NavigationState } from "../types/navigation.types";
 import { getLogger } from "@/shared/utils/logger";
-
-const logger = getLogger("browser-history");
 
 interface HistoryState {
   viewId: string;
@@ -29,57 +27,68 @@ export function useBrowserHistory(
   navigateTo: (viewId: string, params?: Record<string, unknown>) => void,
   enabled = true
 ) {
+  // Initialize logger inside hook to avoid module-level initialization issues
+  const loggerRef = useRef(getLogger("browser-history"));
+  const logger = loggerRef.current;
   /**
    * Update browser history when navigation state changes
    */
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || typeof window === "undefined") return;
 
-    const historyState: HistoryState = {
-      viewId: currentState.currentView,
-      params: currentState.viewParams,
-      timestamp: Date.now(),
-    };
+    try {
+      const historyState: HistoryState = {
+        viewId: currentState.currentView,
+        params: currentState.viewParams,
+        timestamp: Date.now(),
+      };
 
-    // Use hash-based routing for Electron compatibility
-    const hash = `#/${currentState.currentView}`;
-    
-    // Only push if the current hash is different
-    if (window.location.hash !== hash) {
-      window.history.pushState(historyState, "", hash);
-      logger.debug(`Pushed state: ${currentState.currentView}`, historyState);
+      // Use hash-based routing for Electron compatibility
+      const hash = `#/${currentState.currentView}`;
+
+      // Only push if the current hash is different
+      if (window.location.hash !== hash) {
+        window.history.pushState(historyState, "", hash);
+        logger.debug(`Pushed state: ${currentState.currentView}`, historyState);
+      }
+    } catch (error) {
+      logger.error("Error updating browser history:", error);
     }
-  }, [currentState.currentView, currentState.viewParams, enabled]);
+  }, [currentState.currentView, currentState.viewParams, enabled, logger]);
 
   /**
    * Handle browser back/forward buttons
    */
   const handlePopState = useCallback(
     (event: PopStateEvent) => {
-      if (!enabled) return;
+      if (!enabled || typeof window === "undefined") return;
 
-      const state = event.state as HistoryState | null;
-      
-      if (state?.viewId) {
-        logger.debug(`Pop state: ${state.viewId}`, state);
-        navigateTo(state.viewId, state.params);
-      } else {
-        // No state - parse from hash
-        const hash = window.location.hash.replace(/^#\/?/, "");
-        if (hash && hash !== currentState.currentView) {
-          logger.debug(`Pop state from hash: ${hash}`);
-          navigateTo(hash);
+      try {
+        const state = event.state as HistoryState | null;
+
+        if (state?.viewId) {
+          logger.debug(`Pop state: ${state.viewId}`, state);
+          navigateTo(state.viewId, state.params);
+        } else {
+          // No state - parse from hash
+          const hash = window.location.hash.replace(/^#\/?/, "");
+          if (hash && hash !== currentState.currentView) {
+            logger.debug(`Pop state from hash: ${hash}`);
+            navigateTo(hash);
+          }
         }
+      } catch (error) {
+        logger.error("Error handling popstate:", error);
       }
     },
-    [enabled, navigateTo, currentState.currentView]
+    [enabled, navigateTo, currentState.currentView, logger]
   );
 
   /**
    * Setup popstate listener
    */
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || typeof window === "undefined") return;
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -89,13 +98,18 @@ export function useBrowserHistory(
    * Initialize from URL on mount
    */
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || typeof window === "undefined") return;
 
-    const hash = window.location.hash.replace(/^#\/?/, "");
-    if (hash && hash !== currentState.currentView) {
-      logger.debug(`Initial navigation from hash: ${hash}`);
-      navigateTo(hash);
+    try {
+      const hash = window.location.hash.replace(/^#\/?/, "");
+      if (hash && hash !== currentState.currentView) {
+        logger.debug(`Initial navigation from hash: ${hash}`);
+        navigateTo(hash);
+      }
+    } catch (error) {
+      logger.error("Error initializing from URL:", error);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 }
 
@@ -111,7 +125,7 @@ export function parseHashRoute(hash: string): {
 } {
   const cleanHash = hash.replace(/^#\/?/, "");
   const [viewId, queryString] = cleanHash.split("?");
-  
+
   const params: Record<string, unknown> = {};
   if (queryString) {
     const searchParams = new URLSearchParams(queryString);
@@ -119,7 +133,7 @@ export function parseHashRoute(hash: string): {
       params[key] = value;
     });
   }
-  
+
   return { viewId, params };
 }
 
@@ -135,7 +149,7 @@ export function generateHashRoute(
   params?: Record<string, unknown>
 ): string {
   let hash = `#/${viewId}`;
-  
+
   if (params && Object.keys(params).length > 0) {
     const searchParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -143,7 +157,6 @@ export function generateHashRoute(
     });
     hash += `?${searchParams.toString()}`;
   }
-  
+
   return hash;
 }
-
