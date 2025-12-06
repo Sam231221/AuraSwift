@@ -489,14 +489,35 @@ jobs:
           path: dist
           retention-days: 7 # Reduce artifact retention to save storage costs
 
-  # Run E2E tests on the built application
-  # Delegates to test.yml workflow for proper separation of concerns
-  test-built-app:
-    name: Test Built Application
-    needs: build
-    if: ${{ !inputs.skip-tests }}
-    uses: ./.github/workflows/test.yml
-    with:
-      skip-unit: true # Only run E2E tests on built app
-      skip-e2e: false
-    secrets: inherit
+      # Only install Playwright if tests exist (conditional)
+      - name: Check if tests exist
+        id: check-tests
+        if: ${{ !inputs.skip-tests }}
+        run: |
+          if (Test-Path "tests") {
+            echo "tests-exist=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "tests-exist=false" >> $env:GITHUB_OUTPUT
+          }
+        shell: powershell
+
+      - name: Install Playwright
+        if: steps.check-tests.outputs.tests-exist == 'true' && !inputs.skip-tests
+        run: npx playwright install --with-deps
+
+      - name: Run E2E tests on built application
+        if: steps.check-tests.outputs.tests-exist == 'true' && !inputs.skip-tests
+        run: npm run test:e2e
+        env:
+          CI: true
+          NODE_ENV: test
+          ELECTRON_DISABLE_GPU: 1
+          ELECTRON_NO_SANDBOX: 1
+          PLAYWRIGHT_HEADLESS: 1
+          ELECTRON_ENABLE_LOGGING: 1
+          HARDWARE_SIMULATION_MODE: true
+          MOCK_PRINTER_ENABLED: true
+          MOCK_CARD_READER_ENABLED: true
+          MOCK_SCANNER_ENABLED: true
+          ELECTRON_UPDATER_DISABLED: 1
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
