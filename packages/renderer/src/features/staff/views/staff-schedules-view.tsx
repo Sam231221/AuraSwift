@@ -181,17 +181,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
         const response = await window.scheduleAPI.getCashierUsers(businessId);
         if (response.success && response.data) {
           const allUsers = response.data as Staff[];
-          logger.info(
-            `[loadCashiers] Received ${allUsers.length} users from API`
-          );
-
-          // Log all users for debugging
-          allUsers.forEach((user) => {
-            const roleName = getUserRoleName(user);
-            logger.info(
-              `[loadCashiers] User: ${user.firstName} ${user.lastName} (${user.id}), roleName: ${user.roleName}, primaryRoleId: ${user.primaryRoleId}, resolved role: ${roleName}`
-            );
-          });
 
           // RBAC-based filtering: Filter staff members based on user's permissions
           // - Admin (SCHEDULES_MANAGE_ALL): can schedule cashiers and managers
@@ -220,10 +209,6 @@ const StaffSchedulesView: React.FC<StaffSchedulesViewProps> = ({ onBack }) => {
             );
             return false;
           });
-
-          logger.info(
-            `[loadCashiers] Filtered to ${filteredUsers.length} staff members out of ${allUsers.length} total users (canScheduleAll: ${canScheduleAll}, canScheduleCashiers: ${canScheduleCashiers})`
-          );
 
           if (filteredUsers.length === 0 && allUsers.length > 0) {
             logger.warn(

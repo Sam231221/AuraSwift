@@ -1,13 +1,13 @@
 /**
  * Preload Logger Utility
- * 
+ *
  * Simple logger for the preload process with console fallback
  * Preload scripts have limited access, so we keep logging simple
- * 
+ *
  * Usage:
  * ```typescript
  * import { logger } from './logger';
- * 
+ *
  * logger.debug('Debug message', { data });
  * logger.info('Info message');
  * logger.warn('Warning message');
@@ -15,13 +15,13 @@
  * ```
  */
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = "debug" | "info" | "warn" | "error";
 
 class PreloadLogger {
   private isDevelopment: boolean;
 
   constructor() {
-    this.isDevelopment = process.env.NODE_ENV !== 'production';
+    this.isDevelopment = process.env.NODE_ENV !== "production";
   }
 
   /**
@@ -37,39 +37,53 @@ class PreloadLogger {
    */
   debug(message: string, data?: any): void {
     if (this.isDevelopment) {
-      console.debug(this.formatMessage('debug', message), data !== undefined ? data : '');
+      console.debug(
+        this.formatMessage("debug", message),
+        data !== undefined ? data : ""
+      );
     }
   }
 
   /**
-   * Log info message
+   * Log info message (development only)
    */
   info(message: string, data?: any): void {
-    console.info(this.formatMessage('info', message), data !== undefined ? data : '');
+    if (this.isDevelopment) {
+      console.info(
+        this.formatMessage("info", message),
+        data !== undefined ? data : ""
+      );
+    }
   }
 
   /**
    * Log warning message
    */
   warn(message: string, data?: any): void {
-    console.warn(this.formatMessage('warn', message), data !== undefined ? data : '');
+    console.warn(
+      this.formatMessage("warn", message),
+      data !== undefined ? data : ""
+    );
   }
 
   /**
    * Log error message
    */
   error(message: string, error?: any): void {
-    const errorData = error instanceof Error 
-      ? { 
-          message: error.message, 
-          stack: error.stack,
-          name: error.name 
-        }
-      : error;
-    
-    console.error(this.formatMessage('error', message), errorData !== undefined ? errorData : '');
+    const errorData =
+      error instanceof Error
+        ? {
+            message: error.message,
+            stack: error.stack,
+            name: error.name,
+          }
+        : error;
+
+    console.error(
+      this.formatMessage("error", message),
+      errorData !== undefined ? errorData : ""
+    );
   }
 }
 
 export const logger = new PreloadLogger();
-

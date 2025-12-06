@@ -214,10 +214,6 @@ const AdminDashboardView = ({
 
   // Handle feature action clicks
   const handleActionClick = (featureId: string, actionId: string) => {
-    logger.info(
-      `[handleActionClick] Feature: ${featureId}, Action: ${actionId}`
-    );
-
     // Use navigation handler if provided (for actions that map to views)
     if (onActionClick) {
       onActionClick(featureId, actionId);
@@ -333,4 +329,3 @@ const AdminDashboardView = ({
 };
 
 export default AdminDashboardView;
-

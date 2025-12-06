@@ -347,8 +347,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               window.authStore.delete("token"),
             ]);
           }
-        } else {
-          logger.debug("[ValidateSession] No stored session found");
         }
       } catch (error) {
         logger.error("Session validation error:", error);

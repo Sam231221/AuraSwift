@@ -32,12 +32,10 @@ export function DashboardGrid({
   // Memoize the action click handler to prevent unnecessary re-renders
   const handleActionClick = useCallback(
     (featureId: string, actionId: string) => {
-      logger.debug(`Action clicked: ${featureId} -> ${actionId}`);
       if (onActionClick) {
         onActionClick(featureId, actionId);
-      } else {
-        logger.warn(`No onActionClick handler provided`);
       }
+      // No handler provided - action may be handled elsewhere
     },
     [onActionClick]
   );

@@ -57,9 +57,6 @@ export function useUserPermissions(): UserPermissions {
       // Check cache first
       const cached = permissionCache.get(user.id);
       if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-        logger.info(
-          `[useUserPermissions] Using cached permissions for user ${user.id}`
-        );
         setPermissions(cached.permissions);
         setIsLoading(false);
         setError(null);
@@ -113,14 +110,6 @@ export function useUserPermissions(): UserPermissions {
             permissions: userPermissions,
             timestamp: Date.now(),
           });
-
-          logger.info(
-            `[useUserPermissions] Loaded ${
-              userPermissions.length
-            } permissions for user ${user.id}: ${JSON.stringify(
-              userPermissions
-            )}`
-          );
         } else {
           logger.warn(
             `[useUserPermissions] Invalid response format for user ${user.id}:`,

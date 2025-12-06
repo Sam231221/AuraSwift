@@ -63,11 +63,9 @@ export function NavigationProvider({
     (viewId: string, params?: Record<string, unknown>) => {
       const view = getView(viewId);
       if (!view) {
-        logger.warn(`View not found: ${viewId}`);
+        // View not found - silent fail (expected in some navigation scenarios)
         return;
       }
-
-      logger.info(`Navigating to view: ${viewId}`, params);
 
       setState((prev) => ({
         ...prev,
@@ -85,15 +83,13 @@ export function NavigationProvider({
   const goBack = useCallback(() => {
     setState((prev) => {
       if (prev.viewHistory.length <= 1) {
-        logger.warn("Cannot go back: already at root view");
+        // Already at root view - expected condition
         return prev;
       }
 
       const newHistory = [...prev.viewHistory];
       newHistory.pop(); // Remove current view
       const previousView = newHistory[newHistory.length - 1];
-
-      logger.info(`Navigating back to: ${previousView}`);
 
       return {
         ...prev,
@@ -108,8 +104,6 @@ export function NavigationProvider({
    * Navigate to root view
    */
   const goToRoot = useCallback(() => {
-    logger.info(`Navigating to root view: ${initialView}`);
-
     setState((prev) => ({
       ...prev,
       currentView: initialView,
@@ -147,21 +141,14 @@ export function NavigationProvider({
         navigateTo: (viewId: string, params?: Record<string, unknown>) => {
           const view = getView(viewId);
           if (!view) {
-            logger.warn(`Nested view not found: ${viewId}`);
+            // Nested view not found - silent fail
             return;
           }
 
           if (view.parentId !== parentViewId) {
-            logger.warn(
-              `View ${viewId} is not a nested view of ${parentViewId}`
-            );
+            // View is not a nested view of parent - silent fail
             return;
           }
-
-          logger.info(
-            `Navigating to nested view: ${viewId} in parent: ${parentViewId}`,
-            params
-          );
 
           setState((prev) => {
             const currentNested = prev.nestedViews[parentViewId] || {
@@ -191,17 +178,13 @@ export function NavigationProvider({
           setState((prev) => {
             const nested = prev.nestedViews[parentViewId];
             if (!nested || nested.viewHistory.length <= 1) {
-              logger.warn(`Cannot go back in nested view: ${parentViewId}`);
+              // Already at root of nested view - expected condition
               return prev;
             }
 
             const newHistory = [...nested.viewHistory];
             newHistory.pop();
             const previousView = newHistory[newHistory.length - 1];
-
-            logger.info(
-              `Navigating back in nested view ${parentViewId} to: ${previousView}`
-            );
 
             return {
               ...prev,
@@ -218,8 +201,6 @@ export function NavigationProvider({
           });
         },
         goToRoot: () => {
-          logger.info(`Navigating to root of nested view: ${parentViewId}`);
-
           setState((prev) => ({
             ...prev,
             nestedViews: {

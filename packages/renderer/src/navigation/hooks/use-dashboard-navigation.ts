@@ -39,20 +39,12 @@ export function useDashboardNavigation() {
 
   const handleActionClick = useCallback(
     (featureId: string, actionId: string) => {
-      logger.info(`Action clicked: ${featureId} -> ${actionId}`);
-
       const viewId = mapActionToView(featureId, actionId);
 
       if (viewId) {
-        logger.info(`Navigating to view: ${viewId}`);
         navigateTo(viewId);
-      } else {
-        logger.warn(
-          `No view mapping found for feature: ${featureId}, action: ${actionId}`
-        );
-        // Handle actions that don't map to views (e.g., modals, dialogs)
-        // These can be handled by the dashboard page directly
       }
+      // No view mapping - action may be handled elsewhere (e.g., modals, dialogs)
     },
     [navigateTo]
   );

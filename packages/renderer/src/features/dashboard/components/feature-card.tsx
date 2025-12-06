@@ -64,14 +64,12 @@ export function FeatureCard({ feature }: FeatureCardProps) {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                logger.debug(`Button clicked: ${feature.id} -> ${action.id}`);
                 // Call the action's onClick handler (injected by DashboardGrid with navigation)
                 // This handler calls onActionClick(featureId, actionId) which triggers navigation
                 if (action.onClick) {
                   action.onClick();
-                } else {
-                  logger.warn(`No onClick handler for action: ${action.id}`);
                 }
+                // No onClick handler - action may be handled elsewhere
               }}
               disabled={action.disabled}
             >

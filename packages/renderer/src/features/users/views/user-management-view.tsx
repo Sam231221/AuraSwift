@@ -87,10 +87,8 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
 
   // Handle create user
   const handleCreateUser = async (data: UserCreateFormData) => {
-    logger.info("handleCreateUser called with:", data);
     try {
       const result = await createStaffUser(data);
-      logger.info("Create result:", result);
       if (result.success) {
         await refetch();
         closeAddDialog();
@@ -106,9 +104,7 @@ export default function UserManagementView({ onBack }: { onBack: () => void }) {
 
   // Handle update user
   const handleUpdateUser = async (data: UserUpdateFormData) => {
-    logger.info("handleUpdateUser called with:", data);
     const result = await updateStaffUser(data);
-    logger.info("Update result:", result);
     if (result.success) {
       await refetch();
       closeEditDialog();

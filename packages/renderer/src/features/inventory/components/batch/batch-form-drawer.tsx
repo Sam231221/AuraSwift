@@ -39,9 +39,6 @@ import type {
   BatchUpdateData,
 } from "@/features/inventory/schemas/batch-schema";
 
-import { getLogger } from "@/shared/utils/logger";
-const logger = getLogger("batch-form-drawer");
-
 interface BatchFormDrawerProps {
   isOpen: boolean;
   editingBatch: ProductBatch | null;
@@ -122,9 +119,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
           throw new Error(response?.error || "Failed to update batch");
         }
       } else {
-        logger.info("Creating batch with data:", batchData);
         const response = await window.batchesAPI?.create(batchData);
-        logger.info("Batch API response:", response);
         if (response?.success && response.batch) {
           onSave(response.batch);
         } else {

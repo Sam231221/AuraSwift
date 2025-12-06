@@ -1,7 +1,7 @@
 import * as exports from "./index.js";
 import { contextBridge } from "electron";
 
-import { logger } from './logger.js';
+import { logger } from "./logger.js";
 
 // Polyfill btoa for Electron preload context if not available
 if (typeof btoa === "undefined") {
@@ -17,7 +17,8 @@ for (const exportsKey in exports) {
     try {
       contextBridge.exposeInMainWorld(exportsKey, exports[exportsKey]);
     } catch (error) {
-      // Skip if already exposed (e.g., btoa might already exist)
+      // Log warning for IPC exposure failures (important for debugging)
+      // This can happen if already exposed (e.g., btoa might already exist) or actual errors
       logger.warn(`Could not expose ${exportsKey}:`, error);
     }
   }

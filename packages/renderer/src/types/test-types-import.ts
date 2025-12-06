@@ -1,6 +1,6 @@
 /**
  * Type Import Test
- * 
+ *
  * This file tests that all new types can be imported correctly.
  * Run: npx tsc --noEmit test-types-import.ts
  */
@@ -10,10 +10,10 @@ import type {
   // Domain types
   User,
   Product,
-  
+
   // Enum types
   AgeRestrictionLevel,
-} from './index';
+} from "./index";
 
 import {
   // Helper functions
@@ -21,35 +21,35 @@ import {
   getUserDisplayName,
   getMinimumAge,
   getAgeRestrictionLabel,
-} from './index';
+} from "./index";
 
 // Test that types work correctly
 const testUser: User = {
-  id: '1',
-  username: 'test',
-  firstName: 'Test',
-  lastName: 'User',
-  businessName: 'Test Business',
-  businessId: '1',
+  id: "1",
+  username: "test",
+  firstName: "Test",
+  lastName: "User",
+  businessName: "Test Business",
+  businessId: "1",
   isActive: true,
   createdAt: new Date().toISOString(),
 };
 
 const testProduct: Product = {
-  id: '1',
-  name: 'Test Product',
-  sku: 'TEST-001',
+  id: "1",
+  name: "Test Product",
+  sku: "TEST-001",
   basePrice: 10.99,
-  categoryId: '1',
-  businessId: '1',
-  productType: 'STANDARD',
-  salesUnit: 'PIECE',
+  categoryId: "1",
+  businessId: "1",
+  productType: "STANDARD",
+  salesUnit: "PIECE",
   isActive: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
 
-const testLevel: AgeRestrictionLevel = 'AGE_18';
+const testLevel: AgeRestrictionLevel = "AGE_18";
 
 // Test helper functions
 const userName = getUserRoleName(testUser);
@@ -62,10 +62,7 @@ void userName;
 void displayName;
 void minAge;
 void label;
+void testProduct;
 
-console.log('✅ All type imports successful!');
-console.log('User:', displayName);
-console.log('Product:', testProduct.name);
-console.log('Age restriction:', label, 'requires', minAge, 'years');
-
+// Type checking complete - no console output needed for production bundle
 export {};
