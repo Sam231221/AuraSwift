@@ -7,9 +7,7 @@
 
 import { expect } from "@playwright/test";
 import { LoginPage } from "./page-objects/LoginPage";
-
-// Use the existing E2E test fixtures from app.spec.ts
-import { test as electronTest } from "./app.spec";
+import { test as electronTest } from "./fixtures";
 
 electronTest.describe("Authentication Flow", () => {
   let loginPage: LoginPage;
@@ -23,97 +21,100 @@ electronTest.describe("Authentication Flow", () => {
     await loginPage.navigate();
   });
 
-   electronTest.describe("Login", () => {
-     electronTest(
-       "should successfully login with valid user and PIN",
-       async ({ electronApp }) => {
-         const page = await electronApp.firstWindow();
+  electronTest.describe("Login", () => {
+    electronTest(
+      "should successfully login with valid user and PIN",
+      async ({ electronApp }) => {
+        const page = await electronApp.firstWindow();
 
-         // Attempt login with test user and PIN
-         // Replace with actual test user name from your system
-         await loginPage.login("Test Cashier", "1234");
+        // Attempt login with test user and PIN
+        // Replace with actual test user name from your system
+        await loginPage.login("Test Cashier", "1234");
 
-         // Verify redirected to dashboard
-         const isLoggedIn = await loginPage.isLoggedIn();
-         expect(isLoggedIn).toBe(true);
+        // Verify redirected to dashboard
+        const isLoggedIn = await loginPage.isLoggedIn();
+        expect(isLoggedIn).toBe(true);
 
-         // Verify dashboard URL
-         const url = page.url();
-         expect(url).toContain("#/dashboard");
+        // Verify dashboard URL
+        const url = page.url();
+        expect(url).toContain("#/dashboard");
 
-         // Take screenshot for visual verification
-         await loginPage.takeScreenshot("successful-login");
-       }
-     );
+        // Take screenshot for visual verification
+        await loginPage.takeScreenshot("successful-login");
+      }
+    );
 
-     electronTest(
-       "should show error message for invalid PIN",
-       async ({ electronApp }) => {
-         const page = await electronApp.firstWindow();
-         
-         // Select a valid user but enter wrong PIN
-         await loginPage.selectUser("Test Cashier");
-         await loginPage.enterPin("9999");
+    electronTest(
+      "should show error message for invalid PIN",
+      async ({ electronApp }) => {
+        const page = await electronApp.firstWindow();
 
-         // Wait for error to appear (PIN auto-submits on 4 digits)
-         await page.waitForTimeout(2000);
+        // Select a valid user but enter wrong PIN
+        await loginPage.selectUser("Test Cashier");
+        await loginPage.enterPin("9999");
 
-         // Should stay on login page (PIN entry screen)
-         const isLoggedIn = await loginPage.isLoggedIn(2000);
-         expect(isLoggedIn).toBe(false);
+        // Wait for error to appear (PIN auto-submits on 4 digits)
+        await page.waitForTimeout(2000);
 
-         // Should show error message
-         const hasError = await loginPage.hasErrorMessage();
-         expect(hasError).toBe(true);
-       }
-     );
+        // Should stay on login page (PIN entry screen)
+        const isLoggedIn = await loginPage.isLoggedIn(2000);
+        expect(isLoggedIn).toBe(false);
 
-     electronTest("should allow going back to user selection", async () => {
-       // Select a user
-       await loginPage.selectUser("Test Cashier");
+        // Should show error message
+        const hasError = await loginPage.hasErrorMessage();
+        expect(hasError).toBe(true);
+      }
+    );
 
-       // Verify PIN entry screen is visible
-       const isPinVisible = await loginPage.isPinEntryVisible();
-       expect(isPinVisible).toBe(true);
+    electronTest("should allow going back to user selection", async () => {
+      // Select a user
+      await loginPage.selectUser("Test Cashier");
 
-       // Go back to user selection
-       await loginPage.goBackToUserSelection();
+      // Verify PIN entry screen is visible
+      const isPinVisible = await loginPage.isPinEntryVisible();
+      expect(isPinVisible).toBe(true);
 
-       // Verify user selection is visible again
-       const isUserSelectionVisible = await loginPage.isUserSelectionVisible();
-       expect(isUserSelectionVisible).toBe(true);
-     });
+      // Go back to user selection
+      await loginPage.goBackToUserSelection();
 
-     electronTest("should allow deleting PIN digits", async ({ electronApp }) => {
-       const page = await electronApp.firstWindow();
-       
-       // Select a user
-       await loginPage.selectUser("Test Cashier");
+      // Verify user selection is visible again
+      const isUserSelectionVisible = await loginPage.isUserSelectionVisible();
+      expect(isUserSelectionVisible).toBe(true);
+    });
 
-       // Enter some PIN digits
-       await loginPage.enterPin("12");
+    electronTest(
+      "should allow deleting PIN digits",
+      async ({ electronApp }) => {
+        const page = await electronApp.firstWindow();
 
-       // Delete one digit
-       await loginPage.deletePin(1);
+        // Select a user
+        await loginPage.selectUser("Test Cashier");
 
-       // Should be able to continue entering PIN
-       await loginPage.enterPin("34");
+        // Enter some PIN digits
+        await loginPage.enterPin("12");
 
-       // PIN should auto-submit when 4 digits are entered
-       await page.waitForTimeout(1000);
-     });
+        // Delete one digit
+        await loginPage.deletePin(1);
 
-     electronTest(
-       "should persist session after window reload",
-       async ({ electronApp }) => {
-         const page = await electronApp.firstWindow();
+        // Should be able to continue entering PIN
+        await loginPage.enterPin("34");
 
-         // Login successfully
-         await loginPage.login("Test Cashier", "1234");
-         const loggedIn = await loginPage.isLoggedIn(15000);
+        // PIN should auto-submit when 4 digits are entered
+        await page.waitForTimeout(1000);
+      }
+    );
 
-         // Only proceed if login was successful
-         expect(loggedIn).toBe(true);
+    electronTest(
+      "should persist session after window reload",
+      async ({ electronApp }) => {
+        const page = await electronApp.firstWindow();
+
+        // Login successfully
+        await loginPage.login("Test Cashier", "1234");
+        const loggedIn = await loginPage.isLoggedIn(15000);
+
+        // Only proceed if login was successful
+        expect(loggedIn).toBe(true);
 
         // Reload the page
         await page.reload();
@@ -219,14 +220,14 @@ electronTest.describe("Authentication Flow", () => {
   });
 
   electronTest.describe("Session Management", () => {
-     electronTest(
-       "should validate active session on app start",
-       async ({ electronApp }) => {
-         const page = await electronApp.firstWindow();
+    electronTest(
+      "should validate active session on app start",
+      async ({ electronApp }) => {
+        const page = await electronApp.firstWindow();
 
-         // Login to create session
-         await loginPage.login("Test Cashier", "1234");
-         await loginPage.isLoggedIn();
+        // Login to create session
+        await loginPage.login("Test Cashier", "1234");
+        await loginPage.isLoggedIn();
 
         // Close and reopen would test session persistence
         // In Electron E2E, we simulate by checking session validation
@@ -258,36 +259,36 @@ electronTest.describe("Authentication Flow", () => {
   });
 
   electronTest.describe("Security", () => {
-     electronTest(
-       "should not expose PIN in DOM",
-       async ({ electronApp }) => {
-         const page = await electronApp.firstWindow();
+    electronTest("should not expose PIN in DOM", async ({ electronApp }) => {
+      const page = await electronApp.firstWindow();
 
-         await loginPage.login("Test Cashier", "1234");
+      await loginPage.login("Test Cashier", "1234");
 
-         // Check that PIN is not visible in page content
-         const pageContent = await page.content();
-         expect(pageContent).not.toContain("1234");
-       }
-     );
+      // Check that PIN is not visible in page content
+      const pageContent = await page.content();
+      expect(pageContent).not.toContain("1234");
+    });
 
-     electronTest("should display PIN as dots/masked", async ({ electronApp }) => {
-       const page = await electronApp.firstWindow();
+    electronTest(
+      "should display PIN as dots/masked",
+      async ({ electronApp }) => {
+        const page = await electronApp.firstWindow();
 
-       // Select user
-       await loginPage.selectUser("Test Cashier");
+        // Select user
+        await loginPage.selectUser("Test Cashier");
 
-       // Enter PIN digits
-       await loginPage.enterPin("1234");
+        // Enter PIN digits
+        await loginPage.enterPin("1234");
 
-       // Verify PIN is displayed as dots (●) not actual digits
-       const pinDisplay = await page.locator('text=/[●○]+/').first();
-       const pinText = await pinDisplay.textContent();
-       
-       // PIN should be masked (contain ● characters)
-       expect(pinText).toContain("●");
-       // PIN should not contain actual digits in display
-       expect(pinText).not.toMatch(/[0-9]/);
-     });
+        // Verify PIN is displayed as dots (●) not actual digits
+        const pinDisplay = await page.locator("text=/[●○]+/").first();
+        const pinText = await pinDisplay.textContent();
+
+        // PIN should be masked (contain ● characters)
+        expect(pinText).toContain("●");
+        // PIN should not contain actual digits in display
+        expect(pinText).not.toMatch(/[0-9]/);
+      }
+    );
   });
 });
