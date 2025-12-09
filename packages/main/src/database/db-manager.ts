@@ -22,8 +22,8 @@ import {
 // Layer 3: Repair mechanisms
 import { repairDatabase, createFreshDatabase } from "./utils/db-repair.js";
 
-import { getLogger } from '../utils/logger.js';
-const logger = getLogger('db-manager');
+import { getLogger } from "../utils/logger.js";
+const logger = getLogger("db-manager");
 // Layer 4: User dialogs
 import {
   showRecoveryDialog,
@@ -145,13 +145,17 @@ export class DBManager {
               mkdirError instanceof Error
                 ? mkdirError.message
                 : String(mkdirError);
-            logger.error(`❌ Failed to create database directory: ${errorMessage}`);
+            logger.error(
+              `❌ Failed to create database directory: ${errorMessage}`
+            );
             await showDatabaseErrorDialog(
               "Database Directory Error",
               `Failed to create database directory: ${dbDir}`,
               errorMessage
             );
-            throw new Error(`Failed to create database directory: ${errorMessage}`);
+            throw new Error(
+              `Failed to create database directory: ${errorMessage}`
+            );
           }
         }
 
@@ -304,6 +308,9 @@ export class DBManager {
           // Close database connection before quitting
           this.db.close();
           this.db = null;
+          // Reset initialization state to prevent getDb() from being called
+          this.initialized = false;
+          this.initializationPromise = null;
           dialog.showErrorBox(
             "Cannot Open Database",
             "This database was created with a newer version of AuraSwift.\n\n" +
@@ -312,7 +319,10 @@ export class DBManager {
               "Database requires a newer version."
           );
           app.quit();
-          return;
+          // Throw error to prevent getDatabase() from trying to access the database
+          throw new Error(
+            "Database downgrade detected - app version is older than database schema. Please update the application."
+          );
         }
 
         // ========================================
@@ -589,15 +599,15 @@ export class DBManager {
       // Go up 3 levels to get project root
       const projectRoot = path.resolve(__dirname, "../../../");
       finalPath = path.join(projectRoot, "data", "pos_system.db");
-      
+
       // Validate path is at root level (not in packages/)
       if (finalPath.includes(path.join("packages", "data"))) {
         throw new Error(
           `Database path resolved incorrectly to: ${finalPath}. ` +
-          `Expected: ${path.join(projectRoot, "data", "pos_system.db")}`
+            `Expected: ${path.join(projectRoot, "data", "pos_system.db")}`
         );
       }
-      
+
       logger.info("Development mode: Using project directory for database");
       logger.info(`Project root: ${projectRoot}`);
       logger.info(`Database path: ${finalPath}`);
