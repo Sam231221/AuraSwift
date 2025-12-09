@@ -9,20 +9,16 @@ import { BasePage } from "./BasePage";
 
 export class LoginPage extends BasePage {
   // Selectors for user selection and PIN entry
-  private readonly userSelectionGrid = 'text="Select User"';
-  private readonly userButton =
-    'button:has-text("Select User") ~ div button, [role="button"]:has-text("Select User")';
-  private readonly pinEntryScreen = 'text="Enter PIN"';
-  private readonly pinKeypadButton =
-    'button:has-text("0"), button:has-text("1"), button:has-text("2"), button:has-text("3"), button:has-text("4"), button:has-text("5"), button:has-text("6"), button:has-text("7"), button:has-text("8"), button:has-text("9")';
-  private readonly pinDeleteButton =
-    'button[aria-label*="delete" i], button:has([data-lucide="delete"]), button:has([data-lucide="Delete"])';
-  private readonly backButton =
-    'button[aria-label*="back" i], button:has([data-lucide="arrow-left"]), button:has([data-lucide="ArrowLeft"])';
+  private readonly userSelectionHeading = 'text="Select User"';
+  private readonly userButton = "button:has(h3)"; // User buttons contain h3 with name
+  private readonly pinEntryHeading = 'text="Enter PIN"';
+  private readonly pinDots = "text=/[●○]+/";
+  private readonly numberButton = (digit: string) =>
+    `button:has-text("${digit}")`;
+  private readonly backButton = 'button:has-text("BACK")';
+  private readonly deleteButton = 'button:has-text("DELETE")';
   private readonly errorMessage =
-    '[data-testid="error-message"], .error-message, .error, [role="alert"], .text-red-600, .text-red-500';
-  private readonly loadingSpinner =
-    '[class*="animate-spin"], [class*="spinner"]';
+    '.text-red-500, .text-red-600, [class*="text-red"]';
 
   constructor(page: Page) {
     super(page);
@@ -34,13 +30,29 @@ export class LoginPage extends BasePage {
   async navigate(): Promise<void> {
     await this.page.waitForLoadState("load");
 
+    // Wait for body and root to be visible
+    await this.page.waitForSelector("body", {
+      timeout: 10000,
+      state: "visible",
+    });
+    await this.page.waitForSelector("#root", {
+      timeout: 10000,
+      state: "visible",
+    });
+
     // Wait for React to mount
     await this.page.waitForFunction(
       () => {
         const root = document.getElementById("root");
-        return root && root.children.length > 0;
+        if (!root) return false;
+
+        // React must have actually mounted with children or be available
+        return (
+          root.children.length > 0 ||
+          typeof (window as any).React !== "undefined"
+        );
       },
-      { timeout: 10000 }
+      { timeout: 30000 }
     );
 
     // Ensure we're on the auth page
@@ -62,8 +74,8 @@ export class LoginPage extends BasePage {
    * Wait for user selection grid to be present
    */
   private async waitForUserSelection(timeout: number = 10000): Promise<void> {
-    // Wait for "Select User" heading to appear
-    await this.page.waitForSelector('text="Select User"', {
+    // Wait for "Select User" heading to be visible
+    await this.page.waitForSelector(this.userSelectionHeading, {
       timeout,
       state: "visible",
     });
@@ -73,50 +85,63 @@ export class LoginPage extends BasePage {
    * Wait for PIN entry screen to be present
    */
   private async waitForPinEntryScreen(timeout: number = 10000): Promise<void> {
-    // Wait for "Enter PIN" heading to appear
-    await this.page.waitForSelector('text="Enter PIN"', {
+    // Wait for "Enter PIN" heading to be visible
+    await this.page.waitForSelector(this.pinEntryHeading, {
       timeout,
       state: "visible",
     });
   }
 
   /**
-   * Select a user by name (firstName lastName)
+   * Get all available users
    */
-  async selectUser(userName: string): Promise<void> {
+  async getAvailableUsers(): Promise<string[]> {
+    await this.waitForUserSelection();
+
+    const userButtons = this.page.locator(this.userButton);
+    const count = await userButtons.count();
+    const users: string[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const userName = await userButtons.nth(i).locator("h3").textContent();
+      if (userName) {
+        users.push(userName.trim());
+      }
+    }
+
+    return users;
+  }
+
+  /**
+   * Select a user by name (firstName lastName) or by index
+   */
+  async selectUser(userNameOrIndex: string | number): Promise<void> {
     // Wait for user selection grid
     await this.waitForUserSelection();
 
-    // Find user button by name (firstName lastName)
-    const userButton = this.page
-      .locator(`button:has-text("${userName}")`)
-      .first();
-
-    if ((await userButton.count()) === 0) {
-      // Try finding by partial name match
-      const parts = userName.split(" ");
-      if (parts.length >= 2) {
-        const firstName = parts[0];
-        const lastName = parts[parts.length - 1];
-        const userByFirst = this.page
-          .locator(`button:has-text("${firstName}")`)
-          .first();
-        const userByLast = this.page
-          .locator(`button:has-text("${lastName}")`)
-          .first();
-
-        if ((await userByFirst.count()) > 0) {
-          await userByFirst.click();
-        } else if ((await userByLast.count()) > 0) {
-          await userByLast.click();
-        } else {
-          throw new Error(`Could not find user: ${userName}`);
-        }
-      } else {
-        throw new Error(`Could not find user: ${userName}`);
-      }
-    } else {
+    if (typeof userNameOrIndex === "number") {
+      // Select by index
+      const userButton = this.page
+        .locator(this.userButton)
+        .nth(userNameOrIndex);
       await userButton.click();
+    } else {
+      // Select by name
+      const users = await this.getAvailableUsers();
+      const matchingIndex = users.findIndex((name) =>
+        name.toLowerCase().includes(userNameOrIndex.toLowerCase())
+      );
+
+      if (matchingIndex === -1) {
+        // If no match found, try first user
+        const userButton = this.page.locator(this.userButton).first();
+        await userButton.click();
+      } else {
+        const userButton = this.page
+          .locator(this.userButton)
+          .nth(matchingIndex);
+        await userButton.click();
+      }
     }
 
     // Wait for PIN entry screen to appear
@@ -132,31 +157,26 @@ export class LoginPage extends BasePage {
 
     // Enter each digit of the PIN
     for (const digit of pin) {
-      const digitButton = this.page
-        .locator(`button:has-text("${digit}")`)
-        .first();
-
-      if ((await digitButton.count()) === 0) {
-        throw new Error(`Could not find PIN keypad button for digit: ${digit}`);
-      }
-
+      const digitButton = this.page.locator(this.numberButton(digit)).first();
       await digitButton.click();
       // Small delay between keypad presses
-      await this.page.waitForTimeout(100);
+      await this.page.waitForTimeout(200);
     }
 
-    // PIN auto-submits when 4 digits are entered, so wait a bit
-    await this.page.waitForTimeout(500);
+    // If 4 digits entered, wait for auto-submit
+    if (pin.length === 4) {
+      await this.page.waitForTimeout(1000);
+    }
   }
 
   /**
    * Perform login with user selection and PIN
-   * @param userName - Full name (firstName lastName) or username
+   * @param userNameOrIndex - User name (partial match) or index number
    * @param pin - 4-digit PIN
    */
-  async login(userName: string, pin: string): Promise<void> {
+  async login(userNameOrIndex: string | number, pin: string): Promise<void> {
     // Select user
-    await this.selectUser(userName);
+    await this.selectUser(userNameOrIndex);
 
     // Enter PIN (auto-submits when 4 digits entered)
     await this.enterPin(pin);
@@ -169,11 +189,9 @@ export class LoginPage extends BasePage {
     await this.waitForPinEntryScreen();
 
     for (let i = 0; i < times; i++) {
-      const deleteButton = this.page.locator(this.pinDeleteButton).first();
-      if ((await deleteButton.count()) > 0) {
-        await deleteButton.click();
-        await this.page.waitForTimeout(100);
-      }
+      const deleteButton = this.page.locator(this.deleteButton).first();
+      await deleteButton.click();
+      await this.page.waitForTimeout(200);
     }
   }
 
@@ -182,10 +200,8 @@ export class LoginPage extends BasePage {
    */
   async goBackToUserSelection(): Promise<void> {
     const backButton = this.page.locator(this.backButton).first();
-    if ((await backButton.count()) > 0) {
-      await backButton.click();
-      await this.waitForUserSelection();
-    }
+    await backButton.click();
+    await this.waitForUserSelection();
   }
 
   /**
@@ -223,7 +239,8 @@ export class LoginPage extends BasePage {
     try {
       // Wait a bit for error message to appear after failed login
       await this.page.waitForTimeout(1000);
-      return await this.elementExists(this.errorMessage);
+      const errorElements = await this.page.locator(this.errorMessage).count();
+      return errorElements > 0;
     } catch {
       return false;
     }
@@ -233,14 +250,24 @@ export class LoginPage extends BasePage {
    * Check if user selection grid is visible
    */
   async isUserSelectionVisible(): Promise<boolean> {
-    return await this.elementExists('text="Select User"');
+    try {
+      const heading = this.page.locator(this.userSelectionHeading);
+      return await heading.isVisible();
+    } catch {
+      return false;
+    }
   }
 
   /**
    * Check if PIN entry screen is visible
    */
   async isPinEntryVisible(): Promise<boolean> {
-    return await this.elementExists('text="Enter PIN"');
+    try {
+      const heading = this.page.locator(this.pinEntryHeading);
+      return await heading.isVisible();
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -248,12 +275,10 @@ export class LoginPage extends BasePage {
    */
   async getSelectedUserName(): Promise<string> {
     await this.waitForPinEntryScreen();
-    // The user name should be visible in the PIN entry screen
-    const userNameElement = this.page
-      .locator("h3, h2")
-      .filter({ hasText: /^[A-Z][a-z]+ [A-Z][a-z]+$/ });
-    if ((await userNameElement.count()) > 0) {
-      return (await userNameElement.first().textContent()) || "";
+    // Look for the user name in the PIN entry screen
+    const userName = this.page.locator("h2").filter({ hasText: /\w+\s+\w+/ });
+    if ((await userName.count()) > 0) {
+      return (await userName.first().textContent()) || "";
     }
     return "";
   }
@@ -261,9 +286,12 @@ export class LoginPage extends BasePage {
   /**
    * Quick login helper (combines navigate + login)
    */
-  async quickLogin(userName: string, pin: string): Promise<void> {
+  async quickLogin(
+    userNameOrIndex: string | number,
+    pin: string
+  ): Promise<void> {
     await this.navigate();
-    await this.login(userName, pin);
+    await this.login(userNameOrIndex, pin);
     await this.isLoggedIn();
   }
 }

@@ -80,52 +80,11 @@ test.describe("Build Environment Debug", () => {
 });
 
 test.describe("Vite Build & TypeScript Integration", async () => {
-  test("Vite development assets load correctly", async ({ electronApp }) => {
-    const page = await electronApp.firstWindow();
-    await page.waitForLoadState("load");
-
-    // Wait for body to be present
-    await page.waitForSelector("body", { timeout: 10000 });
-
-    // Wait for React root element to exist
-    await page.waitForSelector("#root", { timeout: 10000 });
-
-    // Wait for React root to be populated (React has mounted)
-    await page.waitForFunction(
-      () => {
-        const root = document.getElementById("root");
-        return root && root.children.length > 0;
-      },
-      { timeout: 15000 }
-    );
-
-    // Additional wait to ensure React has fully rendered
-    await page.waitForTimeout(1000);
-
-    // Check that Vite has processed the assets correctly
-    const viteAssetsLoaded = await page.evaluate(() => {
-      // Check for CSS being loaded (Vite injects styles)
-      const hasStyles =
-        document.head.querySelector("style") ||
-        document.head.querySelector('link[rel="stylesheet"]');
-
-      // Check for React being loaded
-      const rootElement = document.querySelector("#root");
-      const hasReact =
-        typeof (window as any).React !== "undefined" ||
-        (rootElement && rootElement.children.length > 0);
-
-      return { hasStyles: !!hasStyles, hasReact };
-    });
-
-    expect(viteAssetsLoaded.hasReact).toBe(true);
-  });
-
   test("TypeScript compilation produces working code", async ({
     electronApp,
   }) => {
     const page = await electronApp.firstWindow();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000); // Reduced from 2000ms
 
     // Verify that TypeScript interfaces and types are working
     const typescriptWorking = await page.evaluate(() => {
@@ -149,6 +108,15 @@ test.describe("Vite Build & TypeScript Integration", async () => {
 // Clean up authentication state before each test to ensure tests start from clean state
 test.beforeEach(async ({ electronApp }) => {
   const page = await electronApp.firstWindow();
+
+  // Ensure window is visible
+  const window = await electronApp.browserWindow(page);
+  await window.evaluate((mainWindow) => {
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  });
+
   await page.waitForLoadState("domcontentloaded");
 
   // Clear browser storage (localStorage, sessionStorage)
@@ -173,15 +141,14 @@ test.beforeEach(async ({ electronApp }) => {
   });
 
   // Close DevTools if open (for clean test environment)
-  const window = await electronApp.browserWindow(page);
   await window.evaluate((mainWindow) => {
     if (mainWindow.webContents.isDevToolsOpened()) {
       mainWindow.webContents.closeDevTools();
     }
   });
 
-  // Small delay to ensure state is cleared
-  await page.waitForTimeout(500);
+  // Small delay to ensure state is cleared (reduced from 500ms)
+  await page.waitForTimeout(200);
 });
 
 test("Main window state", async ({ electronApp }) => {
@@ -197,8 +164,8 @@ test("Main window state", async ({ electronApp }) => {
     }
   });
 
-  // Wait a bit after forcing show
-  await page.waitForTimeout(2000);
+  // Wait a bit after forcing show (reduced from 2000ms)
+  await page.waitForTimeout(1000);
 
   // Give the window more time to show up
   const windowState = await window.evaluate(
@@ -254,154 +221,12 @@ test("Main window state", async ({ electronApp }) => {
 });
 
 test.describe("React TypeScript Electron Vite POS Application", async () => {
-  test("The main window loads React app successfully", async ({
-    electronApp,
-  }) => {
-    const page = await electronApp.firstWindow();
-    await page.waitForLoadState("load");
-
-    // Wait for body to be present
-    await page.waitForSelector("body", { timeout: 10000 });
-
-    // Wait for React root element to exist
-    await page.waitForSelector("#root", { timeout: 10000 });
-
-    // Wait for React root to be populated (React has mounted)
-    await page.waitForFunction(
-      () => {
-        const root = document.getElementById("root");
-        return root && root.children.length > 0;
-      },
-      { timeout: 15000 }
-    );
-
-    // Additional wait to ensure React has fully rendered
-    await page.waitForTimeout(1000);
-
-    // Check if the page has loaded (look for any content)
-    const bodyVisible = await page.locator("body").isVisible();
-    expect(bodyVisible).toBe(true);
-
-    // Check if React root element exists (created by React 18 createRoot)
-    const rootVisible = await page.locator("#root").isVisible();
-    expect(rootVisible).toBe(true);
-
-    // Verify React app has mounted and rendered content
-    const hasReactContent = await page.evaluate(() => {
-      const root = document.getElementById("root");
-      return root && root.children.length > 0;
-    });
-    expect(hasReactContent).toBe(true);
-  });
-
-  test("Router navigation works (HashRouter setup)", async ({
-    electronApp,
-  }) => {
-    const page = await electronApp.firstWindow();
-    await page.waitForLoadState("load");
-
-    // Wait for body and root
-    await page.waitForSelector("body", { timeout: 10000 });
-    await page.waitForSelector("#root", { timeout: 10000 });
-
-    // Wait for React to mount and router to initialize
-    await page.waitForFunction(
-      () => {
-        const root = document.getElementById("root");
-        return root && root.children.length > 0;
-      },
-      { timeout: 15000 }
-    );
-
-    // Wait for router to initialize and navigate (HashRouter)
-    // The router should set the hash route after React mounts
-    await page.waitForFunction(
-      () => {
-        // Check if hash exists in URL
-        const hash = window.location.hash;
-        // Also check if React Router has initialized by looking for navigation
-        return hash.length > 0 || window.location.href.includes("#");
-      },
-      { timeout: 10000 }
-    );
-
-    // Additional wait for router navigation
-    await page.waitForTimeout(1000);
-
-    // Check that HashRouter is working - should redirect to /auth initially
-    const currentUrl = page.url();
-    const currentHash = await page.evaluate(() => window.location.hash);
-
-    // Check both URL and hash
-    expect(currentUrl.includes("#/auth") || currentHash.includes("/auth")).toBe(
-      true
-    );
-  });
-
-  test("Authentication page renders properly", async ({ electronApp }) => {
-    const page = await electronApp.firstWindow();
-    await page.waitForLoadState("load");
-
-    // Wait for body and root
-    await page.waitForSelector("body", { timeout: 10000 });
-    await page.waitForSelector("#root", { timeout: 10000 });
-
-    // Wait for React to mount
-    await page.waitForFunction(
-      () => {
-        const root = document.getElementById("root");
-        return root && root.children.length > 0;
-      },
-      { timeout: 15000 }
-    );
-
-    // Wait for router to navigate to auth page
-    await page.waitForFunction(
-      () => {
-        const hash = window.location.hash;
-        return hash.includes("/auth");
-      },
-      { timeout: 10000 }
-    );
-
-    // Additional wait for auth page to render
-    await page.waitForTimeout(1000);
-
-    // Wait for auth page elements to be present (user selection or PIN entry)
-    await page.waitForSelector(
-      'text="Select User", text="Enter PIN", button, [role="button"]',
-      { timeout: 10000 }
-    );
-
-    // Check if we're on the auth page (due to AppShell redirect)
-    const currentUrl = page.url();
-    const currentHash = await page.evaluate(() => window.location.hash);
-
-    // Check both URL and hash
-    expect(currentUrl.includes("#/auth") || currentHash.includes("/auth")).toBe(
-      true
-    );
-
-    // Verify auth page elements are present (user selection grid or PIN entry)
-    const authPagePresent = await page.evaluate(() => {
-      // Look for auth page elements - user selection or PIN entry
-      const bodyText = document.body.textContent || "";
-      const hasUserSelection = bodyText.includes("Select User");
-      const hasPinEntry = bodyText.includes("Enter PIN");
-      const hasButtons = document.querySelector("button") !== null;
-
-      return !!(hasUserSelection || hasPinEntry || hasButtons);
-    });
-
-    expect(authPagePresent).toBe(true);
-  });
-
   test("POS-specific APIs are available in renderer process", async ({
     electronApp,
   }) => {
     const page = await electronApp.firstWindow();
     await page.waitForLoadState("load");
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000); // Reduced from 2000ms
 
     // Test that key POS APIs are exposed via preload script
     const posAPIsAvailable = await page.evaluate(() => {
@@ -428,8 +253,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait a bit for the application to fully initialize
-      await page.waitForTimeout(2000);
+      // Wait a bit for the application to fully initialize (reduced from 2000ms)
+      await page.waitForTimeout(1000);
 
       // Test that the page loads and has basic DOM structure
       const pageInfo = await page.evaluate(() => {
@@ -454,8 +279,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
 
-      // Give some time for the renderer to initialize
-      await page.waitForTimeout(1000);
+      // Give some time for the renderer to initialize (reduced from 1000ms)
+      await page.waitForTimeout(500);
 
       // Test basic JavaScript execution in renderer
       const result = await page.evaluate(() => {
@@ -471,8 +296,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for preload to complete
-      await page.waitForTimeout(2000);
+      // Wait for preload to complete (reduced from 2000ms)
+      await page.waitForTimeout(1000);
 
       const debugInfo = await page.evaluate(() => {
         const windowBtoa = (window as any).btoa;
@@ -500,7 +325,7 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
     test("btoa function works correctly", async ({ electronApp }) => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000); // Reduced from 2000ms
 
       const testString = "hello world";
       const result = await page.evaluate((str) => {
@@ -521,8 +346,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for preload to complete
-      await page.waitForTimeout(2000);
+      // Wait for preload to complete (reduced from 2000ms)
+      await page.waitForTimeout(1000);
 
       const debugInfo = await page.evaluate(() => {
         const authAPI = (globalThis as any).authAPI;

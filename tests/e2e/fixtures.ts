@@ -10,7 +10,7 @@ process.env.PLAYWRIGHT_TEST = "true";
 
 /**
  * E2E Test Fixtures for AuraSwift POS System
- * 
+ *
  * This file contains the shared test fixtures that can be imported by all E2E test files.
  * Playwright doesn't allow test files to import other test files, so fixtures are
  * extracted into this separate non-test file.
@@ -117,7 +117,7 @@ export const test = base.extend<TestFixtures>({
         electronApp = await electron.launch({
           executablePath: executablePath,
           args: launchArgs,
-          timeout: 60000, // Increase timeout for CI with native modules
+          timeout: 30000, // Reduced from 60000ms for faster startup
           env: {
             ...process.env,
             NODE_ENV: "test",
@@ -145,7 +145,7 @@ export const test = base.extend<TestFixtures>({
             electronApp = await electron.launch({
               executablePath: electronBinary,
               args: [devMainEntry, ...launchArgs],
-              timeout: 60000,
+              timeout: 30000, // Reduced from 60000ms for faster startup
               env: {
                 ...process.env,
                 NODE_ENV: "test",
@@ -179,6 +179,57 @@ export const test = base.extend<TestFixtures>({
         });
       });
 
+      // Ensure the first window is shown and ready
+      const firstWindow = await electronApp.firstWindow();
+      const browserWindow = await electronApp.browserWindow(firstWindow);
+
+      // Show the window if it's hidden and wait for it to be ready
+      await browserWindow.evaluate((mainWindow) => {
+        if (!mainWindow.isVisible()) {
+          mainWindow.show();
+        }
+      });
+
+      // Wait for window to be ready (with timeout)
+      try {
+        await browserWindow.evaluate((mainWindow) => {
+          return new Promise<void>((resolve) => {
+            if (mainWindow.isReady()) {
+              resolve();
+              return;
+            }
+            const timeout = setTimeout(() => resolve(), 10000);
+            mainWindow.once("ready-to-show", () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+          });
+        });
+      } catch (error) {
+        // If ready-to-show fails, continue anyway after a short delay
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      // Wait for the page to be ready
+      await firstWindow.waitForLoadState("domcontentloaded");
+
+      // Wait for basic DOM structure (body and root) to be visible
+      try {
+        await firstWindow.waitForSelector("body", {
+          timeout: 10000,
+          state: "visible",
+        });
+        await firstWindow.waitForSelector("#root", {
+          timeout: 10000,
+          state: "visible",
+        });
+      } catch (error) {
+        // Log but don't fail - some tests might handle this differently
+        console.warn(
+          "[Test Setup] Body or root not visible immediately, tests will handle this"
+        );
+      }
+
       await use(electronApp);
 
       // This code runs after all the tests in the worker process.
@@ -191,4 +242,3 @@ export const test = base.extend<TestFixtures>({
     await use(await electronApp.evaluate(() => process.versions));
   },
 });
-
