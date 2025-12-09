@@ -25,7 +25,7 @@
 
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath } from "url";
 import {
   existsSync,
   copyFileSync,
@@ -34,15 +34,36 @@ import {
   statSync,
   unlinkSync,
 } from "node:fs";
-import { app } from "electron";
 import Database from "better-sqlite3";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema.js";
 
-import { getLogger } from '../utils/logger.js';
-const logger = getLogger('drizzle-migrator');
+import { getLogger } from "../utils/logger.js";
+const logger = getLogger("drizzle-migrator");
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Check if we're running in Electron context
+ */
+function isElectronContext(): boolean {
+  try {
+    require.resolve("electron");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get electron app instance (only in Electron context)
+ */
+function getElectronApp() {
+  if (isElectronContext()) {
+    return require("electron").app;
+  }
+  return null;
+}
 
 /**
  * Get migrations folder path - handles both development and production
@@ -62,8 +83,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * @throws Error if folder not found (in production)
  */
 function getMigrationsFolder(): string {
-  // In development, use source folder
-  if (!app.isPackaged) {
+  const app = getElectronApp();
+
+  // If not in Electron context (CLI mode), use development path
+  if (!app || !app.isPackaged) {
     const devPath = join(__dirname, "migrations");
     if (!existsSync(devPath)) {
       throw new Error(
@@ -105,7 +128,7 @@ function getMigrationsFolder(): string {
   }
 
   // Option 3: Check in app path (if migrations are at app root)
-  const appPath = app.getAppPath();
+  const appPath = app ? app.getAppPath() : process.cwd();
   const appMigrationsPath = join(
     appPath,
     "node_modules",
@@ -320,7 +343,8 @@ export async function runDrizzleMigrations(
   dbPath: string
 ): Promise<boolean> {
   let backupPath = "";
-  const isProduction = app.isPackaged;
+  const app = getElectronApp();
+  const isProduction = app ? app.isPackaged : false;
   const migrationsFolder = getMigrationsFolder();
 
   try {
@@ -340,9 +364,10 @@ export async function runDrizzleMigrations(
         "   💡 Make sure migrations are bundled with the app in production"
       );
       logger.error(`   📍 Current __dirname: ${__dirname}`);
+      const app = getElectronApp();
       logger.error(
         `   📍 App path: ${
-          app.isPackaged ? app.getAppPath() : "N/A (dev mode)"
+          app && app.isPackaged ? app.getAppPath() : "N/A (dev mode)"
         }`
       );
       logger.error(`   📍 Resources path: ${process.resourcesPath || "N/A"}`);
@@ -361,9 +386,7 @@ export async function runDrizzleMigrations(
           }
         } catch (e) {
           const errorMessage = e instanceof Error ? e.message : String(e);
-          logger.error(
-            `   ⚠️  Could not read dist directory: ${errorMessage}`
-          );
+          logger.error(`   ⚠️  Could not read dist directory: ${errorMessage}`);
         }
       }
 

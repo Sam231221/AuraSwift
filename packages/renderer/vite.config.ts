@@ -51,11 +51,10 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV === "development" ? "inline" : "hidden", // Hidden for production
     // Electron: Target Electron's Chromium version for optimal performance
     target: "esnext", // Electron uses modern Chromium
-    // CSS code splitting (beneficial for desktop apps)
-    cssCodeSplit: true,
+    // Electron: Disable CSS code splitting - bundle CSS together for reliability
+    cssCodeSplit: false, // Single CSS file for Electron
     // Electron: Larger chunks acceptable (local disk vs network)
-    // VS Code uses ~1MB chunks, we can be more lenient
-    chunkSizeWarningLimit: 1000, // Warn if chunk > 1MB (desktop app)
+    chunkSizeWarningLimit: 2000, // Warn if chunk > 2MB (desktop apps can handle it)
     rollupOptions: {
       // Tree-shaking (critical for desktop apps - reduce memory footprint)
       treeshake: {
@@ -66,90 +65,28 @@ export default defineConfig({
         tryCatchDeoptimization: false,
       },
       output: {
-        // Intelligent chunking strategy for optimal code-splitting
+        // ELECTRON FIX: Simplified chunking for reliable path resolution
+        // Electron apps don't benefit from aggressive code splitting like web apps
+        // Dynamic imports with file:// protocol can fail in packaged apps
         manualChunks: (id) => {
-          // Feature-based chunking (prioritize by size and usage)
-          const featurePatterns = [
-            { pattern: "/features/inventory/", name: "feature-inventory" },
-            { pattern: "/features/sales/", name: "feature-sales" },
-            { pattern: "/features/users/", name: "feature-users" },
-            { pattern: "/features/rbac/", name: "feature-rbac" },
-            { pattern: "/features/settings/", name: "feature-settings" },
-            { pattern: "/features/staff/", name: "feature-staff" },
-            { pattern: "/features/auth/", name: "feature-auth" },
-            { pattern: "/features/dashboard/", name: "feature-dashboard" },
-          ];
-
-          for (const { pattern, name } of featurePatterns) {
-            if (id.includes(pattern)) {
-              return name;
-            }
-          }
-
-          // Navigation system chunk
-          if (id.includes("/navigation/")) {
-            return "navigation";
-          }
-
-          // Shared utilities chunk
-          if (id.includes("/shared/")) {
-            return "shared";
-          }
-
-          // Vendor chunking strategy (optimize for caching)
+          // Only split heavy vendor libraries to keep bundles manageable
           if (id.includes("node_modules")) {
-            // React core (rarely changes, separate chunk)
+            // React ecosystem (stable, rarely changes)
             if (id.includes("react") || id.includes("react-dom")) {
               return "vendor-react";
             }
 
-            // UI libraries (Radix UI - separate for better caching)
-            if (id.includes("@radix-ui")) {
-              return "vendor-ui-radix";
-            }
-
-            // Form libraries (often used together)
-            if (
-              id.includes("react-hook-form") ||
-              id.includes("zod") ||
-              id.includes("@hookform")
-            ) {
-              return "vendor-forms";
-            }
-
-            // State management
-            if (id.includes("zustand") || id.includes("jotai")) {
-              return "vendor-state";
-            }
-
-            // Large libraries (separate to prevent bloating main vendor)
-            if (
-              id.includes("date-fns") ||
-              id.includes("lodash") ||
-              id.includes("moment")
-            ) {
-              return "vendor-utils";
-            }
-
-            // Other vendors (group smaller libraries)
+            // All other vendors in one chunk for reliability
             return "vendor";
           }
 
-          return undefined; // Let Rollup handle other modules
+          // Bundle all app code together (features, navigation, shared)
+          // This prevents dynamic import path resolution issues in Electron
+          return undefined;
         },
 
-        // Better chunk naming for debugging
-        chunkFileNames: (chunkInfo) => {
-          const facadeModuleId = chunkInfo.facadeModuleId
-            ? chunkInfo.facadeModuleId
-                .split("/")
-                .pop()
-                ?.replace(/\.[^.]*$/, "")
-            : "chunk";
-          return `chunks/${facadeModuleId}-[hash].js`;
-        },
-
-        // Entry chunk naming
+        // Simpler chunk naming (no subdirectories for Electron)
+        chunkFileNames: "assets/[name]-[hash].js",
         entryFileNames: "assets/[name]-[hash].js",
 
         // Asset naming

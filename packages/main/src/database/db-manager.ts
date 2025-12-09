@@ -1,7 +1,14 @@
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { app, dialog } from "electron";
+import {
+  getElectronApp,
+  getElectronDialog,
+  getUserDataPath,
+  getAppPath,
+  getAppVersion,
+  isPackaged,
+} from "./utils/electron-safe.js";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { runDrizzleMigrations } from "./drizzle-migrator.js";
 import Database from "better-sqlite3";
@@ -222,7 +229,8 @@ export class DBManager {
               // Retry opening
               this.db = new Database(dbPath);
             } else if (action === "cancel") {
-              app.quit();
+              const app = getElectronApp();
+              app?.quit();
               return;
             } else {
               throw new Error(
@@ -317,13 +325,14 @@ export class DBManager {
             "Cannot Open Database",
             "This database was created with a newer version of AuraSwift.\n\n" +
               "Please update the application to the latest version to continue.\n\n" +
-              `Current app version: ${app.getVersion()}\n` +
+              `Current app version: ${getAppVersion()}\n` +
               "Database requires a newer version."
           );
 
           // Force quit the app immediately
           // Use exit(1) as a fallback if quit() doesn't work
-          app.quit();
+          const app = getElectronApp();
+          app?.quit();
 
           // Set a timeout to force exit if quit doesn't work within 1 second
           setTimeout(() => {
@@ -464,7 +473,7 @@ export class DBManager {
       // Developers frequently switch branches with different versions,
       // and the database schema should remain compatible
       if (isDevelopmentMode()) {
-        const appVersion = app.getVersion();
+        const appVersion = getAppVersion();
         logger.info(
           `Development mode: Skipping downgrade detection (current version: ${appVersion})`
         );
@@ -493,7 +502,7 @@ export class DBManager {
       }
 
       // Get app version
-      const appVersion = app.getVersion();
+      const appVersion = getAppVersion();
 
       // Check if database has migration tracking table
       const tableExists = db
@@ -630,8 +639,8 @@ export class DBManager {
       isDev,
       NODE_ENV: process.env.NODE_ENV,
       ELECTRON_IS_DEV: process.env.ELECTRON_IS_DEV,
-      isPackaged: app.isPackaged,
-      appVersion: app.getVersion(),
+      isPackaged: isPackaged(),
+      appVersion: getAppVersion(),
     });
 
     // Allow override via environment variable for testing
@@ -669,8 +678,8 @@ export class DBManager {
       logger.info(`Database path: ${finalPath}`);
     } else {
       // Production: Use proper user data directory based on platform
-      // Note: app.getPath("userData") already includes the app name (e.g., "AuraSwift")
-      const userDataPath = app.getPath("userData");
+      // Note: getUserDataPath() already includes the app name (e.g., "AuraSwift")
+      const userDataPath = getUserDataPath();
       finalPath = path.join(userDataPath, "pos_system.db");
       logger.info("Production mode: Using user data directory for database");
       logger.info(`User data path: ${userDataPath}`);
@@ -699,7 +708,7 @@ export class DBManager {
    */
   private getMigrationsFolder(): string {
     // In development, use source folder
-    if (!app.isPackaged) {
+    if (!isPackaged()) {
       return path.join(__dirname, "migrations");
     }
 
@@ -722,7 +731,7 @@ export class DBManager {
     }
 
     // Option 3: Check in app path
-    const appPath = app.getAppPath();
+    const appPath = getAppPath();
     const appMigrationsPath = path.join(
       appPath,
       "node_modules",
@@ -775,12 +784,14 @@ export class DBManager {
               ? `Expected location: ${backupPath}`
               : "No backup path provided"
           );
-          app.quit();
+          const app1 = getElectronApp();
+          app1?.quit();
         }
         break;
 
       case "cancel":
-        app.quit();
+        const app2 = getElectronApp();
+        app2?.quit();
         break;
     }
   }

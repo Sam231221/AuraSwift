@@ -34,7 +34,7 @@ import { getDatabaseInfo } from "./utils/dbInfo.js";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import * as schema from "./schema.js";
-import { seedDefaultData } from "./seed.js";
+import { BasicDataGenerator } from "./seed-data/generators/basic-data-generator.js";
 
 import { getLogger } from "../utils/logger.js";
 const logger = getLogger("index");
@@ -108,16 +108,49 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     // Initialize Drizzle ORM
     const drizzle = initializeDrizzle(db);
 
-    // Seed database with default data if needed
+    // ========================================
+    // AUTOMATIC FIRST-RUN SEEDING
+    // ========================================
+    // Automatically seeds basic data (users, roles, business, terminal) on first run
+    // when the database is empty. This ensures the app works out-of-the-box for
+    // production releases.
+    //
+    // For additional test data during development, use:
+    //   npm run seed:small    - Basic + 2,000 products
+    //   npm run seed:medium   - Basic + 10,000 products
+    //
+    // See: packages/main/src/database/seed-data/README.md
+    // ========================================
+
     try {
-      await seedDefaultData(drizzle as any, schema);
+      // Check if this is the first run (no business exists)
+      const hasBasicData = await BasicDataGenerator.hasBasicData(
+        drizzle as any,
+        schema
+      );
+
+      if (!hasBasicData) {
+        logger.info("🌱 First run detected - seeding essential system data...");
+        logger.info(
+          "   This creates default users, roles, business, and terminal."
+        );
+
+        await BasicDataGenerator.seedBasicData(drizzle as any, schema, false);
+
+        logger.info("✅ First-run seeding completed!");
+        logger.info("");
+        logger.info("📋 You can now log in with:");
+        logger.info("   Username: MrAdmin");
+        logger.info("   Password: admin123");
+        logger.info("   PIN: 1234");
+        logger.info("");
+      }
     } catch (error) {
-      // Provide detailed error context for seeding failures
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
 
-      logger.error("❌ Database seeding failed:");
+      logger.error("❌ First-run database seeding failed:");
       logger.error(`   Error: ${errorMessage}`);
       if (errorStack) {
         logger.error(`   Stack: ${errorStack}`);
@@ -126,7 +159,7 @@ export async function getDatabase(): Promise<DatabaseManagers> {
         "   ⚠️  Warning: Database may be partially initialized. Some default data may be missing."
       );
       logger.error(
-        "   💡 You may need to manually seed the database or restart the application."
+        "   💡 You may need to manually seed the database using: npm run seed:basic"
       );
 
       // Don't throw - allow app to continue even if seeding fails

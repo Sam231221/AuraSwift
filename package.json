@@ -68,11 +68,18 @@
     "db:introspect": "drizzle-kit introspect",
     "db:bridge": "node scripts/bridge-migration.mjs",
     "migrate:rbac": "tsx packages/main/src/scripts/migrate-rbac.ts",
+    "seed:basic": "tsx packages/main/src/database/seed-data/cli.ts basic",
+    "seed:minimal": "tsx packages/main/src/database/seed-data/cli.ts minimal",
+    "seed:small": "tsx packages/main/src/database/seed-data/cli.ts small",
+    "seed:medium": "tsx packages/main/src/database/seed-data/cli.ts medium",
+    "seed:large": "tsx packages/main/src/database/seed-data/cli.ts large",
+    "seed:xlarge": "tsx packages/main/src/database/seed-data/cli.ts xlarge",
     "analyze:packages": "node scripts/analyze-package-sizes.mjs",
     "analyze:bundle": "cd packages/renderer && ANALYZE=true npm run build"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
+    "@faker-js/faker": "^10.1.0",
     "@npmcli/map-workspaces": "5.0.0",
     "@playwright/test": "1.55.0",
     "@semantic-release/changelog": "^6.0.3",
