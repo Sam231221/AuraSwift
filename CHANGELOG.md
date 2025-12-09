@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.17.0](https://github.com/Sam231221/AuraSwift/compare/v1.16.0...v1.17.0) (2025-12-09)
+
+
+* fixnavigation): overhaul navigation system to support lazy loading, error boundaries, and improved performance metrics; remove legacy route mapping and integrate browser history ([](https://github.com/Sam231221/AuraSwift/commit/731b4e81692ccda36f7d4f3fb93fc937650aaf3d))
+* fixplaywright.config): reduce test timeouts for improved test execution speed; update comments for clarity ([](https://github.com/Sam231221/AuraSwift/commit/7dd3d8cde73e5656a40cbe6a6e13e38cc256cb7c))
+
+
+### chore
+
+* **package.json:** update postinstall script to specify architectures and modules for electron-rebuild ([](https://github.com/Sam231221/AuraSwift/commit/19fcc58454eab23d5bad0a0d6d7055272987cc2a))
+
+
+### feat
+
+* **tests:** add comprehensive structure documentation for tests directory; introduce integration tests README; enhance E2E tests with shared fixtures and hardware integration tests ([](https://github.com/Sam231221/AuraSwift/commit/3432bf2641760decb799c08d98bd6c80a6af776b))
+* **tests:** add conditional Playwright installation and E2E test execution based on test presence; improve workflow efficiency ([](https://github.com/Sam231221/AuraSwift/commit/b064c80a4cb34b7597c1e00d3349204d50fe291e))
+* **WindowManager:** add option to remove title bar from window for a cleaner UI ([](https://github.com/Sam231221/AuraSwift/commit/72fa30a41c4c0daa0ea9f9267c286e1e7301d2bb))
+* **package-size-analysis:** add script to analyze package sizes and their impact on the app bundle; update build configurations for platform-specific file exclusions ([](https://github.com/Sam231221/AuraSwift/commit/463c1b8d0ae6a29c15493c7a5f218aa257ee89fd))
+* **e2e-tests:** enhance end-to-end tests with improved waiting mechanisms for React components and routing; update README for better test documentation and structure; refactor database setup utilities for clarity and functionality ([](https://github.com/Sam231221/AuraSwift/commit/eb68c3aa434b60f52fb3796ea5599065f3455871))
+* **tests:** enhance testing scripts and configurations; add new test commands for coverage and staged tests; update Playwright config for better clarity; remove outdated testing documentation ([](https://github.com/Sam231221/AuraSwift/commit/c3b0ebdee97581c629fc78376ff09be94aca7336))
+* **lazy-component-loader:** implement a simplified lazy component loader with improved caching, error handling, and reduced complexity ([](https://github.com/Sam231221/AuraSwift/commit/1039aff058463189626ee276db3e14ba61c6c071))
+* **app-quit:** implement IPC handler for application quit functionality and add quit method to appAPI ([](https://github.com/Sam231221/AuraSwift/commit/9db7a1820137427b27614e2805ab55681879ce4e))
+* **new-transaction-view:** integrate barcode scanner for product selection and validation ([](https://github.com/Sam231221/AuraSwift/commit/874a076f1331cc5da2266298c8705174507ece7d))
+
+
+### fix
+
+* **tests:** extract shared E2E test fixtures into a separate file for improved organization and reusability; update test imports accordingly ([](https://github.com/Sam231221/AuraSwift/commit/61118529d25058e26b42daf18ff4fd8318cb3b41))
+* **navigation:** update browser history integration to improve error handling and stability; adjust default enableHistory setting ([](https://github.com/Sam231221/AuraSwift/commit/f34ee946b5bcdf867e6dac0eecb78f2f8d88cb36))
+* **e2e-tests:** update comment to reflect AppShell redirect instead of ProtectedRoute ([](https://github.com/Sam231221/AuraSwift/commit/45247d4c49a3f01df7cfbd2b9de21473423175f6))
+
+
+### refactor
+
+* **paymentService:** enhance type safety and implement dynamic import for HID module to improve error handling ([](https://github.com/Sam231221/AuraSwift/commit/ff431834ab04af2b8bf33c424514913419f428ce))
+* **AutoUpdater:** improve code readability by formatting conditional statement for download progress logging ([](https://github.com/Sam231221/AuraSwift/commit/361c2774afef619b52073e68c3c1785ea422a23b))
+* **db-manager:** improve code readability by standardizing string quotes and formatting; enhance error handling for database directory creation and initialization state management ([](https://github.com/Sam231221/AuraSwift/commit/34d3bd774f1ba005fa414d79f5f80b0d3a7ae598))
+* **tests:** streamline E2E tests by removing redundant authentication tests and optimizing wait times; enhance LoginPage object for better user interaction handling ([](https://github.com/Sam231221/AuraSwift/commit/ee1e4e747cb75f364bbdc32219e770f5fb319c41))
+* **logging:** streamline logger usage across components by removing unnecessary logs and enhancing error handling comments ([](https://github.com/Sam231221/AuraSwift/commit/c58f5ce3d35c3f2936e3436c8ac4e232fc3c84fa))
+
 # [1.16.0](https://github.com/Sam231221/AuraSwift/compare/v1.15.0...v1.16.0) (2025-12-05)
 
 
