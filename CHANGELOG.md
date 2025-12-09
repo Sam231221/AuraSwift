@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.19.0](https://github.com/Sam231221/AuraSwift/compare/v1.18.0...v1.19.0) (2025-12-09)
+
+
+### feat
+
+* **database:** add manual seeding commands and enhance seeding process; implement bulk data generation for testing ([](https://github.com/Sam231221/AuraSwift/commit/6022ce90940e67542e729dade377afb4c78cfbfa))
+
+
+### fix
+
+* **db-manager:** add error dialog for database opening failure; improve user feedback on initialization issues ([](https://github.com/Sam231221/AuraSwift/commit/a878f55520b6acb12480f29a34a2d090cb881fad))
+
 # [1.18.0](https://github.com/Sam231221/AuraSwift/compare/v1.17.0...v1.18.0) (2025-12-09)
 
 
