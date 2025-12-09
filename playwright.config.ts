@@ -17,12 +17,12 @@ export default defineConfig({
   // Test file patterns - match .spec.ts files in e2e directory
   testMatch: /.*\.spec\.ts/,
 
-  // Timeout for each test (60 seconds)
-  timeout: 60000,
+  // Timeout for each test (30 seconds - reduced from 60)
+  timeout: 30000,
 
-  // Expect timeout (10 seconds)
+  // Expect timeout (5 seconds - reduced from 10)
   expect: {
-    timeout: 10000,
+    timeout: 5000,
   },
 
   // Run tests sequentially (Electron limitation)
@@ -64,7 +64,7 @@ export default defineConfig({
     video: "retain-on-failure",
 
     // Maximum time each action such as `click()` can take
-    actionTimeout: 10000,
+    actionTimeout: 5000,
   },
 
   // Test projects
