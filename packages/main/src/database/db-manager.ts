@@ -311,6 +311,8 @@ export class DBManager {
           // Reset initialization state to prevent getDb() from being called
           this.initialized = false;
           this.initializationPromise = null;
+
+          // Show error dialog
           dialog.showErrorBox(
             "Cannot Open Database",
             "This database was created with a newer version of AuraSwift.\n\n" +
@@ -318,7 +320,17 @@ export class DBManager {
               `Current app version: ${app.getVersion()}\n` +
               "Database requires a newer version."
           );
+
+          // Force quit the app immediately
+          // Use exit(1) as a fallback if quit() doesn't work
           app.quit();
+
+          // Set a timeout to force exit if quit doesn't work within 1 second
+          setTimeout(() => {
+            logger.error("Force exiting app after downgrade detection");
+            process.exit(1);
+          }, 1000);
+
           // Throw error to prevent getDatabase() from trying to access the database
           throw new Error(
             "Database downgrade detected - app version is older than database schema. Please update the application."
@@ -442,9 +454,44 @@ export class DBManager {
   /**
    * Check if user is trying to open a newer database with an older app version
    * This prevents crashes from schema mismatches during downgrades
+   *
+   * NOTE: In development mode, this check is skipped to allow developers
+   * to freely switch between branches/versions without database conflicts
    */
   private checkForDowngrade(db: Database.Database, dbPath: string): boolean {
     try {
+      // Skip downgrade detection in development mode
+      // Developers frequently switch branches with different versions,
+      // and the database schema should remain compatible
+      if (isDevelopmentMode()) {
+        const appVersion = app.getVersion();
+        logger.info(
+          `Development mode: Skipping downgrade detection (current version: ${appVersion})`
+        );
+        // Still update the stored version for consistency
+        const versionTableExists = db
+          .prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='_app_version'"
+          )
+          .get();
+
+        if (!versionTableExists) {
+          db.exec(`
+            CREATE TABLE IF NOT EXISTS _app_version (
+              id INTEGER PRIMARY KEY CHECK (id = 1),
+              version TEXT NOT NULL,
+              updated_at INTEGER NOT NULL
+            );
+          `);
+        }
+
+        db.prepare(
+          "INSERT OR REPLACE INTO _app_version (id, version, updated_at) VALUES (1, ?, ?)"
+        ).run(appVersion, Date.now());
+
+        return false; // Never block in development
+      }
+
       // Get app version
       const appVersion = app.getVersion();
 
@@ -578,6 +625,15 @@ export class DBManager {
     // Use centralized environment detection
     const isDev = isDevelopmentMode();
 
+    // Log environment detection for debugging
+    logger.info("Environment detection:", {
+      isDev,
+      NODE_ENV: process.env.NODE_ENV,
+      ELECTRON_IS_DEV: process.env.ELECTRON_IS_DEV,
+      isPackaged: app.isPackaged,
+      appVersion: app.getVersion(),
+    });
+
     // Allow override via environment variable for testing
     const customDbPath = process.env.POS_DB_PATH;
     if (customDbPath) {
@@ -617,6 +673,8 @@ export class DBManager {
       const userDataPath = app.getPath("userData");
       finalPath = path.join(userDataPath, "pos_system.db");
       logger.info("Production mode: Using user data directory for database");
+      logger.info(`User data path: ${userDataPath}`);
+      logger.info(`Database path: ${finalPath}`);
     }
 
     // Validate path doesn't contain invalid characters
