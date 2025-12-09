@@ -321,6 +321,7 @@ export class DBManager {
           this.initializationPromise = null;
 
           // Show error dialog
+          const dialog = getElectronDialog();
           dialog.showErrorBox(
             "Cannot Open Database",
             "This database was created with a newer version of AuraSwift.\n\n" +
