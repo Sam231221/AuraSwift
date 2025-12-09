@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.18.0](https://github.com/Sam231221/AuraSwift/compare/v1.17.0...v1.18.0) (2025-12-09)
+
+
+### feat
+
+* **db-manager:** implement database downgrade detection and error handling; enhance development mode logging and environment detection ([](https://github.com/Sam231221/AuraSwift/commit/c8c7d84b2e0b6fa67bfdb5344b7a4d6aebee6f62))
+
 # [1.17.0](https://github.com/Sam231221/AuraSwift/compare/v1.16.0...v1.17.0) (2025-12-09)
 
 
