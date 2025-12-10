@@ -10,6 +10,8 @@ import { RBAC_PERMISSIONS } from "./permissions";
 import { RBAC_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
+import RoleManagementView from "../views/role-management-view";
+import UserRoleAssignmentView from "../views/user-role-assignment-view";
 
 /**
  * RBAC Feature Configuration for Dashboard
@@ -50,7 +52,7 @@ export const rbacViews: Record<string, ViewConfig> = {
   [RBAC_ROUTES.ROLE_MANAGEMENT]: {
     id: RBAC_ROUTES.ROLE_MANAGEMENT,
     level: "root",
-    componentLoader: () => import("../views/role-management-view"),
+    component: RoleManagementView,
     metadata: {
       title: "Role Management",
       description: "Manage RBAC roles",
@@ -58,14 +60,12 @@ export const rbacViews: Record<string, ViewConfig> = {
     permissions: [RBAC_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    preloadStrategy: "preload",
-    loadPriority: 7,
     cacheable: true,
   },
   [RBAC_ROUTES.USER_ROLE_ASSIGNMENT]: {
     id: RBAC_ROUTES.USER_ROLE_ASSIGNMENT,
     level: "root",
-    componentLoader: () => import("../views/user-role-assignment-view"),
+    component: UserRoleAssignmentView,
     metadata: {
       title: "User Role Assignment",
       description: "Assign roles to users",
@@ -73,8 +73,6 @@ export const rbacViews: Record<string, ViewConfig> = {
     permissions: [RBAC_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    preloadStrategy: "preload",
-    loadPriority: 7,
     cacheable: true,
   },
 };

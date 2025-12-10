@@ -16,6 +16,7 @@ import { rbacViews } from "@/features/rbac/config/feature-config";
 import { usersViews } from "@/features/users/config/feature-config";
 import { salesViews } from "@/features/sales/config/feature-config";
 import { authViews } from "@/features/auth/config/feature-config";
+import DashboardPageWrapper from "../components/dashboard-page-wrapper";
 
 const logger = getLogger("view-registry");
 
@@ -24,12 +25,6 @@ const logger = getLogger("view-registry");
  *
  * All views in the application are registered here with their configuration.
  * Views can be organized hierarchically using parentId.
- * 
- * IMPORTANT FOR ELECTRON: Keep componentLoader as dynamic imports!
- * - Dynamic imports enable true lazy loading (features load on-demand)
- * - Reduces memory usage and improves startup time
- * - Works perfectly with Electron's file:// protocol when modulePreload is disabled
- * - DO NOT convert to static imports or the entire app will load upfront
  */
 export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   // ============================================================================
@@ -38,14 +33,12 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   dashboard: {
     id: "dashboard",
     level: "root",
-    componentLoader: () => import("../components/dashboard-page-wrapper"),
+    component: DashboardPageWrapper,
     metadata: {
       title: "Dashboard",
       description: "Main dashboard",
     },
     requiresAuth: true,
-    preloadStrategy: "eager",
-    loadPriority: 10,
     cacheable: true,
   },
 

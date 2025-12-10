@@ -3,11 +3,9 @@
  *
  * Generic wrapper component that adds navigation functionality
  * to views that expect onBack callback props.
- * Now supports lazy loading with error boundaries.
  */
 
 import { useNavigation } from "../hooks/use-navigation";
-import { LazyComponentLoader } from "../utils/lazy-component-loader";
 import { ViewErrorBoundary } from "./view-error-boundary";
 import type { ViewConfig, ViewComponentProps } from "../types/navigation.types";
 
@@ -21,7 +19,7 @@ interface ViewWrapperProps {
 /**
  * View Wrapper Component
  *
- * Wraps view components and handles lazy loading, error boundaries, and prop injection.
+ * Wraps view components and handles error boundaries and prop injection.
  */
 export function ViewWrapper({
   config,
@@ -38,9 +36,11 @@ export function ViewWrapper({
     ...params,
   };
 
+  const Component = config.component;
+
   return (
     <ViewErrorBoundary viewId={config.id}>
-      <LazyComponentLoader config={config} props={props} />
+      <Component {...props} />
     </ViewErrorBoundary>
   );
 }

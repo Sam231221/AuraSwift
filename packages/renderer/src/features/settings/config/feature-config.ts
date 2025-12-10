@@ -10,6 +10,8 @@ import { SETTINGS_PERMISSIONS } from "./permissions";
 import { SETTINGS_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
+import GeneralSettingsView from "../views/general-settings-view";
+import VivaWalletSettingsView from "../views/viva-wallet-settings-view";
 
 /**
  * Settings Feature Configuration for Dashboard
@@ -50,7 +52,7 @@ export const settingsViews: Record<string, ViewConfig> = {
   [SETTINGS_ROUTES.GENERAL]: {
     id: SETTINGS_ROUTES.GENERAL,
     level: "root",
-    componentLoader: () => import("../views/general-settings-view"),
+    component: GeneralSettingsView,
     metadata: {
       title: "General Settings",
       description: "System settings",
@@ -58,14 +60,12 @@ export const settingsViews: Record<string, ViewConfig> = {
     permissions: [SETTINGS_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    preloadStrategy: "prefetch",
-    loadPriority: 5,
     cacheable: true,
   },
   [SETTINGS_ROUTES.VIVA_WALLET]: {
     id: SETTINGS_ROUTES.VIVA_WALLET,
     level: "root",
-    componentLoader: () => import("../views/viva-wallet-settings-view"),
+    component: VivaWalletSettingsView,
     metadata: {
       title: "Viva Wallet Settings",
       description: "Configure Viva Wallet payment terminals",
@@ -73,8 +73,6 @@ export const settingsViews: Record<string, ViewConfig> = {
     permissions: [SETTINGS_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    preloadStrategy: "prefetch",
-    loadPriority: 4,
     cacheable: true,
   },
 };

@@ -10,6 +10,8 @@ import { SALES_PERMISSIONS } from "./permissions";
 import { SALES_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
+import NewTransactionView from "../views/new-transaction-view";
+import CashierDashboardView from "@/features/dashboard/views/cashier-dashboard-view";
 
 /**
  * Sales Feature Configuration for Dashboard
@@ -43,7 +45,7 @@ export const salesViews: Record<string, ViewConfig> = {
   [SALES_ROUTES.NEW_TRANSACTION]: {
     id: SALES_ROUTES.NEW_TRANSACTION,
     level: "root",
-    componentLoader: () => import("../views/new-transaction-view"),
+    component: NewTransactionView,
     metadata: {
       title: "New Transaction",
       description: "Create a new sale",
@@ -51,23 +53,18 @@ export const salesViews: Record<string, ViewConfig> = {
     permissions: [SALES_PERMISSIONS.WRITE],
     requiresAuth: true,
     defaultParams: { embeddedInDashboard: true },
-    preloadStrategy: "eager",
-    loadPriority: 10,
     cacheable: true,
   },
   [SALES_ROUTES.CASHIER_DASHBOARD]: {
     id: SALES_ROUTES.CASHIER_DASHBOARD,
     level: "root",
-    componentLoader: () =>
-      import("@/features/dashboard/views/cashier-dashboard-view"),
+    component: CashierDashboardView,
     metadata: {
       title: "Cashier Dashboard",
       description: "Cashier dashboard",
     },
     permissions: [SALES_PERMISSIONS.READ],
     requiresAuth: true,
-    preloadStrategy: "preload",
-    loadPriority: 9,
     cacheable: true,
   },
 };

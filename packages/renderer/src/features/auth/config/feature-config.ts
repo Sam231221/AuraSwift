@@ -7,6 +7,7 @@
 
 import { AUTH_ROUTES } from "./navigation";
 import type { ViewConfig } from "@/navigation/types";
+import AuthPage from "../views/auth-page";
 
 export const authFeature = {
   id: "auth",
@@ -25,14 +26,12 @@ export const authViews: Record<string, ViewConfig> = {
   [AUTH_ROUTES.AUTH]: {
     id: AUTH_ROUTES.AUTH,
     level: "root",
-    componentLoader: () => import("@/features/auth/views/auth-page"),
+    component: AuthPage,
     metadata: {
       title: "Authentication",
       description: "User authentication and login",
     },
     requiresAuth: false,
-    preloadStrategy: "eager",
-    loadPriority: 10,
     cacheable: true,
   },
 };

@@ -1,9 +1,3 @@
-export {
-  LazyComponentLoader,
-  componentCache,
-  ComponentCache,
-} from "./lazy-component-loader";
-export { componentPreloader, usePreloadOnHover } from "./component-preloader";
 export { mapActionToView, hasViewMapping } from "./navigation-mapper";
 export {
   performanceMonitor,

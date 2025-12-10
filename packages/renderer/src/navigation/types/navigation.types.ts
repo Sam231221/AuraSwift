@@ -40,9 +40,9 @@ export interface ViewMetadata {
 export type PreloadStrategy = "none" | "prefetch" | "preload" | "eager";
 
 /**
- * Base view configuration properties
+ * View configuration
  */
-interface BaseViewConfig {
+export interface ViewConfig {
   /** Unique view identifier */
   id: string;
   /** Hierarchy level of the view */
@@ -59,64 +59,21 @@ interface BaseViewConfig {
   defaultParams?: Record<string, unknown>;
   /** Whether authentication is required */
   requiresAuth?: boolean;
-  /** Preloading strategy for performance optimization */
-  preloadStrategy?: PreloadStrategy;
-  /** Estimated bundle size in KB (for performance monitoring) */
-  estimatedSize?: number;
-  /** Priority for loading (1-10, higher = more important) */
-  loadPriority?: number;
   /** Whether this view should be cached after loading */
   cacheable?: boolean;
-}
-
-/**
- * Static view configuration (for backward compatibility)
- */
-interface StaticViewConfig extends BaseViewConfig {
-  type?: "static";
-  /** Static component (deprecated - use componentLoader) */
+  /** Preloading strategy (unused with static imports, kept for compatibility) */
+  preloadStrategy?: PreloadStrategy;
+  /** Priority for loading (unused with static imports, kept for compatibility) */
+  loadPriority?: number;
+  /** Static component */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   component: ComponentType<any>;
-  componentLoader?: never;
 }
 
 /**
- * Lazy-loaded view configuration (recommended)
+ * Type guard to check if view config is static (always true now)
  */
-interface LazyViewConfig extends BaseViewConfig {
-  type?: "lazy";
-  component?: never;
-  /**
-   * Lazy-loaded component loader function
-   * Returns a promise that resolves to a module with a default export
-   * This enables route-based code-splitting
-   *
-   * @example
-   * componentLoader: () => import("../views/product-management-view")
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  componentLoader: () => Promise<{ default: ComponentType<any> }>;
-}
-
-/**
- * View configuration with advanced type safety
- * Uses discriminated union for better type inference
- */
-export type ViewConfig = StaticViewConfig | LazyViewConfig;
-
-/**
- * Type guard to check if view config is lazy-loaded
- */
-export function isLazyViewConfig(config: ViewConfig): config is LazyViewConfig {
-  return "componentLoader" in config && config.componentLoader !== undefined;
-}
-
-/**
- * Type guard to check if view config is static
- */
-export function isStaticViewConfig(
-  config: ViewConfig
-): config is StaticViewConfig {
+export function isStaticViewConfig(config: ViewConfig): config is ViewConfig {
   return "component" in config && config.component !== undefined;
 }
 
