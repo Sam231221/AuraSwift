@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.20.0](https://github.com/Sam231221/AuraSwift/compare/v1.19.0...v1.20.0) (2025-12-10)
+
+
+### feat
+
+* Implement critical Electron build optimizations for lazy loading and dynamic imports, enhance renderer debugging with comprehensive logging, and refine chunking strategy. ([](https://github.com/Sam231221/AuraSwift/commit/db8dc70b52aca1dd5168acaa3bdb123291db21e5))
+
 # [1.19.0](https://github.com/Sam231221/AuraSwift/compare/v1.18.0...v1.19.0) (2025-12-09)
 
 
