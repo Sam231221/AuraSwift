@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.20.2](https://github.com/Sam231221/AuraSwift/compare/v1.20.1...v1.20.2) (2025-12-10)
+
+
+### fix
+
+* expose setWeightInput and setWeightDisplayPrice in useWeightInput hook ([](https://github.com/Sam231221/AuraSwift/commit/443286701e9626b1c03c5f5441075180a4ec397a))
+* **app:** Window not showing fixes ([](https://github.com/Sam231221/AuraSwift/commit/f159e88e90759943c9a3c2add373884d80bb8050))
+
 ## [1.20.1](https://github.com/Sam231221/AuraSwift/compare/v1.20.0...v1.20.1) (2025-12-10)
 
 
