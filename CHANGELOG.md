@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.20.1](https://github.com/Sam231221/AuraSwift/compare/v1.20.0...v1.20.1) (2025-12-10)
+
+
+### fix
+
+* streamline view configuration by replacing dynamic imports with static component references, enhancing performance and simplifying the navigation system ([](https://github.com/Sam231221/AuraSwift/commit/7074b9e4fb062671d26ae68bce3d864f5f0504a9))
+
 # [1.20.0](https://github.com/Sam231221/AuraSwift/compare/v1.19.0...v1.20.0) (2025-12-10)
 
 
