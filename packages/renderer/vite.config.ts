@@ -19,7 +19,34 @@ process.env.VITE_APP_VERSION = appVersion;
 
 // https://vite.dev/config/
 export default defineConfig({
+  // CRITICAL FOR ELECTRON: Use relative paths instead of absolute paths
+  // This ensures file:// protocol can resolve chunks correctly
+  base: "./",
+
   plugins: [
+    // CRITICAL FOR ELECTRON: Fix dynamic imports for file:// protocol
+    // Vite uses import.meta.url which doesn't work in Electron production builds
+    // This plugin ensures chunks are loaded with correct relative paths
+    {
+      name: 'electron-dynamic-import-fix',
+      enforce: 'post' as const,
+      generateBundle(_options: unknown, bundle: Record<string, unknown>) {
+        // Only apply in production builds
+        if (process.env.NODE_ENV !== 'production') return;
+        
+        for (const [_fileName, output] of Object.entries(bundle)) {
+          const chunk = output as { type?: string; code?: string };
+          if (chunk.type === 'chunk' && chunk.code) {
+            // Replace __vite__mapDeps and import.meta.url with relative path resolution
+            // This ensures dynamic imports work with file:// protocol
+            chunk.code = chunk.code.replace(
+              /import\.meta\.url/g,
+              'document.baseURI || document.URL'
+            );
+          }
+        }
+      },
+    },
     react(),
     tailwindcss(),
     // Bundle visualizer - only runs when ANALYZE env var is set
@@ -43,6 +70,11 @@ export default defineConfig({
     },
   },
   build: {
+    // CRITICAL FOR ELECTRON: Disable modulepreload to enable true lazy loading
+    // Electron loads from local disk (no network latency), so preloading is counterproductive
+    // This allows features to load on-demand, reducing memory usage and startup time
+    modulePreload: false,
+    
     // Electron: Enable minification for production (esbuild is fastest)
     minify: "esbuild",
     // Electron: Report sizes (helpful for monitoring, but no compression needed)
@@ -51,10 +83,10 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV === "development" ? "inline" : "hidden", // Hidden for production
     // Electron: Target Electron's Chromium version for optimal performance
     target: "esnext", // Electron uses modern Chromium
-    // Electron: Disable CSS code splitting - bundle CSS together for reliability
-    cssCodeSplit: false, // Single CSS file for Electron
+    // Electron: CSS code splitting is fine with relative paths
+    cssCodeSplit: true, // Split CSS for better lazy loading
     // Electron: Larger chunks acceptable (local disk vs network)
-    chunkSizeWarningLimit: 2000, // Warn if chunk > 2MB (desktop apps can handle it)
+    chunkSizeWarningLimit: 1500, // Warn if chunk > 1.5MB (desktop app)
     rollupOptions: {
       // Tree-shaking (critical for desktop apps - reduce memory footprint)
       treeshake: {
@@ -65,29 +97,78 @@ export default defineConfig({
         tryCatchDeoptimization: false,
       },
       output: {
-        // ELECTRON FIX: Simplified chunking for reliable path resolution
-        // Electron apps don't benefit from aggressive code splitting like web apps
-        // Dynamic imports with file:// protocol can fail in packaged apps
+        // ELECTRON-OPTIMIZED: Smart chunking strategy for desktop apps
+        // With base: './' and modulePreload: false, features load truly on-demand
         manualChunks: (id) => {
-          // Only split heavy vendor libraries to keep bundles manageable
+          // IMPORTANT: Don't bundle feature code - let Vite create separate lazy chunks
+          // This enables true on-demand loading when navigating to features
+          if (id.includes("/features/")) {
+            // Extract feature name for chunk naming
+            const match = id.match(/\/features\/(\w+)\//)
+            if (match) {
+              return `feature-${match[1]}`;
+            }
+          }
+
+          // Navigation system (used everywhere)
+          if (id.includes("/navigation/")) {
+            return "navigation";
+          }
+
+          // Shared utilities
+          if (id.includes("/shared/")) {
+            return "shared";
+          }
+
+          // Vendor chunking (optimize for better memory usage)
           if (id.includes("node_modules")) {
-            // React ecosystem (stable, rarely changes)
+            // React core (most stable dependency)
             if (id.includes("react") || id.includes("react-dom")) {
               return "vendor-react";
             }
 
-            // All other vendors in one chunk for reliability
+            // UI libraries (Radix UI components)
+            if (id.includes("@radix-ui")) {
+              return "vendor-ui-radix";
+            }
+
+            // Form libraries (heavy dependencies)
+            if (
+              id.includes("react-hook-form") ||
+              id.includes("zod") ||
+              id.includes("@hookform")
+            ) {
+              return "vendor-forms";
+            }
+
+            // State management
+            if (id.includes("zustand") || id.includes("jotai")) {
+              return "vendor-state";
+            }
+
+            // Large utility libraries
+            if (
+              id.includes("date-fns") ||
+              id.includes("lodash") ||
+              id.includes("moment")
+            ) {
+              return "vendor-utils";
+            }
+
+            // Other vendors
             return "vendor";
           }
 
-          // Bundle all app code together (features, navigation, shared)
-          // This prevents dynamic import path resolution issues in Electron
           return undefined;
         },
 
-        // Simpler chunk naming (no subdirectories for Electron)
+        // ELECTRON: Keep chunks in assets/ (no subdirectories)
+        // Relative paths work perfectly with base: './'
         chunkFileNames: "assets/[name]-[hash].js",
         entryFileNames: "assets/[name]-[hash].js",
+
+        // ELECTRON: Optimize chunk size for granular lazy loading
+        experimentalMinChunkSize: 0, // Allow small chunks for better on-demand loading
 
         // Asset naming
         assetFileNames: (assetInfo) => {

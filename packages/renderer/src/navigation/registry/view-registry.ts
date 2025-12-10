@@ -24,6 +24,12 @@ const logger = getLogger("view-registry");
  *
  * All views in the application are registered here with their configuration.
  * Views can be organized hierarchically using parentId.
+ * 
+ * IMPORTANT FOR ELECTRON: Keep componentLoader as dynamic imports!
+ * - Dynamic imports enable true lazy loading (features load on-demand)
+ * - Reduces memory usage and improves startup time
+ * - Works perfectly with Electron's file:// protocol when modulePreload is disabled
+ * - DO NOT convert to static imports or the entire app will load upfront
  */
 export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   // ============================================================================

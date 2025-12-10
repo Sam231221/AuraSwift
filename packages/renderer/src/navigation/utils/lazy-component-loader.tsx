@@ -308,7 +308,16 @@ export function LazyComponentLoader({
             : new Error(`Failed to load component: ${viewId}`);
 
         if (cancelled) return;
+        
+        // Enhanced error logging for Electron debugging
         logger.error(`Failed to load component ${viewId}:`, loadError);
+        logger.error(`Error details:`, {
+          message: loadError.message,
+          stack: loadError.stack,
+          viewId,
+          configType: isLazyViewConfig(config) ? 'lazy' : isStaticViewConfig(config) ? 'static' : 'unknown',
+        });
+        
         setError(loadError);
         setLoading(false);
 

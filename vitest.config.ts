@@ -50,6 +50,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./packages/renderer/src"),
       "@app/main": path.resolve(__dirname, "./packages/main/src"),
       "@app/preload": path.resolve(__dirname, "./packages/preload/src"),
+      "@app/shared": path.resolve(__dirname, "./packages/shared/src"),
     },
   },
 });
