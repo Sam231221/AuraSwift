@@ -1,5 +1,8 @@
 import { DashboardGrid, FEATURE_REGISTRY } from "@/features/dashboard";
 import { ManagerStatsCards } from "@/features/dashboard/components/stats-cards";
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("manager-dashboard");
 
 const ManagerDashboardView = ({
   onActionClick,
@@ -8,6 +11,8 @@ const ManagerDashboardView = ({
 }) => {
   // Handle feature action clicks
   const handleActionClick = (featureId: string, actionId: string) => {
+    logger.debug(`handleActionClick: ${featureId} -> ${actionId}`);
+
     // Use navigation handler if provided (for actions that map to views)
     if (onActionClick) {
       onActionClick(featureId, actionId);

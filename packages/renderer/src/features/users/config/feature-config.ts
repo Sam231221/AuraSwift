@@ -10,6 +10,8 @@ import { USERS_PERMISSIONS } from "./permissions";
 import { USERS_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
+
+// Import view from new location
 import UserManagementView from "../views/user-management-view";
 
 /**
@@ -52,6 +54,5 @@ export const usersViews: Record<string, ViewConfig> = {
     permissions: [USERS_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    cacheable: true,
   },
 };

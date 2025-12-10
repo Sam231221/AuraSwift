@@ -473,7 +473,8 @@ export function usePayment({
         try {
           printerStatusResult = await checkPrinterStatus();
         } catch (error) {
-          // Printer check failed - non-critical, continue with transaction
+          logger.warn("Failed to check printer status:", error);
+          // Continue with transaction - printer check is not critical
         }
 
         try {
@@ -565,6 +566,18 @@ export function usePayment({
 
           const { cashAmount: finalCashAmount, cardAmount: finalCardAmount } =
             calculatePaymentAmounts(backendPaymentMethod, cashAmount, total);
+
+          // FIX #12: Gate console.log for development only
+          if (process.env.NODE_ENV === "development") {
+            logger.info("💳 Creating transaction with payment method:", {
+              selectedPaymentMethod: paymentMethod?.type,
+              skipPaymentValidation,
+              backendPaymentMethod,
+              cashAmount: finalCashAmount,
+              cardAmount: finalCardAmount,
+              total,
+            });
+          }
 
           // Create transaction
           // shiftId is optional - null for admin/owner mode, required for cashier/manager

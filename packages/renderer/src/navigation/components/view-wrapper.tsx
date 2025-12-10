@@ -6,41 +6,27 @@
  */
 
 import { useNavigation } from "../hooks/use-navigation";
-import { ViewErrorBoundary } from "./view-error-boundary";
-import type { ViewConfig, ViewComponentProps } from "../types/navigation.types";
+import type { ComponentType } from "react";
+import type { ViewComponentProps } from "../types/navigation.types";
 
 interface ViewWrapperProps {
-  config: ViewConfig;
-  params?: Record<string, unknown>;
-  onBack?: () => void;
+  component: ComponentType<ViewComponentProps>;
   embeddedInDashboard?: boolean;
 }
 
 /**
- * View Wrapper Component
+ * View Wrapper
  *
- * Wraps view components and handles error boundaries and prop injection.
+ * Wraps a view component and provides navigation functionality
+ * via the navigation hook, converting it to onBack prop.
  */
 export function ViewWrapper({
-  config,
-  params = {},
-  onBack,
+  component: Component,
   embeddedInDashboard = false,
 }: ViewWrapperProps) {
-  const { goBack: navigationGoBack } = useNavigation();
-  const handleBack = onBack || navigationGoBack;
-
-  const props: ViewComponentProps = {
-    onBack: handleBack,
-    embeddedInDashboard,
-    ...params,
-  };
-
-  const Component = config.component;
+  const { goBack } = useNavigation();
 
   return (
-    <ViewErrorBoundary viewId={config.id}>
-      <Component {...props} />
-    </ViewErrorBoundary>
+    <Component onBack={goBack} embeddedInDashboard={embeddedInDashboard} />
   );
 }

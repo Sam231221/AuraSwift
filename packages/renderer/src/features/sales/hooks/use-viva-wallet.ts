@@ -35,9 +35,7 @@ export interface Terminal {
 
 export function useVivaWallet() {
   const [terminals, setTerminals] = useState<Terminal[]>([]);
-  const [selectedTerminal, setSelectedTerminal] = useState<Terminal | null>(
-    null
-  );
+  const [selectedTerminal, setSelectedTerminal] = useState<Terminal | null>(null);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<
@@ -58,15 +56,14 @@ export function useVivaWallet() {
 
       if (result.success && result.terminals) {
         setTerminals(result.terminals);
+        logger.info(`Discovered ${result.terminals.length} terminal(s)`);
         return result.terminals;
       } else {
         throw new Error(result.error || "Failed to discover terminals");
       }
     } catch (error) {
       logger.error("Failed to discover terminals:", error);
-      toast.error(
-        "Failed to discover terminals. Please check network connection."
-      );
+      toast.error("Failed to discover terminals. Please check network connection.");
       return [];
     } finally {
       setIsDiscovering(false);
@@ -76,54 +73,55 @@ export function useVivaWallet() {
   /**
    * Connect to a specific terminal
    */
-  const connectTerminal = useCallback(async (terminalId: string) => {
-    setIsConnecting(true);
-    setConnectionStatus("connecting");
+  const connectTerminal = useCallback(
+    async (terminalId: string) => {
+      setIsConnecting(true);
+      setConnectionStatus("connecting");
 
-    try {
-      if (!window.vivaWalletAPI) {
-        throw new Error("Viva Wallet API not available");
+      try {
+        if (!window.vivaWalletAPI) {
+          throw new Error("Viva Wallet API not available");
+        }
+
+        const result = await window.vivaWalletAPI.connectTerminal(terminalId);
+
+        if (result.success && result.terminal) {
+          const terminal: Terminal = {
+            id: result.terminal.id,
+            name: result.terminal.name,
+            ipAddress: result.terminal.ipAddress,
+            port: result.terminal.port,
+            status: result.terminal.status || "online",
+            terminalType: result.terminal.terminalType || "dedicated",
+            paymentCapabilities: result.terminal.paymentCapabilities || {
+              supportsNFC: false,
+              supportsCardReader: false,
+              supportsChip: false,
+              supportsSwipe: false,
+              supportsTap: false,
+            },
+          };
+          setSelectedTerminal(terminal);
+          setConnectionStatus("connected");
+          toast.success(`Connected to ${terminal.name}`);
+          logger.info(`Connected to terminal: ${terminal.name}`);
+          return true;
+        } else {
+          throw new Error(result.error || "Failed to connect to terminal");
+        }
+      } catch (error) {
+        logger.error("Failed to connect to terminal:", error);
+        setConnectionStatus("disconnected");
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to connect to terminal";
+        toast.error(errorMessage);
+        return false;
+      } finally {
+        setIsConnecting(false);
       }
-
-      const result = await window.vivaWalletAPI.connectTerminal(terminalId);
-
-      if (result.success && result.terminal) {
-        const terminal: Terminal = {
-          id: result.terminal.id,
-          name: result.terminal.name,
-          ipAddress: result.terminal.ipAddress,
-          port: result.terminal.port,
-          status: result.terminal.status || "online",
-          terminalType: result.terminal.terminalType || "dedicated",
-          paymentCapabilities: result.terminal.paymentCapabilities || {
-            supportsNFC: false,
-            supportsCardReader: false,
-            supportsChip: false,
-            supportsSwipe: false,
-            supportsTap: false,
-          },
-        };
-        setSelectedTerminal(terminal);
-        setConnectionStatus("connected");
-        toast.success(`Connected to ${terminal.name}`);
-        logger.info(`Connected to terminal: ${terminal.name}`);
-        return true;
-      } else {
-        throw new Error(result.error || "Failed to connect to terminal");
-      }
-    } catch (error) {
-      logger.error("Failed to connect to terminal:", error);
-      setConnectionStatus("disconnected");
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to connect to terminal";
-      toast.error(errorMessage);
-      return false;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   /**
    * Disconnect from the current terminal
@@ -205,23 +203,21 @@ export function useVivaWallet() {
           const config = configResult.config;
           // Load terminals from config
           if (config.terminals && config.terminals.length > 0) {
-            const configuredTerminals: Terminal[] = config.terminals.map(
-              (t: any) => ({
-                id: t.id,
-                name: t.name,
-                ipAddress: t.ipAddress,
-                port: t.port,
-                status: "offline" as const, // Will be updated by status check
-                terminalType: t.terminalType || "dedicated",
-                paymentCapabilities: {
-                  supportsNFC: false,
-                  supportsCardReader: false,
-                  supportsChip: false,
-                  supportsSwipe: false,
-                  supportsTap: false,
-                },
-              })
-            );
+            const configuredTerminals: Terminal[] = config.terminals.map((t: any) => ({
+              id: t.id,
+              name: t.name,
+              ipAddress: t.ipAddress,
+              port: t.port,
+              status: "offline" as const, // Will be updated by status check
+              terminalType: t.terminalType || "dedicated",
+              paymentCapabilities: {
+                supportsNFC: false,
+                supportsCardReader: false,
+                supportsChip: false,
+                supportsSwipe: false,
+                supportsTap: false,
+              },
+            }));
             setTerminals(configuredTerminals);
 
             // Auto-connect to default terminal if configured
@@ -256,3 +252,4 @@ export function useVivaWallet() {
     refreshTerminalStatus,
   };
 }
+

@@ -10,7 +10,9 @@ import { FeatureCard } from "./feature-card";
 import { useUserPermissions } from "../hooks/use-user-permissions";
 import type { FeatureConfig } from "../types/feature-config";
 import type { FeatureCategory } from "../types/feature-config";
-// Logger removed - not currently used
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("dashboard-grid");
 
 interface DashboardGridProps {
   features: FeatureConfig[];
@@ -30,10 +32,12 @@ export function DashboardGrid({
   // Memoize the action click handler to prevent unnecessary re-renders
   const handleActionClick = useCallback(
     (featureId: string, actionId: string) => {
+      logger.debug(`Action clicked: ${featureId} -> ${actionId}`);
       if (onActionClick) {
         onActionClick(featureId, actionId);
+      } else {
+        logger.warn(`No onActionClick handler provided`);
       }
-      // No handler provided - action may be handled elsewhere
     },
     [onActionClick]
   );

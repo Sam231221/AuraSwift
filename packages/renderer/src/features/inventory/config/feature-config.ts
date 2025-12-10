@@ -3,23 +3,28 @@
  *
  * Central configuration for the inventory feature.
  * This is used by the navigation system and dashboard.
+ *
+ * NOTE: This file will be updated as views are migrated to the new structure.
  */
 
 import { Package } from "lucide-react";
 import { INVENTORY_PERMISSIONS } from "./permissions";
 import { INVENTORY_ROUTES } from "./navigation";
-// eslint-disable-next-line no-restricted-imports
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
+
+// Import views from new location
 import ProductManagementView from "../views/product-management-view";
-import { ProductManagementWrapper } from "../wrappers/product-management-wrapper";
-import InventoryDashboardView from "../views/inventory-dashboard-view";
-import ProductDetailsView from "../views/product-details-view";
-import CategoryManagementView from "../views/category-management-view";
-import { BatchManagementWrapper } from "../wrappers/batch-management-wrapper";
+import ManageCategoriesView from "../views/category-management-view";
 import BatchManagementView from "../views/batch-management-view";
-import { ExpiryDashboardView } from "../views/expiry-dashboard-view";
 import StockMovementHistoryView from "../views/stock-movement-history-view";
+import ProductDashboardView from "../views/inventory-dashboard-view";
+import ProductDetailsView from "../views/product-details-view";
+import { ExpiryDashboardView } from "../views/expiry-dashboard-view";
+
+// Import navigation wrappers
+import { ProductManagementWrapper } from "../wrappers/product-management-wrapper";
+import { BatchManagementWrapper } from "../wrappers/batch-management-wrapper";
 
 /**
  * Inventory Feature Configuration for Dashboard
@@ -77,17 +82,17 @@ export const inventoryViews: Record<string, ViewConfig> = {
   [INVENTORY_ROUTES.DASHBOARD]: {
     id: INVENTORY_ROUTES.DASHBOARD,
     level: "root",
-    component: ProductManagementView,
+    component: ProductManagementView, // TODO: Replace with InventoryDashboardView after migration
+    // Tracking: docs/TODO_TRACKING.md#3
     metadata: {
       title: "Inventory Dashboard",
       description: "Overview of inventory status",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
-    cacheable: true,
   },
 
-  // Product management view
+  // Product management (legacy route - will be mapped to new routes)
   [INVENTORY_ROUTES.PRODUCT_MANAGEMENT]: {
     id: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
     level: "root",
@@ -99,7 +104,6 @@ export const inventoryViews: Record<string, ViewConfig> = {
     permissions: [INVENTORY_PERMISSIONS.MANAGE],
     roles: ["admin", "manager"],
     requiresAuth: true,
-    cacheable: true,
   },
 
   // Nested views within Product Management
@@ -107,28 +111,26 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.PRODUCT_DASHBOARD,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: InventoryDashboardView,
+    component: ProductDashboardView,
     metadata: {
       title: "Product Dashboard",
       breadcrumb: "Dashboard",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
-    cacheable: true,
   },
 
   [INVENTORY_ROUTES.PRODUCT_LIST]: {
     id: INVENTORY_ROUTES.PRODUCT_LIST,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: ProductManagementView,
+    component: ProductManagementView, // Rendered internally
     metadata: {
       title: "Product List",
       breadcrumb: "Products",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
-    cacheable: true,
   },
 
   [INVENTORY_ROUTES.PRODUCT_DETAILS_NESTED]: {
@@ -143,7 +145,6 @@ export const inventoryViews: Record<string, ViewConfig> = {
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
     defaultParams: { productId: null },
-    cacheable: true,
   },
 
   // Category management
@@ -151,14 +152,13 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.CATEGORY_MANAGEMENT,
     level: "nested",
     parentId: INVENTORY_ROUTES.PRODUCT_MANAGEMENT,
-    component: CategoryManagementView,
+    component: ManageCategoriesView,
     metadata: {
       title: "Category Management",
       breadcrumb: "Categories",
     },
     permissions: [INVENTORY_PERMISSIONS.MANAGE_CATEGORIES],
     requiresAuth: true,
-    cacheable: true,
   },
 
   // Batch management
@@ -173,7 +173,6 @@ export const inventoryViews: Record<string, ViewConfig> = {
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
-    cacheable: true,
   },
 
   // Nested views within Batch Management
@@ -181,28 +180,26 @@ export const inventoryViews: Record<string, ViewConfig> = {
     id: INVENTORY_ROUTES.BATCH_DASHBOARD,
     level: "nested",
     parentId: INVENTORY_ROUTES.BATCH_MANAGEMENT,
-    component: BatchManagementView,
+    component: BatchManagementView, // Rendered internally
     metadata: {
       title: "Batch Dashboard",
       breadcrumb: "Dashboard",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
-    cacheable: true,
   },
 
   [INVENTORY_ROUTES.BATCH_LIST]: {
     id: INVENTORY_ROUTES.BATCH_LIST,
     level: "nested",
     parentId: INVENTORY_ROUTES.BATCH_MANAGEMENT,
-    component: BatchManagementView,
+    component: BatchManagementView, // Rendered internally
     metadata: {
       title: "Batch List",
       breadcrumb: "All Batches",
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
-    cacheable: true,
   },
 
   [INVENTORY_ROUTES.EXPIRY_ALERTS]: {
@@ -216,7 +213,6 @@ export const inventoryViews: Record<string, ViewConfig> = {
     },
     permissions: [INVENTORY_PERMISSIONS.READ],
     requiresAuth: true,
-    cacheable: true,
   },
 
   // Stock movement history
@@ -231,6 +227,5 @@ export const inventoryViews: Record<string, ViewConfig> = {
     },
     permissions: [INVENTORY_PERMISSIONS.VIEW_HISTORY],
     requiresAuth: true,
-    cacheable: true,
   },
 };

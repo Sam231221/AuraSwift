@@ -10,6 +10,8 @@ import { STAFF_PERMISSIONS } from "./permissions";
 import { STAFF_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
+
+// Import views from new location
 import ManageCashierView from "../views/manage-cashier-view";
 import StaffSchedulesView from "../views/staff-schedules-view";
 
@@ -60,7 +62,6 @@ export const staffViews: Record<string, ViewConfig> = {
     permissions: [STAFF_PERMISSIONS.MANAGE],
     roles: ["admin", "manager"],
     requiresAuth: true,
-    cacheable: true,
   },
   [STAFF_ROUTES.SCHEDULES]: {
     id: STAFF_ROUTES.SCHEDULES,
@@ -73,6 +74,5 @@ export const staffViews: Record<string, ViewConfig> = {
     permissions: [STAFF_PERMISSIONS.MANAGE],
     roles: ["admin", "manager"],
     requiresAuth: true,
-    cacheable: true,
   },
 };

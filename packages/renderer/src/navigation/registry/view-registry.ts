@@ -6,6 +6,7 @@
  */
 
 import type { ViewConfig } from "../types/navigation.types";
+import { mapLegacyRoute } from "./route-mapper";
 import { getLogger } from "@/shared/utils/logger";
 
 // Import feature views
@@ -15,8 +16,9 @@ import { staffViews } from "@/features/staff/config/feature-config";
 import { rbacViews } from "@/features/rbac/config/feature-config";
 import { usersViews } from "@/features/users/config/feature-config";
 import { salesViews } from "@/features/sales/config/feature-config";
-import { authViews } from "@/features/auth/config/feature-config";
-import DashboardPageWrapper from "../components/dashboard-page-wrapper";
+
+// Wrapper components that use navigation hook
+import { DashboardPageWrapper } from "../components/dashboard-page-wrapper";
 
 const logger = getLogger("view-registry");
 
@@ -39,7 +41,6 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
       description: "Main dashboard",
     },
     requiresAuth: true,
-    cacheable: true,
   },
 
   // ============================================================================
@@ -77,25 +78,33 @@ export const VIEW_REGISTRY: Record<string, ViewConfig> = {
   // Imported from RBAC feature config
   // ============================================================================
   ...rbacViews,
-
-  // ============================================================================
-  // Auth Views
-  // Imported from auth feature config
-  // ============================================================================
-  ...authViews,
 };
 
 /**
  * Get view by ID
  *
- * @param viewId - View identifier (use route constants from feature configs)
+ * Automatically maps legacy route names to new standardized routes.
+ * This provides backward compatibility during the migration period.
+ *
+ * @param viewId - View identifier (supports both legacy and new route names)
  * @returns View configuration or undefined
  */
 export function getView(viewId: string): ViewConfig | undefined {
-  const view = VIEW_REGISTRY[viewId];
+  // Map legacy route to new route if applicable
+  const mappedViewId = mapLegacyRoute(viewId);
 
-  if (!view) {
-    logger.warn(`View not found: ${viewId}`);
+  // Return the view config, using mapped ID if different from original
+  const view = VIEW_REGISTRY[mappedViewId];
+
+  // If we mapped a legacy route, log a deprecation warning in development
+  if (
+    mappedViewId !== viewId &&
+    view &&
+    process.env.NODE_ENV === "development"
+  ) {
+    logger.warn(
+      `Deprecated route "${viewId}" has been mapped to "${mappedViewId}". Please update to use the new route constant.`
+    );
   }
 
   return view;

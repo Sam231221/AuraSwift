@@ -1,14 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import {
-  getElectronApp,
-  getElectronDialog,
-  getUserDataPath,
-  getAppPath,
-  getAppVersion,
-  isPackaged,
-} from "./utils/electron-safe.js";
+import { app, dialog } from "electron";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { runDrizzleMigrations } from "./drizzle-migrator.js";
 import Database from "better-sqlite3";
@@ -29,8 +22,8 @@ import {
 // Layer 3: Repair mechanisms
 import { repairDatabase, createFreshDatabase } from "./utils/db-repair.js";
 
-import { getLogger } from "../utils/logger.js";
-const logger = getLogger("db-manager");
+import { getLogger } from '../utils/logger.js';
+const logger = getLogger('db-manager');
 // Layer 4: User dialogs
 import {
   showRecoveryDialog,
@@ -152,17 +145,13 @@ export class DBManager {
               mkdirError instanceof Error
                 ? mkdirError.message
                 : String(mkdirError);
-            logger.error(
-              `❌ Failed to create database directory: ${errorMessage}`
-            );
+            logger.error(`❌ Failed to create database directory: ${errorMessage}`);
             await showDatabaseErrorDialog(
               "Database Directory Error",
               `Failed to create database directory: ${dbDir}`,
               errorMessage
             );
-            throw new Error(
-              `Failed to create database directory: ${errorMessage}`
-            );
+            throw new Error(`Failed to create database directory: ${errorMessage}`);
           }
         }
 
@@ -229,8 +218,7 @@ export class DBManager {
               // Retry opening
               this.db = new Database(dbPath);
             } else if (action === "cancel") {
-              const app = getElectronApp();
-              app?.quit();
+              app.quit();
               return;
             } else {
               throw new Error(
@@ -316,35 +304,15 @@ export class DBManager {
           // Close database connection before quitting
           this.db.close();
           this.db = null;
-          // Reset initialization state to prevent getDb() from being called
-          this.initialized = false;
-          this.initializationPromise = null;
-
-          // Show error dialog
-          const dialog = getElectronDialog();
           dialog.showErrorBox(
             "Cannot Open Database",
             "This database was created with a newer version of AuraSwift.\n\n" +
               "Please update the application to the latest version to continue.\n\n" +
-              `Current app version: ${getAppVersion()}\n` +
+              `Current app version: ${app.getVersion()}\n` +
               "Database requires a newer version."
           );
-
-          // Force quit the app immediately
-          // Use exit(1) as a fallback if quit() doesn't work
-          const app = getElectronApp();
-          app?.quit();
-
-          // Set a timeout to force exit if quit doesn't work within 1 second
-          setTimeout(() => {
-            logger.error("Force exiting app after downgrade detection");
-            process.exit(1);
-          }, 1000);
-
-          // Throw error to prevent getDatabase() from trying to access the database
-          throw new Error(
-            "Database downgrade detected - app version is older than database schema. Please update the application."
-          );
+          app.quit();
+          return;
         }
 
         // ========================================
@@ -464,46 +432,11 @@ export class DBManager {
   /**
    * Check if user is trying to open a newer database with an older app version
    * This prevents crashes from schema mismatches during downgrades
-   *
-   * NOTE: In development mode, this check is skipped to allow developers
-   * to freely switch between branches/versions without database conflicts
    */
   private checkForDowngrade(db: Database.Database, dbPath: string): boolean {
     try {
-      // Skip downgrade detection in development mode
-      // Developers frequently switch branches with different versions,
-      // and the database schema should remain compatible
-      if (isDevelopmentMode()) {
-        const appVersion = getAppVersion();
-        logger.info(
-          `Development mode: Skipping downgrade detection (current version: ${appVersion})`
-        );
-        // Still update the stored version for consistency
-        const versionTableExists = db
-          .prepare(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='_app_version'"
-          )
-          .get();
-
-        if (!versionTableExists) {
-          db.exec(`
-            CREATE TABLE IF NOT EXISTS _app_version (
-              id INTEGER PRIMARY KEY CHECK (id = 1),
-              version TEXT NOT NULL,
-              updated_at INTEGER NOT NULL
-            );
-          `);
-        }
-
-        db.prepare(
-          "INSERT OR REPLACE INTO _app_version (id, version, updated_at) VALUES (1, ?, ?)"
-        ).run(appVersion, Date.now());
-
-        return false; // Never block in development
-      }
-
       // Get app version
-      const appVersion = getAppVersion();
+      const appVersion = app.getVersion();
 
       // Check if database has migration tracking table
       const tableExists = db
@@ -635,15 +568,6 @@ export class DBManager {
     // Use centralized environment detection
     const isDev = isDevelopmentMode();
 
-    // Log environment detection for debugging
-    logger.info("Environment detection:", {
-      isDev,
-      NODE_ENV: process.env.NODE_ENV,
-      ELECTRON_IS_DEV: process.env.ELECTRON_IS_DEV,
-      isPackaged: isPackaged(),
-      appVersion: getAppVersion(),
-    });
-
     // Allow override via environment variable for testing
     const customDbPath = process.env.POS_DB_PATH;
     if (customDbPath) {
@@ -665,26 +589,24 @@ export class DBManager {
       // Go up 3 levels to get project root
       const projectRoot = path.resolve(__dirname, "../../../");
       finalPath = path.join(projectRoot, "data", "pos_system.db");
-
+      
       // Validate path is at root level (not in packages/)
       if (finalPath.includes(path.join("packages", "data"))) {
         throw new Error(
           `Database path resolved incorrectly to: ${finalPath}. ` +
-            `Expected: ${path.join(projectRoot, "data", "pos_system.db")}`
+          `Expected: ${path.join(projectRoot, "data", "pos_system.db")}`
         );
       }
-
+      
       logger.info("Development mode: Using project directory for database");
       logger.info(`Project root: ${projectRoot}`);
       logger.info(`Database path: ${finalPath}`);
     } else {
       // Production: Use proper user data directory based on platform
-      // Note: getUserDataPath() already includes the app name (e.g., "AuraSwift")
-      const userDataPath = getUserDataPath();
+      // Note: app.getPath("userData") already includes the app name (e.g., "AuraSwift")
+      const userDataPath = app.getPath("userData");
       finalPath = path.join(userDataPath, "pos_system.db");
       logger.info("Production mode: Using user data directory for database");
-      logger.info(`User data path: ${userDataPath}`);
-      logger.info(`Database path: ${finalPath}`);
     }
 
     // Validate path doesn't contain invalid characters
@@ -709,7 +631,7 @@ export class DBManager {
    */
   private getMigrationsFolder(): string {
     // In development, use source folder
-    if (!isPackaged()) {
+    if (!app.isPackaged) {
       return path.join(__dirname, "migrations");
     }
 
@@ -732,7 +654,7 @@ export class DBManager {
     }
 
     // Option 3: Check in app path
-    const appPath = getAppPath();
+    const appPath = app.getAppPath();
     const appMigrationsPath = path.join(
       appPath,
       "node_modules",
@@ -785,14 +707,12 @@ export class DBManager {
               ? `Expected location: ${backupPath}`
               : "No backup path provided"
           );
-          const app1 = getElectronApp();
-          app1?.quit();
+          app.quit();
         }
         break;
 
       case "cancel":
-        const app2 = getElectronApp();
-        app2?.quit();
+        app.quit();
         break;
     }
   }

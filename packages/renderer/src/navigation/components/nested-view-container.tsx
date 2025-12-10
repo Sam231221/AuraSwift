@@ -9,7 +9,6 @@ import { useMemo } from "react";
 import { useNestedNavigation } from "../hooks/use-nested-navigation";
 import { getView } from "../registry/view-registry";
 import { ViewTransitionContainer } from "@/components/view-transition-container";
-import { ViewWrapper } from "./view-wrapper";
 import { getLogger } from "@/shared/utils/logger";
 
 const logger = getLogger("nested-view-container");
@@ -60,13 +59,8 @@ export function NestedViewContainer({
       if (defaultViewId) {
         const defaultView = getView(defaultViewId);
         if (defaultView && defaultView.parentId === parentViewId) {
-          return (
-            <ViewWrapper
-              config={defaultView}
-              params={currentNestedParams}
-              onBack={goBack}
-            />
-          );
+          const Component = defaultView.component;
+          return <Component {...currentNestedParams} onBack={goBack} />;
         }
       }
       return null;
@@ -86,21 +80,23 @@ export function NestedViewContainer({
       );
     }
 
-    return (
-      <ViewWrapper
-        config={currentNestedView}
-        params={currentNestedParams}
-        onBack={goBack}
-      />
-    );
-  }, [
-    viewId,
-    currentNestedView,
-    currentNestedParams,
-    parentViewId,
-    defaultViewId,
-    goBack,
-  ]);
+    try {
+      const Component = currentNestedView.component;
+      return <Component {...currentNestedParams} onBack={goBack} />;
+    } catch (error) {
+      logger.error(`Error rendering nested view ${viewId}:`, error);
+      return (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">Error Loading View</h2>
+            <p className="text-muted-foreground">
+              Failed to render nested view "{viewId}".
+            </p>
+          </div>
+        </div>
+      );
+    }
+  }, [viewId, currentNestedView, currentNestedParams, parentViewId, defaultViewId, goBack]);
 
   if (!viewId && !defaultViewId) {
     return null;
@@ -115,3 +111,4 @@ export function NestedViewContainer({
     />
   );
 }
+

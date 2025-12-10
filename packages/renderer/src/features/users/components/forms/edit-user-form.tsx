@@ -100,6 +100,11 @@ export function EditUserForm({
 
   // Update form when user changes
   useEffect(() => {
+    logger.info("Setting form values for user:", {
+      id: user.id,
+      businessId: user.businessId,
+      firstName: user.firstName,
+    });
     form.reset({
       id: user.id,
       email: user.email,
@@ -114,12 +119,20 @@ export function EditUserForm({
   }, [user, form]);
 
   const handleSubmit = async (data: UserUpdateFormData) => {
+    logger.info("Edit form submitted with data:", data);
+    logger.info(`ID value: ${data.id} Type: ${typeof data.id}`);
+    logger.info(
+      `BusinessId value: ${data.businessId} Type: ${typeof data.businessId}`
+    );
+
     // Ensure id and businessId are strings and not empty
     if (!data.id || typeof data.id !== "string") {
+      logger.error("Invalid id value:", data.id);
       form.setError("id", { message: "Invalid user ID" });
       return;
     }
     if (!data.businessId || typeof data.businessId !== "string") {
+      logger.error("Invalid businessId value:", data.businessId);
       form.setError("businessId", { message: "Invalid business ID" });
       return;
     }
@@ -141,6 +154,7 @@ export function EditUserForm({
       <form
         id="edit-user-form"
         onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+          logger.error("Form validation errors:", errors);
           // Show first error message
           const firstError = Object.values(errors)[0];
           if (firstError?.message) {
@@ -173,11 +187,7 @@ export function EditUserForm({
         )}
 
         {/* Scrollable Form Content */}
-        <div
-          className={
-            showButtons ? "" : "p-6 overflow-y-auto flex-1 min-h-0 space-y-4"
-          }
-        >
+        <div className={showButtons ? "" : "p-6 overflow-y-auto flex-1 min-h-0 space-y-4"}>
           {/* Form Errors */}
           {form.formState.errors.root && (
             <div className="text-sm text-red-500 p-2 bg-red-50 rounded">
@@ -185,135 +195,56 @@ export function EditUserForm({
             </div>
           )}
 
-          {/* Hidden fields for id and businessId - required for validation but not displayed */}
+        {/* Hidden fields for id and businessId - required for validation but not displayed */}
+        <FormField
+          control={form.control}
+          name="id"
+          render={({ field }) => <input type="hidden" {...field} />}
+        />
+        <FormField
+          control={form.control}
+          name="businessId"
+          render={({ field }) => <input type="hidden" {...field} />}
+        />
+
+        {/* Avatar Upload */}
+        <FormField
+          control={form.control}
+          name="avatar"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <AvatarUpload
+                  label="Profile Picture (Optional)"
+                  value={field.value}
+                  onChange={field.onChange}
+                  type="user"
+                  size="md"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Name Fields */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField
             control={form.control}
-            name="id"
-            render={({ field }) => <input type="hidden" {...field} />}
-          />
-          <FormField
-            control={form.control}
-            name="businessId"
-            render={({ field }) => <input type="hidden" {...field} />}
-          />
-
-          {/* Avatar Upload */}
-          <FormField
-            control={form.control}
-            name="avatar"
-            render={({ field }) => (
-              <FormItem>
-                <FormControl>
-                  <AvatarUpload
-                    label="Profile Picture (Optional)"
-                    value={field.value}
-                    onChange={field.onChange}
-                    type="user"
-                    size="md"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Name Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={() => (
-                <FormItem>
-                  <FormControl>
-                    <AdaptiveFormField
-                      {...form.register("firstName")}
-                      label="First Name *"
-                      value={keyboard.formValues.firstName || ""}
-                      error={form.formState.errors.firstName?.message}
-                      onFocus={() => keyboard.handleFieldFocus("firstName")}
-                      placeholder="John"
-                      className={cn(
-                        "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                        keyboard.activeField === "firstName" &&
-                          "ring-2 ring-primary border-primary"
-                      )}
-                      readOnly
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={() => (
-                <FormItem>
-                  <FormControl>
-                    <AdaptiveFormField
-                      {...form.register("lastName")}
-                      label="Last Name *"
-                      value={keyboard.formValues.lastName || ""}
-                      error={form.formState.errors.lastName?.message}
-                      onFocus={() => keyboard.handleFieldFocus("lastName")}
-                      placeholder="Smith"
-                      className={cn(
-                        "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                        keyboard.activeField === "lastName" &&
-                          "ring-2 ring-primary border-primary"
-                      )}
-                      readOnly
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Email (Read-only) */}
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                  Email
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type="email"
-                    disabled
-                    className="bg-gray-50 text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
-                    {...field}
-                  />
-                </FormControl>
-                <p className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
-                  Email cannot be changed
-                </p>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Address */}
-          <FormField
-            control={form.control}
-            name="address"
+            name="firstName"
             render={() => (
               <FormItem>
                 <FormControl>
                   <AdaptiveFormField
-                    {...form.register("address")}
-                    label="Address"
-                    value={keyboard.formValues.address || ""}
-                    error={form.formState.errors.address?.message}
-                    onFocus={() => keyboard.handleFieldFocus("address")}
-                    placeholder="123 Main Street, City, State"
+                    {...form.register("firstName")}
+                    label="First Name *"
+                    value={keyboard.formValues.firstName || ""}
+                    error={form.formState.errors.firstName?.message}
+                    onFocus={() => keyboard.handleFieldFocus("firstName")}
+                    placeholder="John"
                     className={cn(
                       "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
-                      keyboard.activeField === "address" &&
+                      keyboard.activeField === "firstName" &&
                         "ring-2 ring-primary border-primary"
                     )}
                     readOnly
@@ -324,89 +255,168 @@ export function EditUserForm({
             )}
           />
 
-          {/* Role */}
           <FormField
             control={form.control}
-            name="role"
-            render={({ field }) => (
+            name="lastName"
+            render={() => (
               <FormItem>
-                <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                  Role *
-                </FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value || availableRoles[0]?.name || "cashier"}
-                  disabled={isLoadingRoles || availableRoles.length === 0}
-                >
-                  <FormControl>
-                    <SelectTrigger className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10">
-                      <SelectValue
-                        placeholder={
-                          isLoadingRoles ? "Loading roles..." : "Select a role"
-                        }
-                      />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {isLoadingRoles ? (
-                      <SelectItem value="loading" disabled>
-                        Loading roles...
-                      </SelectItem>
-                    ) : availableRoles.length === 0 ? (
-                      <SelectItem value="no-roles" disabled>
-                        No roles available
-                      </SelectItem>
-                    ) : (
-                      availableRoles.map((role: Role) => (
-                        <SelectItem key={role.id} value={role.name}>
-                          <div className="flex flex-col items-start">
-                            <span className="text-xs sm:text-sm md:text-base lg:text-base">
-                              {role.displayName}
-                            </span>
-                            {role.description && (
-                              <span className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
-                                {role.description}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
+                <FormControl>
+                  <AdaptiveFormField
+                    {...form.register("lastName")}
+                    label="Last Name *"
+                    value={keyboard.formValues.lastName || ""}
+                    error={form.formState.errors.lastName?.message}
+                    onFocus={() => keyboard.handleFieldFocus("lastName")}
+                    placeholder="Smith"
+                    className={cn(
+                      "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                      keyboard.activeField === "lastName" &&
+                        "ring-2 ring-primary border-primary"
                     )}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Status */}
-          <FormField
-            control={form.control}
-            name="isActive"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
-                  Status
-                </FormLabel>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="editIsActive"
-                    checked={field.value}
-                    onChange={(e) => field.onChange(e.target.checked)}
-                    className="rounded"
+                    readOnly
                   />
-                  <Label
-                    htmlFor="editIsActive"
-                    className="text-xs sm:text-sm md:text-base lg:text-base"
-                  >
-                    Active (user can log in)
-                  </Label>
-                </div>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+        </div>
+
+        {/* Email (Read-only) */}
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
+                Email
+              </FormLabel>
+              <FormControl>
+                <Input
+                  type="email"
+                  disabled
+                  className="bg-gray-50 text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10"
+                  {...field}
+                />
+              </FormControl>
+              <p className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
+                Email cannot be changed
+              </p>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Address */}
+        <FormField
+          control={form.control}
+          name="address"
+          render={() => (
+            <FormItem>
+              <FormControl>
+                <AdaptiveFormField
+                  {...form.register("address")}
+                  label="Address"
+                  value={keyboard.formValues.address || ""}
+                  error={form.formState.errors.address?.message}
+                  onFocus={() => keyboard.handleFieldFocus("address")}
+                  placeholder="123 Main Street, City, State"
+                  className={cn(
+                    "text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10",
+                    keyboard.activeField === "address" &&
+                      "ring-2 ring-primary border-primary"
+                  )}
+                  readOnly
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Role */}
+        <FormField
+          control={form.control}
+          name="role"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
+                Role *
+              </FormLabel>
+              <Select
+                onValueChange={field.onChange}
+                value={field.value || availableRoles[0]?.name || "cashier"}
+                disabled={isLoadingRoles || availableRoles.length === 0}
+              >
+                <FormControl>
+                  <SelectTrigger className="text-xs sm:text-sm md:text-base lg:text-base h-8 sm:h-9 md:h-10">
+                    <SelectValue
+                      placeholder={
+                        isLoadingRoles ? "Loading roles..." : "Select a role"
+                      }
+                    />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {isLoadingRoles ? (
+                    <SelectItem value="loading" disabled>
+                      Loading roles...
+                    </SelectItem>
+                  ) : availableRoles.length === 0 ? (
+                    <SelectItem value="no-roles" disabled>
+                      No roles available
+                    </SelectItem>
+                  ) : (
+                    availableRoles.map((role: Role) => (
+                      <SelectItem key={role.id} value={role.name}>
+                        <div className="flex flex-col items-start">
+                          <span className="text-xs sm:text-sm md:text-base lg:text-base">
+                            {role.displayName}
+                          </span>
+                          {role.description && (
+                            <span className="text-[10px] sm:text-xs md:text-sm lg:text-base text-gray-500">
+                              {role.description}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Status */}
+        <FormField
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs sm:text-sm md:text-base lg:text-base">
+                Status
+              </FormLabel>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="editIsActive"
+                  checked={field.value}
+                  onChange={(e) => field.onChange(e.target.checked)}
+                  className="rounded"
+                />
+                <Label
+                  htmlFor="editIsActive"
+                  className="text-xs sm:text-sm md:text-base lg:text-base"
+                >
+                  Active (user can log in)
+                </Label>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         </div>
 
         {/* Actions - Only show if showButtons is true */}
@@ -440,13 +450,9 @@ export function EditUserForm({
 
         {/* Adaptive Keyboard */}
         {keyboard.showKeyboard && (
-          <div
-            className={cn(
-              showButtons
-                ? "sticky bottom-0 left-0 right-0 z-50 mt-4 bg-background"
-                : "border-t bg-background px-2 py-2 shrink-0"
-            )}
-          >
+          <div className={cn(
+            showButtons ? "sticky bottom-0 left-0 right-0 z-50 mt-4 bg-background" : "border-t bg-background px-2 py-2 shrink-0"
+          )}>
             <div className={showButtons ? "" : "max-w-full overflow-hidden"}>
               <AdaptiveKeyboard
                 onInput={keyboard.handleInput}
@@ -458,9 +464,7 @@ export function EditUserForm({
                     form.handleSubmit(handleSubmit)();
                   }
                 }}
-                initialMode={
-                  keyboard.activeFieldConfig?.keyboardMode || "qwerty"
-                }
+                initialMode={keyboard.activeFieldConfig?.keyboardMode || "qwerty"}
                 visible={keyboard.showKeyboard}
                 onClose={keyboard.handleCloseKeyboard}
               />

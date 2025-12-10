@@ -10,6 +10,8 @@ import { SETTINGS_PERMISSIONS } from "./permissions";
 import { SETTINGS_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
+
+// Import views
 import GeneralSettingsView from "../views/general-settings-view";
 import VivaWalletSettingsView from "../views/viva-wallet-settings-view";
 
@@ -60,7 +62,6 @@ export const settingsViews: Record<string, ViewConfig> = {
     permissions: [SETTINGS_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    cacheable: true,
   },
   [SETTINGS_ROUTES.VIVA_WALLET]: {
     id: SETTINGS_ROUTES.VIVA_WALLET,
@@ -73,6 +74,5 @@ export const settingsViews: Record<string, ViewConfig> = {
     permissions: [SETTINGS_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    cacheable: true,
   },
 };

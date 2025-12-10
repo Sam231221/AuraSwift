@@ -10,6 +10,8 @@ import { RBAC_PERMISSIONS } from "./permissions";
 import { RBAC_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
 import type { ViewConfig } from "@/navigation/types";
+
+// Import views from new location
 import RoleManagementView from "../views/role-management-view";
 import UserRoleAssignmentView from "../views/user-role-assignment-view";
 
@@ -60,7 +62,6 @@ export const rbacViews: Record<string, ViewConfig> = {
     permissions: [RBAC_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    cacheable: true,
   },
   [RBAC_ROUTES.USER_ROLE_ASSIGNMENT]: {
     id: RBAC_ROUTES.USER_ROLE_ASSIGNMENT,
@@ -73,6 +74,5 @@ export const rbacViews: Record<string, ViewConfig> = {
     permissions: [RBAC_PERMISSIONS.MANAGE],
     roles: ["admin"],
     requiresAuth: true,
-    cacheable: true,
   },
 };

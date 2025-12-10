@@ -1,18 +1,37 @@
-/**
- * Main Application Component
- *
- * Now uses only the custom navigation system.
- * No React Router - cleaner architecture with single navigation system.
- */
+import {
+  HashRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
-import { NavigationProvider } from "@/navigation";
-import { AppShell } from "./app-shell";
-import { AUTH_ROUTES } from "@/features/auth/config/navigation";
+import { ProtectedRoute, PublicRoute } from "@/components";
+import { AuthPage } from "@/features/auth";
+import { DashboardView } from "@/features/dashboard";
 
 export default function App() {
   return (
-    <NavigationProvider initialView={AUTH_ROUTES.AUTH}>
-      <AppShell />
-    </NavigationProvider>
+    <Router>
+      <Routes>
+        <Route path="/" element={<Navigate to="/auth" replace />} />
+
+        <Route
+          path="/auth"
+          element={
+            <PublicRoute>
+              <AuthPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardView />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Router>
   );
 }

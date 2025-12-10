@@ -31,16 +31,8 @@ export interface ViewMetadata {
 }
 
 /**
- * Preloading strategy for view components
- * - 'none': No preloading (default)
- * - 'prefetch': Prefetch on hover/focus (low priority)
- * - 'preload': Preload when parent view loads (high priority)
- * - 'eager': Load immediately (for critical views)
- */
-export type PreloadStrategy = "none" | "prefetch" | "preload" | "eager";
-
-/**
  * View configuration
+ * Defines a view in the navigation system
  */
 export interface ViewConfig {
   /** Unique view identifier */
@@ -49,6 +41,8 @@ export interface ViewConfig {
   level: ViewLevel;
   /** Parent view ID for nested views */
   parentId?: string;
+  /** React component to render - accepts components that can receive ViewComponentProps and additional props */
+  component: ComponentType<any>;
   /** View metadata */
   metadata: ViewMetadata;
   /** Required RBAC permissions (any of these) */
@@ -59,22 +53,6 @@ export interface ViewConfig {
   defaultParams?: Record<string, unknown>;
   /** Whether authentication is required */
   requiresAuth?: boolean;
-  /** Whether this view should be cached after loading */
-  cacheable?: boolean;
-  /** Preloading strategy (unused with static imports, kept for compatibility) */
-  preloadStrategy?: PreloadStrategy;
-  /** Priority for loading (unused with static imports, kept for compatibility) */
-  loadPriority?: number;
-  /** Static component */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  component: ComponentType<any>;
-}
-
-/**
- * Type guard to check if view config is static (always true now)
- */
-export function isStaticViewConfig(config: ViewConfig): config is ViewConfig {
-  return "component" in config && config.component !== undefined;
 }
 
 /**

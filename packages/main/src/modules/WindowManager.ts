@@ -346,26 +346,6 @@ class WindowManager implements AppModule {
       browserWindow.show();
     });
 
-    // CRITICAL FOR DEBUGGING: Capture all renderer console output
-    // This helps diagnose dynamic import failures and module loading issues
-    browserWindow.webContents.on("console-message", (event, level, message, line, sourceId) => {
-      const levelMap = ["DEBUG", "INFO", "WARN", "ERROR"];
-      const levelName = levelMap[level] || "LOG";
-      logger.info(`[Renderer ${levelName}] ${message}${sourceId ? ` (${sourceId}:${line})` : ""}`);
-    });
-
-    // Capture module loading failures
-    browserWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
-      logger.error(`[Renderer] Failed to load: ${validatedURL}`);
-      logger.error(`[Renderer] Error: ${errorCode} - ${errorDescription}`);
-    });
-
-    // Capture renderer process crashes
-    browserWindow.webContents.on("render-process-gone", (event, details) => {
-      logger.error(`[Renderer] Process gone: ${details.reason} (exit code: ${details.exitCode})`);
-    });
-
-
     if (this.#renderer instanceof URL) {
       // In development, check if dev server is running before trying to load
       if (process.env.NODE_ENV === "development") {

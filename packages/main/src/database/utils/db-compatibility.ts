@@ -7,23 +7,13 @@
  */
 
 import Database from "better-sqlite3";
+import { app } from "electron";
 import semver from "semver";
 import fs from "fs";
 import { getDatabaseAge, formatDatabaseAge } from "./db-validator.js";
 
-import { getLogger } from "../../utils/logger.js";
-const logger = getLogger("db-compatibility");
-
-/**
- * Get Electron app instance (only in Electron context)
- */
-function getElectronApp() {
-  try {
-    return require("electron").app;
-  } catch {
-    return null;
-  }
-}
+import { getLogger } from '../../utils/logger.js';
+const logger = getLogger('db-compatibility');
 
 export interface CompatibilityResult {
   compatible: boolean;
@@ -47,8 +37,7 @@ export function checkDatabaseCompatibility(
   db: Database.Database,
   dbPath: string
 ): CompatibilityResult {
-  const app = getElectronApp();
-  const appVersion = app ? app.getVersion() : "0.0.0";
+  const appVersion = app.getVersion();
 
   try {
     // Check 1: Does database have migration tracking?
@@ -147,9 +136,7 @@ export function checkDatabaseCompatibility(
       ];
 
       // For now, just check if we can read from migrations table
-      const testQuery = db.prepare(
-        "SELECT COUNT(*) as count FROM __drizzle_migrations"
-      );
+      const testQuery = db.prepare("SELECT COUNT(*) as count FROM __drizzle_migrations");
       testQuery.get();
     } catch (error) {
       schemaValid = false;
@@ -281,9 +268,7 @@ export function getDatabaseVersionInfo(db: Database.Database): {
 
       if (migrationsTableExists) {
         const migrations = db
-          .prepare(
-            "SELECT id, created_at FROM __drizzle_migrations ORDER BY id DESC"
-          )
+          .prepare("SELECT id, created_at FROM __drizzle_migrations ORDER BY id DESC")
           .all() as Array<{ id: number; created_at: number }>;
 
         migrationCount = migrations.length;
@@ -297,9 +282,7 @@ export function getDatabaseVersionInfo(db: Database.Database): {
     }
 
     // Get SQLite version (not app version, but useful for debugging)
-    const sqliteVersion = db
-      .prepare("SELECT sqlite_version() as version")
-      .get() as {
+    const sqliteVersion = db.prepare("SELECT sqlite_version() as version").get() as {
       version: string;
     };
 
@@ -314,3 +297,4 @@ export function getDatabaseVersionInfo(db: Database.Database): {
     return {};
   }
 }
+

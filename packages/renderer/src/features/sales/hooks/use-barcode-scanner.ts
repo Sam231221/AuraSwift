@@ -60,6 +60,8 @@ export function useBarcodeScanner({
    */
   const handleHardwareScan = useCallback(
     async (barcode: string): Promise<boolean> => {
+      logger.info("🔍 Hardware scanner detected barcode:", barcode);
+
       // Search by barcode, PLU, or SKU
       const product = products.find(
         (p) =>
@@ -113,6 +115,7 @@ export function useBarcodeScanner({
         } else {
           // Normal product, add directly to cart
           await onProductFound(product);
+          logger.info("✅ Product added to cart:", product.name);
           return true; // Success!
         }
       } else {
@@ -210,9 +213,9 @@ export function useBarcodeScanner({
   // Initialize audio on component mount
   useEffect(() => {
     if (audioEnabled) {
-      ScannerAudio.init().catch(() => {
-        // Audio initialization failed - non-critical, scanner will work without audio
-      });
+      ScannerAudio.init().catch((error) =>
+        logger.warn("Failed to initialize scanner audio", error)
+      );
     }
   }, [audioEnabled]);
 
