@@ -30,17 +30,7 @@ export default /** @type import('electron-builder').Configuration */
         arch: ['x64', 'arm64']
       }
     ],
-    icon: 'buildResources/icon.icns',
-    // Platform-specific file exclusions for macOS
-    // Exclude Windows and Linux binaries, but keep macOS (darwin) binaries
-    files: [
-      '!**/node_modules/**/prebuilds/win32-*/**',
-      '!**/node_modules/**/prebuilds/linux-*/**',
-      '!**/node_modules/**/prebuilds/android-*/**',
-      '!**/node_modules/**/bin/win32-*/**',
-      '!**/node_modules/**/bin/linux-*/**',
-      '!**/node_modules/**/bin/android-*/**',
-    ]
+    icon: 'buildResources/icon.icns'
   },
   win: {
     target: [
@@ -60,20 +50,6 @@ export default /** @type import('electron-builder').Configuration */
     // Note: electron-builder automatically includes Visual C++ Redistributables for native modules
     // (better-sqlite3, node-hid, serialport, usb) when needed
     // The app is built on windows-2022 runner for better Windows 10 Enterprise compatibility
-    // Platform-specific file exclusions for Windows
-    // Exclude macOS, Linux, and non-x64 Windows binaries, but keep win32-x64 binaries
-    files: [
-      '!**/node_modules/**/prebuilds/darwin-*/**',
-      '!**/node_modules/**/prebuilds/linux-*/**',
-      '!**/node_modules/**/prebuilds/android-*/**',
-      '!**/node_modules/**/prebuilds/win32-ia32/**',
-      '!**/node_modules/**/prebuilds/win32-arm64/**',
-      '!**/node_modules/**/bin/darwin-*/**',
-      '!**/node_modules/**/bin/linux-*/**',
-      '!**/node_modules/**/bin/android-*/**',
-      '!**/node_modules/**/bin/win32-ia32/**',
-      '!**/node_modules/**/bin/win32-arm64/**',
-    ]
   },
   squirrelWindows: {
     // iconUrl is required for Squirrel - must be a public URL
@@ -123,22 +99,10 @@ export default /** @type import('electron-builder').Configuration */
     '!**/__tests__/**',
     '!**/*.test.*',
     '!**/*.spec.*',
-    // Exclude source files from native modules (saves ~19MB)
-    '!**/node_modules/**/*.c',      // C source files
-    '!**/node_modules/**/*.cpp',   // C++ source files
-    '!**/node_modules/**/*.h',      // Header files
-    '!**/node_modules/**/*.hpp',   // C++ header files
-    '!**/node_modules/**/deps/**',  // Source dependencies (e.g., better-sqlite3/deps/sqlite3/)
-    // Exclude build artifacts from native modules (saves ~5-10MB)
-    '!**/node_modules/**/build/**',     // Build directories
-    '!**/node_modules/**/obj/**',      // Object files directories
-    '!**/node_modules/**/Release/**',   // Release build artifacts
-    '!**/node_modules/**/Debug/**',     // Debug build artifacts
-    '!**/node_modules/**/*.o',          // Object files
-    '!**/node_modules/**/*.a',          // Static libraries
-    // Note: Platform-specific binary exclusions are handled in mac/win configs
-    // Global exclusions here apply to all platforms
-    // Legacy module-specific exclusions (kept for compatibility)
+    // Exclude platform-specific native binaries for non-target platforms
+    // Windows x64 builds: exclude darwin, linux, android, and ia32 binaries
+    // Note: Only exclude prebuilds for non-Windows platforms
+    // The actual Windows binaries will be included via asarUnpack
     '!**/usb/prebuilds/darwin-*/**',
     '!**/usb/prebuilds/linux-*/**',
     '!**/usb/prebuilds/android-*/**',
