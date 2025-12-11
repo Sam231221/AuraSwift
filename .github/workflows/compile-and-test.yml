@@ -502,7 +502,7 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
       - name: Run hardware integration tests
-        run: npx playwright test ./tests/hardware-integration.spec.ts
+        run: npx playwright test ./tests/e2e/hardware-integration.spec.ts
         if: steps.check-tests.outputs.tests-exist == 'true'
         env:
           CI: true
