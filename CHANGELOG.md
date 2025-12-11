@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.21.1](https://github.com/Sam231221/AuraSwift/compare/v1.21.0...v1.21.1) (2025-12-11)
+
+
+### fix
+
+* **ci:** improve version setting logic in workflow to avoid unnecessary updates ([](https://github.com/Sam231221/AuraSwift/commit/e67c689e8221c6188ef9d77e5a36a95922357525))
+* **run-vitest:** simplify test file detection and remove unnecessary error handling ([](https://github.com/Sam231221/AuraSwift/commit/49684fa69684e12f059c34a37d0716cae40921ad))
+* **ci:** update hardware integration test path in workflow to reflect new directory structure ([](https://github.com/Sam231221/AuraSwift/commit/36f4b920f99574ae8e2b696076752a62112974f2))
+* **package:** update postinstall script to use default electron-rebuild ([](https://github.com/Sam231221/AuraSwift/commit/4c7899e5f80656abd80e4a5408cc04c26e333fb8))
+
+
+### refactor
+
+* **ci:** consolidate compile and test workflow, removing separate test.yml and enhancing build process with integrated testing steps ([](https://github.com/Sam231221/AuraSwift/commit/56ee04f30da365440699a8b85f764ed77468ddc2))
+
 # [1.21.0](https://github.com/Sam231221/AuraSwift/compare/v1.20.2...v1.21.0) (2025-12-11)
 
 
