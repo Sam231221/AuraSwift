@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.21.2](https://github.com/Sam231221/AuraSwift/compare/v1.21.1...v1.21.2) (2025-12-11)
+
+
+### fix
+
+* **electron-builder:** remove unnecessary platform-specific file exclusions for macOS and Windows ([](https://github.com/Sam231221/AuraSwift/commit/1f3360e6f9679c05705eb868805ec858651803fd))
+
 ## [1.21.1](https://github.com/Sam231221/AuraSwift/compare/v1.21.0...v1.21.1) (2025-12-11)
 
 
