@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.21.0](https://github.com/Sam231221/AuraSwift/compare/v1.20.2...v1.21.0) (2025-12-11)
+
+
+* Merge branch 'main' into release/v1.21.0-rollback ([](https://github.com/Sam231221/AuraSwift/commit/ac446768fe130df13eae3319ee8816aaf29b5af6))
+* Merge pull request #34 from Sam231221/release/v1.21.0-rollback ([](https://github.com/Sam231221/AuraSwift/commit/f1908584eee9234610e3c51e7be6085b52d54eb3)), closes [#34](https://github.com/Sam231221/AuraSwift/issues/34)
+
+
+### feat
+
+* **release:** rollback to v1.16.0 stable codebase as v1.21.0 ([](https://github.com/Sam231221/AuraSwift/commit/2e87b9782a15ebd3fe8c4bf52043d4fc9efb4600))
+
+
+### fix
+
+* **ci:** update workflow to set version with continue-on-error flag ([](https://github.com/Sam231221/AuraSwift/commit/1b5a2ab94bf001f40360c18dce899ee189177fc3))
+
+
+### BREAKING CHANGE
+
+* **release:** Superseding broken versions v1.17.0-v1.20.2
+
+This release contains the stable v1.16.0 codebase with version number
+updated to v1.21.0 to maintain semantic versioning continuity.
+
+Versions v1.17.0 through v1.20.2 contained critical issues and were
+never deployed to production. All future development will build on
+this v1.21.0 (v1.16.0 codebase).
+
+Changes:
+- Updated version from 1.16.0 to 1.21.0
+- Added CHANGELOG entry explaining rollback
+- No code changes - identical to v1.16.0
+
+Fixes: Critical stability issues in v1.17.0-v1.20.2
+
 # [1.21.0](https://github.com/Sam231221/AuraSwift/compare/v1.16.0...v1.21.0) (2025-12-11)
 
 ## ROLLBACK RELEASE
