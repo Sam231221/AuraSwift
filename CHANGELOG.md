@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.21.0](https://github.com/Sam231221/AuraSwift/compare/v1.16.0...v1.21.0) (2025-12-11)
+
+## ROLLBACK RELEASE
+
+This release restores the stable v1.16.0 codebase and supersedes broken versions v1.17.0 through v1.20.2.
+
+### What Happened?
+
+Versions 1.17.0-1.20.2 were released with critical issues that made them unstable. These versions were never deployed to production users. This release (v1.21.0) contains the exact same stable code as v1.16.0 with proper version numbering to maintain semantic versioning continuity.
+
+### For Developers
+
+- **If you have v1.16.0**: You're on the stable version. Update to v1.21.0 (same code, new version number).
+- **If you pulled v1.17.0-v1.20.2**: Update to v1.21.0 immediately.
+- **Going forward**: All future development will build on v1.21.0 (v1.16.0 codebase).
+
+### Technical Details
+
+- **Base codebase**: v1.16.0 (2025-12-05)
+- **Rolled back versions**: v1.17.0, v1.18.0, v1.19.0, v1.20.0, v1.20.1, v1.20.2
+- **Code changes**: None - identical to v1.16.0
+- **Version jump**: Necessary to supersede broken releases
+
+---
+
 # [1.16.0](https://github.com/Sam231221/AuraSwift/compare/v1.15.0...v1.16.0) (2025-12-05)
 
 
