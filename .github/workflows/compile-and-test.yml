@@ -331,8 +331,9 @@ jobs:
         env:
           npm_config_build_from_source: true
 
-      - run: npm version "${{inputs.app-version}}" --no-git-tag-version
-
+      - name: Set version
+        run: npm version "${{inputs.app-version}}" --no-git-tag-version
+        continue-on-error: true
       - name: Ensure Electron binary and verify workspaces before build
         run: |
           Write-Host "Ensuring Electron binary exists..."
