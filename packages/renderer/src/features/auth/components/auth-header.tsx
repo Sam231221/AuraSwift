@@ -1,6 +1,10 @@
-import { BatteryFull, Bell, Store, Wifi } from "lucide-react";
+import { BatteryFull, Bell, Store, Wifi, Power } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getAppVersion } from "@/shared/utils/version";
+import { Button } from "@/components/ui/button";
+import { getLogger } from "@/shared/utils/logger";
+
+const logger = getLogger("auth-header");
 
 // Header component for banner and time
 export function AuthHeader() {
@@ -17,6 +21,14 @@ export function AuthHeader() {
     minute: "2-digit",
     second: "2-digit",
   });
+
+  const handleCloseApp = async () => {
+    try {
+      await window.appAPI.quit();
+    } catch (error) {
+      logger.error("Failed to close app:", error);
+    }
+  };
 
   return (
     <header className="w-full flex items-center justify-between px-2 sm:px-4 lg:px-6 py-2 sm:py-3 border-b border-gray-200 bg-white/90 shadow-sm select-none">
@@ -58,6 +70,14 @@ export function AuthHeader() {
         >
           {timeString}
         </span>
+        <Button
+          onClick={handleCloseApp}
+          variant="ghost"
+          size="sm"
+          className="hover:bg-destructive/10 hover:text-destructive shrink-0"
+        >
+          <Power className="w-4 h-4 lg:w-5 lg:h-5" />
+        </Button>
       </div>
     </header>
   );

@@ -99,10 +99,11 @@ export function useWeightInput() {
     weightDisplayPrice,
     selectedWeightProduct,
     setSelectedWeightProduct,
+    setWeightInput,
+    setWeightDisplayPrice,
     handleWeightInput,
     getWeightValue,
     resetWeightInput,
     clearWeightInput,
   };
 }
-

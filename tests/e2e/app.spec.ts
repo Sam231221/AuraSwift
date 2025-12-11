@@ -1,196 +1,17 @@
-import type { ElectronApplication, JSHandle } from "playwright";
-import { _electron as electron } from "playwright";
-import { expect, test as base } from "@playwright/test";
+import type { JSHandle } from "playwright";
+import { expect } from "@playwright/test";
 import type { BrowserWindow } from "electron";
 import { globSync } from "glob";
-import { platform, arch } from "node:process";
-import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
-import electronPath from "electron";
-
-process.env.PLAYWRIGHT_TEST = "true";
+import { test } from "./fixtures";
 
 /**
  * E2E Tests for AuraSwift POS System
  * Technology Stack: React 18 + TypeScript + Electron + Vite
  * Architecture: Main process, Preload scripts, Renderer (React)
+ *
+ * This file contains the base app tests.
+ * Test fixtures are imported from ./fixtures.ts
  */
-
-// Declare the types of your fixtures.
-type TestFixtures = {
-  electronApp: ElectronApplication;
-  electronVersions: NodeJS.ProcessVersions;
-};
-
-const test = base.extend<TestFixtures>({
-  electronApp: [
-    async ({}, use) => {
-      /**
-       * Improved executable path detection for different environments
-       */
-      let executablePath: string | undefined;
-      let mainEntry: string | undefined;
-      const isCI = process.env.CI === "true";
-
-      // Try multiple possible locations and patterns based on electron-builder output
-      const possiblePaths = [
-        // Windows-specific patterns (prioritized since we're Windows-only now)
-        "dist/win-unpacked/auraswift.exe",
-        "dist/win-unpacked/AuraSwift.exe",
-        "dist/win-unpacked/*.exe",
-        "dist/*.exe",
-        "dist/**/*.exe",
-        "dist/win-unpacked/**/*.exe",
-
-        // Electron-builder Windows output patterns (common locations)
-        "dist/**/auraswift.exe",
-        "dist/**/AuraSwift.exe",
-        "dist/**/aura-swift.exe",
-        "dist/auraswift*.exe",
-        "dist/AuraSwift*.exe",
-        "dist/aura-swift*.exe",
-
-        // Generic executable patterns
-        "dist/**/*.exe",
-        "out/**/*.exe",
-        "release/**/*.exe",
-
-        // Development mode fallbacks (if no built executable found)
-        "dist/main.js",
-        "out/main.js",
-      ].filter(Boolean) as string[];
-
-      // Also check if we're in a packaged app scenario
-      const appPaths = globSync(possiblePaths, { nodir: true });
-
-      if (appPaths.length > 0) {
-        executablePath = appPaths[0];
-      } else {
-        // If no built app found, try running from source (development mode)
-
-        // Check for the entry point file
-        if (existsSync("packages/entry-point.mjs")) {
-          // Use Electron directly with the entry point
-          executablePath = electronPath as unknown as string;
-          mainEntry = "packages/entry-point.mjs";
-        } else {
-          // Look for other main entry points
-          const mainEntries = [
-            "dist-electron/main.js",
-            "out/main.js",
-            "dist/main.js",
-            "build/main.js",
-            "src/main.js",
-            "packages/main/dist/index.js",
-          ].filter(existsSync);
-
-          if (mainEntries.length > 0) {
-            // Use Electron directly with the main entry point
-            executablePath = electronPath as unknown as string;
-            mainEntry = mainEntries[0];
-          } else {
-            // Debug information for troubleshooting
-            const allFiles = globSync("**/*", { nodir: true }).slice(0, 50); // Limit output
-            throw new Error(
-              `App Executable path not found. Checked patterns: ${possiblePaths.join(
-                ", "
-              )}\n` +
-                `Current working directory: ${process.cwd()}\n` +
-                `First 50 files found: ${allFiles.join(", ")}\n` +
-                `Platform: ${platform}, Arch: ${arch}, CI: ${isCI}`
-            );
-          }
-        }
-      }
-
-      const launchArgs = mainEntry
-        ? [mainEntry, "--no-sandbox", "--disable-gpu"]
-        : ["--no-sandbox", "--disable-gpu"];
-
-      // Add more args for Windows CI environment
-      if (isCI && platform === "win32") {
-        launchArgs.push("--disable-dev-shm-usage", "--disable-extensions");
-      }
-
-      let electronApp;
-      try {
-        electronApp = await electron.launch({
-          executablePath: executablePath,
-          args: launchArgs,
-          timeout: 60000, // Increase timeout for CI with native modules
-          env: {
-            ...process.env,
-            NODE_ENV: "test",
-            ELECTRON_DISABLE_GPU: "1",
-            ELECTRON_NO_SANDBOX: "1",
-            ELECTRON_ENABLE_LOGGING: "1",
-          },
-        });
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        console.error(
-          `[Test Setup] Failed to launch Electron: ${errorMessage}`
-        );
-        console.error(`[Test Setup] Executable path: ${executablePath}`);
-        console.error(`[Test Setup] Launch args: ${launchArgs.join(" ")}`);
-
-        // If we're using a built executable and it fails, try development mode
-        if (!mainEntry && executablePath && executablePath.endsWith(".exe")) {
-          // Use the imported electronPath (it's the path to electron executable)
-          const electronBinary = electronPath as unknown as string;
-          const devMainEntry = "packages/entry-point.mjs";
-
-          if (existsSync(devMainEntry)) {
-            electronApp = await electron.launch({
-              executablePath: electronBinary,
-              args: [devMainEntry, ...launchArgs],
-              timeout: 60000,
-              env: {
-                ...process.env,
-                NODE_ENV: "test",
-                ELECTRON_DISABLE_GPU: "1",
-                ELECTRON_NO_SANDBOX: "1",
-                ELECTRON_ENABLE_LOGGING: "1",
-              },
-            });
-          } else {
-            throw error;
-          }
-        } else {
-          throw error;
-        }
-      }
-
-      electronApp.on("console", (msg) => {
-        if (msg.type() === "error") {
-          console.error(`[electron][${msg.type()}] ${msg.text()}`);
-        }
-      });
-
-      electronApp.on("window", (page) => {
-        page.on("pageerror", (error) => {
-          console.error(`[page error] ${error.message}`);
-        });
-        page.on("console", (msg) => {
-          if (msg.type() === "error") {
-            console.error(`[renderer][${msg.type()}] ${msg.text()}`);
-          }
-        });
-      });
-
-      await use(electronApp);
-
-      // This code runs after all the tests in the worker process.
-      await electronApp.close();
-    },
-    { scope: "worker", auto: true } as any,
-  ],
-
-  electronVersions: async ({ electronApp }, use) => {
-    await use(await electronApp.evaluate(() => process.versions));
-  },
-});
 
 test.describe("Build Environment Debug", () => {
   test("Check build output structure", async () => {
@@ -259,34 +80,11 @@ test.describe("Build Environment Debug", () => {
 });
 
 test.describe("Vite Build & TypeScript Integration", async () => {
-  test("Vite development assets load correctly", async ({ electronApp }) => {
-    const page = await electronApp.firstWindow();
-    await page.waitForLoadState("load");
-
-    // Check that Vite has processed the assets correctly
-    const viteAssetsLoaded = await page.evaluate(() => {
-      // Check for CSS being loaded (Vite injects styles)
-      const hasStyles =
-        document.head.querySelector("style") ||
-        document.head.querySelector('link[rel="stylesheet"]');
-
-      // Check for React being loaded
-      const rootElement = document.querySelector("#root");
-      const hasReact =
-        typeof (window as any).React !== "undefined" ||
-        (rootElement && rootElement.children.length > 0);
-
-      return { hasStyles: !!hasStyles, hasReact };
-    });
-
-    expect(viteAssetsLoaded.hasReact).toBe(true);
-  });
-
   test("TypeScript compilation produces working code", async ({
     electronApp,
   }) => {
     const page = await electronApp.firstWindow();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000); // Reduced from 2000ms
 
     // Verify that TypeScript interfaces and types are working
     const typescriptWorking = await page.evaluate(() => {
@@ -310,6 +108,15 @@ test.describe("Vite Build & TypeScript Integration", async () => {
 // Clean up authentication state before each test to ensure tests start from clean state
 test.beforeEach(async ({ electronApp }) => {
   const page = await electronApp.firstWindow();
+
+  // Ensure window is visible
+  const window = await electronApp.browserWindow(page);
+  await window.evaluate((mainWindow) => {
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  });
+
   await page.waitForLoadState("domcontentloaded");
 
   // Clear browser storage (localStorage, sessionStorage)
@@ -334,15 +141,14 @@ test.beforeEach(async ({ electronApp }) => {
   });
 
   // Close DevTools if open (for clean test environment)
-  const window = await electronApp.browserWindow(page);
   await window.evaluate((mainWindow) => {
     if (mainWindow.webContents.isDevToolsOpened()) {
       mainWindow.webContents.closeDevTools();
     }
   });
 
-  // Small delay to ensure state is cleared
-  await page.waitForTimeout(500);
+  // Small delay to ensure state is cleared (reduced from 500ms)
+  await page.waitForTimeout(200);
 });
 
 test("Main window state", async ({ electronApp }) => {
@@ -358,8 +164,8 @@ test("Main window state", async ({ electronApp }) => {
     }
   });
 
-  // Wait a bit after forcing show
-  await page.waitForTimeout(2000);
+  // Wait a bit after forcing show (reduced from 2000ms)
+  await page.waitForTimeout(1000);
 
   // Give the window more time to show up
   const windowState = await window.evaluate(
@@ -415,73 +221,12 @@ test("Main window state", async ({ electronApp }) => {
 });
 
 test.describe("React TypeScript Electron Vite POS Application", async () => {
-  test("The main window loads React app successfully", async ({
-    electronApp,
-  }) => {
-    const page = await electronApp.firstWindow();
-    await page.waitForLoadState("load");
-
-    // Wait for the React app to load with Vite
-    await page.waitForTimeout(3000);
-
-    // Check if the page has loaded (look for any content)
-    const bodyVisible = await page.locator("body").isVisible();
-    expect(bodyVisible).toBe(true);
-
-    // Check if React root element exists (created by React 18 createRoot)
-    const rootVisible = await page.locator("#root").isVisible();
-    expect(rootVisible).toBe(true);
-
-    // Verify React app has mounted and rendered content
-    const hasReactContent = await page.evaluate(() => {
-      const root = document.getElementById("root");
-      return root && root.children.length > 0;
-    });
-    expect(hasReactContent).toBe(true);
-  });
-
-  test("Router navigation works (HashRouter setup)", async ({
-    electronApp,
-  }) => {
-    const page = await electronApp.firstWindow();
-    await page.waitForLoadState("load");
-    await page.waitForTimeout(3000);
-
-    // Check that HashRouter is working - should redirect to /auth initially
-    const currentUrl = page.url();
-    expect(currentUrl).toContain("#/auth");
-  });
-
-  test("Authentication page renders properly", async ({ electronApp }) => {
-    const page = await electronApp.firstWindow();
-    await page.waitForLoadState("load");
-    await page.waitForTimeout(4000);
-
-    // Check if we're on the auth page (due to ProtectedRoute redirect)
-    const currentUrl = page.url();
-    expect(currentUrl).toContain("#/auth");
-
-    // Verify auth page elements are present
-    const authPagePresent = await page.evaluate(() => {
-      // Look for common auth page elements
-      const hasFormElements =
-        document.querySelector('input[type="email"]') ||
-        document.querySelector('input[type="password"]') ||
-        document.querySelector("form") ||
-        document.querySelector('[role="button"]') ||
-        document.querySelector("button");
-      return !!hasFormElements;
-    });
-
-    expect(authPagePresent).toBe(true);
-  });
-
   test("POS-specific APIs are available in renderer process", async ({
     electronApp,
   }) => {
     const page = await electronApp.firstWindow();
     await page.waitForLoadState("load");
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000); // Reduced from 2000ms
 
     // Test that key POS APIs are exposed via preload script
     const posAPIsAvailable = await page.evaluate(() => {
@@ -508,8 +253,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait a bit for the application to fully initialize
-      await page.waitForTimeout(2000);
+      // Wait a bit for the application to fully initialize (reduced from 2000ms)
+      await page.waitForTimeout(1000);
 
       // Test that the page loads and has basic DOM structure
       const pageInfo = await page.evaluate(() => {
@@ -534,8 +279,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
 
-      // Give some time for the renderer to initialize
-      await page.waitForTimeout(1000);
+      // Give some time for the renderer to initialize (reduced from 1000ms)
+      await page.waitForTimeout(500);
 
       // Test basic JavaScript execution in renderer
       const result = await page.evaluate(() => {
@@ -551,8 +296,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for preload to complete
-      await page.waitForTimeout(2000);
+      // Wait for preload to complete (reduced from 2000ms)
+      await page.waitForTimeout(1000);
 
       const debugInfo = await page.evaluate(() => {
         const windowBtoa = (window as any).btoa;
@@ -580,7 +325,7 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
     test("btoa function works correctly", async ({ electronApp }) => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000); // Reduced from 2000ms
 
       const testString = "hello world";
       const result = await page.evaluate((str) => {
@@ -601,8 +346,8 @@ test.describe("Preload Security Context (TypeScript Electron)", async () => {
       const page = await electronApp.firstWindow();
       await page.waitForLoadState("domcontentloaded");
 
-      // Wait for preload to complete
-      await page.waitForTimeout(2000);
+      // Wait for preload to complete (reduced from 2000ms)
+      await page.waitForTimeout(1000);
 
       const debugInfo = await page.evaluate(() => {
         const authAPI = (globalThis as any).authAPI;

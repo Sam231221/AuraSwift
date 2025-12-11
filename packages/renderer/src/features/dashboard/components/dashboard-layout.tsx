@@ -2,13 +2,21 @@ import type { ReactNode } from "react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
-import { Store, LogOut, User, Bell, Settings, Clock } from "lucide-react";
+import {
+  Store,
+  LogOut,
+  User,
+  Bell,
+  Settings,
+  Clock,
+  Power,
+} from "lucide-react";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { ClockOutWarningDialog } from "@/features/auth/components/clock-out-warning-dialog";
 import { userHasAnyRole } from "@/shared/utils/rbac-helpers";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('dashboard-layout');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("dashboard-layout");
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -16,13 +24,14 @@ interface DashboardLayoutProps {
   subtitle?: string;
 }
 
-export function DashboardLayout({
-  children,
-  subtitle,
-}: DashboardLayoutProps) {
+export function DashboardLayout({ children, subtitle }: DashboardLayoutProps) {
   const { user, logout, isLoading } = useAuth();
   const [showClockOutDialog, setShowClockOutDialog] = useState(false);
-  const [activeShift, setActiveShift] = useState<any>(null);
+  const [activeShift, setActiveShift] = useState<{
+    id: string;
+    clockInEvent?: { timestamp: string };
+    createdAt?: string;
+  } | null>(null);
   const [clockInTime, setClockInTime] = useState<string | undefined>();
   const [isCheckingShift, setIsCheckingShift] = useState(false);
 
@@ -100,6 +109,14 @@ export function DashboardLayout({
     await logout();
   };
 
+  const handleCloseApp = async () => {
+    try {
+      await window.appAPI.quit();
+    } catch (error) {
+      logger.error("Failed to close app:", error);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -159,6 +176,14 @@ export function DashboardLayout({
                 )}
               </Button>
             </div>
+            <Button
+              onClick={handleCloseApp}
+              variant="ghost"
+              size="sm"
+              className="hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Power className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </header>
@@ -177,4 +202,3 @@ export function DashboardLayout({
     </div>
   );
 }
-

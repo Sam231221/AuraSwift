@@ -1030,7 +1030,11 @@ export class AutoUpdater implements AppModule {
 
     const onDownloadProgress = (progressInfo: ProgressInfo) => {
       // Log differential update status on first progress event
-      if (progressInfo.total && progressInfo.transferred === 0 && this.#logger) {
+      if (
+        progressInfo.total &&
+        progressInfo.transferred === 0 &&
+        this.#logger
+      ) {
         const totalMB = (progressInfo.total / (1024 * 1024)).toFixed(2);
         // If total size is close to full installer size (>100MB), likely full download
         // Differential updates are typically much smaller (<50MB for most changes)

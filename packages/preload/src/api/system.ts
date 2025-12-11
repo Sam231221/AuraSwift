@@ -137,6 +137,7 @@ export const scaleAPI = {
 export const appAPI = {
   getVersion: () => ipcRenderer.invoke("app:getVersion"),
   restart: () => ipcRenderer.invoke("app:restart"),
+  quit: () => ipcRenderer.invoke("app:quit"),
 };
 
 export const vivaWalletAPI = {
@@ -150,8 +151,17 @@ export const vivaWalletAPI = {
   // Transactions
   initiateSale: (amount: number, currency: string) =>
     ipcRenderer.invoke("viva:initiate-sale", amount, currency),
-  initiateRefund: (originalTransactionId: string, amount: number, currency: string) =>
-    ipcRenderer.invoke("viva:initiate-refund", originalTransactionId, amount, currency),
+  initiateRefund: (
+    originalTransactionId: string,
+    amount: number,
+    currency: string
+  ) =>
+    ipcRenderer.invoke(
+      "viva:initiate-refund",
+      originalTransactionId,
+      amount,
+      currency
+    ),
   cancelTransaction: (transactionId: string) =>
     ipcRenderer.invoke("viva:cancel-transaction", transactionId),
 
