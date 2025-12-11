@@ -1,15 +1,4 @@
-# Build and Compile Workflow for AuraSwift
-#
-# This workflow focuses on building and compiling the Electron application.
-# Testing is delegated to the test.yml workflow for better separation of concerns.
-#
-# Best Practices:
-# - Single responsibility: Build and compile only
-# - Reusable via workflow_call
-# - Calls test.yml for E2E tests on built application
-# - Cost optimization with conditional execution
-
-name: Build and Compile
+name: Compile and test on Windows
 
 on:
   workflow_call:
@@ -25,11 +14,6 @@ on:
       distribution-channel:
         required: true
         type: string
-      skip-tests:
-        description: "Skip running tests after build"
-        required: false
-        type: boolean
-        default: false
 
 defaults:
   run:
@@ -54,7 +38,6 @@ env:
 jobs:
   # Quick typecheck job - runs in parallel with build
   typecheck:
-    name: Type Check
     runs-on: ubuntu-latest # Use faster/cheaper Linux for typecheck
     steps:
       - uses: actions/checkout@v5
@@ -96,10 +79,10 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck -ws --if-present
 
-  # Build and compile job - Windows for native modules and building
+  # Build and test job - Windows for native modules and building
   # Using windows-2022 instead of windows-latest for better Windows 10 Enterprise compatibility
-  build:
-    name: Build Electron Application
+  # windows-latest now uses Windows Server 2025 which may have compatibility issues
+  build-and-test:
     runs-on: windows-2022
     env:
       PYTHON: python
@@ -331,14 +314,7 @@ jobs:
         env:
           npm_config_build_from_source: true
 
-      - name: Set version
-        run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          if [ "$CURRENT" != "${{inputs.app-version}}" ]; then
-            npm version "${{inputs.app-version}}" --no-git-tag-version
-          else
-            echo "Version already set to ${{inputs.app-version}}, skipping"
-          fi
+      - run: npm version "${{inputs.app-version}}" --no-git-tag-version
 
       - name: Ensure Electron binary and verify workspaces before build
         run: |
@@ -470,8 +446,30 @@ jobs:
           }
         shell: powershell
 
+      # Only install Playwright if tests exist (conditional)
+      - name: Check if tests exist
+        id: check-tests
+        run: |
+          if (Test-Path "tests") {
+            echo "tests-exist=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "tests-exist=false" >> $env:GITHUB_OUTPUT
+          }
+        shell: powershell
+
+      - name: Install Playwright
+        if: steps.check-tests.outputs.tests-exist == 'true'
+        run: npx playwright install --with-deps
+
+      - name: Debug build output structure
+        if: steps.check-tests.outputs.tests-exist == 'true'
+        run: |
+          if (Test-Path "dist") { dir dist -Recurse } else { Write-Host "No dist directory found" }
+          if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { Write-Host "No executables found" }
+        shell: powershell
+
       - name: Pre-test hardware module verification
-        if: ${{ !inputs.skip-tests }}
+        if: steps.check-tests.outputs.tests-exist == 'true'
         run: |
           $testReady = $true
           $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
@@ -485,36 +483,27 @@ jobs:
           }
         shell: powershell
 
-      - uses: actions/attest-build-provenance@v3
-        with:
-          subject-path: "dist/auraswift-*, dist/latest*.yml"
+      - name: Run main E2E tests
+        run: npm run test:all --if-present
+        if: steps.check-tests.outputs.tests-exist == 'true'
+        env:
+          CI: true
+          NODE_ENV: test
+          ELECTRON_DISABLE_GPU: 1
+          ELECTRON_NO_SANDBOX: 1
+          PLAYWRIGHT_HEADLESS: 1
+          ELECTRON_ENABLE_LOGGING: 1
+          DEBUG: playwright:*
+          HARDWARE_SIMULATION_MODE: true
+          MOCK_PRINTER_ENABLED: true
+          MOCK_CARD_READER_ENABLED: true
+          MOCK_SCANNER_ENABLED: true
+          ELECTRON_UPDATER_DISABLED: 1
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
-      - name: Upload compiled app
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-${{inputs.distribution-channel}}
-          path: dist
-          retention-days: 7 # Reduce artifact retention to save storage costs
-
-      # Only install Playwright if tests exist (conditional)
-      - name: Check if tests exist
-        id: check-tests
-        if: ${{ !inputs.skip-tests }}
-        run: |
-          if (Test-Path "tests") {
-            echo "tests-exist=true" >> $env:GITHUB_OUTPUT
-          } else {
-            echo "tests-exist=false" >> $env:GITHUB_OUTPUT
-          }
-        shell: powershell
-
-      - name: Install Playwright
-        if: steps.check-tests.outputs.tests-exist == 'true' && !inputs.skip-tests
-        run: npx playwright install --with-deps
-
-      - name: Run E2E tests on built application
-        if: steps.check-tests.outputs.tests-exist == 'true' && !inputs.skip-tests
-        run: npm run test:e2e
+      - name: Run hardware integration tests
+        run: npx playwright test ./tests/hardware-integration.spec.ts
+        if: steps.check-tests.outputs.tests-exist == 'true'
         env:
           CI: true
           NODE_ENV: test
@@ -526,5 +515,14 @@ jobs:
           MOCK_PRINTER_ENABLED: true
           MOCK_CARD_READER_ENABLED: true
           MOCK_SCANNER_ENABLED: true
-          ELECTRON_UPDATER_DISABLED: 1
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      - uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: "dist/auraswift-*, dist/latest*.yml"
+
+      - name: Upload compiled app
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{inputs.distribution-channel}}
+          path: dist
+          retention-days: 7 # Reduce artifact retention to save storage costs
