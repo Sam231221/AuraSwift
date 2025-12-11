@@ -332,8 +332,14 @@ jobs:
           npm_config_build_from_source: true
 
       - name: Set version
-        run: npm version "${{inputs.app-version}}" --no-git-tag-version
-        continue-on-error: true
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" != "${{inputs.app-version}}" ]; then
+            npm version "${{inputs.app-version}}" --no-git-tag-version
+          else
+            echo "Version already set to ${{inputs.app-version}}, skipping"
+          fi
+
       - name: Ensure Electron binary and verify workspaces before build
         run: |
           Write-Host "Ensuring Electron binary exists..."
