@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { PERMISSIONS } from "@app/shared/constants/permissions";
+import { getLogger } from "../utils/logger.js";
 
 /**
  * Get logger, with fallback for non-Electron contexts

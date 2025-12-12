@@ -34,7 +34,12 @@ export function registerSeedHandlers() {
       }
 
       // Create seeder and run
-      const seeder = new CategoryProductSeeder(drizzleDb, sqliteDb, schema);
+      // Type assertion needed: drizzleDb is BetterSQLite3Database but TypeScript infers a more specific type
+      const seeder = new CategoryProductSeeder(
+        drizzleDb as any,
+        sqliteDb,
+        schema
+      );
 
       await seeder.seedWithPreset(preset);
 
@@ -83,7 +88,12 @@ export function registerSeedHandlers() {
           throw new Error("Could not get database instances");
         }
 
-        const seeder = new CategoryProductSeeder(drizzleDb, sqliteDb, schema);
+        // Type assertion needed: drizzleDb is BetterSQLite3Database but TypeScript infers a more specific type
+        const seeder = new CategoryProductSeeder(
+          drizzleDb as any,
+          sqliteDb,
+          schema
+        );
 
         await seeder.seedWithConfig(config);
 

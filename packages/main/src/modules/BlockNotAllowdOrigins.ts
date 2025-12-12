@@ -31,7 +31,7 @@ export class BlockNotAllowedOrigins extends AbstractSecurityRule {
       // Prevent navigation
       event.preventDefault();
 
-      if (import.meta.env.DEV) {
+      if (process.env.NODE_ENV === "development") {
         logger.warn(`Blocked navigating to disallowed origin: ${origin}`);
       }
     });

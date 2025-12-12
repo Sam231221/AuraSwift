@@ -11,9 +11,14 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@app/*": ["../*"]
+      "@app/*": ["../*"],
+      "../main/src/database/schema.js": ["../main/src/database/schema.ts"]
     }
   },
-  "include": ["src/**/*.ts", "../../types/**/*.d.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../../types/**/*.d.ts",
+    "../shared/src/types/db.ts"
+  ],
   "exclude": ["**/*.spec.ts", "**/*.test.ts"]
 }
