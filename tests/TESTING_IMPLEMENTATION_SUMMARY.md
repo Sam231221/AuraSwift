@@ -147,7 +147,7 @@
    - Security checks
    - 15+ test scenarios
 
-5. **Existing E2E** (`tests/e2e/app.spec.ts`) - Main app tests with shared fixtures
+5. **Existing E2E** (`tests/e2e.spec.ts`) - Already exists, enhanced
 
 ### 📊 Summary Statistics
 
@@ -239,7 +239,7 @@ it("should handle click", async () => {
 
 ```typescript
 // tests/e2e/my-feature.spec.ts
-import { test } from "./app.spec";
+import { test } from "../e2e.spec";
 
 test("should work", async ({ electronApp }) => {
   const page = await electronApp.firstWindow();
@@ -299,9 +299,7 @@ AuraSwift/
 │       │   ├── BasePage.ts ✨
 │       │   └── LoginPage.ts ✨
 │       ├── auth.spec.ts ✨
-│       ├── app.spec.ts (main app tests with shared fixtures)
-│       ├── auth.spec.ts
-│       └── hardware-integration.spec.ts
+│       └── e2e.spec.ts (existing)
 │
 ├── playwright.config.ts ✨                  # Playwright config
 ├── vitest.config.ts (existing)              # Vitest config
