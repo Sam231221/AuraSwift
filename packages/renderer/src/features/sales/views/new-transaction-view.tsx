@@ -841,9 +841,9 @@ export function NewTransactionView({
       )}
 
       {/* Main Layout */}
-      <div className="flex p-2 sm:p-3 lg:p-4 flex-col lg:flex-row gap-2 sm:gap-3 min-h-screen">
+      <div className="flex p-2 sm:p-3 lg:p-4 flex-col lg:flex-row gap-2 sm:gap-3 h-screen overflow-hidden">
         {/* Left Column - Product Selection */}
-        <div className="flex mb-0 lg:mb-2 flex-col flex-1 min-h-0 min-w-0">
+        <div className="flex mb-0 lg:mb-2 flex-col flex-1 min-h-0 min-w-0 gap-2 sm:gap-3">
           <ProductSelectionPanel
             products={displayProducts}
             categories={categories.categories}
@@ -867,11 +867,15 @@ export function NewTransactionView({
             }}
             DOUBLE_CLICK_DELAY={DOUBLE_CLICK_DELAY}
           />
-          {!payment.paymentStep && <QuickActionButtons onLogOff={logout} />}
+          {!payment.paymentStep && (
+            <div className="shrink-0">
+              <QuickActionButtons onLogOff={logout} />
+            </div>
+          )}
         </div>
 
         {/* Right Column - Cart & Payment */}
-        <div className="flex flex-col w-full lg:flex-[0_1_480px] lg:w-[480px] lg:max-w-[520px] gap-2 sm:gap-3 min-h-0 overflow-y-auto">
+        <div className="flex flex-col w-full lg:flex-[0_1_480px] lg:w-[480px] lg:max-w-[520px] gap-2 sm:gap-3 min-h-0">
           <QuickActionsCarousel
             onRefund={() => setShowRefundModal(true)}
             onVoid={() => setShowVoidModal(true)}

@@ -62,7 +62,7 @@ export function ProductSelectionPanel({
           />
         </div>
       </CardHeader>
-      <CardContent className="pt-1 px-3 sm:px-6 flex-1 overflow-y-auto scroll-smooth">
+      <CardContent className="pt-1 px-3 sm:px-6 flex-1 flex flex-col min-h-0 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-8 sm:py-12">
             <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-slate-400" />
@@ -86,7 +86,7 @@ export function ProductSelectionPanel({
             </Button>
           </div>
         ) : (
-          <div className="space-y-3 sm:space-y-4">
+          <div className="flex flex-col gap-3 sm:gap-4 min-h-0 flex-1">
             <CategoryNavigation
               categories={categories}
               products={products}

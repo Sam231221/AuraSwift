@@ -33,7 +33,7 @@ export function CategoryNavigation({
   if (searchQuery || currentCategories.length === 0) return null;
 
   return (
-    <div>
+    <div className="shrink-0 max-h-[344px] sm:max-h-[312px] lg:max-h-[236px] overflow-y-auto">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
         {currentCategories.map((category) => {
           const childCount = categories.filter(
