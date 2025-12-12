@@ -880,13 +880,15 @@ export class TransactionManager {
     ];
 
     if (startDate) {
+      const startStr = startDate.toISOString();
       conditions.push(
-        gte(schema.transactions.timestamp, startDate.toISOString())
+        drizzleSql`${schema.transactions.timestamp} >= ${startStr}`
       );
     }
     if (endDate) {
+      const endStr = endDate.toISOString();
       conditions.push(
-        lte(schema.transactions.timestamp, endDate.toISOString())
+        drizzleSql`${schema.transactions.timestamp} <= ${endStr}`
       );
     }
 
@@ -950,6 +952,18 @@ export class TransactionManager {
       previousStart.setHours(0, 0, 0, 0);
     }
 
+    // Ensure end dates are at end of day for proper range inclusion
+    if (currentEnd) {
+      const endOfDay = new Date(currentEnd);
+      endOfDay.setHours(23, 59, 59, 999);
+      currentEnd = endOfDay;
+    }
+    if (previousEnd) {
+      const endOfDay = new Date(previousEnd);
+      endOfDay.setHours(23, 59, 59, 999);
+      previousEnd = endOfDay;
+    }
+
     const currentPeriod = this.getTotalRevenue(
       businessId,
       currentStart,
@@ -982,6 +996,9 @@ export class TransactionManager {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    const todayStr = today.toISOString();
+    const tomorrowStr = tomorrow.toISOString();
+
     const result = this.db
       .select({
         count: drizzleSql<number>`COUNT(*)`,
@@ -992,8 +1009,8 @@ export class TransactionManager {
           eq(schema.transactions.businessId, businessId),
           eq(schema.transactions.type, "sale"),
           eq(schema.transactions.status, "completed"),
-          gte(schema.transactions.timestamp, today.toISOString()),
-          lte(schema.transactions.timestamp, tomorrow.toISOString())
+          drizzleSql`${schema.transactions.timestamp} >= ${todayStr}`,
+          drizzleSql`${schema.transactions.timestamp} < ${tomorrowStr}`
         )
       )
       .get();
@@ -1016,13 +1033,15 @@ export class TransactionManager {
     ];
 
     if (startDate) {
+      const startStr = startDate.toISOString();
       conditions.push(
-        gte(schema.transactions.timestamp, startDate.toISOString())
+        drizzleSql`${schema.transactions.timestamp} >= ${startStr}`
       );
     }
     if (endDate) {
+      const endStr = endDate.toISOString();
       conditions.push(
-        lte(schema.transactions.timestamp, endDate.toISOString())
+        drizzleSql`${schema.transactions.timestamp} <= ${endStr}`
       );
     }
 

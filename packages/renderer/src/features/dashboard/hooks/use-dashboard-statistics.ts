@@ -19,7 +19,12 @@ interface DashboardStatistics {
     changePercent: number;
   };
   salesToday: number;
-  averageOrderValue: number;
+  averageOrderValue: {
+    current: number;
+    previous: number;
+    change: number;
+    changePercent: number;
+  };
 }
 
 interface UseDashboardStatisticsReturn {
@@ -29,12 +34,42 @@ interface UseDashboardStatisticsReturn {
   refetch: () => Promise<void>;
 }
 
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes cache
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds cache (reduced for more frequent updates)
 let statisticsCache: {
   data: DashboardStatistics;
   timestamp: number;
   businessId: string;
 } | null = null;
+
+// Store refetch callbacks to trigger refresh when cache is invalidated
+const refetchCallbacks = new Set<() => void>();
+
+/**
+ * Invalidate dashboard statistics cache
+ * Call this after creating/updating transactions to force refresh
+ */
+export function invalidateDashboardStatisticsCache(businessId?: string) {
+  if (businessId) {
+    if (statisticsCache?.businessId === businessId) {
+      statisticsCache = null;
+      // Trigger all registered refetch callbacks
+      refetchCallbacks.forEach((callback) => callback());
+    }
+  } else {
+    statisticsCache = null;
+    // Trigger all registered refetch callbacks
+    refetchCallbacks.forEach((callback) => callback());
+  }
+}
+
+// Expose cache invalidation globally for use in transaction hooks
+if (typeof window !== "undefined") {
+  (
+    window as typeof window & {
+      invalidateDashboardCache?: typeof invalidateDashboardStatisticsCache;
+    }
+  ).invalidateDashboardCache = invalidateDashboardStatisticsCache;
+}
 
 export function useDashboardStatistics(): UseDashboardStatisticsReturn {
   const { user } = useAuth();
@@ -121,6 +156,14 @@ export function useDashboardStatistics(): UseDashboardStatisticsReturn {
 
   useEffect(() => {
     fetchStatistics();
+  }, [fetchStatistics]);
+
+  // Register refetch callback for cache invalidation
+  useEffect(() => {
+    refetchCallbacks.add(fetchStatistics);
+    return () => {
+      refetchCallbacks.delete(fetchStatistics);
+    };
   }, [fetchStatistics]);
 
   // Clear cache when business changes

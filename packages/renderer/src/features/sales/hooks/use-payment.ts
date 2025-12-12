@@ -672,6 +672,11 @@ export function usePayment({
           // Mark transaction as complete
           setTransactionComplete(true);
 
+          // Invalidate dashboard statistics cache to show updated data immediately
+          if (window.invalidateDashboardCache) {
+            window.invalidateDashboardCache(businessId);
+          }
+
           // Handle receipt generation and display after successful transaction
           await handleReceiptAfterTransaction(
             receiptNumber,

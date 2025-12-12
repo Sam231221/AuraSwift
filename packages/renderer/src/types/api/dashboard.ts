@@ -8,7 +8,12 @@ export interface DashboardStatistics {
     changePercent: number;
   };
   salesToday: number;
-  averageOrderValue: number;
+  averageOrderValue: {
+    current: number;
+    previous: number;
+    change: number;
+    changePercent: number;
+  };
 }
 
 export interface DashboardAPI {

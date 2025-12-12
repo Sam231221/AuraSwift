@@ -38,14 +38,40 @@ export function registerDashboardHandlers() {
         // Get today's sales count
         const todaySalesCount = db.transactions.getTodaySalesCount(businessId);
 
-        // Get average order value for current month
+        // Get average order value for current month and previous month
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const avgOrderValue = db.transactions.getAverageOrderValue(
+        monthStart.setHours(0, 0, 0, 0);
+        const currentEnd = new Date(now);
+        currentEnd.setHours(23, 59, 59, 999);
+
+        const previousMonthStart = new Date(
+          now.getFullYear(),
+          now.getMonth() - 1,
+          1
+        );
+        previousMonthStart.setHours(0, 0, 0, 0);
+        const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        previousMonthEnd.setHours(23, 59, 59, 999);
+
+        const currentAvgOrderValue = db.transactions.getAverageOrderValue(
           businessId,
           monthStart,
-          now
+          currentEnd
         );
+
+        const previousAvgOrderValue = db.transactions.getAverageOrderValue(
+          businessId,
+          previousMonthStart,
+          previousMonthEnd
+        );
+
+        const avgOrderValueChange =
+          currentAvgOrderValue - previousAvgOrderValue;
+        const avgOrderValueChangePercent =
+          previousAvgOrderValue > 0
+            ? (avgOrderValueChange / previousAvgOrderValue) * 100
+            : 0;
 
         return {
           success: true,
@@ -57,7 +83,12 @@ export function registerDashboardHandlers() {
               changePercent: revenueStats.changePercent,
             },
             salesToday: todaySalesCount,
-            averageOrderValue: avgOrderValue,
+            averageOrderValue: {
+              current: currentAvgOrderValue,
+              previous: previousAvgOrderValue,
+              change: avgOrderValueChange,
+              changePercent: avgOrderValueChangePercent,
+            },
           },
         };
       } catch (error) {

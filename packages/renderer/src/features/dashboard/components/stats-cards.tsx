@@ -9,10 +9,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DollarSign,
-  Users,
   AlertTriangle,
   ShoppingCart,
   TrendingUp,
+  Users,
+  Package,
 } from "lucide-react";
 import { useUserPermissions } from "../hooks/use-user-permissions";
 import { useDashboardStatistics } from "../hooks/use-dashboard-statistics";
@@ -23,12 +24,12 @@ interface StatsCardsProps {
 }
 
 /**
- * Format currency value
+ * Format currency value in GBP (British Pounds)
  */
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-GB", {
     style: "currency",
-    currency: "USD",
+    currency: "GBP",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
@@ -44,11 +45,7 @@ function formatPercentageChange(changePercent: number): string {
 
 export function StatsCards({ className = "" }: StatsCardsProps) {
   const { hasPermission, isLoading: permissionsLoading } = useUserPermissions();
-  const {
-    statistics,
-    isLoading: statisticsLoading,
-    error: statisticsError,
-  } = useDashboardStatistics();
+  const { statistics, isLoading: statisticsLoading } = useDashboardStatistics();
 
   const isLoading = permissionsLoading || statisticsLoading;
 
@@ -57,7 +54,7 @@ export function StatsCards({ className = "" }: StatsCardsProps) {
     {
       id: "revenue",
       title: "Total Revenue",
-      value: statistics ? formatCurrency(statistics.revenue.current) : "$0.00",
+      value: statistics ? formatCurrency(statistics.revenue.current) : "£0.00",
       change: statistics
         ? `${formatPercentageChange(
             statistics.revenue.changePercent
@@ -68,13 +65,19 @@ export function StatsCards({ className = "" }: StatsCardsProps) {
       isLoading: statisticsLoading,
     },
     {
-      id: "users",
-      title: "Active Users",
-      value: "12", // TODO: Make this dynamic when user management stats are available
-      change: "3 online now",
-      icon: Users,
-      permission: PERMISSIONS.USERS_MANAGE,
-      isLoading: false,
+      id: "avg-order-value",
+      title: "Average Order Value",
+      value: statistics
+        ? formatCurrency(statistics.averageOrderValue.current)
+        : "£0.00",
+      change: statistics
+        ? `${formatPercentageChange(
+            statistics.averageOrderValue.changePercent
+          )} from last month`
+        : "Loading...",
+      icon: TrendingUp,
+      permission: PERMISSIONS.REPORTS_READ,
+      isLoading: statisticsLoading,
     },
     {
       id: "sales-today",
