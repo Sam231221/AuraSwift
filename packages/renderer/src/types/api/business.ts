@@ -22,5 +22,5 @@ export interface BusinessAPI {
     sessionToken: string,
     businessId: string,
     updates: BusinessUpdateData
-  ) => Promise<APIResponse<{ business: any }>>;
+  ) => Promise<APIResponse & { business?: any }>;
 }

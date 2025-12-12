@@ -38,6 +38,7 @@ import type { PdfReceiptAPI } from "../types/api/pdf-receipt";
 import type { AppAPI } from "../types/api/app";
 import type { UpdateAPI } from "../types/api/update";
 import type { BusinessAPI } from "../types/api/business";
+import type { TerminalsAPI } from "../types/api/terminals";
 import type { APIResponse } from "../types/api/common";
 
 declare global {
@@ -111,6 +112,9 @@ declare global {
 
     // Business Management
     businessAPI: BusinessAPI;
+
+    // Terminal Management
+    terminalsAPI: TerminalsAPI;
 
     // Dashboard cache invalidation
     invalidateDashboardCache?: (businessId?: string) => void;

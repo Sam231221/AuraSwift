@@ -14,6 +14,7 @@ import { registerRoleHandlers } from "./role.handlers.js";
 import { registerSeedHandlers } from "./seed.handlers.js";
 import { registerShiftHandlers } from "./shift.handlers.js";
 import { registerSupplierHandlers } from "./supplier.handlers.js";
+import { registerTerminalHandlers } from "./terminal.handlers.js";
 import { registerTimeTrackingHandlers } from "./time-tracking.handlers.js";
 import { registerTransactionHandlers } from "./transaction.handler.js";
 import { registerUpdateHandlers } from "./update.handlers.js";
@@ -35,6 +36,7 @@ export function registerAllIpcHandlers() {
   registerSeedHandlers();
   registerShiftHandlers();
   registerSupplierHandlers();
+  registerTerminalHandlers();
   registerTimeTrackingHandlers();
   registerTransactionHandlers();
   registerUpdateHandlers();

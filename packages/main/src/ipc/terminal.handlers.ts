@@ -1,0 +1,233 @@
+// Terminal Management IPC Handlers
+
+import { ipcMain } from "electron";
+import { getDatabase } from "../database/index.js";
+import { getLogger } from "../utils/logger.js";
+import {
+  validateSession,
+  validateBusinessAccess,
+} from "../utils/authHelpers.js";
+
+const logger = getLogger("terminalHandlers");
+let db: any = null;
+
+export function registerTerminalHandlers() {
+  // ============================================================================
+  // TERMINAL MANAGEMENT IPC HANDLERS
+  // ============================================================================
+
+  ipcMain.handle(
+    "terminals:getByBusiness",
+    async (event, sessionToken, businessId) => {
+      try {
+        if (!db) db = await getDatabase();
+
+        // Validate session
+        const sessionValidation = await validateSession(db, sessionToken);
+        if (!sessionValidation.success) {
+          return {
+            success: false,
+            message: sessionValidation.message,
+            code: sessionValidation.code,
+          };
+        }
+
+        // Validate business access
+        const businessCheck = validateBusinessAccess(
+          sessionValidation.user!,
+          businessId
+        );
+        if (!businessCheck.success) {
+          return {
+            success: false,
+            message: businessCheck.message,
+            code: businessCheck.code,
+          };
+        }
+
+        // Get terminals
+        const terminals = db.terminals.getTerminalsByBusiness(businessId);
+
+        return {
+          success: true,
+          terminals: terminals.map((t: any) => ({
+            ...t,
+            settings: t.settings ? JSON.parse(t.settings) : null,
+          })),
+        };
+      } catch (error) {
+        logger.error("Get terminals by business IPC error:", error);
+        return {
+          success: false,
+          message: "Failed to get terminals",
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "terminals:getById",
+    async (event, sessionToken, terminalId) => {
+      try {
+        if (!db) db = await getDatabase();
+
+        // Validate session
+        const sessionValidation = await validateSession(db, sessionToken);
+        if (!sessionValidation.success) {
+          return {
+            success: false,
+            message: sessionValidation.message,
+            code: sessionValidation.code,
+          };
+        }
+
+        // Get terminal
+        const terminal = db.terminals.getTerminalById(terminalId);
+        if (!terminal) {
+          return {
+            success: false,
+            message: "Terminal not found",
+          };
+        }
+
+        // Validate business access
+        const businessCheck = validateBusinessAccess(
+          sessionValidation.user!,
+          terminal.business_id
+        );
+        if (!businessCheck.success) {
+          return {
+            success: false,
+            message: businessCheck.message,
+            code: businessCheck.code,
+          };
+        }
+
+        return {
+          success: true,
+          terminal: {
+            ...terminal,
+            settings: terminal.settings ? JSON.parse(terminal.settings) : null,
+          },
+        };
+      } catch (error) {
+        logger.error("Get terminal by ID IPC error:", error);
+        return {
+          success: false,
+          message: "Failed to get terminal",
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "terminals:update",
+    async (event, sessionToken, terminalId, updates) => {
+      try {
+        if (!db) db = await getDatabase();
+
+        // Validate session
+        const sessionValidation = await validateSession(db, sessionToken);
+        if (!sessionValidation.success) {
+          return {
+            success: false,
+            message: sessionValidation.message,
+            code: sessionValidation.code,
+          };
+        }
+
+        // Get terminal to check business access
+        const terminal = db.terminals.getTerminalById(terminalId);
+        if (!terminal) {
+          return {
+            success: false,
+            message: "Terminal not found",
+          };
+        }
+
+        // Validate business access
+        const businessCheck = validateBusinessAccess(
+          sessionValidation.user!,
+          terminal.business_id
+        );
+        if (!businessCheck.success) {
+          return {
+            success: false,
+            message: businessCheck.message,
+            code: businessCheck.code,
+          };
+        }
+
+        // Log the updates being applied
+        logger.info("Updating terminal:", {
+          terminalId,
+          updates,
+          updateCount: Object.keys(updates).length,
+        });
+
+        // Update terminal
+        const updated = db.terminals.updateTerminal(terminalId, updates);
+
+        logger.info("Terminal update result:", {
+          updated,
+          terminalId,
+        });
+
+        if (!updated) {
+          logger.warn("Terminal update returned false - no rows changed");
+          return {
+            success: false,
+            message: "Failed to update terminal - no changes were made",
+          };
+        }
+
+        // Get updated terminal
+        const updatedTerminal = db.terminals.getTerminalById(terminalId);
+        if (!updatedTerminal) {
+          return {
+            success: false,
+            message: "Terminal not found after update",
+          };
+        }
+
+        // Log the action
+        try {
+          await db.audit.createAuditLog({
+            userId: sessionValidation.user!.id,
+            action: "update",
+            entityType: "terminal",
+            entityId: terminalId,
+            details: {
+              updates,
+              timestamp: Date.now(),
+            },
+          });
+        } catch (auditError) {
+          logger.error("Failed to log terminal update:", auditError);
+          // Don't fail the update if audit logging fails
+        }
+
+        return {
+          success: true,
+          terminal: {
+            ...updatedTerminal,
+            settings: updatedTerminal.settings
+              ? JSON.parse(updatedTerminal.settings)
+              : null,
+          },
+        };
+      } catch (error) {
+        logger.error("Update terminal IPC error:", error);
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : "Failed to update terminal details",
+        };
+      }
+    }
+  );
+
+  logger.info("Terminal handlers registered");
+}

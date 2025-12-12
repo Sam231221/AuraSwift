@@ -20,5 +20,5 @@ export interface DashboardAPI {
   getStatistics: (
     sessionToken: string,
     businessId: string
-  ) => Promise<APIResponse<DashboardStatistics>>;
+  ) => Promise<APIResponse & { data?: DashboardStatistics }>;
 }

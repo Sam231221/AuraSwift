@@ -44,6 +44,7 @@ export function mapActionToView(
     },
     "system-settings": {
       "general-settings": SETTINGS_ROUTES.GENERAL,
+      "store-configuration": SETTINGS_ROUTES.STORE_CONFIGURATION,
     },
   };
 

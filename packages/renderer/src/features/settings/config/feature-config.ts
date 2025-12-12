@@ -5,7 +5,7 @@
  * This is used by the navigation system and dashboard.
  */
 
-import { Settings, CreditCard } from "lucide-react";
+import { Settings, CreditCard, Building2 } from "lucide-react";
 import { SETTINGS_PERMISSIONS } from "./permissions";
 import { SETTINGS_ROUTES } from "./navigation";
 import type { FeatureConfig } from "@/features/dashboard/types/feature-config";
@@ -13,6 +13,7 @@ import type { ViewConfig } from "@/navigation/types";
 
 // Import views
 import GeneralSettingsView from "../views/general-settings-view";
+import StoreConfigurationView from "../views/store-configuration-view";
 import VivaWalletSettingsView from "../views/viva-wallet-settings-view";
 
 /**
@@ -31,6 +32,13 @@ export const settingsFeature: FeatureConfig = {
       id: "general-settings",
       label: "General Settings",
       icon: Settings,
+      onClick: () => {}, // Will be injected by dashboard
+      permissions: [SETTINGS_PERMISSIONS.MANAGE],
+    },
+    {
+      id: "store-configuration",
+      label: "Terminal Configuration",
+      icon: Building2,
       onClick: () => {}, // Will be injected by dashboard
       permissions: [SETTINGS_PERMISSIONS.MANAGE],
     },
@@ -58,6 +66,18 @@ export const settingsViews: Record<string, ViewConfig> = {
     metadata: {
       title: "General Settings",
       description: "System settings",
+    },
+    permissions: [SETTINGS_PERMISSIONS.MANAGE],
+    roles: ["admin"],
+    requiresAuth: true,
+  },
+  [SETTINGS_ROUTES.STORE_CONFIGURATION]: {
+    id: SETTINGS_ROUTES.STORE_CONFIGURATION,
+    level: "root",
+    component: StoreConfigurationView,
+    metadata: {
+      title: "Terminal Configuration",
+      description: "Terminal configuration",
     },
     permissions: [SETTINGS_PERMISSIONS.MANAGE],
     roles: ["admin"],

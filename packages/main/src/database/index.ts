@@ -29,6 +29,7 @@ import { CartManager } from "./managers/cartManager.js";
 import { RoleManager } from "./managers/roleManager.js";
 import { UserRoleManager } from "./managers/userRoleManager.js";
 import { UserPermissionManager } from "./managers/userPermissionManager.js";
+import { TerminalManager } from "./managers/terminalManager.js";
 import { initializeDrizzle } from "./drizzle.js";
 import { getDatabaseInfo } from "./utils/dbInfo.js";
 import bcrypt from "bcryptjs";
@@ -76,6 +77,9 @@ export interface DatabaseManagers {
   roles: RoleManager;
   userRoles: UserRoleManager;
   userPermissions: UserPermissionManager;
+
+  // Terminal management
+  terminals: TerminalManager;
 
   getDatabaseInfo: () => {
     path: string;
@@ -181,6 +185,9 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const userRoles = new UserRoleManager(drizzle, uuid);
     const userPermissions = new UserPermissionManager(drizzle, uuid);
 
+    // Terminal management
+    const terminals = new TerminalManager(drizzle, uuid);
+
     managersInstance = {
       users,
       businesses,
@@ -214,6 +221,9 @@ export async function getDatabase(): Promise<DatabaseManagers> {
       roles,
       userRoles,
       userPermissions,
+
+      // Terminal management
+      terminals,
 
       // Database info methods
       getDatabaseInfo: () => {

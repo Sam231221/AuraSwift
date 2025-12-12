@@ -217,7 +217,7 @@ export const FEATURE_REGISTRY: FeatureConfig[] = [
       },
       {
         id: "store-configuration",
-        label: "Store Configuration",
+        label: "Terminal Configuration",
         icon: Store,
         onClick: () => {},
         permissions: [PERMISSIONS.SETTINGS_MANAGE],
