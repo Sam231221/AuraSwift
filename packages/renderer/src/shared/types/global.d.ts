@@ -37,6 +37,7 @@ import type { DatabaseAPI } from "../types/api/database";
 import type { PdfReceiptAPI } from "../types/api/pdf-receipt";
 import type { AppAPI } from "../types/api/app";
 import type { UpdateAPI } from "../types/api/update";
+import type { BusinessAPI } from "../types/api/business";
 import type { APIResponse } from "../types/api/common";
 
 declare global {
@@ -107,6 +108,12 @@ declare global {
 
     // RBAC
     rbacAPI: RBACAPI;
+
+    // Business Management
+    businessAPI: BusinessAPI;
+
+    // Dashboard cache invalidation
+    invalidateDashboardCache?: (businessId?: string) => void;
   }
 }
 

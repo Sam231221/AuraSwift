@@ -34,6 +34,7 @@ import { dashboardAPI } from "./api/dashboard.js";
 import { importAPI } from "./api/import.js";
 import { rbacAPI } from "./api/rbac.js";
 import { seedAPI } from "./api/seed.js";
+import { businessAPI } from "./api/business.js";
 import "./api/updates.js";
 
 // Expose APIs to renderer process
@@ -71,6 +72,7 @@ contextBridge.exposeInMainWorld("dashboardAPI", dashboardAPI);
 contextBridge.exposeInMainWorld("importAPI", importAPI);
 contextBridge.exposeInMainWorld("rbacAPI", rbacAPI);
 contextBridge.exposeInMainWorld("seedAPI", seedAPI);
+contextBridge.exposeInMainWorld("businessAPI", businessAPI);
 
 // Generic IPC send function for testing and general IPC communication
 export const send = (channel: string, ...args: any[]) =>

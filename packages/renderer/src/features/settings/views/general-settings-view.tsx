@@ -28,6 +28,7 @@ import {
   DEFAULT_FIXED_SALES_UNIT,
 } from "@/types/domain/sales-unit";
 import { invalidateSalesUnitSettingsCache } from "@/shared/hooks/use-sales-unit-settings";
+import { BusinessForm } from "../components/business-form";
 
 const logger = getLogger("general-settings-view");
 
@@ -242,6 +243,15 @@ export default function GeneralSettingsView({
             </div>
           </form>
         </Form>
+      </div>
+
+      {/* Business Information Form */}
+      <div className="bg-white rounded-lg border shadow-sm p-6 mt-6">
+        <h2 className="text-xl font-semibold mb-4">Business Information</h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Update your business details and contact information.
+        </p>
+        <BusinessForm />
       </div>
     </div>
   );

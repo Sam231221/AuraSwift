@@ -63,19 +63,56 @@ export class BusinessManager {
       firstName: string;
       lastName: string;
       businessName: string;
-      address: string;
+      email: string;
       phone: string;
+      website: string;
+      address: string;
+      country: string;
+      city: string;
+      postalCode: string;
       vatNumber: string;
+      businessType: "retail" | "restaurant" | "service" | "wholesale" | "other";
+      currency: string;
+      timezone: string;
     }>
   ): boolean {
     const now = new Date();
 
+    // Prepare update object, only including defined fields
+    // This ensures we don't accidentally set fields to undefined
+    const updateData: Record<string, any> = {
+      updatedAt: now,
+    };
+
+    // Explicitly check each field before adding to update
+    if (updates.firstName !== undefined)
+      updateData.firstName = updates.firstName;
+    if (updates.lastName !== undefined) updateData.lastName = updates.lastName;
+    if (updates.businessName !== undefined)
+      updateData.businessName = updates.businessName;
+    if (updates.email !== undefined) updateData.email = updates.email;
+    if (updates.phone !== undefined) updateData.phone = updates.phone;
+    if (updates.website !== undefined) updateData.website = updates.website;
+    if (updates.address !== undefined) updateData.address = updates.address;
+    if (updates.country !== undefined) updateData.country = updates.country;
+    if (updates.city !== undefined) updateData.city = updates.city;
+    if (updates.postalCode !== undefined)
+      updateData.postalCode = updates.postalCode;
+    if (updates.vatNumber !== undefined)
+      updateData.vatNumber = updates.vatNumber;
+    if (updates.businessType !== undefined)
+      updateData.businessType = updates.businessType;
+    if (updates.currency !== undefined) updateData.currency = updates.currency;
+    if (updates.timezone !== undefined) updateData.timezone = updates.timezone;
+
+    // If only updatedAt is in the object, no actual updates were provided
+    if (Object.keys(updateData).length === 1) {
+      return false;
+    }
+
     const result = this.db
       .update(schema.businesses)
-      .set({
-        ...updates,
-        updatedAt: now,
-      })
+      .set(updateData)
       .where(eq(schema.businesses.id, id))
       .run();
 
