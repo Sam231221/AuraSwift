@@ -7,8 +7,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import type { Product } from "@/types/domain";
-// Category type from database - path from navigation/context to types/db.ts at root
-import type { Category } from "../../../../../types/db";
+import type { Category } from "@app/shared";
 
 interface ProductManagementState {
   products: Product[];
