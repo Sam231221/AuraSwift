@@ -9,8 +9,24 @@ import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { PERMISSIONS } from "@app/shared/constants/permissions";
 
-import { getLogger } from "../utils/logger.js";
-const logger = getLogger("seed");
+/**
+ * Get logger, with fallback for non-Electron contexts
+ */
+function getSeedLogger() {
+  try {
+    // Try to import and use Electron logger
+    const { getLogger } = require("../utils/logger.js");
+    return getLogger("seed");
+  } catch (error) {
+    // Fallback to console logger if Electron is not available (e.g., CLI context)
+    return {
+      info: (...args: any[]) => console.log("[seed]", ...args),
+      error: (...args: any[]) => console.error("[seed]", ...args),
+      warn: (...args: any[]) => console.warn("[seed]", ...args),
+      debug: (...args: any[]) => console.debug("[seed]", ...args),
+    };
+  }
+}
 
 // Permission groups for seeding default roles
 const PERMISSION_GROUPS = {
@@ -32,8 +48,10 @@ const PERMISSION_GROUPS = {
 
 export async function seedDefaultData(
   db: BetterSQLite3Database,
-  schema: any
+  schema: any,
+  customLogger?: ReturnType<typeof getLogger>
 ): Promise<void> {
+  const logger = customLogger || getSeedLogger();
   logger.info("🌱 Starting database seeding...");
 
   try {
@@ -71,7 +89,7 @@ export async function seedDefaultData(
         country: "United States",
         city: "New York",
         postalCode: "10001",
-        vatNumber: "",
+        vatNumber: null, // Use null instead of empty string to avoid unique constraint issues
         businessType: "retail",
         currency: "USD",
         timezone: "America/New_York",
@@ -81,7 +99,51 @@ export async function seedDefaultData(
       })
       .run();
 
-    // 2. Create default terminal
+    // 2. Create default VAT categories
+    logger.info("   💰 Creating default VAT categories...");
+    const defaultVatCategories = [
+      {
+        name: "Standard Rate",
+        code: "STD",
+        ratePercent: 20.0,
+        description: "Standard VAT rate",
+        isDefault: true,
+      },
+      {
+        name: "Reduced Rate",
+        code: "RED",
+        ratePercent: 5.0,
+        description: "Reduced VAT rate",
+        isDefault: false,
+      },
+      {
+        name: "Zero Rate",
+        code: "ZRO",
+        ratePercent: 0.0,
+        description: "Zero VAT rate",
+        isDefault: false,
+      },
+    ];
+
+    for (const vatCat of defaultVatCategories) {
+      const vatId = uuidv4();
+      db.insert(schema.vatCategories)
+        .values({
+          id: vatId,
+          name: vatCat.name,
+          code: vatCat.code,
+          ratePercent: vatCat.ratePercent,
+          description: vatCat.description,
+          businessId: businessId,
+          isDefault: vatCat.isDefault,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+    }
+
+    // 3. Create default terminal
     logger.info("   🖥️  Creating default terminal...");
     const terminalId = uuidv4();
     db.insert(schema.terminals)
@@ -105,7 +167,7 @@ export async function seedDefaultData(
       })
       .run();
 
-    // 3. Create default roles
+    // 4. Create default roles
     logger.info("   👔 Creating default roles...");
     const adminRoleId = uuidv4();
     const managerRoleId = uuidv4();
@@ -155,7 +217,7 @@ export async function seedDefaultData(
       ])
       .run();
 
-    // 4. Create default users
+    // 5. Create default users
     logger.info("   👤 Creating default users...");
 
     // Generate password hashes
@@ -234,7 +296,7 @@ export async function seedDefaultData(
       ])
       .run();
 
-    // 5. Assign roles to users
+    // 6. Assign roles to users
     logger.info("   🔗 Assigning roles to users...");
     const adminUserRoleId = uuidv4();
     const managerUserRoleId = uuidv4();

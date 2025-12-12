@@ -10,6 +10,7 @@ import { registerExpiryProductHandlers } from "./expiryProduct.handlers.js";
 import { registerSalesUnitSettingsHandlers } from "./sales-unit-settings.handlers.js";
 import { registerProductHandlers } from "./product.handlers.js";
 import { registerRoleHandlers } from "./role.handlers.js";
+import { registerSeedHandlers } from "./seed.handlers.js";
 import { registerShiftHandlers } from "./shift.handlers.js";
 import { registerSupplierHandlers } from "./supplier.handlers.js";
 import { registerTimeTrackingHandlers } from "./time-tracking.handlers.js";
@@ -29,6 +30,7 @@ export function registerAllIpcHandlers() {
   registerSalesUnitSettingsHandlers();
   registerProductHandlers();
   registerRoleHandlers();
+  registerSeedHandlers();
   registerShiftHandlers();
   registerSupplierHandlers();
   registerTimeTrackingHandlers();

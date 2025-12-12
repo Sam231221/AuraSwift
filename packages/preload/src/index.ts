@@ -32,6 +32,7 @@ import { stockMovementsAPI } from "./api/stockMovements.js";
 import { cartAPI } from "./api/cart.js";
 import { importAPI } from "./api/import.js";
 import { rbacAPI } from "./api/rbac.js";
+import { seedAPI } from "./api/seed.js";
 import "./api/updates.js";
 
 // Expose APIs to renderer process
@@ -67,6 +68,7 @@ contextBridge.exposeInMainWorld("stockMovementsAPI", stockMovementsAPI);
 contextBridge.exposeInMainWorld("cartAPI", cartAPI);
 contextBridge.exposeInMainWorld("importAPI", importAPI);
 contextBridge.exposeInMainWorld("rbacAPI", rbacAPI);
+contextBridge.exposeInMainWorld("seedAPI", seedAPI);
 
 // Generic IPC send function for testing and general IPC communication
 export const send = (channel: string, ...args: any[]) =>

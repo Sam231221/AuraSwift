@@ -68,12 +68,6 @@
     "db:introspect": "drizzle-kit introspect",
     "db:bridge": "node scripts/bridge-migration.mjs",
     "migrate:rbac": "tsx packages/main/src/scripts/migrate-rbac.ts",
-    "seed:basic": "tsx packages/main/src/database/seed-data/cli.ts basic",
-    "seed:minimal": "tsx packages/main/src/database/seed-data/cli.ts minimal",
-    "seed:small": "tsx packages/main/src/database/seed-data/cli.ts small",
-    "seed:medium": "tsx packages/main/src/database/seed-data/cli.ts medium",
-    "seed:large": "tsx packages/main/src/database/seed-data/cli.ts large",
-    "seed:xlarge": "tsx packages/main/src/database/seed-data/cli.ts xlarge",
     "analyze:packages": "node scripts/analyze-package-sizes.mjs",
     "analyze:bundle": "cd packages/renderer && ANALYZE=true npm run build"
   },
@@ -107,7 +101,7 @@
   },
   "dependencies": {
     "@app/main": "*",
-    "better-sqlite3": "^12.4.1",
+    "better-sqlite3": "12.5.0",
     "dotenv": "^16.6.1",
     "node-addon-api": "^8.3.0",
     "node-hid": "^3.2.0",

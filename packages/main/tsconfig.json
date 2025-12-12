@@ -16,6 +16,6 @@
       "@app/shared": ["../shared/src"]
     }
   },
-  "include": ["src/**/*.ts", "../../types/**/*.d.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["**/*.spec.ts", "**/*.test.ts"]
 }
