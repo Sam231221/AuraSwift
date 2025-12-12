@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.22.0](https://github.com/Sam231221/AuraSwift/compare/v1.21.2...v1.22.0) (2025-12-12)
+
+
+### chore
+
+* **types:** add environment variable types for Vite and database types ([](https://github.com/Sam231221/AuraSwift/commit/84593756bb49692e81da1e974d0fc3f753555b9c))
+* **.gitignore:** add test-results to ignore list ([](https://github.com/Sam231221/AuraSwift/commit/959e64a468c6ef17d09185b65ffab98dbbd45653))
+* **package:** update better-sqlite3 dependency to version 12.5.0 ([](https://github.com/Sam231221/AuraSwift/commit/44ee75095740f4be7cfcd499684df6c6879e5de1))
+
+
+### feat
+
+* **seed:** add Seed API type definitions and global interface for seedAPI ([](https://github.com/Sam231221/AuraSwift/commit/e5c0e32f7b96ed0e0e9e46296b4584a5e72a6e78))
+* **dashboard:** enhance dashboard statistics with average order value calculations and cache invalidation ([](https://github.com/Sam231221/AuraSwift/commit/b1d5e294450e69031e5d434d7bc607debf274c64))
+* **seed:** enhance seeding functionality with type assertions and logger integration ([](https://github.com/Sam231221/AuraSwift/commit/493da978640ee54c274bc38cb4c453d42cedcbac))
+* **business:** implement business update functionality with IPC handlers and form integration ([](https://github.com/Sam231221/AuraSwift/commit/49105f5d51c3422f8190526814473d33087ac66b))
+* **seed:** implement category and product seeding functionality with IPC handlers and API integration ([](https://github.com/Sam231221/AuraSwift/commit/0d15dc09377d8d1351168ea3d3f562c91c2043b2))
+* **dashboard:** implement dashboard statistics functionality with IPC handlers and hooks for revenue and sales metrics ([](https://github.com/Sam231221/AuraSwift/commit/dac3241e917a76b09d222708f78d9d3a4276b4ee))
+* **terminal:** implement terminal management functionality with IPC handlers, database integration, and UI components for terminal configuration ([](https://github.com/Sam231221/AuraSwift/commit/8587e5968be8c188f71c1cba473922ba36694f37))
+
+
+### fix
+
+* **product-selection:** improve layout and overflow handling in category navigation, product grid, and selection panel ([](https://github.com/Sam231221/AuraSwift/commit/6c2816020ea71d66788f57f92369eb1bc7c8abf7))
+
+
+### refactor
+
+* **context:** update Category import path to use shared types ([](https://github.com/Sam231221/AuraSwift/commit/e5866dc51e153bd511a2100aa0e67f66c915e9dc))
+
 ## [1.21.2](https://github.com/Sam231221/AuraSwift/compare/v1.21.1...v1.21.2) (2025-12-11)
 
 
