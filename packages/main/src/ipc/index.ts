@@ -5,6 +5,7 @@ import { registerBusinessHandlers } from "./business.handlers.js";
 import { registerCartHandlers } from "./cart.handlers.js";
 import { registerCashDrawerHandlers } from "./cash-drawer.handlers.js";
 import { registerCategoryHandlers } from "./category.handlers.js";
+import { registerDashboardHandlers } from "./dashboard.handlers.js";
 import { registerDbHandlers } from "./db.handler.js";
 import { registerExpiryProductHandlers } from "./expiryProduct.handlers.js";
 import { registerSalesUnitSettingsHandlers } from "./sales-unit-settings.handlers.js";
@@ -25,6 +26,7 @@ export function registerAllIpcHandlers() {
   registerCartHandlers();
   registerCashDrawerHandlers();
   registerCategoryHandlers();
+  registerDashboardHandlers();
   registerDbHandlers();
   registerExpiryProductHandlers();
   registerSalesUnitSettingsHandlers();

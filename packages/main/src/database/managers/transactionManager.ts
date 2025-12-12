@@ -1,5 +1,5 @@
 import type { DrizzleDB } from "../drizzle.js";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 import type { Transaction, TransactionItem, User } from "../schema.js";
 import type { DatabaseManagers } from "../index.js";
@@ -862,5 +862,179 @@ export class TransactionManager {
       isValid: errors.length === 0,
       errors,
     };
+  }
+
+  /**
+   * Calculate total revenue for a business within a date range
+   * Only includes completed sales (excludes refunds and voids)
+   */
+  getTotalRevenue(
+    businessId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): number {
+    const conditions = [
+      eq(schema.transactions.businessId, businessId),
+      eq(schema.transactions.type, "sale"),
+      eq(schema.transactions.status, "completed"),
+    ];
+
+    if (startDate) {
+      conditions.push(
+        gte(schema.transactions.timestamp, startDate.toISOString())
+      );
+    }
+    if (endDate) {
+      conditions.push(
+        lte(schema.transactions.timestamp, endDate.toISOString())
+      );
+    }
+
+    const result = this.db
+      .select({
+        total: drizzleSql<number>`COALESCE(SUM(${schema.transactions.total}), 0)`,
+      })
+      .from(schema.transactions)
+      .where(and(...conditions))
+      .get();
+
+    return result?.total || 0;
+  }
+
+  /**
+   * Get revenue statistics for dashboard
+   * Returns current period revenue and comparison with previous period
+   */
+  getRevenueStatistics(
+    businessId: string,
+    period: "month" | "week" | "day" = "month"
+  ): {
+    currentPeriod: number;
+    previousPeriod: number;
+    change: number;
+    changePercent: number;
+  } {
+    const now = new Date();
+    let currentStart: Date;
+    let currentEnd: Date = now;
+    let previousStart: Date;
+    let previousEnd: Date;
+
+    // Calculate date ranges based on period
+    if (period === "month") {
+      currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      currentStart.setHours(0, 0, 0, 0);
+      previousEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      previousEnd.setHours(23, 59, 59, 999);
+      previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      previousStart.setHours(0, 0, 0, 0);
+    } else if (period === "week") {
+      const dayOfWeek = now.getDay();
+      const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Monday
+      currentStart = new Date(now.getFullYear(), now.getMonth(), diff);
+      currentStart.setHours(0, 0, 0, 0);
+      previousEnd = new Date(currentStart);
+      previousEnd.setDate(previousEnd.getDate() - 1);
+      previousEnd.setHours(23, 59, 59, 999);
+      previousStart = new Date(previousEnd);
+      previousStart.setDate(previousStart.getDate() - 6);
+      previousStart.setHours(0, 0, 0, 0);
+    } else {
+      // day
+      currentStart = new Date(now);
+      currentStart.setHours(0, 0, 0, 0);
+      previousEnd = new Date(currentStart);
+      previousEnd.setDate(previousEnd.getDate() - 1);
+      previousEnd.setHours(23, 59, 59, 999);
+      previousStart = new Date(previousEnd);
+      previousStart.setHours(0, 0, 0, 0);
+    }
+
+    const currentPeriod = this.getTotalRevenue(
+      businessId,
+      currentStart,
+      currentEnd
+    );
+    const previousPeriod = this.getTotalRevenue(
+      businessId,
+      previousStart,
+      previousEnd
+    );
+
+    const change = currentPeriod - previousPeriod;
+    const changePercent =
+      previousPeriod > 0 ? (change / previousPeriod) * 100 : 0;
+
+    return {
+      currentPeriod,
+      previousPeriod,
+      change,
+      changePercent,
+    };
+  }
+
+  /**
+   * Get sales count for today
+   */
+  getTodaySalesCount(businessId: string): number {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const result = this.db
+      .select({
+        count: drizzleSql<number>`COUNT(*)`,
+      })
+      .from(schema.transactions)
+      .where(
+        and(
+          eq(schema.transactions.businessId, businessId),
+          eq(schema.transactions.type, "sale"),
+          eq(schema.transactions.status, "completed"),
+          gte(schema.transactions.timestamp, today.toISOString()),
+          lte(schema.transactions.timestamp, tomorrow.toISOString())
+        )
+      )
+      .get();
+
+    return result?.count || 0;
+  }
+
+  /**
+   * Get average order value for a business within a date range
+   */
+  getAverageOrderValue(
+    businessId: string,
+    startDate?: Date,
+    endDate?: Date
+  ): number {
+    const conditions = [
+      eq(schema.transactions.businessId, businessId),
+      eq(schema.transactions.type, "sale"),
+      eq(schema.transactions.status, "completed"),
+    ];
+
+    if (startDate) {
+      conditions.push(
+        gte(schema.transactions.timestamp, startDate.toISOString())
+      );
+    }
+    if (endDate) {
+      conditions.push(
+        lte(schema.transactions.timestamp, endDate.toISOString())
+      );
+    }
+
+    const result = this.db
+      .select({
+        avg: drizzleSql<number>`COALESCE(AVG(${schema.transactions.total}), 0)`,
+        count: drizzleSql<number>`COUNT(*)`,
+      })
+      .from(schema.transactions)
+      .where(and(...conditions))
+      .get();
+
+    return result && result.count > 0 ? result.avg : 0;
   }
 }

@@ -3,60 +3,98 @@
  *
  * Reusable stats cards component with permission-based visibility.
  * Displays key metrics based on user permissions.
+ * Now includes dynamic data from backend for revenue and sales metrics.
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DollarSign,
   Users,
-  Shield,
   AlertTriangle,
-  Package,
+  ShoppingCart,
   TrendingUp,
 } from "lucide-react";
 import { useUserPermissions } from "../hooks/use-user-permissions";
+import { useDashboardStatistics } from "../hooks/use-dashboard-statistics";
 import { PERMISSIONS } from "@app/shared/constants/permissions";
 
 interface StatsCardsProps {
   className?: string;
 }
-const stats = [
-  {
-    id: "revenue",
-    title: "Total Revenue",
-    value: "$45,231.89",
-    change: "+20.1% from last month",
-    icon: DollarSign,
-    permission: PERMISSIONS.REPORTS_READ,
-  },
-  {
-    id: "users",
-    title: "Active Users",
-    value: "12",
-    change: "3 online now",
-    icon: Users,
-    permission: PERMISSIONS.USERS_MANAGE,
-  },
-  {
-    id: "health",
-    title: "System Health",
-    value: "99.9%",
-    change: "Uptime this month",
-    icon: Shield,
-    permission: PERMISSIONS.SETTINGS_MANAGE,
-  },
-  {
-    id: "alerts",
-    title: "Alerts",
-    value: "2",
-    change: "Require attention",
-    icon: AlertTriangle,
-    permission: PERMISSIONS.REPORTS_READ,
-  },
-];
+
+/**
+ * Format currency value
+ */
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+/**
+ * Format percentage change
+ */
+function formatPercentageChange(changePercent: number): string {
+  const sign = changePercent >= 0 ? "+" : "";
+  return `${sign}${changePercent.toFixed(1)}%`;
+}
 
 export function StatsCards({ className = "" }: StatsCardsProps) {
-  const { hasPermission, isLoading } = useUserPermissions();
+  const { hasPermission, isLoading: permissionsLoading } = useUserPermissions();
+  const {
+    statistics,
+    isLoading: statisticsLoading,
+    error: statisticsError,
+  } = useDashboardStatistics();
+
+  const isLoading = permissionsLoading || statisticsLoading;
+
+  // Build stats array with dynamic data
+  const stats = [
+    {
+      id: "revenue",
+      title: "Total Revenue",
+      value: statistics ? formatCurrency(statistics.revenue.current) : "$0.00",
+      change: statistics
+        ? `${formatPercentageChange(
+            statistics.revenue.changePercent
+          )} from last month`
+        : "Loading...",
+      icon: DollarSign,
+      permission: PERMISSIONS.REPORTS_READ,
+      isLoading: statisticsLoading,
+    },
+    {
+      id: "users",
+      title: "Active Users",
+      value: "12", // TODO: Make this dynamic when user management stats are available
+      change: "3 online now",
+      icon: Users,
+      permission: PERMISSIONS.USERS_MANAGE,
+      isLoading: false,
+    },
+    {
+      id: "sales-today",
+      title: "Sales Today",
+      value: statistics ? statistics.salesToday.toString() : "0",
+      change: statistics ? `Transactions completed` : "Loading...",
+      icon: ShoppingCart,
+      permission: PERMISSIONS.REPORTS_READ,
+      isLoading: statisticsLoading,
+    },
+    {
+      id: "alerts",
+      title: "Alerts",
+      value: "2", // TODO: Make this dynamic when alerts system is available
+      change: "Require attention",
+      icon: AlertTriangle,
+      permission: PERMISSIONS.REPORTS_READ,
+      isLoading: false,
+    },
+  ];
 
   if (isLoading) {
     return (
@@ -103,9 +141,19 @@ export function StatsCards({ className = "" }: StatsCardsProps) {
               <Icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-bold">
+                {stat.isLoading ? (
+                  <span className="animate-pulse">...</span>
+                ) : (
+                  stat.value
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {stat.change}
+                {stat.isLoading ? (
+                  <span className="animate-pulse">Loading...</span>
+                ) : (
+                  stat.change
+                )}
               </p>
             </CardContent>
           </Card>

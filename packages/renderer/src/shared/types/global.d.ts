@@ -32,6 +32,7 @@ import type { OfficePrinterAPI } from "../types/api/office-printer";
 import type { PaymentAPI } from "../types/api/payment";
 import type { VivaWalletAPI } from "../../types/api/viva-wallet";
 import type { ScaleAPI } from "../types/api/scale";
+import type { DashboardAPI } from "../types/api/dashboard";
 import type { DatabaseAPI } from "../types/api/database";
 import type { PdfReceiptAPI } from "../types/api/pdf-receipt";
 import type { AppAPI } from "../types/api/app";
@@ -87,6 +88,9 @@ declare global {
 
     // Import
     importAPI: ImportAPI;
+
+    // Dashboard
+    dashboardAPI: DashboardAPI;
 
     // Hardware Integration
     printerAPI: PrinterAPI;

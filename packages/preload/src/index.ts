@@ -30,6 +30,7 @@ import { expiryNotificationsAPI } from "./api/expiryNotifications.js";
 import { salesUnitSettingsAPI } from "./api/salesUnitSettings.js";
 import { stockMovementsAPI } from "./api/stockMovements.js";
 import { cartAPI } from "./api/cart.js";
+import { dashboardAPI } from "./api/dashboard.js";
 import { importAPI } from "./api/import.js";
 import { rbacAPI } from "./api/rbac.js";
 import { seedAPI } from "./api/seed.js";
@@ -66,6 +67,7 @@ contextBridge.exposeInMainWorld(
 contextBridge.exposeInMainWorld("salesUnitSettingsAPI", salesUnitSettingsAPI);
 contextBridge.exposeInMainWorld("stockMovementsAPI", stockMovementsAPI);
 contextBridge.exposeInMainWorld("cartAPI", cartAPI);
+contextBridge.exposeInMainWorld("dashboardAPI", dashboardAPI);
 contextBridge.exposeInMainWorld("importAPI", importAPI);
 contextBridge.exposeInMainWorld("rbacAPI", rbacAPI);
 contextBridge.exposeInMainWorld("seedAPI", seedAPI);
