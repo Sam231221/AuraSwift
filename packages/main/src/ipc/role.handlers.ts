@@ -51,7 +51,7 @@ export function registerRoleHandlers() {
 
     try {
       const roles = db.roles.getRolesByBusiness(businessId);
-      console.log("\n\nRoles:", roles, "\n\n");
+
       return { success: true, data: roles };
     } catch (error) {
       logger.error("List roles IPC error:", error);
