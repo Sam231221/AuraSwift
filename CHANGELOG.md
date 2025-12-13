@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.23.0](https://github.com/Sam231221/AuraSwift/compare/v1.22.0...v1.23.0) (2025-12-13)
+
+
+### chore
+
+* Remove debug console log for roles in IPC handler ([](https://github.com/Sam231221/AuraSwift/commit/1176deb84d44e4c59cb90ebae4d8d1a6ccd8c489))
+
+
+### feat
+
+* **updater:** add download cancellation functionality with IPC integration and user feedback ([](https://github.com/Sam231221/AuraSwift/commit/11d436ab6c80b5b33b50098718a0deb5bcfc5e69))
+* **product-details:** enhance product details view with tooltips for long text and add category path functionality ([](https://github.com/Sam231221/AuraSwift/commit/fa1333445d5f73d1d3a6d01f5966c6a46eec352f))
+
+
+### refactor
+
+* **category-seeder:** enhance seeding process with savepoints for atomicity and improved error handling ([](https://github.com/Sam231221/AuraSwift/commit/37e6016033e9a2612d3c5299eba7d3da4904a073))
+* **product-details:** improve layout and structure of product details view for better responsiveness and usability ([](https://github.com/Sam231221/AuraSwift/commit/023a67b4093d7094da839d87e636abb48c4e4cac))
+* **toasts:** improve styling and structure of UpdateErrorToast and UpdateReadyToast components for better visual consistency ([](https://github.com/Sam231221/AuraSwift/commit/17db1644a3d91c5f021d3e6242b7072916a5fdd4))
+
 # [1.22.0](https://github.com/Sam231221/AuraSwift/compare/v1.21.2...v1.22.0) (2025-12-12)
 
 
