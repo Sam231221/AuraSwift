@@ -42,19 +42,11 @@ export function UpdateReadyToast({
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1">
-        <Button
-          onClick={onInstall}
-          size="sm"
-          className="flex-1"
-        >
+        <Button onClick={onInstall} size="sm" className="flex-1">
           <Rocket className="h-4 w-4" />
           Install Now
         </Button>
-        <Button
-          onClick={onPostpone}
-          variant="ghost"
-          size="sm"
-        >
+        <Button onClick={onPostpone} variant="ghost" size="sm">
           <Clock className="h-4 w-4" />
           Later
         </Button>
@@ -89,7 +81,10 @@ export function showUpdateReadyToast(
       duration: Infinity, // Don't auto-dismiss until action taken
       position: "top-right",
       id: "update-ready", // Use fixed ID to replace any existing toast
+      style: {
+        border: "none", // Remove default border, component has its own
+        background: "transparent", // Let component handle background
+      },
     }
   );
 }
-

@@ -6,7 +6,13 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, RefreshCw, X, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  AlertCircle,
+  RefreshCw,
+  X,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import type { UpdateError } from "@app/shared";
 
 interface UpdateErrorToastProps {
@@ -36,7 +42,7 @@ export function UpdateErrorToast({
   };
 
   return (
-    <div className="flex flex-col gap-3 w-full max-w-md">
+    <div className="flex flex-col gap-3 w-full max-w-md bg-card border-2 border-border rounded-lg shadow-xl p-4 backdrop-blur-sm">
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5">
@@ -75,9 +81,7 @@ export function UpdateErrorToast({
         </button>
         {showDetails && (
           <div className="mt-2 p-2 bg-destructive/10 rounded-md text-xs text-destructive/80 max-h-32 overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-sans">
-              {error.message}
-            </pre>
+            <pre className="whitespace-pre-wrap font-sans">{error.message}</pre>
             <p className="mt-2 text-xs text-muted-foreground">
               Time: {error.timestamp.toLocaleString()}
             </p>
@@ -136,7 +140,10 @@ export function showUpdateErrorToast(
     {
       duration: 10000, // Auto-dismiss after 10 seconds
       position: "top-right",
+      style: {
+        border: "none", // Remove default border, component has its own
+        background: "transparent", // Let component handle background
+      },
     }
   );
 }
-
