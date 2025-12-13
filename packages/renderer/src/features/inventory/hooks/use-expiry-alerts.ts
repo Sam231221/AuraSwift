@@ -73,13 +73,28 @@ export const useExpiryAlerts = ({
 
     try {
       setLoading(true);
-      const response = await expiryAPI.get(businessId, "PENDING,SENT");
+      // Use getByBusiness to get pending and sent notifications
+      // Since status filter only accepts single value, we'll get all and filter client-side
+      // or use getPending for pending ones specifically
+      const [pendingResponse, sentResponse] = await Promise.all([
+        expiryAPI
+          .getPending(businessId)
+          .catch(() => ({ success: false, notifications: [] })),
+        expiryAPI
+          .getByBusiness(businessId, { status: "SENT" })
+          .catch(() => ({ success: false, notifications: [] })),
+      ]);
 
-      if (response.success && response.alerts) {
-        setNotifications(response.alerts);
-      } else {
-        setNotifications([]);
-      }
+      const allNotifications = [
+        ...(pendingResponse.success && pendingResponse.notifications
+          ? pendingResponse.notifications
+          : []),
+        ...(sentResponse.success && sentResponse.notifications
+          ? sentResponse.notifications
+          : []),
+      ];
+
+      setNotifications(allNotifications);
     } catch (err) {
       logger.error("Error loading notifications:", err);
       setNotifications([]);

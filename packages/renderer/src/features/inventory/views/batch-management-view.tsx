@@ -254,7 +254,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     const loadSuppliers = async () => {
       if (!user?.businessId) return;
       try {
-        const response = await window.supplierAPI.getByBusiness(
+        const response = await window.suppliersAPI.getByBusiness(
           user.businessId
         );
         if (response.success && response.suppliers) {
@@ -494,8 +494,28 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           batches={allBatches}
           expirySettings={expirySettings}
           businessId={user.businessId}
-          onViewBatches={() => navigateTo(INVENTORY_ROUTES.BATCH_LIST)}
-          onReceiveBatch={handleCreateBatch}
+          onViewBatches={() => {
+            try {
+              navigateTo(INVENTORY_ROUTES.BATCH_LIST);
+            } catch (error) {
+              console.error("Navigation error:", error);
+              // Fallback: try again after a short delay
+              setTimeout(() => {
+                try {
+                  navigateTo(INVENTORY_ROUTES.BATCH_LIST);
+                } catch (retryError) {
+                  console.error("Navigation retry failed:", retryError);
+                }
+              }, 100);
+            }
+          }}
+          onReceiveBatch={() => {
+            try {
+              handleCreateBatch();
+            } catch (error) {
+              console.error("Error opening batch form:", error);
+            }
+          }}
           onGenerateReport={() => {
             toast.info("Report generation coming soon");
           }}

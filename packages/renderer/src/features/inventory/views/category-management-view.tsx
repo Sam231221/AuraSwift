@@ -8,6 +8,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -90,10 +95,18 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
               isActive: typeof c.isActive === "boolean" ? c.isActive : true,
               sortOrder: c.sortOrder ?? 0,
               createdAt: c.createdAt
-                ? (typeof c.createdAt === "string" ? c.createdAt : c.createdAt instanceof Date ? c.createdAt.toISOString() : new Date().toISOString())
+                ? typeof c.createdAt === "string"
+                  ? c.createdAt
+                  : c.createdAt instanceof Date
+                  ? c.createdAt.toISOString()
+                  : new Date().toISOString()
                 : new Date().toISOString(),
               updatedAt: c.updatedAt
-                ? (typeof c.updatedAt === "string" ? c.updatedAt : c.updatedAt instanceof Date ? c.updatedAt.toISOString() : null)
+                ? typeof c.updatedAt === "string"
+                  ? c.updatedAt
+                  : c.updatedAt instanceof Date
+                  ? c.updatedAt.toISOString()
+                  : null
                 : null,
               description: c.description ?? "",
               vatOverridePercent: c.vatOverridePercent ?? null,
@@ -167,10 +180,18 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       isActive: typeof c.isActive === "boolean" ? c.isActive : true,
       sortOrder: c.sortOrder ?? 0,
       createdAt: c.createdAt
-        ? (typeof c.createdAt === "string" ? c.createdAt : c.createdAt instanceof Date ? c.createdAt.toISOString() : new Date().toISOString())
+        ? typeof c.createdAt === "string"
+          ? c.createdAt
+          : c.createdAt instanceof Date
+          ? c.createdAt.toISOString()
+          : new Date().toISOString()
         : new Date().toISOString(),
       updatedAt: c.updatedAt
-        ? (typeof c.updatedAt === "string" ? c.updatedAt : c.updatedAt instanceof Date ? c.updatedAt.toISOString() : null)
+        ? typeof c.updatedAt === "string"
+          ? c.updatedAt
+          : c.updatedAt instanceof Date
+          ? c.updatedAt.toISOString()
+          : null
         : null,
       description: c.description ?? "",
       vatOverridePercent: c.vatOverridePercent ?? null,
@@ -325,84 +346,9 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     }
   };
 
-  const handleReorderCategory = async (
-    categoryId: string,
-    direction: "up" | "down"
-  ) => {
-    // Find the category being moved
-    const category = categories.find((c) => c.id === categoryId);
-    if (!category) return;
-
-    // Get siblings (categories with same parent)
-    const siblings = categories.filter((c) =>
-      category.parentId ? c.parentId === category.parentId : !c.parentId
-    );
-
-    // Sort siblings by sortOrder (copy, don't mutate)
-    const sortedSiblings = siblings
-      .slice()
-      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-
-    const currentIndex = sortedSiblings.findIndex((c) => c.id === categoryId);
-    if (
-      (direction === "up" && currentIndex === 0) ||
-      (direction === "down" && currentIndex === sortedSiblings.length - 1)
-    ) {
-      return; // Can't move beyond boundaries
-    }
-
-    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
-    // Swap the two siblings
-    const reorderedSiblings = sortedSiblings.slice();
-    const [moved] = reorderedSiblings.splice(currentIndex, 1);
-    reorderedSiblings.splice(newIndex, 0, moved);
-
-    // Update sortOrder for affected siblings
-    const updatedSiblings = reorderedSiblings.map((sibling, idx) => ({
-      ...sibling,
-      sortOrder: idx + 1,
-    }));
-
-    // Merge updated siblings back into categories
-    const updatedCategories = categories.map((cat) => {
-      const updated = updatedSiblings.find((s) => s.id === cat.id);
-      return updated ? updated : cat;
-    });
-
-    setCategories(updatedCategories);
-
-    try {
-      // Send new order to backend (all category IDs sorted by sortOrder)
-      const categoryIds = [...updatedCategories]
-        .slice()
-        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-        .map((c) => c.id);
-
-      const response = await window.categoryAPI.reorder(
-        user!.businessId,
-        categoryIds
-      );
-
-      if (!response.success) {
-        // Revert on failure
-        setCategories(categories);
-        toast.error("Failed to reorder categories");
-      } else {
-        // Reload to ensure consistency
-        await loadCategories();
-      }
-    } catch (error) {
-      logger.error("Error reordering categories:", error);
-      // Revert on error
-      setCategories(categories);
-      toast.error("Failed to reorder categories");
-    }
-  };
-
   return (
     <>
-      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col h-screen p-3 sm:p-4 md:p-6 gap-4 sm:gap-6 overflow-hidden">
         {/* Header */}
         <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
           <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
@@ -484,15 +430,41 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm text-gray-600">Most Recent</p>
-                <p className="text-base sm:text-lg font-bold text-gray-900 truncate">
-                  {categories.length > 0
-                    ? categories.sort(
-                        (a, b) =>
-                          new Date(b.createdAt).getTime() -
-                          new Date(a.createdAt).getTime()
-                      )[0]?.name
-                    : "None"}
-                </p>
+                {categories.length > 0 ? (
+                  (() => {
+                    const mostRecent = categories.sort(
+                      (a, b) =>
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime()
+                    )[0];
+                    const categoryName = mostRecent?.name || "None";
+                    const shouldTruncate = categoryName.length > 25;
+
+                    return shouldTruncate ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-base sm:text-lg font-bold text-gray-900 truncate cursor-help">
+                            {categoryName}
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="max-w-xs bg-gray-900 text-white"
+                        >
+                          <p className="whitespace-normal">{categoryName}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <p className="text-base sm:text-lg font-bold text-gray-900 truncate">
+                        {categoryName}
+                      </p>
+                    );
+                  })()
+                ) : (
+                  <p className="text-base sm:text-lg font-bold text-gray-900">
+                    None
+                  </p>
+                )}
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">
                   {categories.length > 0
                     ? new Date(
@@ -505,52 +477,26 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                     : ""}
                 </p>
               </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-2">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center shrink-0 ml-2">
                 <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs sm:text-sm text-gray-600">
-                  Quick Actions
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => {
-                    setEditingCategory(null);
-                    setIsDrawerOpen(true);
-                  }}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Category
-                </Button>
-              </div>
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Categories List */}
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-          <div className="p-3 sm:p-4 border-b bg-gray-50">
+        <div className="flex flex-col flex-1 min-h-0 bg-white rounded-lg shadow-sm border overflow-hidden">
+          <div className="p-3 sm:p-4 border-b bg-gray-50 shrink-0">
             <h3 className="text-base sm:text-lg font-semibold text-gray-900">
               Categories
             </h3>
             <p className="text-xs sm:text-sm text-gray-600 mt-1">
-              Use ↑↓ buttons to reorder, click ▶ to expand/collapse
-              subcategories
+              Click ▶ to expand/collapse subcategories
             </p>
           </div>
 
           {loading ? (
-            <div className="p-8 text-center">
+            <div className="flex items-center justify-center flex-1 p-8">
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <span className="ml-2 text-gray-600">
@@ -559,26 +505,28 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
               </div>
             </div>
           ) : categories.length === 0 ? (
-            <div className="p-12 text-center">
-              <Tag className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No categories found
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Create your first category to organize your products.
-              </p>
-              <Button
-                onClick={() => {
-                  setEditingCategory(null);
-                  setIsDrawerOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Category
-              </Button>
+            <div className="flex items-center justify-center flex-1 p-12">
+              <div className="text-center">
+                <Tag className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  No categories found
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Create your first category to organize your products.
+                </p>
+                <Button
+                  onClick={() => {
+                    setEditingCategory(null);
+                    setIsDrawerOpen(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Category
+                </Button>
+              </div>
             </div>
           ) : (
-            <div className="divide-y divide-gray-200">
+            <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-gray-200">
               {categoryTree.map((category) => (
                 <CategoryRow
                   key={category.id}
@@ -589,7 +537,6 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                   onEdit={handleEditCategory}
                   onDelete={handleDeleteCategory}
                   allCategories={categories}
-                  onReorder={handleReorderCategory}
                   expandedCategories={expandedCategories}
                 />
               ))}

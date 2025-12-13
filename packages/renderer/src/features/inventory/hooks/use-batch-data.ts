@@ -62,7 +62,7 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
     }
 
     try {
-      const response = await window.supplierAPI.getByBusiness(businessId);
+      const response = await window.suppliersAPI.getByBusiness(businessId);
 
       if (response.success && response.suppliers) {
         setSuppliers(

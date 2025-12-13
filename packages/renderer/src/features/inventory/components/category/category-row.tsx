@@ -3,14 +3,13 @@ import type {
   CategoryRowProps,
   CategoryWithChildren,
 } from "@/features/inventory/utils";
-import {
-  ChevronDown,
-  ChevronRight,
-  Edit,
-  GripVertical,
-  Trash2,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export const CategoryRow: React.FC<CategoryRowProps> = ({
   category,
@@ -20,27 +19,10 @@ export const CategoryRow: React.FC<CategoryRowProps> = ({
   onEdit,
   onDelete,
   allCategories,
-  onReorder,
   expandedCategories,
 }) => {
   const hasChildren = category.children && category.children.length > 0;
   const paddingLeft = level * 24 + 16;
-
-  // Get siblings at the same level for reordering
-  const getSiblings = () => {
-    if (!category.parentId) {
-      // Top-level categories
-      return allCategories.filter((c) => !c.parentId);
-    } else {
-      // Child categories - same parent
-      return allCategories.filter((c) => c.parentId === category.parentId);
-    }
-  };
-
-  const siblings = getSiblings();
-  const currentIndex = siblings.findIndex((c) => c.id === category.id);
-  const isFirst = currentIndex === 0;
-  const isLast = currentIndex === siblings.length - 1;
 
   return (
     <>
@@ -69,41 +51,30 @@ export const CategoryRow: React.FC<CategoryRowProps> = ({
               ))}
           </button>
 
-          {/* Drag handle */}
-          <div className="cursor-grab">
-            <GripVertical className="w-5 h-5 text-gray-400" />
-          </div>
-
-          {/* Reorder buttons */}
-          <div className="flex flex-col space-y-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onReorder(category.id, "up")}
-              disabled={isFirst}
-              className="h-5 w-5 p-0 hover:bg-blue-100"
-              title="Move up"
-            >
-              <span className="text-xs">↑</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onReorder(category.id, "down")}
-              disabled={isLast}
-              className="h-5 w-5 p-0 hover:bg-blue-100"
-              title="Move down"
-            >
-              <span className="text-xs">↓</span>
-            </Button>
-          </div>
-
           {/* Category info */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2">
-              <span className="font-medium text-gray-900">{category.name}</span>
+              {category.name.length > 40 ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="font-medium text-gray-900 truncate cursor-help max-w-[300px]">
+                      {category.name}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    className="max-w-xs bg-gray-900 text-white"
+                  >
+                    <p className="whitespace-normal">{category.name}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <span className="font-medium text-gray-900">
+                  {category.name}
+                </span>
+              )}
               {hasChildren && (
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded shrink-0">
                   {category.children.length}{" "}
                   {category.children.length === 1
                     ? "subcategory"
@@ -111,11 +82,26 @@ export const CategoryRow: React.FC<CategoryRowProps> = ({
                 </span>
               )}
             </div>
-            {category.description && (
-              <div className="text-sm text-gray-500 mt-0.5">
-                {category.description}
-              </div>
-            )}
+            {category.description &&
+              (category.description.length > 50 ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="text-sm text-gray-500 mt-0.5 truncate cursor-help max-w-[400px]">
+                      {category.description}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    className="max-w-xs bg-gray-900 text-white"
+                  >
+                    <p className="whitespace-normal">{category.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <div className="text-sm text-gray-500 mt-0.5">
+                  {category.description}
+                </div>
+              ))}
             <div className="text-xs text-gray-400 mt-1">
               Created: {new Date(category.createdAt).toLocaleDateString()}
             </div>
@@ -167,7 +153,6 @@ export const CategoryRow: React.FC<CategoryRowProps> = ({
               onEdit={onEdit}
               onDelete={onDelete}
               allCategories={allCategories}
-              onReorder={onReorder}
               expandedCategories={expandedCategories}
             />
           ))}

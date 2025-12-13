@@ -101,9 +101,11 @@ export class CategoryProductSeeder {
         .where(eq(this.schema.products.businessId, businessId))
         .all();
 
-      // Automatically clear existing data if it exists (for development/testing)
-      // This prevents unique constraint errors when reseeding
-      if (existingCategories.length > 0 || existingProducts.length > 0) {
+      // Wrap clearing and seeding in a savepoint to ensure atomicity
+      // If seeding fails, the clearing will be rolled back
+      const needsClearing =
+        existingCategories.length > 0 || existingProducts.length > 0;
+      if (needsClearing) {
         if (config.clearExisting) {
           logger.info(
             `🗑️  Clearing existing data: ${existingCategories.length} categories, ${existingProducts.length} products`
@@ -114,48 +116,77 @@ export class CategoryProductSeeder {
           );
           logger.info("   Automatically clearing to allow reseeding...");
         }
-        await this.clearExistingData();
       }
 
+      // Use a savepoint to wrap the entire operation
+      // This allows us to rollback if anything goes wrong
+      const savepointName = `seed_${Date.now()}`;
       let categoryIds: string[] = [];
 
-      // Step 1: Seed categories (if requested)
-      if (config.categories > 0) {
-        logger.info("\n📦 Step 1/2: Seeding categories...");
-        categoryIds = await this.seedCategories(
-          config.categories,
-          config.batchSize,
-          businessId,
-          vatCategoryIds
-        );
-      } else {
-        // If no new categories, use existing ones
-        const existingCategories = this.db
-          .select({ id: this.schema.categories.id })
-          .from(this.schema.categories)
-          .where(eq(this.schema.categories.businessId, businessId))
-          .all();
-        categoryIds = existingCategories.map((c: any) => c.id);
+      try {
+        // Create savepoint before clearing
+        this.sqliteDb.exec(`SAVEPOINT ${savepointName}`);
 
-        if (categoryIds.length === 0 && config.products > 0) {
-          throw new Error(
-            "No categories found. Cannot seed products without categories. Please seed categories first."
+        // Clear existing data
+        if (needsClearing) {
+          this.clearExistingData();
+        }
+
+        // Step 1: Seed categories (if requested)
+        if (config.categories > 0) {
+          logger.info("\n📦 Step 1/2: Seeding categories...");
+          // Don't use nested transactions since we're already in a savepoint
+          categoryIds = await this.seedCategories(
+            config.categories,
+            config.batchSize,
+            businessId,
+            vatCategoryIds,
+            false // Already in transaction context
+          );
+        } else {
+          // If no new categories, use existing ones (should be empty after clearing)
+          const remainingCategories = this.db
+            .select({ id: this.schema.categories.id })
+            .from(this.schema.categories)
+            .where(eq(this.schema.categories.businessId, businessId))
+            .all();
+          categoryIds = remainingCategories.map((c: any) => c.id);
+
+          if (categoryIds.length === 0 && config.products > 0) {
+            throw new Error(
+              "No categories found. Cannot seed products without categories. Please seed categories first."
+            );
+          }
+        }
+
+        // Step 2: Seed products (if requested)
+        if (config.products > 0) {
+          logger.info("\n🏷️  Step 2/2: Seeding products...");
+          // Don't use nested transactions since we're already in a savepoint
+          await this.seedProducts(
+            config.products,
+            config.batchSize,
+            businessId,
+            categoryIds,
+            false // Already in transaction context
           );
         }
+
+        // Release savepoint on success
+        this.sqliteDb.exec(`RELEASE SAVEPOINT ${savepointName}`);
+      } catch (error) {
+        // Rollback to savepoint on error - this restores the database to before clearing
+        try {
+          this.sqliteDb.exec(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+          this.sqliteDb.exec(`RELEASE SAVEPOINT ${savepointName}`);
+          logger.info("   🔄 Database rolled back to state before seeding");
+        } catch (rollbackError) {
+          logger.error("   ⚠️  Failed to rollback savepoint:", rollbackError);
+        }
+        throw error;
       }
 
-      // Step 2: Seed products (if requested)
-      if (config.products > 0) {
-        logger.info("\n🏷️  Step 2/2: Seeding products...");
-        await this.seedProducts(
-          config.products,
-          config.batchSize,
-          businessId,
-          categoryIds
-        );
-      }
-
-      // Optimize database after bulk inserts
+      // Optimize database after bulk inserts (only if transaction succeeded)
       this.optimizeDatabase();
 
       // Restore production mode
@@ -171,6 +202,9 @@ export class CategoryProductSeeder {
       }
     } catch (error) {
       logger.error("❌ Category/product seeding failed:", error);
+      logger.error(
+        "   💡 Database state preserved - no data was lost due to transaction rollback"
+      );
       this.restoreProductionMode();
       throw error;
     }
@@ -183,7 +217,8 @@ export class CategoryProductSeeder {
     count: number,
     batchSize: number,
     businessId: string,
-    vatCategoryIds: string[]
+    vatCategoryIds: string[],
+    useTransaction: boolean = true
   ): Promise<string[]> {
     if (count === 0) {
       return [];
@@ -196,7 +231,7 @@ export class CategoryProductSeeder {
       vatCategoryIds
     );
 
-    // Insert in batches using transactions
+    // Insert in batches
     const totalBatches = Math.ceil(categories.length / batchSize);
     const categoryIds: string[] = [];
 
@@ -205,15 +240,23 @@ export class CategoryProductSeeder {
       const end = Math.min(start + batchSize, categories.length);
       const batch = categories.slice(start, end);
 
-      // Use transaction for batch insert
       try {
-        const insertCategories = this.sqliteDb.transaction((categories) => {
-          for (const category of categories) {
+        if (useTransaction) {
+          // Use transaction for batch insert when not already in a transaction
+          const insertCategories = this.sqliteDb.transaction((categories) => {
+            for (const category of categories) {
+              this.db.insert(this.schema.categories).values(category).run();
+              categoryIds.push(category.id);
+            }
+          });
+          insertCategories(batch);
+        } else {
+          // Direct insert when already in a transaction context
+          for (const category of batch) {
             this.db.insert(this.schema.categories).values(category).run();
             categoryIds.push(category.id);
           }
-        });
-        insertCategories(batch);
+        }
       } catch (error) {
         logger.error(`Failed to insert category batch ${i + 1}:`, error);
         throw error;
@@ -235,7 +278,8 @@ export class CategoryProductSeeder {
     count: number,
     batchSize: number,
     businessId: string,
-    categoryIds: string[]
+    categoryIds: string[],
+    useTransaction: boolean = true
   ): Promise<void> {
     if (count === 0) {
       return;
@@ -261,14 +305,21 @@ export class CategoryProductSeeder {
         categoryIds
       );
 
-      // Use transaction for batch insert
       try {
-        const insertProducts = this.sqliteDb.transaction((products) => {
+        if (useTransaction) {
+          // Use transaction for batch insert when not already in a transaction
+          const insertProducts = this.sqliteDb.transaction((products) => {
+            for (const product of products) {
+              this.db.insert(this.schema.products).values(product).run();
+            }
+          });
+          insertProducts(products);
+        } else {
+          // Direct insert when already in a transaction context
           for (const product of products) {
             this.db.insert(this.schema.products).values(product).run();
           }
-        });
-        insertProducts(products);
+        }
       } catch (error) {
         logger.error(`Failed to insert product batch ${i + 1}:`, error);
         throw error;

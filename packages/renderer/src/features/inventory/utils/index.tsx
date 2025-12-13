@@ -11,7 +11,6 @@ export interface CategoryRowProps {
   onEdit: (category: Category) => void;
   onDelete: (id: string) => void;
   allCategories: Category[];
-  onReorder: (id: string, direction: "up" | "down") => void;
   expandedCategories: Set<string>;
 }
 

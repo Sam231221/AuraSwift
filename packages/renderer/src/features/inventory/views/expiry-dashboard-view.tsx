@@ -1,4 +1,4 @@
-import React from "react";
+import React, { startTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,14 +78,65 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
           {onViewBatches && (
             <Button
               variant="outline"
-              onClick={onViewBatches}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const target = e.currentTarget;
+                target.blur();
+                target.disabled = true;
+                try {
+                  startTransition(() => {
+                    setTimeout(() => {
+                      try {
+                        onViewBatches();
+                      } catch (error) {
+                        console.error("Error in onViewBatches:", error);
+                      } finally {
+                        setTimeout(() => {
+                          target.disabled = false;
+                        }, 300);
+                      }
+                    }, 0);
+                  });
+                } catch (error) {
+                  console.error("Error setting up onViewBatches:", error);
+                  target.disabled = false;
+                }
+              }}
               className="w-full sm:w-auto"
             >
               View All Batches
             </Button>
           )}
           {onReceiveBatch && (
-            <Button onClick={onReceiveBatch} className="w-full sm:w-auto">
+            <Button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const target = e.currentTarget;
+                target.blur();
+                target.disabled = true;
+                try {
+                  startTransition(() => {
+                    setTimeout(() => {
+                      try {
+                        onReceiveBatch();
+                      } catch (error) {
+                        console.error("Error in onReceiveBatch:", error);
+                      } finally {
+                        setTimeout(() => {
+                          target.disabled = false;
+                        }, 300);
+                      }
+                    }, 0);
+                  });
+                } catch (error) {
+                  console.error("Error setting up onReceiveBatch:", error);
+                  target.disabled = false;
+                }
+              }}
+              className="w-full sm:w-auto"
+            >
               <Package className="w-4 h-4 mr-2" />
               Receive New Batch
             </Button>
@@ -227,7 +278,34 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
               <Button
                 variant="outline"
                 className="w-full justify-start text-sm sm:text-base"
-                onClick={onReceiveBatch}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const target = e.currentTarget;
+                  target.blur();
+                  // Disable button temporarily to prevent multiple clicks
+                  target.disabled = true;
+                  try {
+                    // Use startTransition to mark as non-urgent and setTimeout as fallback
+                    startTransition(() => {
+                      setTimeout(() => {
+                        try {
+                          onReceiveBatch();
+                        } catch (error) {
+                          console.error("Error in onReceiveBatch:", error);
+                        } finally {
+                          // Re-enable button after a delay
+                          setTimeout(() => {
+                            target.disabled = false;
+                          }, 300);
+                        }
+                      }, 0);
+                    });
+                  } catch (error) {
+                    console.error("Error setting up onReceiveBatch:", error);
+                    target.disabled = false;
+                  }
+                }}
               >
                 <Package className="w-4 h-4 mr-2" />
                 Receive New Batch
@@ -237,7 +315,34 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
               <Button
                 variant="outline"
                 className="w-full justify-start text-sm sm:text-base"
-                onClick={onViewBatches}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const target = e.currentTarget;
+                  target.blur();
+                  // Disable button temporarily to prevent multiple clicks
+                  target.disabled = true;
+                  try {
+                    // Use startTransition to mark as non-urgent and setTimeout as fallback
+                    startTransition(() => {
+                      setTimeout(() => {
+                        try {
+                          onViewBatches();
+                        } catch (error) {
+                          console.error("Error in onViewBatches:", error);
+                        } finally {
+                          // Re-enable button after a delay
+                          setTimeout(() => {
+                            target.disabled = false;
+                          }, 300);
+                        }
+                      }, 0);
+                    });
+                  } catch (error) {
+                    console.error("Error setting up onViewBatches:", error);
+                    target.disabled = false;
+                  }
+                }}
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 View All Batches
@@ -247,7 +352,13 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
               <Button
                 variant="outline"
                 className="w-full justify-start text-sm sm:text-base"
-                onClick={onGenerateReport}
+                onClick={(e) => {
+                  const target = e.currentTarget;
+                  target.blur();
+                  requestAnimationFrame(() => {
+                    onGenerateReport();
+                  });
+                }}
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Generate Expiry Report
@@ -257,7 +368,13 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
               <Button
                 variant="outline"
                 className="w-full justify-start text-sm sm:text-base"
-                onClick={onCreatePromotion}
+                onClick={(e) => {
+                  const target = e.currentTarget;
+                  target.blur();
+                  requestAnimationFrame(() => {
+                    onCreatePromotion();
+                  });
+                }}
               >
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 Create Promotion ({criticalCount} items)
