@@ -254,7 +254,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     const loadSuppliers = async () => {
       if (!user?.businessId) return;
       try {
-        const response = await window.suppliersAPI.getByBusiness(
+        const response = await window.supplierAPI.getByBusiness(
           user.businessId
         );
         if (response.success && response.suppliers) {

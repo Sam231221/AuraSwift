@@ -247,5 +247,35 @@ export function registerUpdateHandlers(): void {
     }
   });
 
+  /**
+   * Handle cancel download request
+   */
+  ipcMain.handle("update:cancel-download", async () => {
+    try {
+      const updaterInstance = getAutoUpdaterInstance();
+      if (!updaterInstance) {
+        return { success: false, error: "Auto-updater not available" };
+      }
+
+      const cancelled = updaterInstance.cancelDownload();
+
+      if (cancelled) {
+        logger.info("Download cancelled successfully");
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: "No download in progress to cancel",
+        };
+      }
+    } catch (error) {
+      logger.error("Error cancelling download:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
   logger.info("Update IPC handlers registered");
 }

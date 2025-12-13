@@ -109,6 +109,10 @@ export function showDownloadProgressToast(
       duration: Infinity, // Don't auto-dismiss during download
       position: "top-right",
       id: "download-progress", // Use fixed ID to update same toast
+      style: {
+        border: "none", // Remove default border, component has its own
+        background: "transparent", // Let component handle background
+      },
     }
   );
 }

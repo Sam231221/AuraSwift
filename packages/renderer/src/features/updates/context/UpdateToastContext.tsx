@@ -92,6 +92,9 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
     undefined
   );
   const dismissErrorRef = useRef<(() => void) | undefined>(undefined);
+  const cancelDownloadRef = useRef<(() => Promise<void>) | undefined>(
+    undefined
+  );
 
   // Cleanup listeners on unmount
   useEffect(() => {
@@ -103,6 +106,7 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
         window.updateAPI.removeAllListeners("update:error");
         window.updateAPI.removeAllListeners("update:check-complete");
         window.updateAPI.removeAllListeners("update:install-request");
+        window.updateAPI.removeAllListeners("update:download-cancelled");
       }
     };
 
@@ -173,8 +177,10 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
       }
 
       // Always use the fixed ID to replace/update the same toast
-      downloadProgressToastIdRef.current =
-        showDownloadProgressToast(progressData);
+      downloadProgressToastIdRef.current = showDownloadProgressToast(
+        progressData,
+        () => cancelDownloadRef.current?.()
+      );
     };
 
     window.updateAPI.onDownloadProgress(handleDownloadProgress);
@@ -182,6 +188,36 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
     return () => {
       if (window.updateAPI) {
         window.updateAPI.removeAllListeners("update:download-progress");
+      }
+    };
+  }, []);
+
+  // Listen for download cancelled
+  useEffect(() => {
+    if (!window.updateAPI) return;
+
+    const handleDownloadCancelled = () => {
+      setState("idle");
+      setProgress(null);
+
+      // Dismiss progress toast
+      toast.dismiss("download-progress");
+      if (downloadProgressToastIdRef.current) {
+        downloadProgressToastIdRef.current = null;
+      }
+
+      // Show cancellation confirmation
+      toast.info("Download cancelled", {
+        description: "The update download has been cancelled.",
+        duration: 3000,
+      });
+    };
+
+    window.updateAPI.onDownloadCancelled(handleDownloadCancelled);
+
+    return () => {
+      if (window.updateAPI) {
+        window.updateAPI.removeAllListeners("update:download-cancelled");
       }
     };
   }, []);
@@ -424,6 +460,24 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
     }
   }, [state]);
 
+  // Cancel download
+  const cancelDownload = useCallback(async () => {
+    try {
+      const result = await window.updateAPI.cancelDownload();
+      if (result.success) {
+        setState("idle");
+        setProgress(null);
+        // The cancellation event will handle toast dismissal
+      } else {
+        toast.error(result.error || "Failed to cancel download");
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to cancel download";
+      toast.error(errorMessage);
+    }
+  }, []);
+
   // Update refs when functions change (must be after all functions are defined)
   useEffect(() => {
     downloadUpdateRef.current = downloadUpdate;
@@ -431,12 +485,14 @@ export function UpdateToastProvider({ children }: UpdateToastProviderProps) {
     postponeUpdateRef.current = postponeUpdate;
     checkForUpdatesRef.current = checkForUpdates;
     dismissErrorRef.current = dismissError;
+    cancelDownloadRef.current = cancelDownload;
   }, [
     downloadUpdate,
     installUpdate,
     postponeUpdate,
     checkForUpdates,
     dismissError,
+    cancelDownload,
   ]);
 
   const value: UpdateContextValue = {

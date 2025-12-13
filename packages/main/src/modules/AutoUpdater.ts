@@ -4,6 +4,7 @@ import electronUpdater, {
   type Logger,
   type UpdateInfo,
   type ProgressInfo,
+  CancellationToken,
 } from "electron-updater";
 import { app, dialog, Notification, shell, BrowserWindow } from "electron";
 
@@ -23,6 +24,7 @@ export class AutoUpdater implements AppModule {
   #isDownloading = false;
   #downloadStartTime: number | null = null;
   #lastError: { message: string; timestamp: Date; type: string } | null = null;
+  #downloadCancellationToken: CancellationToken | null = null;
 
   readonly #REMIND_LATER_INTERVAL = 2 * 60 * 60 * 1000;
   readonly #MAX_POSTPONE_COUNT = 3;
@@ -502,6 +504,45 @@ export class AutoUpdater implements AppModule {
     } else {
       this.#downloadStartTime = null;
       this.#hasShownProgressNotification = false;
+      // Clear cancellation token when stopping download
+      this.#downloadCancellationToken = null;
+    }
+  }
+
+  /**
+   * Cancel ongoing download
+   * @returns true if cancellation was successful, false if no download in progress
+   */
+  cancelDownload(): boolean {
+    if (!this.#isDownloading || !this.#downloadCancellationToken) {
+      return false;
+    }
+
+    try {
+      this.#downloadCancellationToken.cancel();
+
+      if (this.#logger) {
+        this.#logger.info("Download cancelled by user");
+      }
+
+      // Update state
+      this.setDownloading(false);
+
+      // Clear download state (user cancelled, don't preserve for resume)
+      this.#downloadState = null;
+
+      // Broadcast cancellation to renderer
+      this.broadcastToAllWindows("update:download-cancelled", {
+        timestamp: new Date(),
+      });
+
+      return true;
+    } catch (error) {
+      const errorMessage = this.formatErrorMessage(error);
+      if (this.#logger) {
+        this.#logger.error(`Failed to cancel download: ${errorMessage}`);
+      }
+      return false;
     }
   }
 
@@ -1200,9 +1241,26 @@ export class AutoUpdater implements AppModule {
     const onError = (error: Error) => {
       const errorMessage = this.formatErrorMessage(error);
 
-      // Reset download state on error
+      // Check if this is a cancellation (cancelled downloads may trigger error event)
+      const isCancellation =
+        errorMessage.includes("cancelled") ||
+        errorMessage.includes("canceled") ||
+        errorMessage.includes("CancellationToken") ||
+        this.#downloadCancellationToken?.cancelled === true;
+
+      // Reset download state on error (unless it's a cancellation - already handled)
       const wasDownloading = this.#isDownloading;
-      this.setDownloading(false);
+      if (!isCancellation) {
+        this.setDownloading(false);
+      }
+
+      // If cancelled, don't process as error - cancellation is already handled
+      if (isCancellation) {
+        if (this.#logger) {
+          this.#logger.info("Download was cancelled");
+        }
+        return;
+      }
 
       // Phase 4.1: Keep download state for resume (don't clear on error)
       // The download state is preserved so user can retry and resume
@@ -1348,6 +1406,9 @@ export class AutoUpdater implements AppModule {
    */
   private downloadWithResume(updater: AppUpdater, version: string): void {
     try {
+      // Create new cancellation token for this download
+      this.#downloadCancellationToken = new CancellationToken();
+
       // Check for partial download to resume
       if (
         this.#downloadState &&
@@ -1374,11 +1435,12 @@ export class AutoUpdater implements AppModule {
         }
       }
 
-      // Start/resume download
-      updater.downloadUpdate();
+      // Start/resume download with cancellation token
+      updater.downloadUpdate(this.#downloadCancellationToken);
     } catch (error) {
       const errorMessage = this.formatErrorMessage(error);
       this.#isDownloading = false;
+      this.#downloadCancellationToken = null;
       if (this.#logger) {
         this.#logger.error(`Failed to start download: ${errorMessage}`);
       }

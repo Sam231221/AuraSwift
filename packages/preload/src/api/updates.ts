@@ -127,6 +127,25 @@ export const updateAPI = {
   },
 
   /**
+   * Cancel ongoing download
+   */
+  cancelDownload: async (): Promise<{
+    success: boolean;
+    error?: string;
+  }> => {
+    return await ipcRenderer.invoke("update:cancel-download");
+  },
+
+  /**
+   * Listen for download cancelled event
+   */
+  onDownloadCancelled: (callback: () => void) => {
+    ipcRenderer.on("update:download-cancelled", () => {
+      callback();
+    });
+  },
+
+  /**
    * Remove all listeners for a specific channel
    */
   removeAllListeners: (channel: string) => {
