@@ -21,6 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Pagination } from "@/components/ui/pagination";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Product } from "@/types/domain";
 import { ImportBookerModal } from "@/features/inventory/components/shared/import-booker-modal";
 import type { Category } from "../hooks/use-product-data";
@@ -67,6 +72,34 @@ interface ProductDetailsViewProps {
 
   onProductsImported: () => void;
 }
+
+/**
+ * Build category path from category ID by traversing parent categories
+ * Returns the full path as a string (e.g., "Parent > Child > Subchild")
+ */
+const getCategoryPath = (
+  categoryId: string | null | undefined,
+  categories: Category[]
+): string | null => {
+  if (!categoryId) return null;
+
+  const categoryMap = new Map<string, Category>();
+  categories.forEach((cat) => categoryMap.set(cat.id, cat));
+
+  const path: string[] = [];
+  let currentId: string | null | undefined = categoryId;
+  const visited = new Set<string>(); // Prevent infinite loops
+
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+    const category = categoryMap.get(currentId);
+    if (!category) break;
+    path.unshift(category.name);
+    currentId = category.parentId;
+  }
+
+  return path.length > 0 ? path.join(" > ") : null;
+};
 
 const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
   products,
@@ -236,20 +269,20 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full min-w-[800px]">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="text-left p-4 font-semibold text-gray-900">
                       Image
                     </th>
                     {showFields.name && (
-                      <th className="text-left p-4 font-semibold text-gray-900">
+                      <th className="text-left p-4 font-semibold text-gray-900 min-w-[150px] max-w-[300px]">
                         Name
                       </th>
                     )}
                     {showFields.category && (
-                      <th className="text-left p-4 font-semibold text-gray-900">
+                      <th className="text-left p-4 font-semibold text-gray-900 min-w-[120px] max-w-[200px]">
                         Category
                       </th>
                     )}
@@ -264,7 +297,7 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                       </th>
                     )}
                     {showFields.sku && (
-                      <th className="text-left p-4 font-semibold text-gray-900">
+                      <th className="text-left p-4 font-semibold text-gray-900 min-w-[100px] max-w-[150px]">
                         SKU
                       </th>
                     )}
@@ -303,25 +336,92 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                           </div>
                         </td>
                         {showFields.name && (
-                          <td className="p-4">
-                            <div>
-                              <div className="font-medium text-gray-900">
-                                {product.name}
-                              </div>
-                              <div className="text-sm text-gray-500 truncate max-w-xs">
-                                {product.description}
-                              </div>
+                          <td className="p-4 min-w-[150px] max-w-[300px]">
+                            <div className="space-y-1">
+                              {product.name.length > 30 ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="font-medium text-gray-900 truncate cursor-help">
+                                      {product.name}
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    side="top"
+                                    className="max-w-xs bg-gray-900 text-white"
+                                  >
+                                    <p className="whitespace-normal">
+                                      {product.name}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <div className="font-medium text-gray-900">
+                                  {product.name}
+                                </div>
+                              )}
+                              {product.description &&
+                                (product.description.length > 40 ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="text-sm text-gray-500 truncate cursor-help">
+                                        {product.description}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="top"
+                                      className="max-w-xs bg-gray-900 text-white"
+                                    >
+                                      <p className="whitespace-normal">
+                                        {product.description}
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ) : (
+                                  <div className="text-sm text-gray-500 truncate">
+                                    {product.description}
+                                  </div>
+                                ))}
                             </div>
                           </td>
                         )}
-                        {showFields.category && (
-                          <td className="p-4">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                              {categories.find((cat) => cat.id === categoryId)
-                                ?.name || "Unknown"}
-                            </span>
-                          </td>
-                        )}
+                        {showFields.category &&
+                          (() => {
+                            const categoryPath = getCategoryPath(
+                              categoryId,
+                              categories
+                            );
+                            const categoryName =
+                              categories.find((cat) => cat.id === categoryId)
+                                ?.name || "Unknown";
+                            const hasLongPath =
+                              categoryPath && categoryPath !== categoryName;
+
+                            return (
+                              <td className="p-4 min-w-[120px] max-w-[200px]">
+                                {hasLongPath ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium truncate max-w-full cursor-help">
+                                        {categoryName}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="top"
+                                      className="max-w-xs bg-gray-900 text-white"
+                                    >
+                                      <p className="whitespace-normal">
+                                        {categoryPath}
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ) : (
+                                  <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                    {categoryName}
+                                  </span>
+                                )}
+                              </td>
+                            );
+                          })()}
                         {showFields.price && (
                           <td className="p-4">
                             <div className="flex items-center space-x-2">
@@ -380,8 +480,28 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                           </td>
                         )}
                         {showFields.sku && (
-                          <td className="p-4 text-gray-600 font-mono text-sm">
-                            {product.sku}
+                          <td className="p-4 min-w-[100px] max-w-[150px]">
+                            {product.sku && product.sku.length > 15 ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="text-gray-600 font-mono text-sm truncate cursor-help">
+                                    {product.sku}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  className="max-w-xs bg-gray-900 text-white font-mono"
+                                >
+                                  <p className="whitespace-normal">
+                                    {product.sku}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <div className="text-gray-600 font-mono text-sm">
+                                {product.sku}
+                              </div>
+                            )}
                           </td>
                         )}
                         {showFields.status && (
