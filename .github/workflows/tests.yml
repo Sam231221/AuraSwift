@@ -28,10 +28,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  actions: read
-  checks: write
+# Note: Permissions are inherited from the calling workflow (ci.yml)
+# Reusable workflows should not define their own permissions
 
 env:
   NODE_NO_WARNINGS: 1
