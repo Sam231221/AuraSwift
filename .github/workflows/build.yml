@@ -1,4 +1,4 @@
-name: Compile and test on Windows
+name: Build Windows
 
 on:
   workflow_call:
@@ -36,12 +36,13 @@ env:
   GYP-MSVS-VERSION: 2022
 
 jobs:
-  # Build and test job - Windows for native modules and building
+  # Build job - Windows for native modules and building
   # Using windows-2022 instead of windows-latest for better Windows 10 Enterprise compatibility
   # windows-latest now uses Windows Server 2025 which may have compatibility issues
-  # NOTE: Typecheck is handled by tests.yml workflow to avoid duplication
-  build-and-test:
+  # NOTE: All testing is handled by .github/workflows/tests.yml
+  build:
     runs-on: windows-2022
+    timeout-minutes: 60
     env:
       PYTHON: python
       MSVS-VERSION: 2022
