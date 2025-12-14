@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.24.0](https://github.com/Sam231221/AuraSwift/compare/v1.23.0...v1.24.0) (2025-12-14)
+
+
+* fixdb-manager): improve code readability and update app version retrieval method ([](https://github.com/Sam231221/AuraSwift/commit/c96c85c083cec0114d378f15dd5cbb913fb20ba4))
+
+
+### feat
+
+* **ci:** add type checking job and streamline test workflows for improved validation ([](https://github.com/Sam231221/AuraSwift/commit/1ec69e2dce6c12d96399225186d05328e15b7039))
+* **ci:** add verification step for Electron installation in CI workflow to ensure proper setup ([](https://github.com/Sam231221/AuraSwift/commit/a2806b08584c665d18117825f009002cd57d0742))
+* **tests:** implement comprehensive testing infrastructure with dedicated workflows for unit, component, integration, and E2E tests ([](https://github.com/Sam231221/AuraSwift/commit/142d16ae42e6eb0eec2d3f6e43e737984af06f78))
+
+
+### fix
+
+* **tests:** adjust coverage thresholds to unblock CI and reflect current coverage levels ([](https://github.com/Sam231221/AuraSwift/commit/ac0ef0f002a2f797d6c2712594e8e43571f4c431))
+* **tests:** update coverage thresholds in vitest configuration to reflect current baseline and set achievable targets ([](https://github.com/Sam231221/AuraSwift/commit/ac6f0677efd8ee55b4c0ee0fc038c4736c7b7170))
+* **ci:** update permissions for tests workflow and remove redundant permission definitions ([](https://github.com/Sam231221/AuraSwift/commit/61d54b67e3c4b71de8690cc4a6cf9b771ae832d2))
+
+
+### refactor
+
+* **adaptive-keyboard:** clean up JSX structure for improved readability and maintainability ([](https://github.com/Sam231221/AuraSwift/commit/ad063793df3bf1aa7e1139a6080a902abea7094a))
+
 # [1.23.0](https://github.com/Sam231221/AuraSwift/compare/v1.22.0...v1.23.0) (2025-12-13)
 
 
