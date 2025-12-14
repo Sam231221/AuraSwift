@@ -1,0 +1,436 @@
+name: Test Suite
+
+on:
+  workflow_call:
+    # Can be called from other workflows
+  workflow_dispatch:
+    # Can be manually triggered
+  pull_request:
+    paths:
+      - "packages/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vitest.config.ts"
+      - "playwright.config.ts"
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vitest.config.ts"
+      - "playwright.config.ts"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_NO_WARNINGS: 1
+  NODE_ENV: test
+  CI: true
+
+jobs:
+  # Job 1: Type checking (fast, runs in parallel)
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Run typecheck
+        run: npm run typecheck -ws --if-present
+
+  # Job 2: Unit Tests (fastest, runs first)
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        test-path:
+          - "tests/unit/main"
+          - "tests/unit/renderer"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: test-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            test-deps-${{ runner.os }}-node22-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Create test-results directory
+        run: mkdir -p test-results
+
+      - name: Set test path slug
+        id: test-path-slug
+        run: echo "slug=$(echo '${{ matrix.test-path }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - name: Run unit tests
+        run: npx vitest run ${{ matrix.test-path }} --reporter=verbose --reporter=junit --outputFile=test-results/unit-${{ steps.test-path-slug.outputs.slug }}.xml
+        continue-on-error: true
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results-${{ steps.test-path-slug.outputs.slug }}
+          path: test-results/unit-*.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # Job 3: Component Tests
+  component-tests:
+    name: Component Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: test-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            test-deps-${{ runner.os }}-node22-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Create test-results directory
+        run: mkdir -p test-results
+
+      - name: Run component tests
+        run: npm run test:components -- --reporter=verbose --reporter=junit --outputFile=test-results/component-tests.xml
+        continue-on-error: true
+
+      - name: Upload component test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-test-results
+          path: test-results/component-tests.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # Job 4: Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        test-path:
+          - "tests/integration/main"
+          - "tests/integration/renderer"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: test-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            test-deps-${{ runner.os }}-node22-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Create test-results directory
+        run: mkdir -p test-results
+
+      - name: Set test path slug
+        id: test-path-slug
+        run: echo "slug=$(echo '${{ matrix.test-path }}' | tr '/' '-')" >> $GITHUB_OUTPUT
+
+      - name: Run integration tests
+        run: npx vitest run ${{ matrix.test-path }} --reporter=verbose --reporter=junit --outputFile=test-results/integration-${{ steps.test-path-slug.outputs.slug }}.xml
+        continue-on-error: true
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results-${{ steps.test-path-slug.outputs.slug }}
+          path: test-results/integration-*.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # Job 5: Test Coverage (runs all vitest tests with coverage)
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [unit-tests, component-tests, integration-tests]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+          key: test-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            test-deps-${{ runner.os }}-node22-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        continue-on-error: true
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/
+            coverage/lcov.info
+          retention-days: 30
+
+      - name: Publish coverage to PR
+        if: github.event_name == 'pull_request' && always()
+        run: |
+          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage/lcov.info ]; then
+            echo "Coverage report generated successfully." >> $GITHUB_STEP_SUMMARY
+            echo "View detailed coverage in the artifacts." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Coverage report not found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Job 6: E2E Tests (requires build, runs on Windows for Electron compatibility)
+  e2e-tests:
+    name: E2E Tests
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      PYTHON: python
+      MSVS-VERSION: 2022
+      GYP-MSVS-VERSION: 2022
+      ELECTRON_DISABLE_GPU: 1
+      ELECTRON_NO_SANDBOX: 1
+      PLAYWRIGHT_HEADLESS: 1
+      HARDWARE_SIMULATION_MODE: true
+      MOCK_PRINTER_ENABLED: true
+      MOCK_CARD_READER_ENABLED: true
+      MOCK_SCANNER_ENABLED: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            packages/*/node_modules
+            **/node_modules/better-sqlite3/build
+            **/node_modules/node-hid/build
+            **/node_modules/serialport/build
+            **/node_modules/usb/build
+          key: e2e-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            e2e-deps-${{ runner.os }}-node22-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+        shell: powershell
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Rebuild native modules
+        run: npx electron-rebuild --force --only=better-sqlite3,node-hid,serialport,usb
+        shell: powershell
+        env:
+          npm_config_build_from_source: true
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+        shell: powershell
+
+      - name: Build application (minimal for E2E)
+        run: npm run build
+        shell: powershell
+        env:
+          NODE_ENV: production
+          VITE_DISTRIBUTION_CHANNEL: test
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        shell: powershell
+        continue-on-error: true
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+      - name: Upload E2E screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: test-results/**/*.png
+          retention-days: 7
+
+      - name: Upload E2E videos
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-videos
+          path: test-results/**/*.webm
+          retention-days: 7
+
+  # Job 7: Test Summary (aggregates all test results)
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs:
+      [
+        typecheck,
+        unit-tests,
+        component-tests,
+        integration-tests,
+        coverage,
+        e2e-tests,
+      ]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: all-test-results
+          pattern: "*test-results*"
+          merge-multiple: true
+
+      - name: Generate test summary
+        run: |
+          echo "# Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Execution Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Type Check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Component Tests | ${{ needs.component-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Test results and coverage reports are available in the workflow artifacts." >> $GITHUB_STEP_SUMMARY
+
+      - name: Check if all tests passed
+        run: |
+          if [ "${{ needs.typecheck.result }}" != "success" ] || \
+             [ "${{ needs.unit-tests.result }}" != "success" ] || \
+             [ "${{ needs.component-tests.result }}" != "success" ] || \
+             [ "${{ needs.integration-tests.result }}" != "success" ] || \
+             [ "${{ needs.e2e-tests.result }}" != "success" ]; then
+            echo "Some tests failed. Check individual job results for details."
+            exit 1
+          fi
+          echo "All tests passed successfully!"

@@ -196,10 +196,15 @@ jobs:
           echo "- \`APP_FULL_VERSION\`: ${{ steps.version.outputs.APP_FULL_VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- \`SHOULD_RELEASE\`: ${{ steps.version.outputs.SHOULD_RELEASE }}" >> $GITHUB_STEP_SUMMARY
 
-  #Job2: Build and test
+  #Job2: Run comprehensive test suite
+  tests:
+    uses: ./.github/workflows/tests.yml
+    needs: prepare
+
+  #Job3: Build and test
   compile-and-test:
     uses: ./.github/workflows/compile-and-test.yml
-    needs: prepare
+    needs: [prepare, tests]
     permissions:
       contents: write
       id-token: write
@@ -210,13 +215,14 @@ jobs:
       app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
       distribution-channel: ${{ inputs.distribution-channel || 'main' }}
 
-  #Job3: Semantic Release (only on main branch when there are releasable commits)
+  #Job4: Semantic Release (only on main branch when there are releasable commits)
   semantic-release:
     name: Semantic Release with Electron Builder
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.prepare.outputs.SHOULD_RELEASE == 'true'
     needs:
       - prepare
+      - tests
       - compile-and-test
 
     permissions:

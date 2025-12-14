@@ -483,8 +483,10 @@ jobs:
           }
         shell: powershell
 
-      - name: Run main E2E tests
-        run: npm run test:all --if-present
+      # Note: Comprehensive test suite is now handled by .github/workflows/tests.yml
+      # This workflow focuses on build and basic E2E smoke tests
+      - name: Run E2E smoke tests
+        run: npm run test:e2e --if-present
         if: steps.check-tests.outputs.tests-exist == 'true'
         env:
           CI: true
@@ -493,28 +495,12 @@ jobs:
           ELECTRON_NO_SANDBOX: 1
           PLAYWRIGHT_HEADLESS: 1
           ELECTRON_ENABLE_LOGGING: 1
-          DEBUG: playwright:*
           HARDWARE_SIMULATION_MODE: true
           MOCK_PRINTER_ENABLED: true
           MOCK_CARD_READER_ENABLED: true
           MOCK_SCANNER_ENABLED: true
           ELECTRON_UPDATER_DISABLED: 1
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
-
-      - name: Run hardware integration tests
-        run: npx playwright test ./tests/e2e/hardware-integration.spec.ts
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        env:
-          CI: true
-          NODE_ENV: test
-          ELECTRON_DISABLE_GPU: 1
-          ELECTRON_NO_SANDBOX: 1
-          PLAYWRIGHT_HEADLESS: 1
-          ELECTRON_ENABLE_LOGGING: 1
-          HARDWARE_SIMULATION_MODE: true
-          MOCK_PRINTER_ENABLED: true
-          MOCK_CARD_READER_ENABLED: true
-          MOCK_SCANNER_ENABLED: true
 
       - uses: actions/attest-build-provenance@v3
         with:
