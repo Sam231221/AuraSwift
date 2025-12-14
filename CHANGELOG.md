@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.25.0](https://github.com/Sam231221/AuraSwift/compare/v1.24.0...v1.25.0) (2025-12-14)
+
+
+### feat
+
+* Establish comprehensive testing setup documentation, action items, and metrics. ([](https://github.com/Sam231221/AuraSwift/commit/23a45b2ebca941de6e8d48d538cb31eaee82946c))
+* **workflows:** introduce Windows build workflow for Electron app, replacing compile-and-test with comprehensive build steps and verification ([](https://github.com/Sam231221/AuraSwift/commit/527b3ef2c3b3ae9a99e9f5c1d6d8b4ccdd6c5ad0))
+
 # [1.24.0](https://github.com/Sam231221/AuraSwift/compare/v1.23.0...v1.24.0) (2025-12-14)
 
 
