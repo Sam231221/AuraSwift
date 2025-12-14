@@ -22,8 +22,8 @@ import {
 // Layer 3: Repair mechanisms
 import { repairDatabase, createFreshDatabase } from "./utils/db-repair.js";
 
-import { getLogger } from '../utils/logger.js';
-const logger = getLogger('db-manager');
+import { getLogger } from "../utils/logger.js";
+const logger = getLogger("db-manager");
 // Layer 4: User dialogs
 import {
   showRecoveryDialog,
@@ -145,13 +145,17 @@ export class DBManager {
               mkdirError instanceof Error
                 ? mkdirError.message
                 : String(mkdirError);
-            logger.error(`❌ Failed to create database directory: ${errorMessage}`);
+            logger.error(
+              `❌ Failed to create database directory: ${errorMessage}`
+            );
             await showDatabaseErrorDialog(
               "Database Directory Error",
               `Failed to create database directory: ${dbDir}`,
               errorMessage
             );
-            throw new Error(`Failed to create database directory: ${errorMessage}`);
+            throw new Error(
+              `Failed to create database directory: ${errorMessage}`
+            );
           }
         }
 
@@ -308,7 +312,7 @@ export class DBManager {
             "Cannot Open Database",
             "This database was created with a newer version of AuraSwift.\n\n" +
               "Please update the application to the latest version to continue.\n\n" +
-              `Current app version: ${app.getVersion()}\n` +
+              `Current app version: ${this.getAppVersion()}\n` +
               "Database requires a newer version."
           );
           app.quit();
@@ -430,13 +434,36 @@ export class DBManager {
   }
 
   /**
+   * Get the actual app version from package.json, not Electron's version
+   * app.getVersion() can return Electron's version in dev mode, which is incorrect
+   */
+  private getAppVersion(): string {
+    try {
+      // Find package.json at project root
+      const projectRoot = isDevelopmentMode()
+        ? path.resolve(process.cwd())
+        : path.resolve(app.getAppPath(), "../../..");
+
+      const packageJsonPath = path.join(projectRoot, "package.json");
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+      return packageJson.version;
+    } catch (error) {
+      logger.warn(
+        "Could not read version from package.json, falling back to app.getVersion():",
+        error
+      );
+      return app.getVersion();
+    }
+  }
+
+  /**
    * Check if user is trying to open a newer database with an older app version
    * This prevents crashes from schema mismatches during downgrades
    */
   private checkForDowngrade(db: Database.Database, dbPath: string): boolean {
     try {
-      // Get app version
-      const appVersion = app.getVersion();
+      // Get app version from package.json (not from Electron which returns wrong version)
+      const appVersion = this.getAppVersion();
 
       // Check if database has migration tracking table
       const tableExists = db
@@ -589,15 +616,15 @@ export class DBManager {
       // Go up 3 levels to get project root
       const projectRoot = path.resolve(__dirname, "../../../");
       finalPath = path.join(projectRoot, "data", "pos_system.db");
-      
+
       // Validate path is at root level (not in packages/)
       if (finalPath.includes(path.join("packages", "data"))) {
         throw new Error(
           `Database path resolved incorrectly to: ${finalPath}. ` +
-          `Expected: ${path.join(projectRoot, "data", "pos_system.db")}`
+            `Expected: ${path.join(projectRoot, "data", "pos_system.db")}`
         );
       }
-      
+
       logger.info("Development mode: Using project directory for database");
       logger.info(`Project root: ${projectRoot}`);
       logger.info(`Database path: ${finalPath}`);
