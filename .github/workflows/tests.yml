@@ -356,6 +356,31 @@ jobs:
         run: npx playwright install --with-deps
         shell: powershell
 
+      - name: Verify Electron installation
+        run: |
+          Write-Host "Verifying Electron installation..."
+          if (Test-Path "node_modules/electron/dist/electron.exe") {
+            Write-Host "[OK] Electron binary found"
+            npx electron --version
+          } else {
+            Write-Host "[ERROR] Electron binary not found, reinstalling..."
+            # Clean electron installation
+            if (Test-Path "node_modules/electron") {
+              Remove-Item -Path "node_modules/electron" -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            # Force reinstall electron
+            npm install electron --force --no-save
+            # Verify again
+            if (Test-Path "node_modules/electron/dist/electron.exe") {
+              Write-Host "[OK] Electron reinstalled successfully"
+              npx electron --version
+            } else {
+              Write-Host "[ERROR] Electron still not found after reinstall"
+              exit 1
+            }
+          }
+        shell: powershell
+
       - name: Build application (minimal for E2E)
         run: npm run build
         shell: powershell
