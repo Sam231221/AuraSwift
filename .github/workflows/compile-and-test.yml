@@ -36,52 +36,10 @@ env:
   GYP-MSVS-VERSION: 2022
 
 jobs:
-  # Quick typecheck job - runs in parallel with build
-  typecheck:
-    runs-on: ubuntu-latest # Use faster/cheaper Linux for typecheck
-    steps:
-      - uses: actions/checkout@v5
-
-      # Setup Node.js FIRST - must run before any cache or npm operations
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22.x"
-          # Disable setup-node cache to avoid stale node_modules from different Node versions
-          cache: ""
-
-      # Verify Node version is correct
-      - name: Verify Node.js version
-        run: |
-          echo "Node.js version:"
-          node -v
-          echo "npm version:"
-          npm -v
-          echo "Node.js path:"
-          which node
-
-      - name: Cache node_modules for typecheck (with Node version in key)
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            packages/*/node_modules
-          key: typecheck-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            typecheck-deps-${{ runner.os }}-node22-
-
-      - name: Install dependencies (lightweight, no native builds needed)
-        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-
-      - name: Run typecheck
-        run: npm run typecheck -ws --if-present
-
   # Build and test job - Windows for native modules and building
   # Using windows-2022 instead of windows-latest for better Windows 10 Enterprise compatibility
   # windows-latest now uses Windows Server 2025 which may have compatibility issues
+  # NOTE: Typecheck is handled by tests.yml workflow to avoid duplication
   build-and-test:
     runs-on: windows-2022
     env:
@@ -446,61 +404,9 @@ jobs:
           }
         shell: powershell
 
-      # Only install Playwright if tests exist (conditional)
-      - name: Check if tests exist
-        id: check-tests
-        run: |
-          if (Test-Path "tests") {
-            echo "tests-exist=true" >> $env:GITHUB_OUTPUT
-          } else {
-            echo "tests-exist=false" >> $env:GITHUB_OUTPUT
-          }
-        shell: powershell
-
-      - name: Install Playwright
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        run: npx playwright install --with-deps
-
-      - name: Debug build output structure
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        run: |
-          if (Test-Path "dist") { dir dist -Recurse } else { Write-Host "No dist directory found" }
-          if (Test-Path "dist") { dir dist -Recurse -Include "*.exe", "*.app" } else { Write-Host "No executables found" }
-        shell: powershell
-
-      - name: Pre-test hardware module verification
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        run: |
-          $testReady = $true
-          $modules = @("better-sqlite3", "node-hid", "serialport", "usb")
-          foreach ($module in $modules) {
-            if (Test-Path "node_modules/$module/build") {
-              Write-Host "SUCCESS: $module native build ready for testing"
-            } else {
-              Write-Host "WARNING: $module native build not found"
-              $testReady = $false
-            }
-          }
-        shell: powershell
-
-      # Note: Comprehensive test suite is now handled by .github/workflows/tests.yml
-      # This workflow focuses on build and basic E2E smoke tests
-      - name: Run E2E smoke tests
-        run: npm run test:e2e --if-present
-        if: steps.check-tests.outputs.tests-exist == 'true'
-        env:
-          CI: true
-          NODE_ENV: test
-          ELECTRON_DISABLE_GPU: 1
-          ELECTRON_NO_SANDBOX: 1
-          PLAYWRIGHT_HEADLESS: 1
-          ELECTRON_ENABLE_LOGGING: 1
-          HARDWARE_SIMULATION_MODE: true
-          MOCK_PRINTER_ENABLED: true
-          MOCK_CARD_READER_ENABLED: true
-          MOCK_SCANNER_ENABLED: true
-          ELECTRON_UPDATER_DISABLED: 1
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      # Note: All testing including E2E is handled by .github/workflows/tests.yml
+      # This workflow focuses solely on building and packaging the application
+      # Build artifacts are uploaded and can be used by the tests workflow
 
       - uses: actions/attest-build-provenance@v3
         with:

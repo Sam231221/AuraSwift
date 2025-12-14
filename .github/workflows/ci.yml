@@ -196,15 +196,34 @@ jobs:
           echo "- \`APP_FULL_VERSION\`: ${{ steps.version.outputs.APP_FULL_VERSION }}" >> $GITHUB_STEP_SUMMARY
           echo "- \`SHOULD_RELEASE\`: ${{ steps.version.outputs.SHOULD_RELEASE }}" >> $GITHUB_STEP_SUMMARY
 
-  #Job2: Run comprehensive test suite
-  tests:
-    uses: ./.github/workflows/tests.yml
+  #Job2: Quick typecheck (fast gate, catches syntax errors early)
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
     needs: prepare
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
 
-  #Job3: Build and test
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: Run typecheck
+        run: npm run typecheck -ws --if-present
+
+  #Job3: Build and compile (ensure code builds before running tests)
   compile-and-test:
     uses: ./.github/workflows/compile-and-test.yml
-    needs: [prepare, tests]
+    needs: [prepare, typecheck]
     permissions:
       contents: write
       id-token: write
@@ -215,15 +234,21 @@ jobs:
       app-version: ${{ needs.prepare.outputs.APP_FULL_VERSION }}
       distribution-channel: ${{ inputs.distribution-channel || 'main' }}
 
-  #Job4: Semantic Release (only on main branch when there are releasable commits)
+  #Job4: Run comprehensive test suite (after successful build)
+  tests:
+    uses: ./.github/workflows/tests.yml
+    needs: [prepare, compile-and-test]
+
+  #Job5: Semantic Release (only on main branch when there are releasable commits)
   semantic-release:
     name: Semantic Release with Electron Builder
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.prepare.outputs.SHOULD_RELEASE == 'true'
     needs:
       - prepare
-      - tests
+      - typecheck
       - compile-and-test
+      - tests
 
     permissions:
       contents: write

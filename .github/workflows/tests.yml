@@ -28,37 +28,19 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
 env:
   NODE_NO_WARNINGS: 1
   NODE_ENV: test
   CI: true
 
 jobs:
-  # Job 1: Type checking (fast, runs in parallel)
-  typecheck:
-    name: Type Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22.x"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
-
-      - name: Run typecheck
-        run: npm run typecheck -ws --if-present
-
-  # Job 2: Unit Tests (fastest, runs first)
+  # Job 1: Unit Tests (fastest, runs first)
+  # Note: Typecheck and build are handled by ci.yml before this workflow runs
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -85,9 +67,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
-          key: test-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          key: node-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            test-deps-${{ runner.os }}-node22-
+            node-deps-${{ runner.os }}-node22-
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
@@ -102,9 +84,20 @@ jobs:
         id: test-path-slug
         run: echo "slug=$(echo '${{ matrix.test-path }}' | tr '/' '-')" >> $GITHUB_OUTPUT
 
+      - name: Check if test files exist
+        id: check-tests
+        run: |
+          if [ -d "${{ matrix.test-path }}" ] && [ -n "$(find ${{ matrix.test-path }} -name '*.test.ts' -o -name '*.test.tsx' | head -1)" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✓ Test files found in ${{ matrix.test-path }}"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠ No test files found in ${{ matrix.test-path }}"
+          fi
+
       - name: Run unit tests
+        if: steps.check-tests.outputs.exists == 'true'
         run: npx vitest run ${{ matrix.test-path }} --reporter=verbose --reporter=junit --outputFile=test-results/unit-${{ steps.test-path-slug.outputs.slug }}.xml
-        continue-on-error: true
 
       - name: Upload unit test results
         if: always()
@@ -136,9 +129,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
-          key: test-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          key: node-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            test-deps-${{ runner.os }}-node22-
+            node-deps-${{ runner.os }}-node22-
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
@@ -149,9 +142,20 @@ jobs:
       - name: Create test-results directory
         run: mkdir -p test-results
 
+      - name: Check if component test files exist
+        id: check-tests
+        run: |
+          if [ -d "tests/components" ] && [ -n "$(find tests/components -name '*.test.ts' -o -name '*.test.tsx' | head -1)" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✓ Component test files found"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠ No component test files found"
+          fi
+
       - name: Run component tests
-        run: npm run test:components -- --reporter=verbose --reporter=junit --outputFile=test-results/component-tests.xml
-        continue-on-error: true
+        if: steps.check-tests.outputs.exists == 'true'
+        run: npx vitest run tests/components --reporter=verbose --reporter=junit --outputFile=test-results/component-tests.xml
 
       - name: Upload component test results
         if: always()
@@ -189,9 +193,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
-          key: test-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          key: node-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            test-deps-${{ runner.os }}-node22-
+            node-deps-${{ runner.os }}-node22-
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
@@ -206,9 +210,20 @@ jobs:
         id: test-path-slug
         run: echo "slug=$(echo '${{ matrix.test-path }}' | tr '/' '-')" >> $GITHUB_OUTPUT
 
+      - name: Check if test files exist
+        id: check-tests
+        run: |
+          if [ -d "${{ matrix.test-path }}" ] && [ -n "$(find ${{ matrix.test-path }} -name '*.test.ts' -o -name '*.test.tsx' | head -1)" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✓ Test files found in ${{ matrix.test-path }}"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠ No test files found in ${{ matrix.test-path }}"
+          fi
+
       - name: Run integration tests
+        if: steps.check-tests.outputs.exists == 'true'
         run: npx vitest run ${{ matrix.test-path }} --reporter=verbose --reporter=junit --outputFile=test-results/integration-${{ steps.test-path-slug.outputs.slug }}.xml
-        continue-on-error: true
 
       - name: Upload integration test results
         if: always()
@@ -225,7 +240,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [unit-tests, component-tests, integration-tests]
-    if: always()
+    if: success()
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -242,9 +257,9 @@ jobs:
           path: |
             node_modules
             packages/*/node_modules
-          key: test-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          key: node-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            test-deps-${{ runner.os }}-node22-
+            node-deps-${{ runner.os }}-node22-
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
@@ -254,7 +269,6 @@ jobs:
 
       - name: Run tests with coverage
         run: npm run test:coverage
-        continue-on-error: true
 
       - name: Upload coverage reports
         if: always()
@@ -286,9 +300,11 @@ jobs:
       PYTHON: python
       MSVS-VERSION: 2022
       GYP-MSVS-VERSION: 2022
+      CI: true
+      NODE_ENV: test
       ELECTRON_DISABLE_GPU: 1
       ELECTRON_NO_SANDBOX: 1
-      PLAYWRIGHT_HEADLESS: 1
+      ELECTRON_ENABLE_LOGGING: 1
       HARDWARE_SIMULATION_MODE: true
       MOCK_PRINTER_ENABLED: true
       MOCK_CARD_READER_ENABLED: true
@@ -321,15 +337,16 @@ jobs:
             **/node_modules/node-hid/build
             **/node_modules/serialport/build
             **/node_modules/usb/build
-          key: e2e-deps-${{ runner.os }}-node22-${{ hashFiles('**/package-lock.json') }}
+          key: node-deps-${{ runner.os }}-node22-electron-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
-            e2e-deps-${{ runner.os }}-node22-
+            node-deps-${{ runner.os }}-node22-electron-
+            node-deps-${{ runner.os }}-node22-
+            node-deps-${{ runner.os }}-node22-
 
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit --no-fund --ignore-scripts
         shell: powershell
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+        # Note: Don't skip Playwright browser download for E2E tests
 
       - name: Rebuild native modules
         run: npx electron-rebuild --force --only=better-sqlite3,node-hid,serialport,usb
@@ -348,10 +365,28 @@ jobs:
           NODE_ENV: production
           VITE_DISTRIBUTION_CHANNEL: test
 
+      - name: Check if E2E test files exist
+        id: check-e2e-tests
+        run: |
+          if (Test-Path "tests/e2e") {
+            $testFiles = Get-ChildItem -Path tests/e2e -Filter "*.spec.ts" -Recurse
+            if ($testFiles.Count -gt 0) {
+              echo "exists=true" >> $env:GITHUB_OUTPUT
+              Write-Host "\u2713 E2E test files found: $($testFiles.Count)"
+            } else {
+              echo "exists=false" >> $env:GITHUB_OUTPUT
+              Write-Host "\u26a0 No E2E test files found"
+            }
+          } else {
+            echo "exists=false" >> $env:GITHUB_OUTPUT
+            Write-Host "\u26a0 tests/e2e directory not found"
+          }
+        shell: powershell
+
       - name: Run E2E tests
+        if: steps.check-e2e-tests.outputs.exists == 'true'
         run: npm run test:e2e
         shell: powershell
-        continue-on-error: true
 
       - name: Upload E2E test results
         if: always()
@@ -380,18 +415,11 @@ jobs:
           retention-days: 7
 
   # Job 7: Test Summary (aggregates all test results)
+  # Note: Typecheck is handled in ci.yml before this workflow
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs:
-      [
-        typecheck,
-        unit-tests,
-        component-tests,
-        integration-tests,
-        coverage,
-        e2e-tests,
-      ]
+    needs: [unit-tests, component-tests, integration-tests, coverage, e2e-tests]
     if: always()
     steps:
       - name: Checkout code
@@ -409,28 +437,100 @@ jobs:
           echo "# Test Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Test Execution Status" >> $GITHUB_STEP_SUMMARY
+          echo "_Note: Type checking and build validation are performed in the main CI workflow before tests_" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Test Type | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Type Check | ${{ needs.typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Component Tests | ${{ needs.component-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Coverage | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Type | Status | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Unit tests
+          if [ "${{ needs.unit-tests.result }}" == "success" ]; then
+            echo "| Unit Tests | \u2705 Passed | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Unit Tests | \u274c Failed | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Component tests
+          if [ "${{ needs.component-tests.result }}" == "success" ]; then
+            echo "| Component Tests | \u2705 Passed | ${{ needs.component-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Component Tests | \u274c Failed | ${{ needs.component-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Integration tests
+          if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+            echo "| Integration Tests | \u2705 Passed | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Integration Tests | \u274c Failed | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Coverage
+          if [ "${{ needs.coverage.result }}" == "success" ]; then
+            echo "| Coverage | \u2705 Passed | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.coverage.result }}" == "skipped" ]; then
+            echo "| Coverage | \u23ed Skipped | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Coverage | \u26a0\ufe0f Warning | ${{ needs.coverage.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # E2E tests
+          if [ "${{ needs.e2e-tests.result }}" == "success" ]; then
+            echo "| E2E Tests | \u2705 Passed | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| E2E Tests | \u274c Failed | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Test results and coverage reports are available in the workflow artifacts." >> $GITHUB_STEP_SUMMARY
+          echo "Test results, coverage reports, and screenshots are available in the workflow artifacts." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count test result files if available
+          if [ -d "all-test-results" ]; then
+            TEST_COUNT=$(find all-test-results -name "*.xml" -type f 2>/dev/null | wc -l | tr -d ' ')
+            echo "- Test result files: $TEST_COUNT" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Check if all tests passed
         run: |
-          if [ "${{ needs.typecheck.result }}" != "success" ] || \
-             [ "${{ needs.unit-tests.result }}" != "success" ] || \
-             [ "${{ needs.component-tests.result }}" != "success" ] || \
-             [ "${{ needs.integration-tests.result }}" != "success" ] || \
-             [ "${{ needs.e2e-tests.result }}" != "success" ]; then
-            echo "Some tests failed. Check individual job results for details."
+          echo "Checking test results..."
+          echo "Note: Type checking and build validation are performed in the main CI workflow before tests"
+          echo ""
+
+          # Check unit tests
+          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+            echo "❌ Unit tests failed"
             exit 1
           fi
-          echo "All tests passed successfully!"
+          echo "✓ Unit tests passed"
+
+          # Check component tests
+          if [ "${{ needs.component-tests.result }}" != "success" ]; then
+            echo "❌ Component tests failed"
+            exit 1
+          fi
+          echo "✓ Component tests passed"
+
+          # Check integration tests
+          if [ "${{ needs.integration-tests.result }}" != "success" ]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          fi
+          echo "✓ Integration tests passed"
+
+          # Check E2E tests
+          if [ "${{ needs.e2e-tests.result }}" != "success" ]; then
+            echo "❌ E2E tests failed"
+            exit 1
+          fi
+          echo "✓ E2E tests passed"
+
+          # Coverage is optional, so we only warn
+          if [ "${{ needs.coverage.result }}" != "success" ] && [ "${{ needs.coverage.result }}" != "skipped" ]; then
+            echo "⚠️  Coverage generation had issues but not blocking"
+          else
+            echo "✓ Coverage passed"
+          fi
+
+          echo ""
+          echo "✅ All tests passed successfully!"
