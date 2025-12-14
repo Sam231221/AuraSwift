@@ -24,53 +24,10 @@ export function UpdateAvailableToast({
 }: UpdateAvailableToastProps) {
   const [showNotes, setShowNotes] = useState(false);
 
-  const formatReleaseNotes = (notes?: string | string[] | unknown): string => {
-    if (!notes) return "";
-
-    // Handle objects - try to extract meaningful content
-    if (typeof notes === "object" && !Array.isArray(notes)) {
-      // If it's an object, try to stringify it or extract a message property
-      if (notes && typeof notes === "object") {
-        const obj = notes as Record<string, unknown>;
-        // Try common properties that might contain release notes
-        if (typeof obj.message === "string") {
-          return obj.message;
-        }
-        if (typeof obj.content === "string") {
-          return obj.content;
-        }
-        if (typeof obj.body === "string") {
-          return obj.body;
-        }
-        // If no known property, try to stringify (but format nicely)
-        try {
-          const str = JSON.stringify(notes, null, 2);
-          // If it's a simple object with one property, extract it
-          const entries = Object.entries(obj);
-          if (entries.length === 1 && typeof entries[0][1] === "string") {
-            return entries[0][1];
-          }
-          return str;
-        } catch {
-          return "Release notes available on GitHub";
-        }
-      }
-      return "Release notes available on GitHub";
-    }
-
-    if (Array.isArray(notes)) {
-      return notes.join("\n");
-    }
-
-    if (typeof notes === "string") {
-      // Strip HTML tags if present
-      return notes.replace(/<[^>]*>/g, "").trim();
-    }
-
-    return "Release notes available on GitHub";
-  };
-
-  const releaseNotes = formatReleaseNotes(updateInfo.releaseNotes);
+  // Release notes are now pre-formatted by the main process
+  const releaseNotes = typeof updateInfo.releaseNotes === "string" 
+    ? updateInfo.releaseNotes 
+    : "Release notes available on GitHub";
   const hasNotes = releaseNotes.length > 0;
 
   return (

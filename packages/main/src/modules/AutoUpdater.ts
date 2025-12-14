@@ -25,6 +25,7 @@ export class AutoUpdater implements AppModule {
   #downloadStartTime: number | null = null;
   #lastError: { message: string; timestamp: Date; type: string } | null = null;
   #downloadCancellationToken: CancellationToken | null = null;
+  #lastErrorNotification: number | null = null;
 
   readonly #REMIND_LATER_INTERVAL = 2 * 60 * 60 * 1000;
   readonly #MAX_POSTPONE_COUNT = 3;
@@ -825,119 +826,121 @@ export class AutoUpdater implements AppModule {
     this.#isCheckingForUpdates = true;
     const checkStartTime = Date.now();
 
-    // Phase 2.1: Retry logic with timeout
-    let lastError: Error | null = null;
-    for (let attempt = 1; attempt <= this.#MAX_RETRIES; attempt++) {
-      try {
-        const updater = this.getAutoUpdater();
-        // Note: Listeners are set up once in enable(), not on every check
-        // Just configure updater settings here
+    try {
+      // Phase 2.1: Retry logic with timeout
+      let lastError: Error | null = null;
+      for (let attempt = 1; attempt <= this.#MAX_RETRIES; attempt++) {
+        try {
+          const updater = this.getAutoUpdater();
+          // Note: Listeners are set up once in enable(), not on every check
+          // Just configure updater settings here
 
-        // Phase 2.1: Add timeout wrapper
-        const checkPromise = updater.checkForUpdates();
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            this.#metrics.timeoutCount++;
-            reject(new Error("Update check timeout"));
-          }, this.#REQUEST_TIMEOUT);
-        });
+          // Phase 2.1: Add timeout wrapper
+          const checkPromise = updater.checkForUpdates();
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              this.#metrics.timeoutCount++;
+              reject(new Error("Update check timeout"));
+            }, this.#REQUEST_TIMEOUT);
+          });
 
-        const result = await Promise.race([checkPromise, timeoutPromise]);
-        const checkDuration = Date.now() - checkStartTime;
+          const result = await Promise.race([checkPromise, timeoutPromise]);
+          const checkDuration = Date.now() - checkStartTime;
 
-        // Track metrics (Phase 5.1)
-        this.trackCheckMetrics(checkDuration, false);
+          // Track metrics (Phase 5.1)
+          this.trackCheckMetrics(checkDuration, false);
 
-        // Cache successful result (Performance: Phase 1.2)
-        if (result?.updateInfo) {
-          this.#lastCheckResult = {
-            version: result.updateInfo.version,
-            timestamp: Date.now(),
-          };
-          this.#lastCheckTime = Date.now();
+          // Cache successful result (Performance: Phase 1.2)
+          if (result?.updateInfo) {
+            this.#lastCheckResult = {
+              version: result.updateInfo.version,
+              timestamp: Date.now(),
+            };
+            this.#lastCheckTime = Date.now();
 
-          if (this.#logger) {
-            this.#logger.info(
-              `Update check completed in ${checkDuration}ms (attempt ${attempt}/${
-                this.#MAX_RETRIES
-              }), cached for ${Math.floor(
-                this.#CACHE_DURATION / 60000
-              )} minutes`
-            );
-          }
-        } else {
-          // Cache "no update" result too
-          this.#lastCheckTime = Date.now();
-          this.#lastCheckResult = {
-            version: app.getVersion(),
-            timestamp: Date.now(),
-          };
-        }
-
-        if (result === null) {
-          return null;
-        }
-
-        return result;
-      } catch (error) {
-        lastError = error as Error;
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-
-        // Track retry attempt
-        if (attempt < this.#MAX_RETRIES) {
-          this.#metrics.retryCount++;
-        }
-
-        // Handle expected errors (don't retry)
-        if (
-          errorMessage.includes("No published versions") ||
-          errorMessage.includes("Cannot find latest") ||
-          errorMessage.includes("No updates available")
-        ) {
-          return null;
-        }
-
-        // Handle network errors (retry)
-        if (
-          errorMessage.includes("ENOTFOUND") ||
-          errorMessage.includes("ETIMEDOUT") ||
-          errorMessage.includes("ECONNREFUSED") ||
-          errorMessage.includes("timeout")
-        ) {
-          if (attempt < this.#MAX_RETRIES) {
-            const retryDelay = this.#RETRY_DELAY * attempt; // Exponential backoff
             if (this.#logger) {
-              this.#logger.warn(
-                `Update check failed (attempt ${attempt}/${
+              this.#logger.info(
+                `Update check completed in ${checkDuration}ms (attempt ${attempt}/${
                   this.#MAX_RETRIES
-                }): ${errorMessage}. Retrying in ${retryDelay}ms...`
+                }), cached for ${Math.floor(
+                  this.#CACHE_DURATION / 60000
+                )} minutes`
               );
             }
-            await new Promise((resolve) => setTimeout(resolve, retryDelay));
-            continue;
+          } else {
+            // Cache "no update" result too
+            this.#lastCheckTime = Date.now();
+            this.#lastCheckResult = {
+              version: app.getVersion(),
+              timestamp: Date.now(),
+            };
           }
-        }
 
-        // If we've exhausted retries or it's not a retryable error, throw
-        if (attempt === this.#MAX_RETRIES) {
-          this.#metrics.errorCount++;
-          if (this.#logger) {
-            this.#logger.error(
-              `Update check failed after ${
-                this.#MAX_RETRIES
-              } attempts: ${errorMessage}`
-            );
+          if (result === null) {
+            return null;
           }
-          throw lastError || new Error("Update check failed after retries");
+
+          return result;
+        } catch (error) {
+          lastError = error as Error;
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+
+          // Track retry attempt
+          if (attempt < this.#MAX_RETRIES) {
+            this.#metrics.retryCount++;
+          }
+
+          // Handle expected errors (don't retry)
+          if (
+            errorMessage.includes("No published versions") ||
+            errorMessage.includes("Cannot find latest") ||
+            errorMessage.includes("No updates available")
+          ) {
+            return null;
+          }
+
+          // Handle network errors (retry)
+          if (
+            errorMessage.includes("ENOTFOUND") ||
+            errorMessage.includes("ETIMEDOUT") ||
+            errorMessage.includes("ECONNREFUSED") ||
+            errorMessage.includes("timeout")
+          ) {
+            if (attempt < this.#MAX_RETRIES) {
+              const retryDelay = this.#RETRY_DELAY * attempt; // Exponential backoff
+              if (this.#logger) {
+                this.#logger.warn(
+                  `Update check failed (attempt ${attempt}/${
+                    this.#MAX_RETRIES
+                  }): ${errorMessage}. Retrying in ${retryDelay}ms...`
+                );
+              }
+              await new Promise((resolve) => setTimeout(resolve, retryDelay));
+              continue;
+            }
+          }
+
+          // If we've exhausted retries or it's not a retryable error, throw
+          if (attempt === this.#MAX_RETRIES) {
+            this.#metrics.errorCount++;
+            if (this.#logger) {
+              this.#logger.error(
+                `Update check failed after ${
+                  this.#MAX_RETRIES
+                } attempts: ${errorMessage}`
+              );
+            }
+            throw lastError || new Error("Update check failed after retries");
+          }
         }
-      } finally {
-        this.#isCheckingForUpdates = false;
       }
-    }
 
-    // Should never reach here, but TypeScript needs it
-    throw lastError || new Error("Update check failed");
+      // Should never reach here, but TypeScript needs it
+      throw lastError || new Error("Update check failed");
+    } finally {
+      this.#isCheckingForUpdates = false;
+    }
   }
 
   /**
@@ -1034,11 +1037,14 @@ export class AutoUpdater implements AppModule {
       // any existing toast, so it's safe to show even if previously postponed.
       // This ensures users are notified about available updates on app restart
       // or periodic checks, even if they postponed the update earlier.
+      // Format notes before sending to ensure consistency with dialogs
+      const formattedNotes = this.formatReleaseNotes(info);
+
       // Use UpdateInfo type directly to ensure type compatibility
       this.broadcastToAllWindows<UpdateInfo>("update:available", {
         version: info.version,
         releaseDate: info.releaseDate,
-        releaseNotes: info.releaseNotes,
+        releaseNotes: formattedNotes,
         files: info.files,
         path: info.path,
         sha512: info.sha512,
@@ -1202,13 +1208,16 @@ export class AutoUpdater implements AppModule {
 
       const newVersion = info.version;
 
+      // Format notes before sending
+      const formattedNotes = this.formatReleaseNotes(info);
+
       // Cursor-style: Broadcast to renderer for toast notification
       // No dialog - toast will handle the UI
       // Use UpdateInfo type directly to ensure type compatibility
       this.broadcastToAllWindows<UpdateInfo>("update:downloaded", {
         version: info.version,
         releaseDate: info.releaseDate,
-        releaseNotes: info.releaseNotes,
+        releaseNotes: formattedNotes,
         files: info.files,
         path: info.path,
         sha512: info.sha512,
@@ -1307,6 +1316,25 @@ export class AutoUpdater implements AppModule {
         process.env.NODE_ENV !== "production";
 
       if (!shouldSkipDialog) {
+        // Debounce error notifications (UI Spam Prevention)
+        const now = Date.now();
+        const timeSinceLastError = this.#lastErrorNotification
+          ? now - this.#lastErrorNotification
+          : Infinity;
+        const ERROR_NOTIFICATION_COOLDOWN = 60 * 1000; // 1 minute
+
+        if (timeSinceLastError < ERROR_NOTIFICATION_COOLDOWN) {
+          if (this.#logger) {
+            this.#logger.info(
+              `Skipping error UI (cooldown active: ${Math.floor(
+                timeSinceLastError / 1000
+              )}s)`
+            );
+          }
+          return;
+        }
+        this.#lastErrorNotification = now;
+
         const isNetworkError =
           errorMessage.includes("ENOTFOUND") ||
           errorMessage.includes("ETIMEDOUT") ||
