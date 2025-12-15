@@ -291,7 +291,7 @@ const AdminDashboardView = ({
               <AlertDialogTitle className="text-lg sm:text-xl text-red-600">
                 ⚠️ Empty Database
               </AlertDialogTitle>
-              <AlertDialogDescription className="space-y-3 text-sm sm:text-base">
+              <div className="space-y-3 text-sm sm:text-base text-muted-foreground">
                 <p className="font-semibold">This action cannot be undone!</p>
                 <p>This will permanently delete ALL data from your database:</p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
@@ -303,7 +303,7 @@ const AdminDashboardView = ({
                 <p className="text-red-600 font-semibold mt-2">
                   A backup will be created automatically before emptying.
                 </p>
-              </AlertDialogDescription>
+              </div>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
               <AlertDialogCancel className="w-full sm:w-auto mt-2 sm:mt-0">
@@ -333,4 +333,3 @@ const AdminDashboardView = ({
 };
 
 export default AdminDashboardView;
-
