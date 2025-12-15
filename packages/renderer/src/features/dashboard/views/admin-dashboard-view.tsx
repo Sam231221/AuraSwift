@@ -134,18 +134,24 @@ const AdminDashboardView = ({
         description: `Imported from: ${data.importedFrom} (${(
           data.importSize /
           (1024 * 1024)
-        ).toFixed(2)} MB)${backupMsg}\n\nThe application will now restart.`,
+        ).toFixed(
+          2
+        )} MB)${backupMsg}\n\nReloading application to initialize imported database...`,
         duration: 5000,
       });
 
-      setTimeout(async () => {
-        try {
-          await window.appAPI.restart();
-        } catch (restartError) {
-          logger.error("Restart error:", restartError);
-          window.location.reload();
-        }
-      }, 1500);
+      // Strategy: Use window reload for both dev and production
+      // The database connection has been closed (with WAL checkpoint) and file swapped
+      // Window reload will trigger fresh database initialization via getDatabase()
+      // This works because:
+      // 1. Main process has closed the old connection with WAL checkpoint
+      // 2. Main process has verified the new database is valid
+      // 3. Main process has swapped the database file
+      // 4. Fresh page load calls getDatabase() which opens the new file
+      // 5. Works in both dev (keeps dev server) and production
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
     } catch (error) {
       logger.error("Import error:", error);
       toast.error("Failed to import database", {
@@ -188,18 +194,15 @@ const AdminDashboardView = ({
 
       toast.success("Database emptied successfully!", {
         id: "empty-db",
-        description: `Backup saved to: ${data.backupPath}\n${data.tablesEmptied} tables emptied, ${data.totalRowsDeleted} rows deleted.\nThe application will now restart.`,
+        description: `Backup saved to: ${data.backupPath}\n${data.tablesEmptied} tables emptied, ${data.totalRowsDeleted} rows deleted.\nDatabase has been reseeded with default data.`,
         duration: 5000,
       });
 
-      setTimeout(async () => {
-        try {
-          await window.appAPI.restart();
-        } catch (restartError) {
-          logger.error("Restart error:", restartError);
-          window.location.reload();
-        }
-      }, 1500);
+      // Reload the window instead of full app restart
+      // This avoids dev server connection issues and is faster
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (error) {
       logger.error("Empty database error:", error);
       toast.error("Failed to empty database", {

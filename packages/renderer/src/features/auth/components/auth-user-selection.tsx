@@ -6,8 +6,8 @@ import { PinEntryScreen } from "@/features/auth/components/pin-entry-screen";
 import { getUserColor } from "@/features/auth/components/utils";
 import type { UserForLogin } from "@/types/domain";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('auth-user-selection');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("auth-user-selection");
 
 export function AuthUserSelection() {
   const [users, setUsers] = useState<UserForLogin[]>([]);
@@ -15,10 +15,26 @@ export function AuthUserSelection() {
   const [pin, setPin] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [showSkeleton, setShowSkeleton] = useState(true);
   const [isClockingIn, setIsClockingIn] = useState(false);
   const [isClockingOut, setIsClockingOut] = useState(false);
   const [clockMessage, setClockMessage] = useState("");
   const { login, isLoading, clockIn, clockOut } = useAuth();
+
+  // Minimum loading duration to prevent skeleton flash
+  // Only show skeleton if loading takes more than 200ms
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    if (isLoadingUsers) {
+      // Show skeleton after 200ms to prevent flash on fast loads
+      timer = setTimeout(() => setShowSkeleton(true), 200);
+    } else {
+      setShowSkeleton(false);
+    }
+
+    return () => clearTimeout(timer);
+  }, [isLoadingUsers]);
 
   // Fetch users on mount
   useEffect(() => {
@@ -136,7 +152,7 @@ export function AuthUserSelection() {
         {!selectedUser ? (
           <UserSelectionGrid
             users={users}
-            isLoading={isLoadingUsers}
+            isLoading={showSkeleton}
             onUserSelect={setSelectedUser}
           />
         ) : (
