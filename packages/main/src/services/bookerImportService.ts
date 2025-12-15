@@ -56,26 +56,48 @@ export class BookerImportService {
   async parseFile(
     filePath: string
   ): Promise<ParseResult<BookerDepartment | BookerProduct>> {
-    const content = await fs.promises.readFile(filePath, "utf-8");
-    const fileType = this.detectFileType(content);
+    try {
+      const content = await fs.promises.readFile(filePath, "utf-8");
+      const fileType = this.detectFileType(content);
 
-    switch (fileType) {
-      case "department":
-        return this.parseDepartmentReport(content);
-      case "product":
-        return this.parseProductReport(content);
-      default:
-        return {
-          success: false,
-          data: [],
-          errors: [
-            { row: 0, field: "", value: "", message: "Unknown file type" },
-          ],
-          warnings: [],
-          fileType: "unknown",
-          rowCount: 0,
-          validRowCount: 0,
-        };
+      switch (fileType) {
+        case "department":
+          return this.parseDepartmentReport(content);
+        case "product":
+          return this.parseProductReport(content);
+        default:
+          return {
+            success: false,
+            data: [],
+            errors: [
+              { row: 0, field: "", value: "", message: "Unknown file type" },
+            ],
+            warnings: [],
+            fileType: "unknown",
+            rowCount: 0,
+            validRowCount: 0,
+          };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        data: [],
+        errors: [
+          {
+            row: 0,
+            field: "",
+            value: "",
+            message:
+              error instanceof Error
+                ? `File read error: ${error.message}`
+                : "Failed to read file",
+          },
+        ],
+        warnings: [],
+        fileType: "unknown",
+        rowCount: 0,
+        validRowCount: 0,
+      };
     }
   }
 
@@ -243,7 +265,7 @@ export class BookerImportService {
   }
 
   /**
-   * Parse CSV line handling quoted fields
+   * Parse CSV line handling quoted fields and escaped quotes
    */
   private parseCSVLine(line: string): string[] {
     const result: string[] = [];
@@ -252,18 +274,25 @@ export class BookerImportService {
 
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
+      const nextChar = i < line.length - 1 ? line[i + 1] : null;
 
       if (char === '"') {
-        inQuotes = !inQuotes;
+        // Handle escaped quotes ("")
+        if (inQuotes && nextChar === '"') {
+          current += '"';
+          i++; // Skip next quote
+        } else {
+          inQuotes = !inQuotes;
+        }
       } else if (char === "," && !inQuotes) {
-        result.push(current);
+        result.push(current.trim());
         current = "";
       } else {
         current += char;
       }
     }
 
-    result.push(current);
+    result.push(current.trim());
     return result;
   }
 

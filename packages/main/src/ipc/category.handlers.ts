@@ -4,13 +4,13 @@ import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
 
 const logger = getLogger("categoryHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerCategoryHandlers() {
   // Category Management IPC handlers
   ipcMain.handle("categories:create", async (event, categoryData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.categories.createCategoryWithResponse(categoryData);
     } catch (error: any) {
       logger.error("Create category IPC error:", error);
@@ -23,7 +23,7 @@ export function registerCategoryHandlers() {
 
   ipcMain.handle("categories:getByBusiness", async (event, businessId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.categories.getCategoriesByBusinessWithResponse(
         businessId
       );
@@ -38,7 +38,7 @@ export function registerCategoryHandlers() {
 
   ipcMain.handle("categories:getById", async (event, id) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.categories.getCategoryByIdWithResponse(id);
     } catch (error: any) {
       logger.error("Get category by ID IPC error:", error);
@@ -51,7 +51,7 @@ export function registerCategoryHandlers() {
 
   ipcMain.handle("categories:update", async (event, id, updates) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.categories.updateCategoryWithResponse(id, updates);
     } catch (error: any) {
       logger.error("Update category IPC error:", error);
@@ -64,7 +64,7 @@ export function registerCategoryHandlers() {
 
   ipcMain.handle("categories:delete", async (event, id) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.categories.deleteCategoryWithResponse(id);
     } catch (error: any) {
       logger.error("Delete category IPC error:", error);
@@ -79,7 +79,7 @@ export function registerCategoryHandlers() {
     "categories:reorder",
     async (event, businessId, categoryIds) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         return await db.categories.reorderCategoriesWithResponse(
           businessId,
           categoryIds

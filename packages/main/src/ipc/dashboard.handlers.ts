@@ -6,7 +6,7 @@ import { validateSessionAndPermission } from "../utils/authHelpers.js";
 import { PERMISSIONS } from "@app/shared/constants/permissions";
 
 const logger = getLogger("dashboardHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerDashboardHandlers() {
   /**
@@ -16,7 +16,7 @@ export function registerDashboardHandlers() {
     "dashboard:getStatistics",
     async (event, sessionToken, businessId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // Validate session and check REPORTS_READ permission
         const auth = await validateSessionAndPermission(

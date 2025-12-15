@@ -4,7 +4,7 @@ import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
 
 const logger = getLogger("supplierHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerSupplierHandlers() {
   // ============================================================================
@@ -13,7 +13,7 @@ export function registerSupplierHandlers() {
 
   ipcMain.handle("suppliers:create", async (event, supplierData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const supplier = await db.suppliers.createSupplier(supplierData);
 
       return {
@@ -32,7 +32,7 @@ export function registerSupplierHandlers() {
 
   ipcMain.handle("suppliers:getById", async (event, supplierId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const supplier = await db.suppliers.getSupplierById(supplierId);
 
       return {
@@ -52,7 +52,7 @@ export function registerSupplierHandlers() {
     "suppliers:getByBusiness",
     async (event, businessId, includeInactive) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const suppliers = await db.suppliers.getSuppliersByBusiness(
           businessId,
           includeInactive
@@ -74,7 +74,7 @@ export function registerSupplierHandlers() {
 
   ipcMain.handle("suppliers:update", async (event, supplierId, updates) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const supplier = await db.suppliers.updateSupplier(supplierId, updates);
 
       return {
@@ -93,7 +93,7 @@ export function registerSupplierHandlers() {
 
   ipcMain.handle("suppliers:delete", async (event, supplierId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const deleted = await db.suppliers.deleteSupplier(supplierId);
 
       return {

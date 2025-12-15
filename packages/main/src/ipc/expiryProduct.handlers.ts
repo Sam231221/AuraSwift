@@ -4,14 +4,14 @@ import { getLogger } from "../utils/logger.js";
 import { ExpiryNotificationService } from "../services/expiryNotificationService.js";
 
 const logger = getLogger("expiryProductHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerExpiryProductHandlers() {
   ipcMain.handle(
     "expiryNotifications:create",
     async (event, notificationData) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const notification = await db.expiryNotifications.createNotification(
           notificationData
         );
@@ -35,7 +35,7 @@ export function registerExpiryProductHandlers() {
 
   ipcMain.handle("expiryNotifications:getByBatch", async (event, batchId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const notifications =
         await db.expiryNotifications.getNotificationsByBatch(batchId);
 
@@ -56,7 +56,7 @@ export function registerExpiryProductHandlers() {
     "expiryNotifications:getByBusiness",
     async (event, businessId, filters) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const notifications =
           await db.expiryNotifications.getNotificationsByBusiness(
             businessId,
@@ -81,7 +81,7 @@ export function registerExpiryProductHandlers() {
     "expiryNotifications:getPending",
     async (event, businessId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const notifications =
           await db.expiryNotifications.getPendingNotifications(businessId);
 
@@ -103,7 +103,7 @@ export function registerExpiryProductHandlers() {
     "expiryNotifications:acknowledge",
     async (event, notificationId, userId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const notification =
           await db.expiryNotifications.acknowledgeNotification(
             notificationId,
@@ -126,7 +126,7 @@ export function registerExpiryProductHandlers() {
 
   ipcMain.handle("expirySettings:get", async (event, businessId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const settings = await db.expirySettings.getOrCreateSettings(businessId);
 
       return {
@@ -146,7 +146,7 @@ export function registerExpiryProductHandlers() {
     "expirySettings:createOrUpdate",
     async (event, businessId, settingsData) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const settings = await db.expirySettings.createOrUpdateSettings(
           businessId,
           settingsData
@@ -173,7 +173,7 @@ export function registerExpiryProductHandlers() {
     "expiryNotifications:scanAndCreate",
     async (event, businessId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const service = new ExpiryNotificationService(db);
         const count = await service.scanAndCreateNotifications(businessId);
 
@@ -195,7 +195,7 @@ export function registerExpiryProductHandlers() {
     "expiryNotifications:processTasks",
     async (event, businessId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const service = new ExpiryNotificationService(db);
         const result = await service.processExpiryTasks(businessId);
 

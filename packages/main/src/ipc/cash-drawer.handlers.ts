@@ -4,12 +4,12 @@ import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
 
 const logger = getLogger("cashDrawerHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerCashDrawerHandlers() {
   ipcMain.handle("cashDrawer:getExpectedCash", async (event, shiftId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const result = db.cashDrawers.getExpectedCashForShift(shiftId);
 
       return {
@@ -27,7 +27,7 @@ export function registerCashDrawerHandlers() {
 
   ipcMain.handle("cashDrawer:createCount", async (event, countData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Get shift to determine business ID
       const shift = db.shifts.getShiftById(countData.shiftId);
@@ -86,7 +86,7 @@ export function registerCashDrawerHandlers() {
 
   ipcMain.handle("cashDrawer:getCountsByShift", async (event, shiftId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const counts = db.cashDrawers.getCashDrawerCountsByShift(shiftId);
 
       return {

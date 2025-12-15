@@ -3,13 +3,13 @@ import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
 
 const logger = getLogger("ageVerificationHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerAgeVerificationHandlers() {
   // Age Verification IPC handlers
   ipcMain.handle("ageVerification:create", async (event, verificationData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const record = await db.ageVerification.createAgeVerification(
         verificationData
       );
@@ -34,7 +34,7 @@ export function registerAgeVerificationHandlers() {
     "ageVerification:getByTransaction",
     async (event, transactionId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const records =
           await db.ageVerification.getAgeVerificationsByTransaction(
             transactionId
@@ -58,7 +58,7 @@ export function registerAgeVerificationHandlers() {
     "ageVerification:getByTransactionItem",
     async (event, transactionItemId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const records =
           await db.ageVerification.getAgeVerificationsByTransactionItem(
             transactionItemId
@@ -85,7 +85,7 @@ export function registerAgeVerificationHandlers() {
     "ageVerification:getByBusiness",
     async (event, businessId, options) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const records = await db.ageVerification.getAgeVerificationsByBusiness(
           businessId,
           options
@@ -107,7 +107,7 @@ export function registerAgeVerificationHandlers() {
 
   ipcMain.handle("ageVerification:getByProduct", async (event, productId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const records = await db.ageVerification.getAgeVerificationsByProduct(
         productId
       );
@@ -129,7 +129,7 @@ export function registerAgeVerificationHandlers() {
     "ageVerification:getByStaff",
     async (event, staffId, options) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const records = await db.ageVerification.getAgeVerificationsByStaff(
           staffId,
           options

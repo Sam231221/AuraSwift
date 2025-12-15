@@ -3,13 +3,13 @@ import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
 
 const logger = getLogger("productHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerProductHandlers() {
   // Product Management IPC handlers
   ipcMain.handle("products:create", async (event, productData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.products.createProductWithValidation(productData);
     } catch (error: any) {
       logger.error("Create product IPC error:", error);
@@ -24,7 +24,7 @@ export function registerProductHandlers() {
     "products:getByBusiness",
     async (event, businessId, includeInactive = false) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const products = await db.products.getProductsByBusiness(
           businessId,
           includeInactive
@@ -46,7 +46,7 @@ export function registerProductHandlers() {
 
   ipcMain.handle("products:getById", async (event, id) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.products.getProductByIdWithResponse(id);
     } catch (error: any) {
       logger.error("Get product by ID IPC error:", error);
@@ -59,7 +59,7 @@ export function registerProductHandlers() {
 
   ipcMain.handle("products:update", async (event, id, updates) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.products.updateProductWithValidation(id, updates);
     } catch (error: any) {
       logger.error("Update product IPC error:", error);
@@ -72,7 +72,7 @@ export function registerProductHandlers() {
 
   ipcMain.handle("products:delete", async (event, id) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.products.deleteProductWithResponse(id);
     } catch (error: any) {
       logger.error("Delete product IPC error:", error);
@@ -88,7 +88,7 @@ export function registerProductHandlers() {
     "products:getPaginated",
     async (event, businessId, pagination, filters) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const result = await db.products.getProductsByBusinessPaginated(
           businessId,
           pagination,
@@ -111,7 +111,7 @@ export function registerProductHandlers() {
   // Stock adjustment with audit trail
   ipcMain.handle("products:adjustStock", async (event, adjustmentData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const { productId, type, quantity, reason, userId, businessId, batchId } =
         adjustmentData;
@@ -208,7 +208,7 @@ export function registerProductHandlers() {
   // Sync product stock from batches
   ipcMain.handle("products:syncStock", async (event, businessId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Get all products for the business
       const products = await db.products.getByBusiness(businessId);
@@ -259,7 +259,7 @@ export function registerProductHandlers() {
 
   ipcMain.handle("stock:adjust", async (event, adjustmentData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const adjustment = await db.inventory.createStockAdjustment(
         adjustmentData
       );
@@ -279,7 +279,7 @@ export function registerProductHandlers() {
 
   ipcMain.handle("stock:getAdjustments", async (event, productId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const adjustments = db.inventory.getStockAdjustmentsByProduct(productId);
       return {
         success: true,
@@ -298,7 +298,7 @@ export function registerProductHandlers() {
 
 ipcMain.handle("stockMovements:create", async (event, movementData) => {
   try {
-    if (!db) db = await getDatabase();
+    const db = await getDatabase();
     const movement = await db.stockMovements.createStockMovement(movementData);
 
     return {
@@ -319,7 +319,7 @@ ipcMain.handle("stockMovements:create", async (event, movementData) => {
 
 ipcMain.handle("stockMovements:getByProduct", async (event, productId) => {
   try {
-    if (!db) db = await getDatabase();
+    const db = await getDatabase();
     const movements = await db.stockMovements.getMovementsByProduct(productId);
 
     return {
@@ -337,7 +337,7 @@ ipcMain.handle("stockMovements:getByProduct", async (event, productId) => {
 
 ipcMain.handle("stockMovements:getByBatch", async (event, batchId) => {
   try {
-    if (!db) db = await getDatabase();
+    const db = await getDatabase();
     const movements = await db.stockMovements.getMovementsByBatch(batchId);
 
     return {
@@ -357,7 +357,7 @@ ipcMain.handle(
   "stockMovements:getByBusiness",
   async (event, businessId, filters) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const movements = await db.stockMovements.getMovementsByBusiness(
         businessId,
         filters

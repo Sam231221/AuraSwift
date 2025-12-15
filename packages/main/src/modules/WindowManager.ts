@@ -349,15 +349,32 @@ class WindowManager implements AppModule {
     if (this.#renderer instanceof URL) {
       // In development, check if dev server is running before trying to load
       if (process.env.NODE_ENV === "development") {
-        try {
-          const response = await fetch(this.#renderer.href, {
-            method: "HEAD",
-            signal: AbortSignal.timeout(2000), // 2 second timeout
-          });
-          if (!response.ok) {
-            throw new Error(`Dev server returned ${response.status}`);
+        let devServerReady = false;
+        const maxRetries = 5;
+        const retryDelay = 1000; // 1 second between retries
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const response = await fetch(this.#renderer.href, {
+              method: "HEAD",
+              signal: AbortSignal.timeout(3000), // 3 second timeout per attempt
+            });
+            if (response.ok) {
+              devServerReady = true;
+              break;
+            }
+          } catch (error) {
+            if (attempt < maxRetries) {
+              logger.warn(
+                `⚠️  Dev server check failed (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms...`
+              );
+              await new Promise((resolve) => setTimeout(resolve, retryDelay));
+              continue;
+            }
           }
-        } catch (error) {
+        }
+
+        if (!devServerReady) {
           logger.error("\n❌ Frontend dev server is not running!");
           logger.error(`   Cannot load: ${this.#renderer.href}`);
           logger.error("\n💡 To start the frontend dev server, run:");

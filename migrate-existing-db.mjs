@@ -180,6 +180,36 @@ async function copyDatabaseData(sourceDbPath, targetDbPath) {
     const sourceDb = new Database(sourceDbPath, { readonly: true });
     const targetDb = new Database(targetDbPath);
 
+    // Validate schema compatibility
+    console.log("🔍 Validating schema compatibility...");
+    const sourceTables = sourceDb
+      .prepare(
+        `SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
+      )
+      .all();
+    const targetTables = targetDb
+      .prepare(
+        `SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
+      )
+      .all();
+
+    const sourceTableNames = new Set(sourceTables.map((t) => t.name));
+    const targetTableNames = new Set(targetTables.map((t) => t.name));
+
+    // Check if all source tables exist in target
+    const missingTables = [...sourceTableNames].filter(
+      (name) => !targetTableNames.has(name)
+    );
+
+    if (missingTables.length > 0) {
+      console.log("⚠️  Warning: Source has tables not in target:");
+      missingTables.forEach((name) => console.log(`   - ${name}`));
+      console.log(
+        "\n❓ Continue anyway? These tables will be skipped. (Press Ctrl+C to cancel)"
+      );
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+
     // Get list of tables from source database
     console.log("🔍 Analyzing source database structure...");
     const tables = sourceDb
@@ -196,8 +226,18 @@ async function copyDatabaseData(sourceDbPath, targetDbPath) {
 
     // Begin transaction for data copying
     const transaction = targetDb.transaction(() => {
+      const errors = [];
+      const copiedTables = [];
+
       for (const table of tables) {
         const tableName = table.name;
+
+        // Skip if table doesn't exist in target
+        if (!targetTableNames.has(tableName)) {
+          console.log(`\n⏭️  Skipping table: ${tableName} (not in target)`);
+          continue;
+        }
+
         console.log(`\n📋 Copying table: ${tableName}`);
 
         try {
@@ -234,13 +274,18 @@ async function copyDatabaseData(sourceDbPath, targetDbPath) {
           }
 
           console.log(`   ✅ Copied ${insertedCount} records`);
+          copiedTables.push({ name: tableName, count: insertedCount });
         } catch (error) {
-          console.log(
-            `   ⚠️  Error copying table ${tableName}:`,
-            error.message
-          );
-          // Continue with other tables even if one fails
+          const errorMsg = `Error copying table ${tableName}: ${error.message}`;
+          console.log(`   ⚠️  ${errorMsg}`);
+          errors.push(errorMsg);
+          // Throw to rollback transaction if critical table fails
+          throw new Error(`Critical error during data copy: ${errorMsg}`);
         }
+      }
+
+      if (errors.length > 0) {
+        throw new Error(`Data copy failed with ${errors.length} error(s)`);
       }
     });
 

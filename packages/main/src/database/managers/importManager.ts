@@ -11,8 +11,8 @@ import { VatCategoryManager } from "./vatCategoryManager.js";
 import { eq, and } from "drizzle-orm";
 import * as schema from "../schema.js";
 
-import { getLogger } from '../../utils/logger.js';
-const logger = getLogger('importManager');
+import { getLogger } from "../../utils/logger.js";
+const logger = getLogger("importManager");
 
 export interface ImportOptions {
   // Conflict resolution
@@ -125,40 +125,72 @@ export class ImportManager {
         `🚀 Starting Booker import: ${departmentData.length} departments, ${productData.length} products`
       );
 
-      // Phase 1: Import categories from department data
-      const categoryMap = await this.importCategories(
-        departmentData,
-        businessId,
-        options,
-        result
-      );
-      logger.info(
-        `✅ Categories phase complete: ${result.categoriesCreated} created, ${result.categoriesUpdated} updated`
-      );
+      // Wrap entire import in a transaction for atomicity
+      await this.drizzle.transaction(async (tx) => {
+        // Use transaction instance for all operations
+        const txCategoryManager = new CategoryManager(tx, this.uuid);
+        const txProductManager = new ProductManager(tx, this.uuid);
+        const txSupplierManager = new SupplierManager(tx, this.uuid);
+        const txBatchManager = new BatchManager(tx, this.uuid);
+        const txVatCategoryManager = new VatCategoryManager(tx, this.uuid);
 
-      // Phase 2: Import suppliers from product data
-      const supplierMap = await this.importSuppliers(
-        productData,
-        businessId,
-        options,
-        result
-      );
-      logger.info(
-        `✅ Suppliers phase complete: ${result.suppliersCreated} created, ${result.suppliersUpdated} updated`
-      );
+        // Temporarily swap managers to use transaction
+        const originalCategoryManager = this.categoryManager;
+        const originalProductManager = this.productManager;
+        const originalSupplierManager = this.supplierManager;
+        const originalBatchManager = this.batchManager;
+        const originalVatCategoryManager = this.vatCategoryManager;
 
-      // Phase 3: Import products and create batches
-      await this.importProducts(
-        productData,
-        businessId,
-        categoryMap,
-        supplierMap,
-        options,
-        result
-      );
-      logger.info(
-        `✅ Products phase complete: ${result.productsCreated} created, ${result.productsUpdated} updated, ${result.batchesCreated} batches`
-      );
+        this.categoryManager = txCategoryManager;
+        this.productManager = txProductManager;
+        this.supplierManager = txSupplierManager;
+        this.batchManager = txBatchManager;
+        this.vatCategoryManager = txVatCategoryManager;
+
+        try {
+          // Phase 1: Import categories from department data
+          const categoryMap = await this.importCategories(
+            departmentData,
+            businessId,
+            options,
+            result
+          );
+          logger.info(
+            `✅ Categories phase complete: ${result.categoriesCreated} created, ${result.categoriesUpdated} updated`
+          );
+
+          // Phase 2: Import suppliers from product data
+          const supplierMap = await this.importSuppliers(
+            productData,
+            businessId,
+            options,
+            result
+          );
+          logger.info(
+            `✅ Suppliers phase complete: ${result.suppliersCreated} created, ${result.suppliersUpdated} updated`
+          );
+
+          // Phase 3: Import products and create batches
+          await this.importProducts(
+            productData,
+            businessId,
+            categoryMap,
+            supplierMap,
+            options,
+            result
+          );
+          logger.info(
+            `✅ Products phase complete: ${result.productsCreated} created, ${result.productsUpdated} updated, ${result.batchesCreated} batches`
+          );
+        } finally {
+          // Restore original managers
+          this.categoryManager = originalCategoryManager;
+          this.productManager = originalProductManager;
+          this.supplierManager = originalSupplierManager;
+          this.batchManager = originalBatchManager;
+          this.vatCategoryManager = originalVatCategoryManager;
+        }
+      });
 
       result.success = result.errors.length === 0;
       result.duration = Date.now() - startTime;
@@ -541,12 +573,21 @@ export class ImportManager {
             `📦 Creating batch: ${batchNumber} for product ${productId} with ${product.balanceOnHand} units`
           );
 
-          // Check if batch already exists (to avoid duplicates if re-running import)
-          const existingBatch = await this.batchManager.getBatchByNumber(
-            batchNumber,
-            productId,
-            businessId
-          );
+          // Use a SELECT FOR UPDATE to prevent race conditions
+          const existingBatches = await this.drizzle
+            .select()
+            .from(schema.productBatches)
+            .where(
+              and(
+                eq(schema.productBatches.batchNumber, batchNumber),
+                eq(schema.productBatches.productId, productId),
+                eq(schema.productBatches.businessId, businessId)
+              )
+            )
+            .limit(1);
+
+          const existingBatch =
+            existingBatches.length > 0 ? existingBatches[0] : null;
 
           if (!existingBatch) {
             await this.batchManager.createBatch({
@@ -561,7 +602,29 @@ export class ImportManager {
               manufacturingDate: importDate, // Assume received date as manufacturing date for now
             });
             result.batchesCreated++;
-            logger.info(`✅ Batch created: ${batchNumber}`);
+
+            // Update product stock level after batch creation
+            const currentProduct = await this.productManager.getProductById(
+              productId
+            );
+            if (currentProduct) {
+              const newStockLevel =
+                options.stockUpdateMode === "add"
+                  ? (currentProduct.stockLevel || 0) + product.balanceOnHand
+                  : product.balanceOnHand;
+
+              await this.drizzle
+                .update(schema.products)
+                .set({
+                  stockLevel: newStockLevel,
+                  updatedAt: new Date(),
+                })
+                .where(eq(schema.products.id, productId));
+
+              logger.info(
+                `✅ Batch created: ${batchNumber}, stock updated to ${newStockLevel}`
+              );
+            }
           } else if (options.stockUpdateMode === "add") {
             // If batch exists and we are in 'add' mode, we might want to update it?
             // But for now, let's just log a warning or skip to avoid double counting if re-importing same file

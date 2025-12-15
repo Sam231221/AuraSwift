@@ -9,7 +9,7 @@ import {
 } from "../utils/authHelpers.js";
 
 const logger = getLogger("terminalHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerTerminalHandlers() {
   // ============================================================================
@@ -20,7 +20,7 @@ export function registerTerminalHandlers() {
     "terminals:getByBusiness",
     async (event, sessionToken, businessId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // Validate session
         const sessionValidation = await validateSession(db, sessionToken);
@@ -69,7 +69,7 @@ export function registerTerminalHandlers() {
     "terminals:getById",
     async (event, sessionToken, terminalId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // Validate session
         const sessionValidation = await validateSession(db, sessionToken);
@@ -124,7 +124,7 @@ export function registerTerminalHandlers() {
     "terminals:update",
     async (event, sessionToken, terminalId, updates) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // Validate session
         const sessionValidation = await validateSession(db, sessionToken);

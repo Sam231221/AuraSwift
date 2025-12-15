@@ -4,7 +4,7 @@ import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
 
 const logger = getLogger("dbHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerDbHandlers() {
   ipcMain.handle("database:getInfo", async () => {
@@ -124,11 +124,24 @@ export function registerDbHandlers() {
       // Empty all tables using the public method
       const result = await db.emptyAllTables();
 
-      if (!result.success) {
+      if (!result || !result.success) {
         return {
           success: false,
-          message: result.error || "Failed to empty database",
+          message: "Failed to empty database",
         };
+      }
+
+      // Reseed database with default data after emptying
+      try {
+        await db.reseedDatabase();
+        logger.info("✅ Database reseeded after emptying");
+      } catch (seedError) {
+        logger.error(
+          "⚠️  Failed to reseed database after emptying:",
+          seedError
+        );
+        // Don't fail the entire operation if reseeding fails
+        // The database is empty and will be reseeded on next app start
       }
 
       return {
@@ -140,7 +153,7 @@ export function registerDbHandlers() {
           totalRowsDeleted: result.rowsDeleted,
           tableList: result.tablesEmptied,
         },
-        message: "Database emptied successfully",
+        message: "Database emptied and reseeded successfully",
       };
     } catch (error) {
       logger.error("Database empty error:", error);
@@ -158,6 +171,7 @@ export function registerDbHandlers() {
       const { dialog, app: electronApp } = await import("electron");
       const fs = await import("fs/promises");
       const path = await import("path");
+      const Database = (await import("better-sqlite3")).default;
 
       // Show open file dialog to select database file
       const result = await dialog.showOpenDialog({
@@ -200,6 +214,107 @@ export function registerDbHandlers() {
       const importStats = await fs.stat(importPath);
       const importSize = importStats.size;
 
+      // Check file size limit (e.g., 500MB)
+      const MAX_DB_SIZE = 500 * 1024 * 1024;
+      if (importSize > MAX_DB_SIZE) {
+        return {
+          success: false,
+          message: `Database file too large (${(
+            importSize /
+            1024 /
+            1024
+          ).toFixed(2)}MB). Maximum allowed: ${MAX_DB_SIZE / 1024 / 1024}MB`,
+        };
+      }
+
+      // Validate database file structure
+      logger.info("Validating database structure...");
+      try {
+        const testDb = new Database(importPath, { readonly: true });
+
+        // Check if it's a valid SQLite database
+        const tables = testDb
+          .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+          .all();
+
+        if (tables.length === 0) {
+          testDb.close();
+          return {
+            success: false,
+            message: "Invalid database file: No tables found",
+          };
+        }
+
+        // Validate AuraSwift schema - check for required tables
+        const tableNames = tables.map((t: any) => t.name);
+        const requiredTables = [
+          "users",
+          "businesses",
+          "products",
+          "categories",
+          "transactions",
+          "sessions",
+        ];
+
+        const missingTables = requiredTables.filter(
+          (table) => !tableNames.includes(table)
+        );
+
+        if (missingTables.length > 0) {
+          testDb.close();
+          logger.warn(
+            `Database missing required tables: ${missingTables.join(", ")}`
+          );
+          return {
+            success: false,
+            message: `Invalid AuraSwift database: Missing required tables (${missingTables.join(
+              ", "
+            )}). This may not be an AuraSwift database or it may be corrupted.`,
+          };
+        }
+
+        // Check if users table has any data
+        try {
+          const userCount = testDb
+            .prepare("SELECT COUNT(*) as count FROM users")
+            .get() as { count: number };
+          logger.info(`Database has ${userCount.count} users`);
+
+          if (userCount.count === 0) {
+            testDb.close();
+            return {
+              success: false,
+              message:
+                "Database has no users. Cannot import an empty database. Please use the 'Empty Database' feature instead, or ensure the database you're importing has at least one user.",
+            };
+          }
+        } catch (userCheckError) {
+          testDb.close();
+          logger.error("Failed to check users table:", userCheckError);
+          return {
+            success: false,
+            message:
+              "Database users table appears to be corrupted or incompatible.",
+          };
+        }
+
+        testDb.close();
+
+        logger.info(
+          `Database validation passed. Found ${tables.length} tables with ${requiredTables.length} required tables present.`
+        );
+      } catch (validationError) {
+        logger.error("Database validation failed:", validationError);
+        return {
+          success: false,
+          message: `Invalid database file: ${
+            validationError instanceof Error
+              ? validationError.message
+              : "Unknown error"
+          }`,
+        };
+      }
+
       // Get current database info (before closing)
       const db = await getDatabase();
       const info = db.getDatabaseInfo();
@@ -219,9 +334,23 @@ export function registerDbHandlers() {
       );
 
       // Backup current database
+      let backupCreated = false;
       if (info.exists) {
-        await fs.copyFile(info.path, backupPath);
-        logger.info(`Current database backed up to: ${backupPath}`);
+        try {
+          await fs.copyFile(info.path, backupPath);
+          logger.info(`Current database backed up to: ${backupPath}`);
+          backupCreated = true;
+        } catch (backupError) {
+          logger.error("Failed to create backup:", backupError);
+          return {
+            success: false,
+            message: `Failed to create backup: ${
+              backupError instanceof Error
+                ? backupError.message
+                : "Unknown error"
+            }`,
+          };
+        }
       }
 
       // Close current database connection
@@ -229,17 +358,144 @@ export function registerDbHandlers() {
       closeDatabase();
       logger.info("Database connection closed");
 
-      // Wait a bit to ensure database is fully closed
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Wait for database to fully close - retry mechanism instead of fixed delay
+      let retries = 10;
+      while (retries > 0) {
+        try {
+          // Try to get exclusive access
+          const testDb = new Database(info.path, { readonly: false });
+          testDb.close();
+          break;
+        } catch (error) {
+          retries--;
+          if (retries === 0) {
+            // Restore backup if we have one
+            if (backupCreated) {
+              try {
+                await fs.copyFile(backupPath, info.path);
+                logger.info("Restored backup after failed import");
+              } catch (restoreError) {
+                logger.error("Failed to restore backup:", restoreError);
+              }
+            }
+            return {
+              success: false,
+              message:
+                "Failed to close database connection. Please close the app and try again.",
+            };
+          }
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+      }
 
       // Copy imported file to database location
-      await fs.copyFile(importPath, info.path);
-      logger.info(`Database imported from: ${importPath}`);
+      try {
+        await fs.copyFile(importPath, info.path);
+        logger.info(`Database imported from: ${importPath}`);
+      } catch (copyError) {
+        // Restore backup on failure
+        if (backupCreated) {
+          try {
+            await fs.copyFile(backupPath, info.path);
+            logger.info("Restored backup after failed copy");
+          } catch (restoreError) {
+            logger.error("Failed to restore backup:", restoreError);
+          }
+        }
+        throw copyError;
+      }
 
       // Get stats of imported database
       const newStats = await fs.stat(info.path);
 
-      // Return success (app will restart from renderer side)
+      // Verify the imported database can be opened and is valid
+      // This ensures the file is not corrupted and will work when the window reloads
+      logger.info("Verifying imported database can be opened...");
+      try {
+        const testDb = new Database(info.path, { readonly: true });
+
+        // Quick validation: check if we can query users table
+        const userCount = testDb
+          .prepare("SELECT COUNT(*) as count FROM users")
+          .get() as { count: number };
+        testDb.close();
+
+        logger.info(
+          `✅ Imported database verified: ${userCount.count} users found`
+        );
+
+        if (userCount.count === 0) {
+          throw new Error("Imported database has no users");
+        }
+      } catch (verifyError) {
+        logger.error("❌ Imported database verification failed:", verifyError);
+
+        // Restore backup
+        if (backupCreated) {
+          try {
+            await fs.copyFile(backupPath, info.path);
+            logger.info("Restored backup after verification failure");
+          } catch (restoreError) {
+            logger.error("Failed to restore backup:", restoreError);
+          }
+        }
+
+        return {
+          success: false,
+          message: `Imported database verification failed: ${
+            verifyError instanceof Error ? verifyError.message : "Unknown error"
+          }. Your original database has been restored.`,
+        };
+      }
+
+      logger.info(
+        "Database file imported and verified successfully. Reinitializing connection..."
+      );
+
+      // CRITICAL: Reinitialize the database immediately so it's ready for API calls
+      // The renderer will make auth/settings calls before the reload happens
+      // We need a fresh connection to the new database file RIGHT NOW
+      try {
+        const { getDatabase: reinitDatabase } = await import(
+          "../database/index.js"
+        );
+        await reinitDatabase();
+        logger.info(
+          "✅ Database reinitialized successfully with imported file"
+        );
+      } catch (reinitError) {
+        logger.error(
+          "❌ Failed to reinitialize database after import:",
+          reinitError
+        );
+
+        // Restore backup on failure
+        if (backupCreated) {
+          try {
+            await fs.copyFile(backupPath, info.path);
+            logger.info("Restored backup after failed reinitialization");
+            // Try to reinitialize with the backup
+            const { getDatabase: reinitBackup } = await import(
+              "../database/index.js"
+            );
+            await reinitBackup();
+          } catch (restoreError) {
+            logger.error(
+              "Failed to restore and reinitialize backup:",
+              restoreError
+            );
+          }
+        }
+
+        return {
+          success: false,
+          message: `Database imported but failed to initialize: ${
+            reinitError instanceof Error ? reinitError.message : "Unknown error"
+          }. Your original database has been restored.`,
+        };
+      }
+
+      // Return success (window will reload from renderer side to refresh UI)
       return {
         success: true,
         data: {
@@ -299,6 +555,9 @@ export function registerDbHandlers() {
       // Close database connection before restart
       const { closeDatabase } = await import("../database/index.js");
       closeDatabase();
+
+      // Small delay to ensure cleanup completes
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Relaunch and exit
       electronApp.relaunch();

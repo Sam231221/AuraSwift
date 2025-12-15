@@ -58,6 +58,7 @@ export async function seedDefaultData(
   try {
     // Check if data already exists
     let existingBusinesses;
+    let existingUsers;
     try {
       existingBusinesses = db.select().from(schema.businesses).all();
     } catch (error) {
@@ -65,9 +66,24 @@ export async function seedDefaultData(
       existingBusinesses = [];
     }
 
-    if (existingBusinesses.length > 0) {
+    try {
+      existingUsers = db.select().from(schema.users).all();
+    } catch (error) {
+      existingUsers = [];
+    }
+
+    // Only skip seeding if BOTH businesses AND users exist
+    // This fixes the case where businesses exist but users don't
+    if (existingBusinesses.length > 0 && existingUsers.length > 0) {
       logger.info("✅ Database already seeded, skipping...");
       return;
+    }
+
+    // If businesses exist but no users, we have a problem - log it
+    if (existingBusinesses.length > 0 && existingUsers.length === 0) {
+      logger.warn(
+        "⚠️ Database has businesses but NO users! Attempting to seed users..."
+      );
     }
 
     const now = new Date();

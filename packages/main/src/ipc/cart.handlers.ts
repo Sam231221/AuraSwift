@@ -3,7 +3,7 @@ import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
 
 const logger = getLogger("cartHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerCartHandlers() {
   // ============================================================================
@@ -12,7 +12,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:createSession", async (event, sessionData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const session = await db.cart.createSession(sessionData);
 
       return {
@@ -33,7 +33,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:getSession", async (event, sessionId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const session = await db.cart.getSessionById(sessionId);
 
       return {
@@ -52,7 +52,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:getActiveSession", async (event, cashierId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const session = await db.cart.getActiveSession(cashierId);
 
       return {
@@ -73,7 +73,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:updateSession", async (event, sessionId, updates) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const session = await db.cart.updateSession(sessionId, updates);
 
       return {
@@ -94,7 +94,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:completeSession", async (event, sessionId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const session = await db.cart.completeSession(sessionId);
 
       return {
@@ -115,7 +115,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:cancelSession", async (event, sessionId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const session = await db.cart.cancelSession(sessionId);
 
       return {
@@ -136,7 +136,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:addItem", async (event, itemData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const item = await db.cart.addItem(itemData);
 
       return {
@@ -155,7 +155,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:getItems", async (event, sessionId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const items = await db.cart.getItemsBySession(sessionId);
 
       return {
@@ -174,7 +174,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:updateItem", async (event, itemId, updates) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const item = await db.cart.updateItem(itemId, updates);
 
       return {
@@ -193,7 +193,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:removeItem", async (event, itemId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       await db.cart.removeItem(itemId);
 
       return {
@@ -211,7 +211,7 @@ export function registerCartHandlers() {
 
   ipcMain.handle("cart:clearCart", async (event, sessionId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       await db.cart.clearCart(sessionId);
 
       return {

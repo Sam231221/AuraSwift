@@ -10,7 +10,7 @@ import {
 } from "../utils/authHelpers.js";
 
 const logger = getLogger("roleHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerRoleHandlers() {
   // ============================================================================
@@ -18,7 +18,7 @@ export function registerRoleHandlers() {
   // ============================================================================
 
   ipcMain.handle("roles:list", async (event, sessionToken, businessId) => {
-    if (!db) db = await getDatabase();
+    const db = await getDatabase();
 
     // First validate session
     const sessionValidation = await validateSession(db, sessionToken);
@@ -63,7 +63,7 @@ export function registerRoleHandlers() {
   });
 
   ipcMain.handle("roles:create", async (event, sessionToken, roleData) => {
-    if (!db) db = await getDatabase();
+    const db = await getDatabase();
 
     const sessionValidation = await validateSession(db, sessionToken);
     if (!sessionValidation.success) {
@@ -103,7 +103,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "roles:update",
     async (event, sessionToken, roleId, updates) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -154,7 +154,7 @@ export function registerRoleHandlers() {
   );
 
   ipcMain.handle("roles:delete", async (event, sessionToken, roleId) => {
-    if (!db) db = await getDatabase();
+    const db = await getDatabase();
 
     const auth = await validateSessionAndPermission(
       db,
@@ -207,7 +207,7 @@ export function registerRoleHandlers() {
   });
 
   ipcMain.handle("roles:getById", async (event, sessionToken, roleId) => {
-    if (!db) db = await getDatabase();
+    const db = await getDatabase();
 
     const auth = await validateSessionAndPermission(
       db,
@@ -243,7 +243,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "userRoles:assign",
     async (event, sessionToken, userId, roleId) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -292,7 +292,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "userRoles:revoke",
     async (event, sessionToken, userId, roleId) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -337,7 +337,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "userRoles:getUserRoles",
     async (event, sessionToken, userId) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -365,7 +365,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "userRoles:setPrimaryRole",
     async (event, sessionToken, userId, roleId) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -460,7 +460,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "roles:getUsersByRole",
     async (event, sessionToken, roleId) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -492,7 +492,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "userPermissions:grant",
     async (event, sessionToken, userId, permission, reason, expiresAt) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -545,7 +545,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "userPermissions:revoke",
     async (event, sessionToken, userId, permission) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -595,7 +595,7 @@ export function registerRoleHandlers() {
   ipcMain.handle(
     "userPermissions:getUserPermissions",
     async (event, sessionToken, userId) => {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const auth = await validateSessionAndPermission(
         db,
@@ -633,7 +633,7 @@ export function registerRoleHandlers() {
   // Cleanup expired sessions every hour
   setInterval(async () => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       db.sessions.cleanupExpiredSessions();
     } catch (error) {
       logger.error("Failed to cleanup expired sessions:", error);

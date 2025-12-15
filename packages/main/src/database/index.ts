@@ -30,7 +30,7 @@ import { RoleManager } from "./managers/roleManager.js";
 import { UserRoleManager } from "./managers/userRoleManager.js";
 import { UserPermissionManager } from "./managers/userPermissionManager.js";
 import { TerminalManager } from "./managers/terminalManager.js";
-import { initializeDrizzle } from "./drizzle.js";
+import { initializeDrizzle, resetDrizzle } from "./drizzle.js";
 import { getDatabaseInfo } from "./utils/dbInfo.js";
 import { isDevelopmentMode } from "./utils/environment.js";
 import bcrypt from "bcryptjs";
@@ -90,6 +90,7 @@ export interface DatabaseManagers {
   };
 
   emptyAllTables(): Promise<any>;
+  reseedDatabase(): Promise<void>;
 }
 export async function getDatabase(): Promise<DatabaseManagers> {
   // Return existing instance if already initialized
@@ -255,7 +256,9 @@ export async function getDatabase(): Promise<DatabaseManagers> {
 
         // SAFETY CHECK: Prevent running this in production
         if (!isDevelopmentMode()) {
-          logger.error("🛑 Blocked attempt to empty all tables in production mode");
+          logger.error(
+            "🛑 Blocked attempt to empty all tables in production mode"
+          );
           throw new Error(
             "OPERATION DENIED: emptyAllTables may only be used in development mode."
           );
@@ -286,7 +289,6 @@ export async function getDatabase(): Promise<DatabaseManagers> {
             schema.transactionItems,
             schema.transactions,
             schema.cashDrawerCounts,
-            schema.shifts,
             schema.schedules,
             schema.stockMovements,
             schema.expiryNotifications,
@@ -297,22 +299,41 @@ export async function getDatabase(): Promise<DatabaseManagers> {
             schema.discounts,
             schema.auditLogs,
             schema.sessions,
+            schema.userRoles,
             // Parent tables (referenced by others) - delete last
             schema.products,
             schema.categories,
             schema.vatCategories,
+            schema.roles,
             schema.users,
             schema.businesses,
             // System tables (usually keep app_settings, but empty if requested)
             schema.appSettings,
           ];
 
-          let deletedCount = 0;
+          const tablesEmptied: string[] = [];
+          let totalRowsDeleted = 0;
+
           for (const table of tablesToEmpty) {
             try {
+              // Get table name for reporting
+              const tableAny = table as any;
+              const tableName =
+                tableAny._?.name ||
+                tableAny[Symbol.for("drizzle:Name")] ||
+                "unknown";
+
+              // Count rows before deletion
+              const countResult = rawDb
+                .prepare(`SELECT COUNT(*) as count FROM ${tableName}`)
+                .get() as { count: number };
+              const rowCount = countResult?.count || 0;
+
               // Use Drizzle's delete API - delete all rows from table
               await drizzle.delete(table);
-              deletedCount++;
+
+              tablesEmptied.push(tableName);
+              totalRowsDeleted += rowCount;
             } catch (error) {
               // Try to get table name for error reporting
               const tableAny = table as any;
@@ -332,9 +353,13 @@ export async function getDatabase(): Promise<DatabaseManagers> {
           rawDb.prepare("PRAGMA foreign_keys = ON").run();
 
           logger.info(
-            `✅ Successfully emptied ${deletedCount} of ${tablesToEmpty.length} tables`
+            `✅ Successfully emptied ${tablesEmptied.length} of ${tablesToEmpty.length} tables`
           );
-          return { deletedCount, totalTables: tablesToEmpty.length };
+          return {
+            success: true,
+            tablesEmptied,
+            rowsDeleted: totalRowsDeleted,
+          };
         } catch (error) {
           // Re-enable foreign key constraints even on error
           try {
@@ -346,6 +371,34 @@ export async function getDatabase(): Promise<DatabaseManagers> {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
           throw new Error(`Failed to empty all tables: ${errorMessage}`, {
+            cause: error,
+          });
+        }
+      },
+      reseedDatabase: async () => {
+        if (!dbManagerInstance) {
+          throw new Error("Database not initialized");
+        }
+
+        // SAFETY CHECK: Prevent running this in production
+        if (!isDevelopmentMode()) {
+          logger.error(
+            "🛑 Blocked attempt to reseed database in production mode"
+          );
+          throw new Error(
+            "OPERATION DENIED: reseedDatabase may only be used in development mode."
+          );
+        }
+
+        try {
+          logger.info("🌱 Reseeding database with default data...");
+          await seedDefaultData(drizzle as any, schema);
+          logger.info("✅ Database reseeded successfully");
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          logger.error(`❌ Failed to reseed database: ${errorMessage}`);
+          throw new Error(`Failed to reseed database: ${errorMessage}`, {
             cause: error,
           });
         }
@@ -364,6 +417,9 @@ export function closeDatabase(): void {
     dbManagerInstance = null;
     managersInstance = null;
     initializationPromise = null;
+    // CRITICAL: Reset Drizzle singleton to prevent stale connection references
+    // When the database file changes (like during import), we need a fresh Drizzle instance
+    resetDrizzle();
   }
 }
 

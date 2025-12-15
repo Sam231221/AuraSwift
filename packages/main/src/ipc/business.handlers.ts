@@ -10,7 +10,7 @@ import {
 } from "../utils/authHelpers.js";
 
 const logger = getLogger("businessHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerBusinessHandlers() {
   // ============================================================================
@@ -21,7 +21,7 @@ export function registerBusinessHandlers() {
     "business:update",
     async (event, sessionToken, businessId, updates) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // Validate session
         const sessionValidation = await validateSession(db, sessionToken);

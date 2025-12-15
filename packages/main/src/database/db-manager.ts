@@ -803,8 +803,18 @@ export class DBManager {
 
   close(): void {
     if (this.db) {
+      try {
+        // Checkpoint WAL file to ensure all data is written to main database file
+        // This is critical for database import/export operations
+        this.db.pragma("wal_checkpoint(TRUNCATE)");
+        logger.info("✅ WAL checkpoint completed");
+      } catch (walError) {
+        logger.warn("⚠️  WAL checkpoint failed:", walError);
+      }
+
       this.db.close();
       this.initialized = false;
+      logger.info("✅ Database connection closed");
     }
   }
 }

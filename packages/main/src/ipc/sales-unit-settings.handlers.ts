@@ -3,12 +3,12 @@ import { getDatabase } from "../database/index.js";
 import { getLogger } from "../utils/logger.js";
 
 const logger = getLogger("salesUnitSettingsHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerSalesUnitSettingsHandlers() {
   ipcMain.handle("salesUnitSettings:get", async (event, businessId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const settings = await db.salesUnitSettings.getOrCreateSettings(
         businessId
       );
@@ -30,7 +30,7 @@ export function registerSalesUnitSettingsHandlers() {
     "salesUnitSettings:createOrUpdate",
     async (event, businessId, settingsData) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
         const settings = await db.salesUnitSettings.createOrUpdateSettings(
           businessId,
           settingsData

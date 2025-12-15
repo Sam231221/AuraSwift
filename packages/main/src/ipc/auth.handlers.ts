@@ -31,16 +31,15 @@ if (!isEncryptionAvailable) {
 // Keys that should be encrypted
 const ENCRYPTED_KEYS = ["token", "user", "refreshToken"];
 
-// Get database instance
-let db: DatabaseManagers | null = null;
-getDatabase().then((database) => {
-  db = database;
-});
+// IMPORTANT: Don't cache database reference at module level!
+// After database import, the old reference becomes stale (connection closed).
+// Always use getDatabase() to get the current singleton instance.
 
 export function registerAuthHandlers() {
   ipcMain.handle("auth:set", async (event, key: string, value: string) => {
     try {
-      if (!db) db = await getDatabase();
+      // Always get fresh database reference to avoid stale connection issues
+      const db = await getDatabase();
 
       // Determine if this key should be encrypted
       const shouldEncrypt = ENCRYPTED_KEYS.includes(key);
@@ -86,7 +85,7 @@ export function registerAuthHandlers() {
 
   ipcMain.handle("auth:get", async (event, key: string) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const value = db.settings.getSetting(key);
 
@@ -118,7 +117,7 @@ export function registerAuthHandlers() {
 
   ipcMain.handle("auth:delete", async (event, key: string) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Delete both the value and encryption marker
       db.settings.deleteSetting(key);
@@ -134,7 +133,7 @@ export function registerAuthHandlers() {
   // Authentication API handlers
   ipcMain.handle("auth:register", async (event, userData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       return await db.users.register(userData);
     } catch (error) {
       logger.error("Registration IPC error:", error);
@@ -148,7 +147,7 @@ export function registerAuthHandlers() {
   // Register business owner (automatically sets role to admin)
   ipcMain.handle("auth:registerBusiness", async (event, userData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       // Business owners are automatically admin users
       const registrationData = {
         ...userData,
@@ -167,7 +166,7 @@ export function registerAuthHandlers() {
 
   ipcMain.handle("auth:login", async (event, credentials) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Rate limiting: Check if login attempts are allowed
       // For desktop EPOS: Use terminal ID + username combination
@@ -260,7 +259,7 @@ export function registerAuthHandlers() {
 
   ipcMain.handle("auth:refreshToken", async (event, refreshToken) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Validate refresh token format
       if (
@@ -306,7 +305,7 @@ export function registerAuthHandlers() {
           code: "USER_INACTIVE",
         };
       }
-      
+
       if (!session) {
         return {
           success: false,
@@ -345,7 +344,7 @@ export function registerAuthHandlers() {
 
   ipcMain.handle("auth:validateSession", async (event, token) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Validate token format first
       if (!token || typeof token !== "string" || token.trim().length === 0) {
@@ -401,7 +400,7 @@ export function registerAuthHandlers() {
 
   ipcMain.handle("auth:logout", async (event, token, options) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Use userManager.logout() which handles:
       // 1. Auto clock-out if user has active shift
@@ -441,7 +440,7 @@ export function registerAuthHandlers() {
     "auth:getUserById",
     async (event, sessionTokenOrUserId: string, userId?: string) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // 🔥 Handle both authenticated and public access patterns
         // Pattern 1: (sessionToken, userId) - authenticated access
@@ -534,7 +533,7 @@ export function registerAuthHandlers() {
     "auth:updateUser",
     async (event, sessionToken, userId, updates) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // Validate session and permission
         const auth = await validateSessionAndPermission(
@@ -595,7 +594,7 @@ export function registerAuthHandlers() {
 
   ipcMain.handle("auth:deleteUser", async (event, sessionToken, userId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Validate session and permission
       const auth = await validateSessionAndPermission(
@@ -659,7 +658,7 @@ export function registerAuthHandlers() {
     "auth:getUsersByBusiness",
     async (event, sessionToken, businessId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // Validate session and permission
         const auth = await validateSessionAndPermission(
@@ -695,7 +694,7 @@ export function registerAuthHandlers() {
 
   ipcMain.handle("auth:createUser", async (event, sessionToken, userData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Validate session and permission
       const auth = await validateSessionAndPermission(
@@ -746,7 +745,7 @@ export function registerAuthHandlers() {
     "auth:getAllActiveUsers",
     async (event, sessionToken?: string) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // 🔥 SPECIAL CASE: Login page needs user list before authentication
         // If sessionToken is provided, validate and filter by business
@@ -820,7 +819,7 @@ export function registerAuthHandlers() {
     "auth:getBusinessById",
     async (event, sessionToken, businessId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         // Validate session
         const sessionValidation = await validateSession(db, sessionToken);

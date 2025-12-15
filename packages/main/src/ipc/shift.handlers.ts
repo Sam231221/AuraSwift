@@ -5,13 +5,13 @@ import { scheduleValidator } from "../utils/scheduleValidator.js";
 import { shiftRequirementResolver } from "../utils/shiftRequirementResolver.js";
 
 const logger = getLogger("shiftHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerShiftHandlers() {
   // Schedule Management API handlers
   ipcMain.handle("schedules:create", async (event, scheduleData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Convert ISO string timestamps to Date objects
       // Drizzle expects Date objects for timestamp_ms columns (it will convert to milliseconds)
@@ -49,7 +49,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("schedules:getByBusiness", async (event, businessId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const schedules = db.schedules.getSchedulesByBusiness(businessId);
 
       // Convert to plain objects to ensure serialization works
@@ -70,7 +70,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("schedules:getByStaff", async (event, staffId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const schedules = db.schedules.getSchedulesByStaffId(staffId);
 
       // Convert to plain objects to ensure serialization works
@@ -91,7 +91,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("schedules:update", async (event, id, updates) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Convert ISO string timestamps to Date objects if present
       // Drizzle expects Date objects for timestamp_ms columns
@@ -131,7 +131,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("schedules:delete", async (event, id) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       db.schedules.deleteSchedule(id);
 
@@ -151,7 +151,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("schedules:updateStatus", async (event, id, status) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       db.schedules.updateScheduleStatus(id, status);
       return {
         success: true,
@@ -168,7 +168,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("schedules:getCashierUsers", async (event, businessId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const users = db.users.getUsersByBusiness(businessId);
 
       // Return all active users - let the frontend filter by role using RBAC
@@ -198,7 +198,7 @@ export function registerShiftHandlers() {
   // Shift management IPC handlers
   ipcMain.handle("shift:start", async (event, shiftData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Helper function to handle clock-out after closing shifts
       const handleClockOutAfterShiftClose = async (
@@ -461,7 +461,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("shift:end", async (event, shiftId, endData) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Get the shift being ended to check its timeShiftId
       const shift = db.shifts.getShiftById(shiftId);
@@ -552,7 +552,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("shift:getActive", async (event, cashierId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // First, auto-end any overdue shifts from today (more aggressive)
       const overdueShifts = db.shifts.autoEndOverdueShiftsToday();
@@ -590,7 +590,7 @@ export function registerShiftHandlers() {
     "schedules:validateClockIn",
     async (event, userId, businessId) => {
       try {
-        if (!db) db = await getDatabase();
+        const db = await getDatabase();
 
         const validation = await scheduleValidator.validateClockIn(
           userId,
@@ -623,7 +623,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("shift:getTodaySchedule", async (event, cashierId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const now = new Date();
       // Use local date string to match schedules created in local timezone
@@ -748,7 +748,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("shift:getStats", async (event, shiftId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const transactions = await db.transactions.getTransactionsByShift(
         shiftId
@@ -783,7 +783,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("shift:getHourlyStats", async (event, shiftId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const hourlyStats = db.shifts.getHourlyTransactionStats(shiftId);
 
@@ -802,7 +802,7 @@ export function registerShiftHandlers() {
 
   ipcMain.handle("shift:getCashDrawerBalance", async (event, shiftId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       const cashBalance = db.cashDrawers.getCurrentCashDrawerBalance(shiftId);
 

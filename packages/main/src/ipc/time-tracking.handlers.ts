@@ -5,13 +5,13 @@ import { scheduleValidator } from "../utils/scheduleValidator.js";
 import { shiftRequirementResolver } from "../utils/shiftRequirementResolver.js";
 
 const logger = getLogger("timeTrackingHandlers");
-let db: any = null;
+// let db: any = null; // Removed: Always get fresh DB reference
 
 export function registerTimeTrackingHandlers() {
   // Time Tracking IPC Handlers
   ipcMain.handle("timeTracking:clockIn", async (event, data) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Comprehensive validation before clock-in
       const userId = data.userId;
@@ -167,7 +167,7 @@ export function registerTimeTrackingHandlers() {
 
   ipcMain.handle("timeTracking:clockOut", async (event, data) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Comprehensive validation before clock-out
       const userId = data.userId;
@@ -321,7 +321,7 @@ export function registerTimeTrackingHandlers() {
 
   ipcMain.handle("timeTracking:getActiveShift", async (event, userId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const shift = db.timeTracking.getActiveShift(userId);
 
       if (!shift) {
@@ -358,7 +358,7 @@ export function registerTimeTrackingHandlers() {
 
   ipcMain.handle("timeTracking:startBreak", async (event, data) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
 
       // Get shift to retrieve businessId
       const shift = db.timeTracking.getShiftById(data.shiftId);
@@ -390,7 +390,7 @@ export function registerTimeTrackingHandlers() {
 
   ipcMain.handle("timeTracking:endBreak", async (event, breakId) => {
     try {
-      if (!db) db = await getDatabase();
+      const db = await getDatabase();
       const breakRecord = await db.timeTracking.endBreak(breakId);
       return {
         success: true,
