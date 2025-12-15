@@ -32,6 +32,7 @@ import { UserPermissionManager } from "./managers/userPermissionManager.js";
 import { TerminalManager } from "./managers/terminalManager.js";
 import { initializeDrizzle } from "./drizzle.js";
 import { getDatabaseInfo } from "./utils/dbInfo.js";
+import { isDevelopmentMode } from "./utils/environment.js";
 import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import * as schema from "./schema.js";
@@ -180,6 +181,20 @@ export async function getDatabase(): Promise<DatabaseManagers> {
     const inventory = new InventoryManager(drizzle, uuid, stockMovements);
     const cart = new CartManager(drizzle, uuid);
 
+    // Cleanup expired sessions on startup
+    try {
+      sessions.cleanupExpiredSessions();
+    } catch (error) {
+      logger.warn("Failed to cleanup expired sessions:", error);
+    }
+
+    // Cleanup old audit logs on startup (keep 90 days)
+    try {
+      auditLogs.cleanupOldLogs(90);
+    } catch (error) {
+      logger.warn("Failed to cleanup old audit logs:", error);
+    }
+
     // RBAC managers
     const roles = new RoleManager(drizzle, uuid);
     const userRoles = new UserRoleManager(drizzle, uuid);
@@ -236,6 +251,14 @@ export async function getDatabase(): Promise<DatabaseManagers> {
       emptyAllTables: async () => {
         if (!dbManagerInstance) {
           throw new Error("Database not initialized");
+        }
+
+        // SAFETY CHECK: Prevent running this in production
+        if (!isDevelopmentMode()) {
+          logger.error("🛑 Blocked attempt to empty all tables in production mode");
+          throw new Error(
+            "OPERATION DENIED: emptyAllTables may only be used in development mode."
+          );
         }
 
         const rawDb = dbManagerInstance.getDb();

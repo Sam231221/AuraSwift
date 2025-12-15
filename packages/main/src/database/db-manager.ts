@@ -115,15 +115,24 @@ export class DBManager {
               logger.info(`   Backup created: ${migrationResult.backupPath}`);
             }
           } else {
-            logger.warn(
-              "⚠️  Database migration failed:",
-              migrationResult.reason
-            );
-            logger.warn(
+            const errorMessage =
+              migrationResult.reason || "Unknown error during path migration";
+            logger.error("❌ Database migration failed:", errorMessage);
+            logger.error(
               "   Old database preserved at:",
               migrationResult.oldPath
             );
-            logger.warn("   App will continue with new database location");
+
+            // CRITICAL: Stop initialization to prevent data loss (silent fresh start)
+            await showDatabaseErrorDialog(
+              "Database Migration Failed",
+              "We found your data in an old location but couldn't move it automatically.",
+              `Your existing data is safe at:\n${
+                migrationResult.oldPath || "unknown location"
+              }\n\nReason: ${errorMessage}\n\nPlease contact support or check file permissions.`
+            );
+
+            throw new Error(`Database path migration failed: ${errorMessage}`);
           }
         }
 

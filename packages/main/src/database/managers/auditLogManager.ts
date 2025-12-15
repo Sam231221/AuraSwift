@@ -1,5 +1,5 @@
 import type { DrizzleDB } from "../drizzle.js";
-import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, desc, lt, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "../schema.js";
 
 export class AuditLogManager {
@@ -133,5 +133,27 @@ export class AuditLogManager {
       ...log,
       details: log.details ? JSON.parse(log.details) : null,
     }));
+  }
+
+  /**
+   * Cleanup old audit logs
+   * @param daysToKeep - Number of days to keep logs (default: 90)
+   * @returns Number of logs deleted
+   */
+  cleanupOldLogs(daysToKeep: number = 90): number {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+      const result = this.db
+        .delete(schema.auditLogs)
+        .where(lt(schema.auditLogs.timestamp, cutoffDate))
+        .run();
+
+      return result.changes;
+    } catch (error) {
+      console.error("Failed to cleanup old audit logs:", error);
+      return 0;
+    }
   }
 }
