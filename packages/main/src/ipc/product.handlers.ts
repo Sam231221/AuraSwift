@@ -376,3 +376,21 @@ ipcMain.handle(
     }
   }
 );
+
+// Get product statistics for dashboard (optimized - no full product loading)
+ipcMain.handle("products:getStats", async (event, businessId) => {
+  try {
+    const db = await getDatabase();
+    const stats = await db.products.getProductStats(businessId);
+    return {
+      success: true,
+      data: stats,
+    };
+  } catch (error: any) {
+    logger.error("Get product stats IPC error:", error);
+    return {
+      success: false,
+      message: error.message || "Failed to get product statistics",
+    };
+  }
+});

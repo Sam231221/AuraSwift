@@ -61,11 +61,6 @@ export function ImportBookerModal({
   // Reset state when modal closes and trigger onSuccess if needed
   useEffect(() => {
     if (!open) {
-      // If we had a successful import, call onSuccess when modal closes
-      if (result?.success && onSuccess) {
-        onSuccess();
-      }
-      
       setTimeout(() => {
         setStep("select");
         setSelectedFile(null);
@@ -78,15 +73,34 @@ export function ImportBookerModal({
         setError(null);
       }, 300);
     }
-  }, [open, result, onSuccess]);
+  }, [open]);
+
+  // Call onSuccess when import completes and products/categories were actually created
+  // We call onSuccess even if there are errors, as long as some items were imported
+  // This ensures the UI refreshes to show the newly imported products
+  useEffect(() => {
+    if (result && onSuccess) {
+      const hasImportedItems =
+        result.productsCreated > 0 ||
+        result.productsUpdated > 0 ||
+        result.categoriesCreated > 0 ||
+        result.categoriesUpdated > 0;
+
+      if (hasImportedItems) {
+        onSuccess();
+      }
+    }
+  }, [result, onSuccess]);
 
   // Subscribe to progress updates
   useEffect(() => {
     if (!open) return;
 
-    const unsubscribe = window.importAPI.onProgress((progressData: ImportProgress) => {
-      setProgress(progressData);
-    });
+    const unsubscribe = window.importAPI.onProgress(
+      (progressData: ImportProgress) => {
+        setProgress(progressData);
+      }
+    );
 
     return () => {
       unsubscribe();

@@ -11,3 +11,6 @@ export * from "./use-barcode-scanner";
 export * from "./use-shift";
 export * from "./use-payment";
 
+// Performance-optimized hooks for large datasets
+export * from "./use-paginated-products";
+export * from "./use-virtual-categories";

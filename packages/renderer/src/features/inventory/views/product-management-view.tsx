@@ -18,6 +18,11 @@ import StockMovementHistoryView from "./stock-movement-history-view";
 import { getLogger } from "@/shared/utils/logger";
 const logger = getLogger("manage-product-view");
 import type { Category, VatCategory } from "../hooks/use-product-data";
+import {
+  invalidateInventoryCache,
+  invalidateProductStatsCache,
+  invalidateAllCaches,
+} from "@/shared/utils/simple-cache";
 
 interface ProductManagementViewProps {
   onBack: () => void;
@@ -56,7 +61,21 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
   // Data state
   const [products, setProducts] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]); // For dashboard stats
+  const [productStats, setProductStats] = useState<{
+    totalProducts: number;
+    activeProducts: number;
+    inactiveProducts: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+    totalInventoryValue: number;
+  }>({
+    totalProducts: 0,
+    activeProducts: 0,
+    inactiveProducts: 0,
+    lowStockCount: 0,
+    outOfStockCount: 0,
+    totalInventoryValue: 0,
+  });
   const [categories, setCategories] = useState<Category[]>([]);
   const [vatCategories, setVatCategories] = useState<VatCategory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -95,14 +114,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   const [stockAdjustmentQuantity, setStockAdjustmentQuantity] = useState("");
   const [stockAdjustmentReason, setStockAdjustmentReason] = useState("");
 
-  // Computed values for dashboard
-  const lowStockProducts = allProducts.filter(
-    (p) =>
-      p.isActive &&
-      p.stockLevel !== undefined &&
-      p.minStockLevel !== undefined &&
-      p.stockLevel <= p.minStockLevel
-  );
+  // Stats are now loaded directly from backend aggregation
 
   // Load paginated products
   const loadProducts = useCallback(async () => {
@@ -158,17 +170,17 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     filterStatus,
   ]);
 
-  // Load all products for dashboard stats (without pagination)
-  const loadAllProducts = useCallback(async () => {
+  // Load product statistics for dashboard (optimized - no full product loading)
+  const loadProductStats = useCallback(async () => {
     if (!user?.businessId) return;
 
     try {
-      const response = await window.productAPI.getByBusiness(user.businessId);
-      if (response.success && response.products) {
-        setAllProducts(response.products);
+      const response = await window.productAPI.getStats(user.businessId);
+      if (response.success && response.data) {
+        setProductStats(response.data);
       }
     } catch (error) {
-      logger.error("Error loading all products:", error);
+      logger.error("Error loading product stats:", error);
     }
   }, [user?.businessId]);
 
@@ -214,17 +226,16 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   }, [loadProducts]);
 
   useEffect(() => {
-    loadAllProducts();
+    loadProductStats();
     loadCategories();
     loadVatCategories();
-  }, [loadAllProducts, loadCategories, loadVatCategories]);
+  }, [loadProductStats, loadCategories, loadVatCategories]);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (but NOT when page changes)
   useEffect(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
-  }, [searchTerm, filterCategory, filterStock, filterStatus, currentPage]);
+    setCurrentPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, filterCategory, filterStock, filterStatus]);
 
   // Reload categories when returning from category management
   useEffect(() => {
@@ -264,8 +275,15 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         const response = await window.productAPI.delete(id);
         if (response.success) {
           toast.success("Product deleted successfully");
+
+          // Invalidate caches
+          if (user?.businessId) {
+            invalidateInventoryCache(user.businessId);
+            invalidateProductStatsCache(user.businessId);
+          }
+
           loadProducts();
-          loadAllProducts();
+          loadProductStats();
         } else {
           toast.error(response.message || "Failed to delete product");
         }
@@ -274,7 +292,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         toast.error("Failed to delete product");
       }
     },
-    [loadProducts, loadAllProducts]
+    [user, loadProducts, loadProductStats]
   );
 
   const handleAdjustStockClick = useCallback((product: Product) => {
@@ -308,8 +326,14 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
 
         const response = await window.productAPI.adjustStock(adjustmentData);
         if (response.success) {
+          // Invalidate caches
+          if (user?.businessId) {
+            invalidateInventoryCache(user.businessId);
+            invalidateProductStatsCache(user.businessId);
+          }
+
           await loadProducts();
-          await loadAllProducts();
+          await loadProductStats();
           toast.success("Stock adjustment completed successfully");
           setStockAdjustmentProduct(null);
         } else {
@@ -320,7 +344,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         toast.error("Failed to adjust stock");
       }
     },
-    [user, loadProducts, loadAllProducts]
+    [user, loadProducts, loadProductStats]
   );
 
   const handleEditProduct = useCallback((product: Product) => {
@@ -334,14 +358,26 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   }, []);
 
   const handleSaveProduct = useCallback(() => {
+    // Invalidate caches on product create/update
+    if (user?.businessId) {
+      invalidateInventoryCache(user.businessId);
+      invalidateProductStatsCache(user.businessId);
+    }
+
     loadProducts(); // Reload to ensure consistency
-    loadAllProducts(); // Update dashboard stats
-  }, [loadProducts, loadAllProducts]);
+    loadProductStats(); // Update dashboard stats
+  }, [user, loadProducts, loadProductStats]);
 
   const handleUpdateProduct = useCallback(() => {
+    // Invalidate caches on product update
+    if (user?.businessId) {
+      invalidateInventoryCache(user.businessId);
+      invalidateProductStatsCache(user.businessId);
+    }
+
     loadProducts(); // Reload to ensure consistency
-    loadAllProducts(); // Update dashboard stats
-  }, [loadProducts, loadAllProducts]);
+    loadProductStats(); // Update dashboard stats
+  }, [user, loadProducts, loadProductStats]);
 
   // Create view components with proper props (must be before conditional return)
   const viewComponents = useMemo(() => {
@@ -357,16 +393,14 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     return {
       productDashboard: (
         <ProductDashboardView
-          products={allProducts}
+          productStats={productStats}
           categories={categories}
-          lowStockProducts={lowStockProducts}
           onBack={goToMainDashboard}
           onManageProducts={() => navigateTo(INVENTORY_ROUTES.PRODUCT_LIST)}
           onManageCategories={() =>
             navigateTo(INVENTORY_ROUTES.CATEGORY_MANAGEMENT)
           }
           onAddProduct={openAddProductDrawer}
-          onRestockProduct={handleAdjustStockClick}
           onManageBatches={() => navigateTo(INVENTORY_ROUTES.BATCH_MANAGEMENT)}
         />
       ),
@@ -400,8 +434,12 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
             setCurrentPage(1);
           }}
           onProductsImported={() => {
+            // Invalidate all caches after bulk import
+            if (user?.businessId) {
+              invalidateAllCaches(user.businessId);
+            }
             loadProducts();
-            loadAllProducts();
+            loadProductStats();
           }}
         />
       ),
@@ -421,9 +459,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     user,
     navigateTo,
     navigateToMainView,
-    allProducts,
+    productStats,
     categories,
-    lowStockProducts,
     products,
     loading,
     searchTerm,
@@ -447,7 +484,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     setCurrentPage,
     setPageSize,
     loadProducts,
-    loadAllProducts,
+    loadProductStats,
     batchFilterProductId,
     setBatchFilterProductId,
   ]);
@@ -459,7 +496,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
   return (
     <>
       {/* Main Content - Use NestedViewContainer for navigation */}
-      <div className="w-full">
+      <div className="w-full h-full relative">
         {currentView === INVENTORY_ROUTES.PRODUCT_DASHBOARD &&
           viewComponents.productDashboard}
         {currentView === INVENTORY_ROUTES.PRODUCT_LIST &&

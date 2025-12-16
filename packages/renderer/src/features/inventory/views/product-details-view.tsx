@@ -29,6 +29,9 @@ import {
 import type { Product } from "@/types/domain";
 import { ImportBookerModal } from "@/features/inventory/components/shared/import-booker-modal";
 import type { Category } from "../hooks/use-product-data";
+import { VirtualizedProductTable } from "../components/product/virtualized-product-table";
+import { ProductTableSkeleton } from "../components/shared/skeleton-loaders";
+import { USE_VIRTUALIZED_INVENTORY_TABLE } from "@/shared/config/feature-flags";
 
 interface ProductDetailsViewProps {
   products: Product[];
@@ -130,9 +133,9 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
 }) => {
   const [importModalOpen, setImportModalOpen] = useState(false);
   return (
-    <div className="flex flex-col h-screen p-3 sm:p-4 md:p-6 gap-4 sm:gap-6 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 shrink-0 p-4 md:p-6">
         <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
           <Button
             variant="outline"
@@ -168,61 +171,63 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border">
-        <div className="flex flex-col space-y-4">
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-10 w-full"
-              />
+      <div className="shrink-0 px-4 md:px-6 pb-4">
+        <div className="bg-white p-4 rounded-lg shadow-sm border">
+          <div className="flex flex-col space-y-4">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search products..."
+                  value={searchTerm}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
+
+              <Select
+                value={filterCategory}
+                onValueChange={onCategoryFilterChange}
+              >
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterStock} onValueChange={onStockFilterChange}>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stock</SelectItem>
+                  <SelectItem value="in_stock">In Stock</SelectItem>
+                  <SelectItem value="low">Low Stock</SelectItem>
+                  <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterStatus} onValueChange={onStatusFilterChange}>
+                <SelectTrigger className="w-full sm:w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            <Select
-              value={filterCategory}
-              onValueChange={onCategoryFilterChange}
-            >
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={filterStock} onValueChange={onStockFilterChange}>
-              <SelectTrigger className="w-full sm:w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stock</SelectItem>
-                <SelectItem value="in_stock">In Stock</SelectItem>
-                <SelectItem value="low">Low Stock</SelectItem>
-                <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={filterStatus} onValueChange={onStatusFilterChange}>
-              <SelectTrigger className="w-full sm:w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="all">All Status</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap mt-3 items-center gap-2">
             <Filter className="w-4 h-4 text-gray-500" />
             <span className="text-xs sm:text-sm text-gray-600">
               Show fields:
@@ -245,131 +250,139 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
       </div>
 
       {/* Products Table */}
-      <div className="flex flex-col flex-1 min-h-0 bg-white rounded-lg shadow-sm border overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center flex-1 p-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading products...</p>
+      <div className="flex-1 min-h-0 px-4 md:px-6 pb-4 md:pb-6">
+        <div className="flex flex-col h-full bg-white rounded-lg shadow-sm border overflow-hidden">
+          {loading ? (
+            <ProductTableSkeleton rows={pageSize} />
+          ) : products.length === 0 ? (
+            <div className="flex items-center justify-center flex-1 p-12">
+              <div className="text-center">
+                <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  No products found
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  {totalItems === 0
+                    ? "Get started by adding your first product to the menu."
+                    : "Try adjusting your search criteria or filters."}
+                </p>
+                <Button onClick={onAddProduct}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Product
+                </Button>
+              </div>
             </div>
-          </div>
-        ) : products.length === 0 ? (
-          <div className="flex items-center justify-center flex-1 p-12">
-            <div className="text-center">
-              <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No products found
-              </h3>
-              <p className="text-gray-600 mb-4">
-                {totalItems === 0
-                  ? "Get started by adding your first product to the menu."
-                  : "Try adjusting your search criteria or filters."}
-              </p>
-              <Button onClick={onAddProduct}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Product
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              <div className="overflow-x-auto overflow-y-auto flex-1 -mx-4 sm:mx-0">
-                <table className="w-full min-w-[800px]">
-                  <thead className="bg-gray-50 border-b sticky top-0 z-10">
-                    <tr>
-                      <th className="text-left p-4 font-semibold text-gray-900">
-                        Image
-                      </th>
-                      {showFields.name && (
-                        <th className="text-left p-4 font-semibold text-gray-900 min-w-[150px] max-w-[300px]">
-                          Name
-                        </th>
-                      )}
-                      {showFields.category && (
-                        <th className="text-left p-4 font-semibold text-gray-900 min-w-[120px] max-w-[200px]">
-                          Category
-                        </th>
-                      )}
-                      {showFields.price && (
-                        <th className="text-left p-4 font-semibold text-gray-900">
-                          Price
-                        </th>
-                      )}
-                      {showFields.stock && (
-                        <th className="text-left p-4 font-semibold text-gray-900">
-                          Stock
-                        </th>
-                      )}
-                      {showFields.sku && (
-                        <th className="text-left p-4 font-semibold text-gray-900 min-w-[100px] max-w-[150px]">
-                          SKU
-                        </th>
-                      )}
-                      {showFields.status && (
-                        <th className="text-left p-4 font-semibold text-gray-900">
-                          Status
-                        </th>
-                      )}
-                      <th className="text-left p-4 font-semibold text-gray-900">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {products.map((product) => {
-                      const categoryId = product.categoryId;
-                      const usesScale = product.usesScale || false;
-                      const pricePerKg =
-                        product.pricePerKg || product.basePrice || 0;
-                      const basePrice = product.basePrice || 0;
-                      const salesUnit = product.salesUnit || "KG";
-
-                      return (
-                        <tr key={product.id} className="hover:bg-gray-50">
-                          <td className="p-4">
-                            <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                              {product.image ? (
-                                <img
-                                  src={product.image}
-                                  alt={product.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <ImageIcon className="w-6 h-6 text-gray-400" />
-                              )}
-                            </div>
-                          </td>
+          ) : (
+            <>
+              {/* Use virtualized table if feature flag is enabled */}
+              {USE_VIRTUALIZED_INVENTORY_TABLE ? (
+                <VirtualizedProductTable
+                  products={products}
+                  categories={categories}
+                  showFields={showFields}
+                  onEditProduct={onEditProduct}
+                  onDeleteProduct={onDeleteProduct}
+                  onAdjustStock={onAdjustStock}
+                />
+              ) : (
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <div className="flex-1 overflow-auto min-h-0">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-gray-50 border-b sticky top-0 z-10">
+                        <tr>
+                          <th
+                            className="text-left p-4 font-semibold text-gray-900"
+                            style={{ width: "80px" }}
+                          >
+                            Image
+                          </th>
                           {showFields.name && (
-                            <td className="p-4 min-w-[150px] max-w-[300px]">
-                              <div className="space-y-1">
-                                {product.name.length > 30 ? (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="font-medium text-gray-900 truncate cursor-help">
-                                        {product.name}
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent
-                                      side="top"
-                                      className="max-w-xs bg-gray-900 text-white"
-                                    >
-                                      <p className="whitespace-normal">
-                                        {product.name}
-                                      </p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                ) : (
-                                  <div className="font-medium text-gray-900">
-                                    {product.name}
-                                  </div>
-                                )}
-                                {product.description &&
-                                  (product.description.length > 40 ? (
+                            <th
+                              className="text-left p-4 font-semibold text-gray-900"
+                              style={{ minWidth: "200px" }}
+                            >
+                              Name
+                            </th>
+                          )}
+                          {showFields.category && (
+                            <th
+                              className="text-left p-4 font-semibold text-gray-900"
+                              style={{ minWidth: "180px" }}
+                            >
+                              Category
+                            </th>
+                          )}
+                          {showFields.price && (
+                            <th
+                              className="text-left p-4 font-semibold text-gray-900"
+                              style={{ width: "140px" }}
+                            >
+                              Price
+                            </th>
+                          )}
+                          {showFields.stock && (
+                            <th
+                              className="text-left p-4 font-semibold text-gray-900"
+                              style={{ width: "160px" }}
+                            >
+                              Stock
+                            </th>
+                          )}
+                          {showFields.sku && (
+                            <th
+                              className="text-left p-4 font-semibold text-gray-900"
+                              style={{ minWidth: "140px" }}
+                            >
+                              SKU
+                            </th>
+                          )}
+                          {showFields.status && (
+                            <th
+                              className="text-left p-4 font-semibold text-gray-900"
+                              style={{ width: "100px" }}
+                            >
+                              Status
+                            </th>
+                          )}
+                          <th
+                            className="text-left p-4 font-semibold text-gray-900"
+                            style={{ width: "130px" }}
+                          >
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {products.map((product) => {
+                          const categoryId = product.categoryId;
+                          const usesScale = product.usesScale || false;
+                          const pricePerKg =
+                            product.pricePerKg || product.basePrice || 0;
+                          const basePrice = product.basePrice || 0;
+                          const salesUnit = product.salesUnit || "KG";
+
+                          return (
+                            <tr key={product.id} className="hover:bg-gray-50">
+                              <td className="p-4">
+                                <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                                  {product.image ? (
+                                    <img
+                                      src={product.image}
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <ImageIcon className="w-6 h-6 text-gray-400" />
+                                  )}
+                                </div>
+                              </td>
+                              {showFields.name && (
+                                <td className="p-4 max-w-[250px]">
+                                  <div className="space-y-1">
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <div className="text-sm text-gray-500 truncate cursor-help">
-                                          {product.description}
+                                        <div className="font-medium text-gray-900 truncate cursor-help">
+                                          {product.name}
                                         </div>
                                       </TooltipTrigger>
                                       <TooltipContent
@@ -377,192 +390,200 @@ const ProductDetailsView: React.FC<ProductDetailsViewProps> = ({
                                         className="max-w-xs bg-gray-900 text-white"
                                       >
                                         <p className="whitespace-normal">
-                                          {product.description}
+                                          {product.name}
                                         </p>
                                       </TooltipContent>
                                     </Tooltip>
-                                  ) : (
-                                    <div className="text-sm text-gray-500 truncate">
-                                      {product.description}
-                                    </div>
-                                  ))}
-                              </div>
-                            </td>
-                          )}
-                          {showFields.category &&
-                            (() => {
-                              const categoryPath = getCategoryPath(
-                                categoryId,
-                                categories
-                              );
-                              const categoryName =
-                                categories.find((cat) => cat.id === categoryId)
-                                  ?.name || "Unknown";
-                              const hasLongPath =
-                                categoryPath && categoryPath !== categoryName;
+                                    {product.description && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <div className="text-sm text-gray-500 truncate cursor-help">
+                                            {product.description}
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                          side="top"
+                                          className="max-w-xs bg-gray-900 text-white"
+                                        >
+                                          <p className="whitespace-normal">
+                                            {product.description}
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                </td>
+                              )}
+                              {showFields.category &&
+                                (() => {
+                                  const categoryPath = getCategoryPath(
+                                    categoryId,
+                                    categories
+                                  );
+                                  const categoryName = categoryId
+                                    ? categories.find(
+                                        (cat) => cat.id === categoryId
+                                      )?.name || "Uncategorized"
+                                    : "Uncategorized";
 
-                              return (
-                                <td className="p-4 min-w-[120px] max-w-[200px]">
-                                  {hasLongPath ? (
+                                  return (
+                                    <td className="p-4 max-w-[200px]">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium truncate max-w-full cursor-help">
+                                            {categoryName}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                          side="top"
+                                          className="max-w-xs bg-gray-900 text-white"
+                                        >
+                                          <p className="whitespace-normal">
+                                            {categoryPath || categoryName}
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </td>
+                                  );
+                                })()}
+                              {showFields.price && (
+                                <td className="p-4">
+                                  <div className="flex items-center space-x-2">
+                                    <div>
+                                      <div className="text-gray-900 font-medium">
+                                        £
+                                        {usesScale
+                                          ? pricePerKg.toFixed(2)
+                                          : basePrice.toFixed(2)}
+                                        {usesScale && (
+                                          <span className="text-xs text-gray-500 ml-1">
+                                            /{salesUnit}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        Cost: £
+                                        {(product.costPrice || 0).toFixed(2)}
+                                      </div>
+                                    </div>
+                                    {usesScale && (
+                                      <Scale className="w-4 h-4 text-blue-500" />
+                                    )}
+                                  </div>
+                                </td>
+                              )}
+                              {showFields.stock && (
+                                <td className="p-4">
+                                  <div className="flex items-center space-x-2">
+                                    <span
+                                      className={`font-medium ${
+                                        (product.stockLevel || 0) <=
+                                        (product.minStockLevel || 0)
+                                          ? "text-red-600"
+                                          : (product.stockLevel || 0) <=
+                                            (product.minStockLevel || 0) * 2
+                                          ? "text-orange-600"
+                                          : "text-green-600"
+                                      }`}
+                                    >
+                                      {product.stockLevel || 0}
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => onAdjustStock(product)}
+                                    >
+                                      Adjust
+                                    </Button>
+                                  </div>
+                                  {(product.stockLevel || 0) <=
+                                    (product.minStockLevel || 0) && (
+                                    <div className="text-xs text-red-600 mt-1">
+                                      Low Stock!
+                                    </div>
+                                  )}
+                                </td>
+                              )}
+                              {showFields.sku && (
+                                <td className="p-4">
+                                  {product.sku && product.sku.length > 15 ? (
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium truncate max-w-full cursor-help">
-                                          {categoryName}
-                                        </span>
+                                        <div className="text-gray-600 font-mono text-sm truncate cursor-help">
+                                          {product.sku}
+                                        </div>
                                       </TooltipTrigger>
                                       <TooltipContent
                                         side="top"
-                                        className="max-w-xs bg-gray-900 text-white"
+                                        className="max-w-xs bg-gray-900 text-white font-mono"
                                       >
                                         <p className="whitespace-normal">
-                                          {categoryPath}
+                                          {product.sku}
                                         </p>
                                       </TooltipContent>
                                     </Tooltip>
                                   ) : (
-                                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                                      {categoryName}
-                                    </span>
-                                  )}
-                                </td>
-                              );
-                            })()}
-                          {showFields.price && (
-                            <td className="p-4">
-                              <div className="flex items-center space-x-2">
-                                <div>
-                                  <div className="text-gray-900 font-medium">
-                                    £
-                                    {usesScale
-                                      ? pricePerKg.toFixed(2)
-                                      : basePrice.toFixed(2)}
-                                    {usesScale && (
-                                      <span className="text-xs text-gray-500 ml-1">
-                                        /{salesUnit}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Cost: £{(product.costPrice || 0).toFixed(2)}
-                                  </div>
-                                </div>
-                                {usesScale && (
-                                  <Scale className="w-4 h-4 text-blue-500" />
-                                )}
-                              </div>
-                            </td>
-                          )}
-                          {showFields.stock && (
-                            <td className="p-4">
-                              <div className="flex items-center space-x-2">
-                                <span
-                                  className={`font-medium ${
-                                    (product.stockLevel || 0) <=
-                                    (product.minStockLevel || 0)
-                                      ? "text-red-600"
-                                      : (product.stockLevel || 0) <=
-                                        (product.minStockLevel || 0) * 2
-                                      ? "text-orange-600"
-                                      : "text-green-600"
-                                  }`}
-                                >
-                                  {product.stockLevel || 0}
-                                </span>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => onAdjustStock(product)}
-                                >
-                                  Adjust
-                                </Button>
-                              </div>
-                              {(product.stockLevel || 0) <=
-                                (product.minStockLevel || 0) && (
-                                <div className="text-xs text-red-600 mt-1">
-                                  Low Stock!
-                                </div>
-                              )}
-                            </td>
-                          )}
-                          {showFields.sku && (
-                            <td className="p-4 min-w-[100px] max-w-[150px]">
-                              {product.sku && product.sku.length > 15 ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="text-gray-600 font-mono text-sm truncate cursor-help">
+                                    <div className="text-gray-600 font-mono text-sm">
                                       {product.sku}
                                     </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent
-                                    side="top"
-                                    className="max-w-xs bg-gray-900 text-white font-mono"
-                                  >
-                                    <p className="whitespace-normal">
-                                      {product.sku}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <div className="text-gray-600 font-mono text-sm">
-                                  {product.sku}
-                                </div>
+                                  )}
+                                </td>
                               )}
-                            </td>
-                          )}
-                          {showFields.status && (
-                            <td className="p-4">
-                              <span
-                                className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  product.isActive
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {product.isActive ? "Active" : "Inactive"}
-                              </span>
-                            </td>
-                          )}
-                          <td className="p-4">
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onEditProduct(product)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onDeleteProduct(product.id)}
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination - Fixed at bottom */}
-              <div className="shrink-0 border-t bg-white">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  pageSize={pageSize}
-                  totalItems={totalItems}
-                  onPageChange={onPageChange}
-                  onPageSizeChange={onPageSizeChange}
-                  showPageSizeSelector={true}
-                  showPageInfo={true}
-                />
-              </div>
-            </div>
-          </>
-        )}
+                              {showFields.status && (
+                                <td className="p-4">
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      product.isActive
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                    }`}
+                                  >
+                                    {product.isActive ? "Active" : "Inactive"}
+                                  </span>
+                                </td>
+                              )}
+                              <td className="p-4">
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onEditProduct(product)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => onDeleteProduct(product.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Pagination - Fixed at bottom */}
+                  <div className="shrink-0 border-t bg-white">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      pageSize={pageSize}
+                      totalItems={totalItems}
+                      onPageChange={onPageChange}
+                      onPageSizeChange={onPageSizeChange}
+                      showPageSizeSelector={true}
+                      showPageInfo={true}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
       {/* Import from Booker Modal */}
       <ImportBookerModal

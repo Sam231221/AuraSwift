@@ -3,8 +3,8 @@ import type { DrizzleDB } from "../drizzle.js";
 import { eq, and, sql as drizzleSql, desc, asc } from "drizzle-orm";
 import * as schema from "../schema.js";
 
-import { getLogger } from '../../utils/logger.js';
-const logger = getLogger('productManager');
+import { getLogger } from "../../utils/logger.js";
+const logger = getLogger("productManager");
 import type {
   PaginationParams,
   PaginatedResult,
@@ -236,13 +236,10 @@ export class ProductManager {
       updatedAt: schema.products.updatedAt,
     };
 
-    const sortColumnRef =
-      columnMap[sortColumn] || schema.products.name;
+    const sortColumnRef = columnMap[sortColumn] || schema.products.name;
 
     const orderByClause =
-      sortDirection === "desc"
-        ? desc(sortColumnRef)
-        : asc(sortColumnRef);
+      sortDirection === "desc" ? desc(sortColumnRef) : asc(sortColumnRef);
 
     // Get paginated items
     const items = await this.drizzle
@@ -579,5 +576,39 @@ export class ProductManager {
         message: error.message || "Failed to delete product",
       };
     }
+  }
+
+  /**
+   * Get aggregated product statistics for dashboard
+   * Optimized to return only counts/sums without loading all products
+   */
+  async getProductStats(businessId: string): Promise<{
+    totalProducts: number;
+    activeProducts: number;
+    inactiveProducts: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+    totalInventoryValue: number;
+  }> {
+    const [stats] = await this.drizzle
+      .select({
+        totalProducts: drizzleSql<number>`COUNT(*)`,
+        activeProducts: drizzleSql<number>`COUNT(CASE WHEN ${schema.products.isActive} = 1 THEN 1 END)`,
+        inactiveProducts: drizzleSql<number>`COUNT(CASE WHEN ${schema.products.isActive} = 0 THEN 1 END)`,
+        lowStockCount: drizzleSql<number>`COUNT(CASE WHEN ${schema.products.stockLevel} > 0 AND ${schema.products.stockLevel} <= ${schema.products.minStockLevel} THEN 1 END)`,
+        outOfStockCount: drizzleSql<number>`COUNT(CASE WHEN ${schema.products.stockLevel} = 0 THEN 1 END)`,
+        totalInventoryValue: drizzleSql<number>`SUM(CAST(${schema.products.stockLevel} AS REAL) * CAST(${schema.products.costPrice} AS REAL))`,
+      })
+      .from(schema.products)
+      .where(eq(schema.products.businessId, businessId));
+
+    return {
+      totalProducts: Number(stats.totalProducts) || 0,
+      activeProducts: Number(stats.activeProducts) || 0,
+      inactiveProducts: Number(stats.inactiveProducts) || 0,
+      lowStockCount: Number(stats.lowStockCount) || 0,
+      outOfStockCount: Number(stats.outOfStockCount) || 0,
+      totalInventoryValue: Number(stats.totalInventoryValue) || 0,
+    };
   }
 }

@@ -36,6 +36,24 @@ export function registerCategoryHandlers() {
     }
   });
 
+  // Get category stats (optimized for dashboards)
+  ipcMain.handle("categories:getStats", async (event, businessId) => {
+    try {
+      const db = await getDatabase();
+      const stats = await db.categories.getCategoryStats(businessId);
+      return {
+        success: true,
+        data: stats,
+      };
+    } catch (error: any) {
+      logger.error("Get category stats IPC error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to get category stats",
+      };
+    }
+  });
+
   ipcMain.handle("categories:getById", async (event, id) => {
     try {
       const db = await getDatabase();
@@ -89,6 +107,31 @@ export function registerCategoryHandlers() {
         return {
           success: false,
           message: error.message || "Failed to reorder categories",
+        };
+      }
+    }
+  );
+
+  // Get category children with pagination (for lazy loading large category trees)
+  ipcMain.handle(
+    "categories:getChildren",
+    async (event, businessId, parentId, pagination) => {
+      try {
+        const db = await getDatabase();
+        const result = await db.categories.getCategoryChildren(
+          businessId,
+          parentId,
+          pagination
+        );
+        return {
+          success: true,
+          data: result,
+        };
+      } catch (error: any) {
+        logger.error("Get category children IPC error:", error);
+        return {
+          success: false,
+          message: error.message || "Failed to get categories",
         };
       }
     }

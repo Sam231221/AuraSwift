@@ -21,8 +21,14 @@ import {
   useShift,
   usePayment,
   useBarcodeScanner,
+  usePaginatedProducts,
+  useVirtualCategories,
 } from "../hooks";
 import { useSalesMode } from "../hooks/use-sales-mode";
+import {
+  USE_VIRTUALIZED_PRODUCTS,
+  USE_VIRTUAL_CATEGORIES,
+} from "@/shared/config/feature-flags";
 
 // Components
 import {
@@ -60,7 +66,7 @@ import type {
 import { ScaleDisplay } from "../components/input/ScaleDisplay";
 
 // Types
-import type { Product } from "@/types/domain";
+import type { Product, Category } from "@/types/domain";
 import type { PrinterConfig } from "@/types/features/printer";
 
 // Utils
@@ -162,8 +168,29 @@ export function NewTransactionView({
     [connectPrinterInternal]
   );
 
-  // Products hook
-  const products = useProducts(user?.businessId);
+  // Shared state for current category (used by both products and categories hooks)
+  const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(
+    null
+  );
+
+  // Products hook - use paginated version for large datasets
+  const legacyProducts = useProducts(
+    USE_VIRTUALIZED_PRODUCTS ? undefined : user?.businessId
+  );
+  const paginatedProducts = usePaginatedProducts({
+    businessId: USE_VIRTUALIZED_PRODUCTS ? user?.businessId : undefined,
+    categoryId: currentCategoryId, // Reactive - updates when category navigation changes
+  });
+
+  // Unified products interface
+  const products = USE_VIRTUALIZED_PRODUCTS
+    ? {
+        products: paginatedProducts.products,
+        loading: paginatedProducts.initialLoading,
+        error: paginatedProducts.error,
+        loadProducts: paginatedProducts.refresh,
+      }
+    : legacyProducts;
 
   // Weight input hook
   const weightInput = useWeightInput();
@@ -194,15 +221,69 @@ export function NewTransactionView({
     todaySchedule: shift.todaySchedule,
   });
 
-  // Categories hook
-  const categories = useCategories({
-    businessId: user?.businessId,
+  // Categories hook - use virtual version for large category trees
+  const legacyCategories = useCategories({
+    businessId: USE_VIRTUAL_CATEGORIES ? undefined : user?.businessId,
     products: products.products,
     onCategorySelectForPriceInput: (category) => {
       categoryPriceInput.setPendingCategory(category);
       weightInput.resetWeightInput();
     },
   });
+  const virtualCategories = useVirtualCategories({
+    businessId: USE_VIRTUAL_CATEGORIES ? user?.businessId : undefined,
+    products: products.products,
+    onCategorySelectForPriceInput: (category) => {
+      categoryPriceInput.setPendingCategory(category);
+      weightInput.resetWeightInput();
+    },
+  });
+
+  // Wrap category handlers to sync with shared currentCategoryId for product filtering
+  const wrappedCategoryClick = useCallback(
+    async (category: Category, addToCart?: boolean) => {
+      if (USE_VIRTUAL_CATEGORIES) {
+        await virtualCategories.handleCategoryClick(category, addToCart);
+        // Sync the category ID for product filtering
+        if (!addToCart) {
+          setCurrentCategoryId(category.id);
+        }
+      } else {
+        legacyCategories.handleCategoryClick(category, addToCart);
+        setCurrentCategoryId(category.id);
+      }
+    },
+    [virtualCategories, legacyCategories]
+  );
+
+  const wrappedBreadcrumbClick = useCallback(
+    async (index: number) => {
+      if (USE_VIRTUAL_CATEGORIES) {
+        await virtualCategories.handleBreadcrumbClick(index);
+        // Get the target category ID from breadcrumb
+        const targetId = virtualCategories.breadcrumb[index]?.id ?? null;
+        setCurrentCategoryId(targetId);
+      } else {
+        legacyCategories.handleBreadcrumbClick(index);
+        const targetId = legacyCategories.breadcrumb[index]?.id ?? null;
+        setCurrentCategoryId(targetId);
+      }
+    },
+    [virtualCategories, legacyCategories]
+  );
+
+  // Unified categories interface with wrapped handlers
+  const categories = USE_VIRTUAL_CATEGORIES
+    ? {
+        ...virtualCategories,
+        handleCategoryClick: wrappedCategoryClick,
+        handleBreadcrumbClick: wrappedBreadcrumbClick,
+      }
+    : {
+        ...legacyCategories,
+        handleCategoryClick: wrappedCategoryClick,
+        handleBreadcrumbClick: wrappedBreadcrumbClick,
+      };
 
   // Payment hook
   const payment = usePayment({
@@ -809,8 +890,12 @@ export function NewTransactionView({
   }
 
   // Get products to display
-  const displayProducts = searchQuery
-    ? products.getFilteredProducts(searchQuery)
+  // In virtualized mode, filtering is done server-side, so we use products directly
+  // In legacy mode, we filter client-side using getFilteredProducts
+  const displayProducts = USE_VIRTUALIZED_PRODUCTS
+    ? products.products // Server-side filtering already applied
+    : searchQuery
+    ? legacyProducts.getFilteredProducts(searchQuery)
     : categories.getCurrentCategoryProducts();
 
   return (
@@ -866,6 +951,15 @@ export function NewTransactionView({
               categories.loadCategories();
             }}
             DOUBLE_CLICK_DELAY={DOUBLE_CLICK_DELAY}
+            onLoadMore={
+              USE_VIRTUALIZED_PRODUCTS ? paginatedProducts.loadMore : undefined
+            }
+            hasMore={
+              USE_VIRTUALIZED_PRODUCTS ? paginatedProducts.hasMore : false
+            }
+            isLoadingMore={
+              USE_VIRTUALIZED_PRODUCTS ? paginatedProducts.loading : false
+            }
           />
           {!payment.paymentStep && (
             <div className="shrink-0">

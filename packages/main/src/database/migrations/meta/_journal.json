@@ -57,6 +57,13 @@
       "when": 1764881116134,
       "tag": "0007_amazing_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1737417600000,
+      "tag": "0008_performance_indexes",
+      "breakpoints": true
     }
   ]
 }

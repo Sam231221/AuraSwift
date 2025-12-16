@@ -18,6 +18,7 @@ export * from "./product-selection/category-navigation";
 export * from "./product-selection/product-card";
 export * from "./product-selection/product-grid";
 export * from "./product-selection/product-selection-panel";
+export * from "./product-selection/virtualized-product-grid";
 
 // Cart
 export * from "./cart/cart-item-row";

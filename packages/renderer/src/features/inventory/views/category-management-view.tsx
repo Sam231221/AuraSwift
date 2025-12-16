@@ -46,6 +46,19 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
 
   // State management
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryStats, setCategoryStats] = useState<{
+    totalCategories: number;
+    activeCategories: number;
+    inactiveCategories: number;
+    rootCategories: number;
+    mostRecentCategory: { id: string; name: string; createdAt: string } | null;
+  }>({
+    totalCategories: 0,
+    activeCategories: 0,
+    inactiveCategories: 0,
+    rootCategories: 0,
+    mostRecentCategory: null,
+  });
   const [loading, setLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -157,9 +170,30 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
     }
   }, [user]);
 
+  // Load category stats (optimized - uses aggregation)
+  const loadCategoryStats = useCallback(async () => {
+    if (!user?.businessId) return;
+
+    try {
+      const response = await window.categoryAPI.getStats(user.businessId);
+      if (response.success && response.data) {
+        setCategoryStats(response.data);
+      }
+    } catch (error) {
+      logger.error("Error loading category stats:", error);
+    }
+  }, [user?.businessId]);
+
   useEffect(() => {
     loadVatCategories();
   }, [loadVatCategories]);
+
+  // Load stats immediately on mount (fast query)
+  useEffect(() => {
+    if (user?.businessId) {
+      loadCategoryStats();
+    }
+  }, [user?.businessId, loadCategoryStats]);
 
   // Load categories on component mount
   useEffect(() => {
@@ -228,6 +262,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
           const normalizedCat = normalizeCategory(response.category);
           setCategories([...categories, normalizedCat]);
           await loadCategories();
+          await loadCategoryStats();
         } else {
           const errorMsg = response.message || "Failed to create category";
           const lowerErrorMsg = errorMsg.toLowerCase();
@@ -285,6 +320,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
             categories.map((c) => (c.id === id ? normalizedCat : c))
           );
           await loadCategories();
+          await loadCategoryStats();
         } else {
           const errorMsg = response.message || "Failed to update category";
           const lowerErrorMsg = errorMsg.toLowerCase();
@@ -332,6 +368,7 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
       const response = await window.categoryAPI.delete(categoryToDelete);
       if (response.success) {
         setCategories(categories.filter((c) => c.id !== categoryToDelete));
+        await loadCategoryStats();
         toast.success("Category deleted successfully");
       } else {
         toast.error(response.message || "Failed to delete category");
@@ -414,10 +451,10 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                   Total Categories
                 </p>
                 <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                  {categories.length}
+                  {categoryStats.totalCategories}
                 </p>
                 <p className="text-xs sm:text-sm text-green-600 mt-1">
-                  {categories.filter((c) => c.isActive).length} active
+                  {categoryStats.activeCategories} active
                 </p>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -430,14 +467,9 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-xs sm:text-sm text-gray-600">Most Recent</p>
-                {categories.length > 0 ? (
+                {categoryStats.mostRecentCategory ? (
                   (() => {
-                    const mostRecent = categories.sort(
-                      (a, b) =>
-                        new Date(b.createdAt).getTime() -
-                        new Date(a.createdAt).getTime()
-                    )[0];
-                    const categoryName = mostRecent?.name || "None";
+                    const categoryName = categoryStats.mostRecentCategory.name;
                     const shouldTruncate = categoryName.length > 25;
 
                     return shouldTruncate ? (
@@ -466,13 +498,9 @@ const ManageCategoriesView: React.FC<ManageCategoriesViewProps> = ({
                   </p>
                 )}
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                  {categories.length > 0
+                  {categoryStats.mostRecentCategory
                     ? new Date(
-                        categories.sort(
-                          (a, b) =>
-                            new Date(b.createdAt).getTime() -
-                            new Date(a.createdAt).getTime()
-                        )[0]?.createdAt
+                        categoryStats.mostRecentCategory.createdAt
                       ).toLocaleDateString()
                     : ""}
                 </p>

@@ -1,10 +1,15 @@
 import type { DrizzleDB } from "../drizzle.js";
-import { eq, and, sql as drizzleSql } from "drizzle-orm";
+import { eq, and, sql as drizzleSql, isNull } from "drizzle-orm";
 import { Category, categories } from "../schema.js";
 import * as schema from "../schema.js";
+import type { PaginationParams, PaginatedResult } from "../types/pagination.js";
+import {
+  calculatePagination,
+  calculateLimitOffset,
+} from "../types/pagination.js";
 
-import { getLogger } from '../../utils/logger.js';
-const logger = getLogger('categoryManager');
+import { getLogger } from "../../utils/logger.js";
+const logger = getLogger("categoryManager");
 
 export interface CategoryResponse {
   success: boolean;
@@ -21,6 +26,57 @@ export class CategoryManager {
   constructor(drizzle: DrizzleDB, uuid: any) {
     this.drizzle = drizzle;
     this.uuid = uuid;
+  }
+
+  /**
+   * Get category statistics for a business (optimized - uses COUNT aggregation)
+   */
+  async getCategoryStats(businessId: string): Promise<{
+    totalCategories: number;
+    activeCategories: number;
+    inactiveCategories: number;
+    rootCategories: number;
+    mostRecentCategory: { id: string; name: string; createdAt: string } | null;
+  }> {
+    // Get counts using SQL aggregation (fast even with large datasets)
+    const [stats] = await this.drizzle
+      .select({
+        totalCategories: drizzleSql<number>`count(*)`,
+        activeCategories: drizzleSql<number>`sum(case when ${schema.categories.isActive} = 1 then 1 else 0 end)`,
+        inactiveCategories: drizzleSql<number>`sum(case when ${schema.categories.isActive} = 0 then 1 else 0 end)`,
+        rootCategories: drizzleSql<number>`sum(case when ${schema.categories.parentId} is null then 1 else 0 end)`,
+      })
+      .from(schema.categories)
+      .where(eq(schema.categories.businessId, businessId));
+
+    // Get most recent category separately (single row query)
+    const [mostRecent] = await this.drizzle
+      .select({
+        id: schema.categories.id,
+        name: schema.categories.name,
+        createdAt: schema.categories.createdAt,
+      })
+      .from(schema.categories)
+      .where(eq(schema.categories.businessId, businessId))
+      .orderBy(drizzleSql`${schema.categories.createdAt} DESC`)
+      .limit(1);
+
+    return {
+      totalCategories: Number(stats?.totalCategories) || 0,
+      activeCategories: Number(stats?.activeCategories) || 0,
+      inactiveCategories: Number(stats?.inactiveCategories) || 0,
+      rootCategories: Number(stats?.rootCategories) || 0,
+      mostRecentCategory: mostRecent
+        ? {
+            id: mostRecent.id,
+            name: mostRecent.name,
+            createdAt:
+              mostRecent.createdAt instanceof Date
+                ? mostRecent.createdAt.toISOString()
+                : String(mostRecent.createdAt),
+          }
+        : null,
+    };
   }
 
   /**
@@ -56,6 +112,61 @@ export class CategoryManager {
       .orderBy(schema.categories.sortOrder, schema.categories.name);
 
     return categories as Category[];
+  }
+
+  /**
+   * Get direct children of a category with pagination
+   * If parentId is null, returns root categories (categories with no parent)
+   * This is optimized for lazy loading large category trees
+   */
+  async getCategoryChildren(
+    businessId: string,
+    parentId: string | null,
+    pagination: PaginationParams
+  ): Promise<PaginatedResult<Category>> {
+    const { limit, offset } = calculateLimitOffset(
+      pagination.page,
+      pagination.pageSize
+    );
+
+    // Build WHERE conditions
+    const conditions = [
+      eq(schema.categories.businessId, businessId),
+      eq(schema.categories.isActive, true),
+    ];
+
+    // Add parent filter - isNull for root categories, eq for children
+    if (parentId === null) {
+      conditions.push(isNull(schema.categories.parentId));
+    } else {
+      conditions.push(eq(schema.categories.parentId, parentId));
+    }
+
+    // Get total count for pagination
+    const [countResult] = await this.drizzle
+      .select({ count: drizzleSql<number>`count(*)` })
+      .from(schema.categories)
+      .where(and(...conditions));
+
+    const totalItems = Number(countResult.count);
+
+    // Get paginated items
+    const items = await this.drizzle
+      .select()
+      .from(schema.categories)
+      .where(and(...conditions))
+      .orderBy(schema.categories.sortOrder, schema.categories.name)
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items: items as Category[],
+      pagination: calculatePagination(
+        totalItems,
+        pagination.page,
+        pagination.pageSize
+      ),
+    };
   }
 
   /**

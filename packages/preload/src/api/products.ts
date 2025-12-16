@@ -110,4 +110,12 @@ export const productAPI = {
 
   syncStock: (businessId: string) =>
     ipcRenderer.invoke("products:syncStock", businessId),
+
+  /**
+   * Get aggregated product statistics for dashboard
+   * Optimized to return only counts/sums without loading all products
+   * @param businessId - Business ID
+   */
+  getStats: (businessId: string) =>
+    ipcRenderer.invoke("products:getStats", businessId),
 };

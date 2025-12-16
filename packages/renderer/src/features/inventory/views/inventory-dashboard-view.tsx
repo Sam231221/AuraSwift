@@ -15,26 +15,28 @@ import type { Product } from "@/types/domain";
 import type { Category } from "../hooks/use-product-data";
 
 interface ProductDashboardViewProps {
-  products: Product[];
+  productStats: {
+    totalProducts: number;
+    activeProducts: number;
+    inactiveProducts: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+    totalInventoryValue: number;
+  };
   categories: Category[];
-  lowStockProducts: Product[];
   onBack: () => void;
   onManageProducts: () => void;
   onManageCategories: () => void;
   onAddProduct: () => void;
-  onRestockProduct: (product: Product) => void;
   onManageBatches?: () => void;
 }
 
 const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
-  products,
+  productStats,
   categories,
-  lowStockProducts,
   onBack,
   onManageProducts,
   onManageCategories,
-
-  onRestockProduct,
   onManageBatches,
 }) => {
   return (
@@ -62,11 +64,11 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
       </div>
 
       {/* Alert for low stock */}
-      {lowStockProducts.length > 0 && (
+      {productStats.lowStockCount > 0 && (
         <Alert className="border-orange-200 bg-orange-50">
           <AlertTriangle className="h-4 w-4 text-orange-600" />
           <AlertDescription className="text-orange-800">
-            {lowStockProducts.length} product(s) are running low on stock and
+            {productStats.lowStockCount} product(s) are running low on stock and
             need attention.
           </AlertDescription>
         </Alert>
@@ -79,10 +81,10 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
             <div>
               <p className="text-xs sm:text-sm text-gray-600">Total Products</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                {products.length}
+                {productStats.totalProducts}
               </p>
               <p className="text-xs sm:text-sm text-blue-600 mt-1">
-                {products.filter((p) => p.isActive).length} active
+                {productStats.activeProducts} active
               </p>
             </div>
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -115,7 +117,7 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
                 Low Stock Items
               </p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                {lowStockProducts.length}
+                {productStats.lowStockCount}
               </p>
               <p className="text-xs sm:text-sm text-orange-600 mt-1">
                 Need restocking
@@ -130,18 +132,14 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm text-gray-600">Average Price</p>
+              <p className="text-xs sm:text-sm text-gray-600">
+                Inventory Value
+              </p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                £
-                {products.length > 0
-                  ? (
-                      products.reduce((sum, p) => sum + (p.basePrice || 0), 0) /
-                      products.length
-                    ).toFixed(2)
-                  : "0.00"}
+                £{productStats.totalInventoryValue.toFixed(2)}
               </p>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                Across all items
+                Total stock value
               </p>
             </div>
             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -193,40 +191,30 @@ const ProductDashboardView: React.FC<ProductDashboardViewProps> = ({
           <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">
             Low Stock Alerts
           </h3>
-          {lowStockProducts.length === 0 ? (
+          {productStats.lowStockCount === 0 ? (
             <p className="text-gray-500 text-xs sm:text-sm">
               All products are well stocked!
             </p>
           ) : (
-            <div className="space-y-2">
-              {lowStockProducts.slice(0, 3).map((product) => (
-                <div
-                  key={product.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2 sm:p-3 bg-orange-50 rounded"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate">
-                      {product.name}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {product.stockLevel} left (min: {product.minStockLevel})
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onRestockProduct(product)}
-                    className="w-full sm:w-auto"
-                  >
-                    Restock
-                  </Button>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-orange-50 rounded">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  <span className="font-medium text-sm">
+                    {productStats.lowStockCount} product
+                    {productStats.lowStockCount !== 1 ? "s" : ""} need
+                    {productStats.lowStockCount === 1 ? "s" : ""} attention
+                  </span>
                 </div>
-              ))}
-              {lowStockProducts.length > 3 && (
-                <p className="text-xs sm:text-sm text-gray-500 text-center pt-2">
-                  +{lowStockProducts.length - 3} more items need attention
-                </p>
-              )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onManageProducts}
+                className="w-full"
+              >
+                View Low Stock Products
+              </Button>
             </div>
           )}
         </div>

@@ -125,72 +125,44 @@ export class ImportManager {
         `🚀 Starting Booker import: ${departmentData.length} departments, ${productData.length} products`
       );
 
-      // Wrap entire import in a transaction for atomicity
-      await this.drizzle.transaction(async (tx) => {
-        // Use transaction instance for all operations
-        const txCategoryManager = new CategoryManager(tx, this.uuid);
-        const txProductManager = new ProductManager(tx, this.uuid);
-        const txSupplierManager = new SupplierManager(tx, this.uuid);
-        const txBatchManager = new BatchManager(tx, this.uuid);
-        const txVatCategoryManager = new VatCategoryManager(tx, this.uuid);
+      // Note: better-sqlite3 transactions are synchronous and cannot contain async operations
+      // Since our import methods are async, we run without a transaction wrapper
+      // Each individual operation is still atomic, and errors are collected for reporting
 
-        // Temporarily swap managers to use transaction
-        const originalCategoryManager = this.categoryManager;
-        const originalProductManager = this.productManager;
-        const originalSupplierManager = this.supplierManager;
-        const originalBatchManager = this.batchManager;
-        const originalVatCategoryManager = this.vatCategoryManager;
+      // Phase 1: Import categories from department data
+      const categoryMap = await this.importCategories(
+        departmentData,
+        businessId,
+        options,
+        result
+      );
+      logger.info(
+        `✅ Categories phase complete: ${result.categoriesCreated} created, ${result.categoriesUpdated} updated`
+      );
 
-        this.categoryManager = txCategoryManager;
-        this.productManager = txProductManager;
-        this.supplierManager = txSupplierManager;
-        this.batchManager = txBatchManager;
-        this.vatCategoryManager = txVatCategoryManager;
+      // Phase 2: Import suppliers from product data
+      const supplierMap = await this.importSuppliers(
+        productData,
+        businessId,
+        options,
+        result
+      );
+      logger.info(
+        `✅ Suppliers phase complete: ${result.suppliersCreated} created, ${result.suppliersUpdated} updated`
+      );
 
-        try {
-          // Phase 1: Import categories from department data
-          const categoryMap = await this.importCategories(
-            departmentData,
-            businessId,
-            options,
-            result
-          );
-          logger.info(
-            `✅ Categories phase complete: ${result.categoriesCreated} created, ${result.categoriesUpdated} updated`
-          );
-
-          // Phase 2: Import suppliers from product data
-          const supplierMap = await this.importSuppliers(
-            productData,
-            businessId,
-            options,
-            result
-          );
-          logger.info(
-            `✅ Suppliers phase complete: ${result.suppliersCreated} created, ${result.suppliersUpdated} updated`
-          );
-
-          // Phase 3: Import products and create batches
-          await this.importProducts(
-            productData,
-            businessId,
-            categoryMap,
-            supplierMap,
-            options,
-            result
-          );
-          logger.info(
-            `✅ Products phase complete: ${result.productsCreated} created, ${result.productsUpdated} updated, ${result.batchesCreated} batches`
-          );
-        } finally {
-          // Restore original managers
-          this.categoryManager = originalCategoryManager;
-          this.productManager = originalProductManager;
-          this.supplierManager = originalSupplierManager;
-          this.batchManager = originalBatchManager;
-          this.vatCategoryManager = originalVatCategoryManager;
-        }
-      });
+      // Phase 3: Import products and create batches
+      await this.importProducts(
+        productData,
+        businessId,
+        categoryMap,
+        supplierMap,
+        options,
+        result
+      );
+      logger.info(
+        `✅ Products phase complete: ${result.productsCreated} created, ${result.productsUpdated} updated, ${result.batchesCreated} batches`
+      );
 
       result.success = result.errors.length === 0;
       result.duration = Date.now() - startTime;

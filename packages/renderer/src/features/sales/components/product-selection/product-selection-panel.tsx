@@ -9,6 +9,8 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Breadcrumb } from "./breadcrumb";
 import { CategoryNavigation } from "./category-navigation";
 import { ProductGrid } from "./product-grid";
+import { VirtualizedProductGrid } from "./virtualized-product-grid";
+import { USE_VIRTUALIZED_PRODUCTS } from "@/shared/config/feature-flags";
 import type { Product } from "@/types/domain";
 import type { Category } from "@/types/domain/category";
 import type { BreadcrumbItem } from "@/types/ui";
@@ -32,6 +34,12 @@ interface ProductSelectionPanelProps {
   ) => void;
   onRetry: () => void;
   DOUBLE_CLICK_DELAY: number;
+  /** Callback for loading more products (infinite scroll) */
+  onLoadMore?: () => void;
+  /** Whether there are more products to load */
+  hasMore?: boolean;
+  /** Whether more products are being loaded */
+  isLoadingMore?: boolean;
 }
 
 export function ProductSelectionPanel({
@@ -51,6 +59,9 @@ export function ProductSelectionPanel({
   onSetLastClickTime,
   onRetry,
   DOUBLE_CLICK_DELAY,
+  onLoadMore,
+  hasMore = false,
+  isLoadingMore = false,
 }: ProductSelectionPanelProps) {
   return (
     <Card className="bg-white border-slate-200 flex-1 flex flex-col shadow-sm overflow-hidden">
@@ -89,7 +100,6 @@ export function ProductSelectionPanel({
           <div className="flex flex-col gap-3 sm:gap-4 min-h-0 flex-1">
             <CategoryNavigation
               categories={categories}
-              products={products}
               currentCategories={currentCategories}
               searchQuery={searchQuery}
               lastClickTime={lastClickTime}
@@ -97,13 +107,26 @@ export function ProductSelectionPanel({
               onSetLastClickTime={onSetLastClickTime}
               DOUBLE_CLICK_DELAY={DOUBLE_CLICK_DELAY}
             />
-            <ProductGrid
-              products={products}
-              searchQuery={searchQuery}
-              selectedWeightProductId={selectedWeightProductId}
-              onProductClick={onProductClick}
-              onGenericItemClick={onGenericItemClick}
-            />
+            {USE_VIRTUALIZED_PRODUCTS ? (
+              <VirtualizedProductGrid
+                products={products}
+                searchQuery={searchQuery}
+                selectedWeightProductId={selectedWeightProductId}
+                onProductClick={onProductClick}
+                onGenericItemClick={onGenericItemClick}
+                onLoadMore={onLoadMore}
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+              />
+            ) : (
+              <ProductGrid
+                products={products}
+                searchQuery={searchQuery}
+                selectedWeightProductId={selectedWeightProductId}
+                onProductClick={onProductClick}
+                onGenericItemClick={onGenericItemClick}
+              />
+            )}
           </div>
         )}
       </CardContent>
