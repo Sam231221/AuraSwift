@@ -50,6 +50,80 @@ export class BatchManager {
   }
 
   /**
+   * Get batch statistics for a business (optimized - uses COUNT aggregation)
+   * This is much faster than loading all batches for dashboard display
+   */
+  async getBatchStats(businessId: string, expirySettings?: {
+    criticalAlertDays: number;
+    warningAlertDays: number;
+    infoAlertDays: number;
+  }): Promise<{
+    totalBatches: number;
+    activeBatches: number;
+    expiredBatches: number;
+    soldOutBatches: number;
+    criticalBatches: number;
+    warningBatches: number;
+    expiringThisWeek: number;
+    expiringNext30Days: number;
+    valueAtRisk: number;
+    wasteValue: number;
+  }> {
+    const now = new Date();
+    const criticalDays = expirySettings?.criticalAlertDays ?? 3;
+    const warningDays = expirySettings?.warningAlertDays ?? 7;
+    
+    const criticalDate = new Date();
+    criticalDate.setDate(criticalDate.getDate() + criticalDays);
+    
+    const warningDate = new Date();
+    warningDate.setDate(warningDate.getDate() + warningDays);
+    
+    const weekDate = new Date();
+    weekDate.setDate(weekDate.getDate() + 7);
+    
+    const thirtyDayDate = new Date();
+    thirtyDayDate.setDate(thirtyDayDate.getDate() + 30);
+
+    // Convert dates to ISO strings for SQLite compatibility
+    const nowStr = now.toISOString();
+    const criticalDateStr = criticalDate.toISOString();
+    const warningDateStr = warningDate.toISOString();
+    const weekDateStr = weekDate.toISOString();
+    const thirtyDayDateStr = thirtyDayDate.toISOString();
+
+    // Get counts and values using SQL aggregation (fast even with large datasets)
+    const [stats] = await this.db
+      .select({
+        totalBatches: sql<number>`count(*)`,
+        activeBatches: sql<number>`sum(case when ${schema.productBatches.status} = 'ACTIVE' then 1 else 0 end)`,
+        expiredBatches: sql<number>`sum(case when ${schema.productBatches.status} = 'EXPIRED' then 1 else 0 end)`,
+        soldOutBatches: sql<number>`sum(case when ${schema.productBatches.status} = 'SOLD_OUT' then 1 else 0 end)`,
+        criticalBatches: sql<number>`sum(case when ${schema.productBatches.status} = 'ACTIVE' and ${schema.productBatches.expiryDate} > ${nowStr} and ${schema.productBatches.expiryDate} <= ${criticalDateStr} then 1 else 0 end)`,
+        warningBatches: sql<number>`sum(case when ${schema.productBatches.status} = 'ACTIVE' and ${schema.productBatches.expiryDate} > ${criticalDateStr} and ${schema.productBatches.expiryDate} <= ${warningDateStr} then 1 else 0 end)`,
+        expiringThisWeek: sql<number>`sum(case when ${schema.productBatches.status} = 'ACTIVE' and ${schema.productBatches.expiryDate} > ${nowStr} and ${schema.productBatches.expiryDate} <= ${weekDateStr} then 1 else 0 end)`,
+        expiringNext30Days: sql<number>`sum(case when ${schema.productBatches.status} = 'ACTIVE' and ${schema.productBatches.expiryDate} > ${nowStr} and ${schema.productBatches.expiryDate} <= ${thirtyDayDateStr} then 1 else 0 end)`,
+        valueAtRisk: sql<number>`sum(case when ${schema.productBatches.status} = 'ACTIVE' and ${schema.productBatches.expiryDate} > ${nowStr} and ${schema.productBatches.expiryDate} <= ${weekDateStr} then coalesce(${schema.productBatches.costPrice}, 0) * ${schema.productBatches.currentQuantity} else 0 end)`,
+        wasteValue: sql<number>`sum(case when ${schema.productBatches.status} = 'EXPIRED' then coalesce(${schema.productBatches.costPrice}, 0) * ${schema.productBatches.currentQuantity} else 0 end)`,
+      })
+      .from(schema.productBatches)
+      .where(eq(schema.productBatches.businessId, businessId));
+
+    return {
+      totalBatches: Number(stats?.totalBatches) || 0,
+      activeBatches: Number(stats?.activeBatches) || 0,
+      expiredBatches: Number(stats?.expiredBatches) || 0,
+      soldOutBatches: Number(stats?.soldOutBatches) || 0,
+      criticalBatches: Number(stats?.criticalBatches) || 0,
+      warningBatches: Number(stats?.warningBatches) || 0,
+      expiringThisWeek: Number(stats?.expiringThisWeek) || 0,
+      expiringNext30Days: Number(stats?.expiringNext30Days) || 0,
+      valueAtRisk: Number(stats?.valueAtRisk) || 0,
+      wasteValue: Number(stats?.wasteValue) || 0,
+    };
+  }
+
+  /**
    * Generate batch number if not provided
    */
   private generateBatchNumber(productId: string, expiryDate: Date): string {
@@ -350,17 +424,64 @@ export class BatchManager {
     const orderByClause =
       sortDirection === "desc" ? desc(sortColumnRef) : asc(sortColumnRef);
 
-    // Get paginated items
+    // Get paginated items with product info via LEFT JOIN
+    // This avoids the need to load all products client-side for enrichment
     const items = await this.db
-      .select()
+      .select({
+        // Batch fields
+        id: schema.productBatches.id,
+        productId: schema.productBatches.productId,
+        batchNumber: schema.productBatches.batchNumber,
+        manufacturingDate: schema.productBatches.manufacturingDate,
+        expiryDate: schema.productBatches.expiryDate,
+        initialQuantity: schema.productBatches.initialQuantity,
+        currentQuantity: schema.productBatches.currentQuantity,
+        supplierId: schema.productBatches.supplierId,
+        purchaseOrderNumber: schema.productBatches.purchaseOrderNumber,
+        costPrice: schema.productBatches.costPrice,
+        status: schema.productBatches.status,
+        businessId: schema.productBatches.businessId,
+        createdAt: schema.productBatches.createdAt,
+        updatedAt: schema.productBatches.updatedAt,
+        // Product fields (via JOIN)
+        productName: schema.products.name,
+        productSku: schema.products.sku,
+        productImage: schema.products.image,
+      })
       .from(schema.productBatches)
+      .leftJoin(schema.products, eq(schema.productBatches.productId, schema.products.id))
       .where(and(...conditions))
       .orderBy(orderByClause)
       .limit(limit)
       .offset(offset);
 
+    // Transform to include nested product object
+    const transformedItems = items.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      batchNumber: item.batchNumber,
+      manufacturingDate: item.manufacturingDate,
+      expiryDate: item.expiryDate,
+      initialQuantity: item.initialQuantity,
+      currentQuantity: item.currentQuantity,
+      supplierId: item.supplierId,
+      purchaseOrderNumber: item.purchaseOrderNumber,
+      costPrice: item.costPrice,
+      status: item.status,
+      businessId: item.businessId,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      // Nested product object (if product exists)
+      product: item.productName ? {
+        id: item.productId,
+        name: item.productName,
+        sku: item.productSku,
+        image: item.productImage,
+      } : undefined,
+    }));
+
     return {
-      items: items as ProductBatch[],
+      items: transformedItems as ProductBatch[],
       pagination: calculatePagination(
         totalItems,
         pagination.page,

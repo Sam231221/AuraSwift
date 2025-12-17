@@ -80,6 +80,8 @@ export class DBManager {
   private db: Database.Database | null = null;
   private initialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
+  private initializationAttempts: number = 0;
+  private static readonly MAX_INITIALIZATION_ATTEMPTS = 3;
 
   async initialize(): Promise<void> {
     // Return existing promise if initialization is in progress
@@ -91,6 +93,33 @@ export class DBManager {
     if (this.initialized) {
       return;
     }
+
+    // Check for infinite loop protection
+    this.initializationAttempts++;
+    if (this.initializationAttempts > DBManager.MAX_INITIALIZATION_ATTEMPTS) {
+      const errorMessage =
+        `Database initialization failed after ${DBManager.MAX_INITIALIZATION_ATTEMPTS} attempts. ` +
+        `This may indicate a corrupted migration file or schema issue. ` +
+        `Please check the migration files in packages/main/src/database/migrations/ for duplicates or errors.`;
+      logger.error(`❌ ${errorMessage}`);
+
+      // Show error dialog and quit
+      await showDatabaseErrorDialog(
+        "Database Initialization Failed",
+        `Failed to initialize database after ${DBManager.MAX_INITIALIZATION_ATTEMPTS} attempts.`,
+        "This may indicate:\n" +
+          "• Duplicate or conflicting migration files\n" +
+          "• Corrupted migration SQL syntax\n" +
+          "• File permission issues\n\n" +
+          "Please check the application logs for more details."
+      );
+      app.quit();
+      throw new Error(errorMessage);
+    }
+
+    logger.info(
+      `🔄 Database initialization attempt ${this.initializationAttempts}/${DBManager.MAX_INITIALIZATION_ATTEMPTS}`
+    );
 
     // Start initialization and store the promise to prevent concurrent initializations
     this.initializationPromise = (async (): Promise<void> => {
@@ -409,6 +438,7 @@ export class DBManager {
         }
 
         this.initialized = true;
+        this.initializationAttempts = 0; // Reset counter on successful initialization
         logger.info("✅ Database initialized successfully\n");
       } catch (error) {
         // Reset state on error to allow retry

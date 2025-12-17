@@ -138,6 +138,43 @@ export class ProductManager {
     return product;
   }
 
+  /**
+   * Get lightweight product lookup data (id, name, sku only)
+   * Optimized for dropdowns and batch enrichment - much faster than loading full products
+   */
+  async getProductLookup(
+    businessId: string,
+    options?: { 
+      includeInactive?: boolean;
+      productIds?: string[];
+    }
+  ): Promise<Array<{ id: string; name: string; sku: string | null }>> {
+    const conditions = [eq(schema.products.businessId, businessId)];
+    
+    if (!options?.includeInactive) {
+      conditions.push(eq(schema.products.isActive, true));
+    }
+
+    // If specific product IDs provided, filter to only those
+    if (options?.productIds && options.productIds.length > 0) {
+      conditions.push(
+        drizzleSql`${schema.products.id} IN (${drizzleSql.join(options.productIds.map(id => drizzleSql`${id}`), drizzleSql`, `)})`
+      );
+    }
+
+    const products = await this.drizzle
+      .select({
+        id: schema.products.id,
+        name: schema.products.name,
+        sku: schema.products.sku,
+      })
+      .from(schema.products)
+      .where(and(...conditions))
+      .orderBy(schema.products.name);
+
+    return products;
+  }
+
   async getProductsByBusiness(
     businessId: string,
     includeInactive: boolean = false

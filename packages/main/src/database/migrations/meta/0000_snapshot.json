@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e5386fd9-b934-4c56-bdfd-8f33db0ca5a4",
+  "id": "62ad5bae-304e-4c84-b75b-503661c978b8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "age_verification_records": {
@@ -1299,7 +1299,7 @@
           "name": "shift_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "business_id": {
@@ -1440,7 +1440,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "cart_sessions_business_id_businesses_id_fk": {
@@ -1905,6 +1905,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "schedule_id": {
+          "name": "schedule_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "type": {
           "name": "type",
           "type": "text",
@@ -2006,6 +2013,13 @@
           ],
           "isUnique": false
         },
+        "clock_events_schedule_idx": {
+          "name": "clock_events_schedule_idx",
+          "columns": [
+            "schedule_id"
+          ],
+          "isUnique": false
+        },
         "clock_events_user_timestamp_idx": {
           "name": "clock_events_user_timestamp_idx",
           "columns": [
@@ -2061,6 +2075,19 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "clock_events_schedule_id_schedules_id_fk": {
+          "name": "clock_events_schedule_id_schedules_id_fk",
+          "tableFrom": "clock_events",
+          "tableTo": "schedules",
+          "columnsFrom": [
+            "schedule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -3577,6 +3604,14 @@
           "autoincrement": false,
           "default": true
         },
+        "shift_required": {
+          "name": "shift_required",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -3620,6 +3655,89 @@
         "roles_business_id_businesses_id_fk": {
           "name": "roles_business_id_businesses_id_fk",
           "tableFrom": "roles",
+          "tableTo": "businesses",
+          "columnsFrom": [
+            "business_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "sales_unit_settings": {
+      "name": "sales_unit_settings",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "business_id": {
+          "name": "business_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sales_unit_mode": {
+          "name": "sales_unit_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'Varying'"
+        },
+        "fixed_sales_unit": {
+          "name": "fixed_sales_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'KG'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "sales_unit_settings_business_idx": {
+          "name": "sales_unit_settings_business_idx",
+          "columns": [
+            "business_id"
+          ],
+          "isUnique": false
+        },
+        "sales_unit_settings_business_unique": {
+          "name": "sales_unit_settings_business_unique",
+          "columns": [
+            "business_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "sales_unit_settings_business_id_businesses_id_fk": {
+          "name": "sales_unit_settings_business_id_businesses_id_fk",
+          "tableFrom": "sales_unit_settings",
           "tableTo": "businesses",
           "columnsFrom": [
             "business_id"
@@ -5373,6 +5491,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "break_id": {
+          "name": "break_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "user_id": {
           "name": "user_id",
           "type": "text",
@@ -5474,6 +5599,13 @@
           ],
           "isUnique": false
         },
+        "time_corrections_break_idx": {
+          "name": "time_corrections_break_idx",
+          "columns": [
+            "break_id"
+          ],
+          "isUnique": false
+        },
         "time_corrections_user_idx": {
           "name": "time_corrections_user_idx",
           "columns": [
@@ -5516,6 +5648,19 @@
           "tableTo": "shifts",
           "columnsFrom": [
             "shift_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "time_corrections_break_id_breaks_id_fk": {
+          "name": "time_corrections_break_id_breaks_id_fk",
+          "tableFrom": "time_corrections",
+          "tableTo": "breaks",
+          "columnsFrom": [
+            "break_id"
           ],
           "columnsTo": [
             "id"
@@ -5835,7 +5980,7 @@
           "name": "shiftId",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "businessId": {
@@ -5993,6 +6138,28 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "viva_wallet_transaction_id": {
+          "name": "viva_wallet_transaction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "viva_wallet_terminal_id": {
+          "name": "viva_wallet_terminal_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'GBP'"
         }
       },
       "indexes": {},
@@ -6007,7 +6174,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "transactions_businessId_businesses_id_fk": {
@@ -6366,20 +6533,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "permissions": {
-          "name": "permissions",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
         "businessId": {
           "name": "businessId",
           "type": "text",
@@ -6408,13 +6561,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "lastLoginAt": {
-          "name": "lastLoginAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "isActive": {
           "name": "isActive",
           "type": "integer",
@@ -6422,21 +6568,6 @@
           "notNull": false,
           "autoincrement": false,
           "default": true
-        },
-        "login_attempts": {
-          "name": "login_attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": 0
-        },
-        "locked_until": {
-          "name": "locked_until",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "address": {
           "name": "address",

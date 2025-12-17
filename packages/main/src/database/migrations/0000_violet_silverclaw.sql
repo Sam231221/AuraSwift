@@ -174,7 +174,7 @@ CREATE INDEX `cart_items_type_idx` ON `cart_items` (`item_type`);--> statement-b
 CREATE TABLE `cart_sessions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`cashier_id` text NOT NULL,
-	`shift_id` text NOT NULL,
+	`shift_id` text,
 	`business_id` text NOT NULL,
 	`terminal_id` text,
 	`status` text DEFAULT 'ACTIVE' NOT NULL,
@@ -187,7 +187,7 @@ CREATE TABLE `cart_sessions` (
 	`created_at` integer NOT NULL,
 	`updated_at` integer,
 	FOREIGN KEY (`cashier_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`shift_id`) REFERENCES `shifts`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`shift_id`) REFERENCES `shifts`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`terminal_id`) REFERENCES `terminals`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`verified_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
@@ -253,6 +253,7 @@ CREATE TABLE `clock_events` (
 	`business_id` text NOT NULL,
 	`terminal_id` text NOT NULL,
 	`location_id` text,
+	`schedule_id` text,
 	`type` text NOT NULL,
 	`timestamp` integer NOT NULL,
 	`method` text NOT NULL,
@@ -264,7 +265,8 @@ CREATE TABLE `clock_events` (
 	`updated_at` integer,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`terminal_id`) REFERENCES `terminals`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`terminal_id`) REFERENCES `terminals`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`schedule_id`) REFERENCES `schedules`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
 CREATE INDEX `clock_events_user_idx` ON `clock_events` (`user_id`);--> statement-breakpoint
@@ -272,6 +274,7 @@ CREATE INDEX `clock_events_business_idx` ON `clock_events` (`business_id`);--> s
 CREATE INDEX `clock_events_timestamp_idx` ON `clock_events` (`timestamp`);--> statement-breakpoint
 CREATE INDEX `clock_events_type_idx` ON `clock_events` (`type`);--> statement-breakpoint
 CREATE INDEX `clock_events_status_idx` ON `clock_events` (`status`);--> statement-breakpoint
+CREATE INDEX `clock_events_schedule_idx` ON `clock_events` (`schedule_id`);--> statement-breakpoint
 CREATE INDEX `clock_events_user_timestamp_idx` ON `clock_events` (`user_id`,`timestamp`);--> statement-breakpoint
 CREATE INDEX `clock_events_business_timestamp_idx` ON `clock_events` (`business_id`,`timestamp`);--> statement-breakpoint
 CREATE TABLE `discounts` (
@@ -479,6 +482,7 @@ CREATE TABLE `roles` (
 	`permissions` text NOT NULL,
 	`is_system_role` integer DEFAULT false,
 	`is_active` integer DEFAULT true,
+	`shift_required` integer DEFAULT true,
 	`created_at` integer NOT NULL,
 	`updated_at` integer,
 	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade
@@ -487,6 +491,18 @@ CREATE TABLE `roles` (
 CREATE INDEX `idx_roles_business` ON `roles` (`business_id`);--> statement-breakpoint
 CREATE INDEX `idx_roles_name` ON `roles` (`name`);--> statement-breakpoint
 CREATE UNIQUE INDEX `unique_role_name_per_business` ON `roles` (`business_id`,`name`);--> statement-breakpoint
+CREATE TABLE `sales_unit_settings` (
+	`id` text PRIMARY KEY NOT NULL,
+	`business_id` text NOT NULL,
+	`sales_unit_mode` text DEFAULT 'Varying' NOT NULL,
+	`fixed_sales_unit` text DEFAULT 'KG' NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer,
+	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `sales_unit_settings_business_idx` ON `sales_unit_settings` (`business_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `sales_unit_settings_business_unique` ON `sales_unit_settings` (`business_id`);--> statement-breakpoint
 CREATE TABLE `schedules` (
 	`id` text PRIMARY KEY NOT NULL,
 	`staffId` text NOT NULL,
@@ -727,6 +743,7 @@ CREATE TABLE `time_corrections` (
 	`id` text PRIMARY KEY NOT NULL,
 	`clock_event_id` text,
 	`shift_id` text,
+	`break_id` text,
 	`user_id` text NOT NULL,
 	`business_id` text NOT NULL,
 	`correction_type` text NOT NULL,
@@ -741,6 +758,7 @@ CREATE TABLE `time_corrections` (
 	`updated_at` integer,
 	FOREIGN KEY (`clock_event_id`) REFERENCES `clock_events`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`shift_id`) REFERENCES `shifts`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`break_id`) REFERENCES `breaks`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`business_id`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`requested_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
@@ -749,6 +767,7 @@ CREATE TABLE `time_corrections` (
 --> statement-breakpoint
 CREATE INDEX `time_corrections_clock_event_idx` ON `time_corrections` (`clock_event_id`);--> statement-breakpoint
 CREATE INDEX `time_corrections_shift_idx` ON `time_corrections` (`shift_id`);--> statement-breakpoint
+CREATE INDEX `time_corrections_break_idx` ON `time_corrections` (`break_id`);--> statement-breakpoint
 CREATE INDEX `time_corrections_user_idx` ON `time_corrections` (`user_id`);--> statement-breakpoint
 CREATE INDEX `time_corrections_business_idx` ON `time_corrections` (`business_id`);--> statement-breakpoint
 CREATE INDEX `time_corrections_status_idx` ON `time_corrections` (`status`);--> statement-breakpoint
@@ -785,7 +804,7 @@ CREATE TABLE `transaction_items` (
 --> statement-breakpoint
 CREATE TABLE `transactions` (
 	`id` text PRIMARY KEY NOT NULL,
-	`shiftId` text NOT NULL,
+	`shiftId` text,
 	`businessId` text NOT NULL,
 	`terminal_id` text,
 	`type` text NOT NULL,
@@ -808,7 +827,10 @@ CREATE TABLE `transactions` (
 	`isPartialRefund` integer DEFAULT false,
 	`discountAmount` real DEFAULT 0,
 	`appliedDiscounts` text,
-	FOREIGN KEY (`shiftId`) REFERENCES `shifts`(`id`) ON UPDATE no action ON DELETE no action,
+	`viva_wallet_transaction_id` text,
+	`viva_wallet_terminal_id` text,
+	`currency` text DEFAULT 'GBP' NOT NULL,
+	FOREIGN KEY (`shiftId`) REFERENCES `shifts`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`businessId`) REFERENCES `businesses`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`terminal_id`) REFERENCES `terminals`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`originalTransactionId`) REFERENCES `transactions`(`id`) ON UPDATE no action ON DELETE no action,
@@ -856,16 +878,11 @@ CREATE TABLE `users` (
 	`firstName` text NOT NULL,
 	`lastName` text NOT NULL,
 	`businessName` text NOT NULL,
-	`role` text NOT NULL,
-	`permissions` text NOT NULL,
 	`businessId` text NOT NULL,
 	`primary_role_id` text,
 	`shift_required` integer,
 	`active_role_context` text,
-	`lastLoginAt` integer,
 	`isActive` integer DEFAULT true,
-	`login_attempts` integer DEFAULT 0,
-	`locked_until` integer,
 	`address` text DEFAULT '',
 	`created_at` integer NOT NULL,
 	`updated_at` integer,
