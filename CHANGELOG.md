@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file. See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.26.0](https://github.com/Sam231221/AuraSwift/compare/v1.25.0...v1.26.0) (2025-12-17)
+
+
+### chore
+
+* Remove outdated testing documentation files (STRUCTURE.md and TESTING_IMPLEMENTATION_SUMMARY.md) to streamline the tests directory ([](https://github.com/Sam231221/AuraSwift/commit/927ce14fa1a300d6d965b6393930b48568fb5596))
+
+
+### docs
+
+* Add comprehensive testing setup code review, database analysis, and testing metrics documentation, and update the admin dashboard view. ([](https://github.com/Sam231221/AuraSwift/commit/d2428555d93721beb9c69e2692594f05ed4e0e1c))
+
+
+### feat
+
+* Add audit log cleanup functionality and extensive testing setup documentation and reports. ([](https://github.com/Sam231221/AuraSwift/commit/081162514dfc1e6060dccfd770197224878b427d))
+* **batches:** Add optimized data statistics and dashboard fetching functionality ([](https://github.com/Sam231221/AuraSwift/commit/83dfa14fde820d7535ad2c28f0c40d29b3588bdd))
+* **db:** Enhance database initialization with retry logic and error handling, with fresh migration ([](https://github.com/Sam231221/AuraSwift/commit/c1db805f60ee9d2391d3b1ae09881db7316d84a1))
+* Enhance database migration process with schema validation and error handling ([](https://github.com/Sam231221/AuraSwift/commit/77b4bb46219114e1fccfe281b1d4cee298f9993e))
+* Implement enhanced virtual scrolling capabilities for product and categories ([](https://github.com/Sam231221/AuraSwift/commit/824aac0c9433e702c35f3d24a70ffd5509e7d029))
+* **log-migration:** Implement log path migration from Roaming to Local for improved log management ([](https://github.com/Sam231221/AuraSwift/commit/43cdc924094ba970b6343de48a0b7d6f56092af3))
+* **pdfReceipt:** Integrate business details fetching from database for PDF receipt generation and update receipt data structure ([](https://github.com/Sam231221/AuraSwift/commit/1f4722e1698115543e984c5fcaf342c262a932e3))
+* Introduce skeleton loading components and animations for improved user experience during data fetching ([](https://github.com/Sam231221/AuraSwift/commit/00cc25c1b309cfda6107c6301e1f35503c7d4295))
+
+
+### fix
+
+* **electron-builder:** change installation setting to allow system-wide installation ([](https://github.com/Sam231221/AuraSwift/commit/a2db1627532d55d109b6ff544ef845427b7dcac2))
+* **vitest:** Update test coverage thresholds to reflect current coverage metrics ([](https://github.com/Sam231221/AuraSwift/commit/a35a0bec5a547e4bcc0fc1bf638671f94a703d37))
+
+
+### refactor
+
+* **auth:** Remove background image from AuthHeroSection for cleaner design ([](https://github.com/Sam231221/AuraSwift/commit/20eeef8d04bb6542b8076aedca9fabc6412bb5a7))
+* **product:** standardize formatting and improve code readability in product-related files ([](https://github.com/Sam231221/AuraSwift/commit/a1475115d318ddbd7a99f72888644be887dc7f27))
+* Update batch, business, cash drawer, product, shift, terminal, and time tracking handlers for improved data handling and consistency ([](https://github.com/Sam231221/AuraSwift/commit/714e0470fe491d91b9993146a8c74ba02240ccba))
+* **tests:** update performance benchmark expectations for scaling factor in buildCategoryTree tests ([](https://github.com/Sam231221/AuraSwift/commit/5ea1e36f66820d43b26bd0b682d80acec4d176fc))
+
 # [1.25.0](https://github.com/Sam231221/AuraSwift/compare/v1.24.0...v1.25.0) (2025-12-14)
 
 
