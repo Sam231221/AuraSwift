@@ -59,7 +59,7 @@ export default /** @type import('electron-builder').Configuration */
   },
   nsis: {
     oneClick: false,                    // Show installation wizard (not one-click)
-    perMachine: false,                  // Install for current user (better for Enterprise environments)
+    perMachine: true,                   // Install system-wide to C:\Program Files\ (requires admin)
     allowElevation: true,               // Allow elevation if user wants to install for all users
     allowToChangeInstallationDirectory: true,  // Let user choose install location
     createDesktopShortcut: true,        // Create desktop shortcut
