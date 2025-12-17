@@ -144,13 +144,13 @@ export class ProductManager {
    */
   async getProductLookup(
     businessId: string,
-    options?: { 
+    options?: {
       includeInactive?: boolean;
       productIds?: string[];
     }
   ): Promise<Array<{ id: string; name: string; sku: string | null }>> {
     const conditions = [eq(schema.products.businessId, businessId)];
-    
+
     if (!options?.includeInactive) {
       conditions.push(eq(schema.products.isActive, true));
     }
@@ -158,7 +158,10 @@ export class ProductManager {
     // If specific product IDs provided, filter to only those
     if (options?.productIds && options.productIds.length > 0) {
       conditions.push(
-        drizzleSql`${schema.products.id} IN (${drizzleSql.join(options.productIds.map(id => drizzleSql`${id}`), drizzleSql`, `)})`
+        drizzleSql`${schema.products.id} IN (${drizzleSql.join(
+          options.productIds.map((id) => drizzleSql`${id}`),
+          drizzleSql`, `
+        )})`
       );
     }
 

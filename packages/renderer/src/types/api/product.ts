@@ -1,26 +1,29 @@
 /**
  * Product API Types
- * 
+ *
  * Types for product management operations.
- * 
+ *
  * @module types/api/product
  */
 
 export interface ProductAPI {
   create: (productData: Record<string, any>) => Promise<any>;
-  getByBusiness: (businessId: string, includeInactive?: boolean) => Promise<any>;
+  getByBusiness: (
+    businessId: string,
+    includeInactive?: boolean
+  ) => Promise<any>;
   getPaginated: (
     businessId: string,
     pagination: {
       page: number;
       pageSize: number;
       sortBy?: string;
-      sortOrder?: 'asc' | 'desc';
+      sortOrder?: "asc" | "desc";
     },
     filters?: {
       categoryId?: string;
       searchTerm?: string;
-      stockStatus?: 'all' | 'in_stock' | 'low' | 'out_of_stock';
+      stockStatus?: "all" | "in_stock" | "low" | "out_of_stock";
       isActive?: boolean;
     }
   ) => Promise<any>;

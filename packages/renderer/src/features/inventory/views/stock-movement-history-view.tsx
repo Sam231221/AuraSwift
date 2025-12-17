@@ -21,8 +21,8 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/shared/hooks/use-auth";
 
-import { getLogger } from '@/shared/utils/logger';
-const logger = getLogger('stock-movement-history-view');
+import { getLogger } from "@/shared/utils/logger";
+const logger = getLogger("stock-movement-history-view");
 
 interface StockMovement {
   id: string;

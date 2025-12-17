@@ -1,8 +1,8 @@
 /**
  * Product API Types - Preload
- * 
+ *
  * Type definitions for product management IPC APIs.
- * 
+ *
  * @module preload/types/api/product
  */
 
@@ -35,7 +35,10 @@ export interface ProductAPIPreload {
     allowDiscount?: boolean;
   }) => Promise<any>;
 
-  getByBusiness: (businessId: string, includeInactive?: boolean) => Promise<any>;
+  getByBusiness: (
+    businessId: string,
+    includeInactive?: boolean
+  ) => Promise<any>;
 
   getPaginated: (
     businessId: string,
@@ -123,4 +126,3 @@ export interface ProductAPIPreload {
 
   getStats: (businessId: string) => Promise<any>;
 }
-

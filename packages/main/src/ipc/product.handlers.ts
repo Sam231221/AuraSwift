@@ -111,10 +111,17 @@ export function registerProductHandlers() {
   // Get lightweight product lookup (optimized for dropdowns - only id, name, sku)
   ipcMain.handle(
     "products:getLookup",
-    async (event, businessId, options?: { includeInactive?: boolean; productIds?: string[] }) => {
+    async (
+      event,
+      businessId,
+      options?: { includeInactive?: boolean; productIds?: string[] }
+    ) => {
       try {
         const db = await getDatabase();
-        const products = await db.products.getProductLookup(businessId, options);
+        const products = await db.products.getProductLookup(
+          businessId,
+          options
+        );
         return {
           success: true,
           products,
