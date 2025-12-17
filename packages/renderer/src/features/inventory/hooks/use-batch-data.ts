@@ -56,13 +56,13 @@ export const useBatchData = ({ businessId, productId }: UseBatchDataProps) => {
   }, [businessId, productId]);
 
   const loadSuppliers = useCallback(async () => {
-    if (!businessId || !window.supplierAPI) {
+    if (!businessId || !window.suppliersAPI) {
       setSuppliers([]);
       return;
     }
 
     try {
-      const response = await window.supplierAPI.getByBusiness(businessId);
+      const response = await window.suppliersAPI.getByBusiness(businessId);
 
       if (response.success && response.suppliers) {
         setSuppliers(

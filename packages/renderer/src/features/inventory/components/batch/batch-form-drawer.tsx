@@ -47,6 +47,7 @@ interface BatchFormDrawerProps {
   editingBatch: ProductBatch | null;
   product: Product | null;
   products?: Product[]; // For product selection when creating new batch
+  loadingProducts?: boolean; // Show loading state while products are loading
   suppliers: Supplier[];
   businessId: string;
   onClose: () => void;
@@ -59,6 +60,7 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
   editingBatch,
   product: initialProduct,
   products = [],
+  loadingProducts = false,
   suppliers,
   businessId,
   onClose,
@@ -330,21 +332,32 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                           }
                         }}
                         value={field.value || ""}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || loadingProducts}
                         onOpenChange={() => keyboard.handleCloseKeyboard()}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a product" />
+                            <SelectValue
+                              placeholder={
+                                loadingProducts
+                                  ? "Loading products..."
+                                  : "Select a product"
+                              }
+                            />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {products.length === 0 ? (
+                          {loadingProducts ? (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
+                              <span className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                              Loading products...
+                            </div>
+                          ) : products.length === 0 ? (
                             <div className="px-2 py-1.5 text-sm text-muted-foreground">
                               No products available
                             </div>
                           ) : (
-                            products.map((prod) => (
+                            products.slice(0, 100).map((prod) => (
                               <SelectItem key={prod.id} value={prod.id}>
                                 <div className="flex items-center space-x-2">
                                   {prod.image && (
@@ -361,6 +374,11 @@ const BatchFormDrawer: React.FC<BatchFormDrawerProps> = ({
                                 </div>
                               </SelectItem>
                             ))
+                          )}
+                          {!loadingProducts && products.length > 100 && (
+                            <div className="px-2 py-1.5 text-xs text-muted-foreground border-t">
+                              Showing first 100 of {products.length} products
+                            </div>
                           )}
                         </SelectContent>
                       </Select>

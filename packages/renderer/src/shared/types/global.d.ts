@@ -66,10 +66,10 @@ declare global {
 
     // Batch Management
     batchesAPI: BatchAPI;
-    supplierAPI: SupplierAPI;
+    suppliersAPI: SupplierAPI;
     expirySettingsAPI: ExpirySettingsAPI;
     salesUnitSettingsAPI: SalesUnitSettingsAPI;
-    stockMovementAPI: StockMovementAPI;
+    stockMovementsAPI: StockMovementAPI;
 
     // Shift Management
     shiftAPI: ShiftAPI;

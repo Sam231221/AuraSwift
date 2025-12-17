@@ -53,11 +53,14 @@ export class BatchManager {
    * Get batch statistics for a business (optimized - uses COUNT aggregation)
    * This is much faster than loading all batches for dashboard display
    */
-  async getBatchStats(businessId: string, expirySettings?: {
-    criticalAlertDays: number;
-    warningAlertDays: number;
-    infoAlertDays: number;
-  }): Promise<{
+  async getBatchStats(
+    businessId: string,
+    expirySettings?: {
+      criticalAlertDays: number;
+      warningAlertDays: number;
+      infoAlertDays: number;
+    }
+  ): Promise<{
     totalBatches: number;
     activeBatches: number;
     expiredBatches: number;
@@ -72,16 +75,16 @@ export class BatchManager {
     const now = new Date();
     const criticalDays = expirySettings?.criticalAlertDays ?? 3;
     const warningDays = expirySettings?.warningAlertDays ?? 7;
-    
+
     const criticalDate = new Date();
     criticalDate.setDate(criticalDate.getDate() + criticalDays);
-    
+
     const warningDate = new Date();
     warningDate.setDate(warningDate.getDate() + warningDays);
-    
+
     const weekDate = new Date();
     weekDate.setDate(weekDate.getDate() + 7);
-    
+
     const thirtyDayDate = new Date();
     thirtyDayDate.setDate(thirtyDayDate.getDate() + 30);
 
@@ -449,7 +452,10 @@ export class BatchManager {
         productImage: schema.products.image,
       })
       .from(schema.productBatches)
-      .leftJoin(schema.products, eq(schema.productBatches.productId, schema.products.id))
+      .leftJoin(
+        schema.products,
+        eq(schema.productBatches.productId, schema.products.id)
+      )
       .where(and(...conditions))
       .orderBy(orderByClause)
       .limit(limit)
@@ -472,12 +478,14 @@ export class BatchManager {
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       // Nested product object (if product exists)
-      product: item.productName ? {
-        id: item.productId,
-        name: item.productName,
-        sku: item.productSku,
-        image: item.productImage,
-      } : undefined,
+      product: item.productName
+        ? {
+            id: item.productId,
+            name: item.productName,
+            sku: item.productSku,
+            image: item.productImage,
+          }
+        : undefined,
     }));
 
     return {
@@ -735,5 +743,141 @@ export class BatchManager {
       .limit(1);
 
     return (batch as ProductBatch) || null;
+  }
+
+  /**
+   * Get batches for dashboard display (OPTIMIZED)
+   * Only returns expired batches and batches expiring within the specified days
+   * with a limit to prevent loading massive datasets.
+   * Includes product info via JOIN for display.
+   */
+  async getBatchesForDashboard(
+    businessId: string,
+    options?: {
+      expiringWithinDays?: number; // Default 30 days
+      limit?: number; // Default 100
+      includeExpired?: boolean; // Default true
+    }
+  ): Promise<{
+    expiredBatches: ProductBatch[];
+    expiringBatches: ProductBatch[];
+  }> {
+    const expiringDays = options?.expiringWithinDays ?? 30;
+    const limit = options?.limit ?? 100;
+    const includeExpired = options?.includeExpired ?? true;
+
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + expiringDays);
+
+    // Get expiring batches (active, expiring within the specified days)
+    const expiringBatches = await this.db
+      .select({
+        // Batch fields
+        id: schema.productBatches.id,
+        productId: schema.productBatches.productId,
+        batchNumber: schema.productBatches.batchNumber,
+        manufacturingDate: schema.productBatches.manufacturingDate,
+        expiryDate: schema.productBatches.expiryDate,
+        initialQuantity: schema.productBatches.initialQuantity,
+        currentQuantity: schema.productBatches.currentQuantity,
+        supplierId: schema.productBatches.supplierId,
+        purchaseOrderNumber: schema.productBatches.purchaseOrderNumber,
+        costPrice: schema.productBatches.costPrice,
+        status: schema.productBatches.status,
+        businessId: schema.productBatches.businessId,
+        createdAt: schema.productBatches.createdAt,
+        updatedAt: schema.productBatches.updatedAt,
+        // Product fields (via JOIN)
+        productName: schema.products.name,
+        productSku: schema.products.sku,
+        productImage: schema.products.image,
+      })
+      .from(schema.productBatches)
+      .leftJoin(
+        schema.products,
+        eq(schema.productBatches.productId, schema.products.id)
+      )
+      .where(
+        and(
+          eq(schema.productBatches.businessId, businessId),
+          eq(schema.productBatches.status, "ACTIVE"),
+          gte(schema.productBatches.expiryDate, now),
+          lte(schema.productBatches.expiryDate, futureDate)
+        )
+      )
+      .orderBy(asc(schema.productBatches.expiryDate))
+      .limit(limit);
+
+    // Get expired batches if requested
+    let expiredBatches: any[] = [];
+    if (includeExpired) {
+      expiredBatches = await this.db
+        .select({
+          // Batch fields
+          id: schema.productBatches.id,
+          productId: schema.productBatches.productId,
+          batchNumber: schema.productBatches.batchNumber,
+          manufacturingDate: schema.productBatches.manufacturingDate,
+          expiryDate: schema.productBatches.expiryDate,
+          initialQuantity: schema.productBatches.initialQuantity,
+          currentQuantity: schema.productBatches.currentQuantity,
+          supplierId: schema.productBatches.supplierId,
+          purchaseOrderNumber: schema.productBatches.purchaseOrderNumber,
+          costPrice: schema.productBatches.costPrice,
+          status: schema.productBatches.status,
+          businessId: schema.productBatches.businessId,
+          createdAt: schema.productBatches.createdAt,
+          updatedAt: schema.productBatches.updatedAt,
+          // Product fields (via JOIN)
+          productName: schema.products.name,
+          productSku: schema.products.sku,
+          productImage: schema.products.image,
+        })
+        .from(schema.productBatches)
+        .leftJoin(
+          schema.products,
+          eq(schema.productBatches.productId, schema.products.id)
+        )
+        .where(
+          and(
+            eq(schema.productBatches.businessId, businessId),
+            eq(schema.productBatches.status, "EXPIRED")
+          )
+        )
+        .orderBy(desc(schema.productBatches.expiryDate))
+        .limit(limit);
+    }
+
+    // Transform results to include nested product object
+    const transformBatch = (item: any) => ({
+      id: item.id,
+      productId: item.productId,
+      batchNumber: item.batchNumber,
+      manufacturingDate: item.manufacturingDate,
+      expiryDate: item.expiryDate,
+      initialQuantity: item.initialQuantity,
+      currentQuantity: item.currentQuantity,
+      supplierId: item.supplierId,
+      purchaseOrderNumber: item.purchaseOrderNumber,
+      costPrice: item.costPrice,
+      status: item.status,
+      businessId: item.businessId,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      product: item.productName
+        ? {
+            id: item.productId,
+            name: item.productName,
+            sku: item.productSku,
+            image: item.productImage,
+          }
+        : undefined,
+    });
+
+    return {
+      expiredBatches: expiredBatches.map(transformBatch) as ProductBatch[],
+      expiringBatches: expiringBatches.map(transformBatch) as ProductBatch[],
+    };
   }
 }

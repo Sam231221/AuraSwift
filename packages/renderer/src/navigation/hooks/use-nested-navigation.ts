@@ -56,9 +56,7 @@ export function useNestedNavigation(parentViewId: string) {
       }
 
       if (view.parentId !== parentViewId) {
-        logger.warn(
-          `View ${viewId} is not a nested view of ${parentViewId}`
-        );
+        logger.warn(`View ${viewId} is not a nested view of ${parentViewId}`);
         return;
       }
 
@@ -80,4 +78,3 @@ export function useNestedNavigation(parentViewId: string) {
     currentNestedParams: nestedContext.state.viewParams,
   };
 }
-

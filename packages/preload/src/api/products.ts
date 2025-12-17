@@ -96,6 +96,17 @@ export const productAPI = {
     options: { name: string; price: number }[];
   }) => ipcRenderer.invoke("modifiers:create", modifierData),
 
+  /**
+   * Get lightweight product lookup data (optimized for dropdowns)
+   * Only returns id, name, sku - much faster than loading full products
+   * @param businessId - Business ID
+   * @param options - Optional filters (includeInactive, specific productIds)
+   */
+  getLookup: (
+    businessId: string,
+    options?: { includeInactive?: boolean; productIds?: string[] }
+  ) => ipcRenderer.invoke("products:getLookup", businessId, options),
+
   adjustStock: (adjustmentData: {
     productId: string;
     type: "add" | "remove" | "sale" | "waste" | "adjustment";

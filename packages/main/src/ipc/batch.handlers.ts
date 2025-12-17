@@ -110,6 +110,30 @@ export function registerBatchHandlers() {
     }
   );
 
+  // Get batch stats (optimized for dashboards)
+  ipcMain.handle(
+    "batches:getStats",
+    async (event, businessId, expirySettings) => {
+      try {
+        const db = await getDatabase();
+        const stats = await db.batches.getBatchStats(
+          businessId,
+          expirySettings
+        );
+        return {
+          success: true,
+          data: stats,
+        };
+      } catch (error: any) {
+        logger.error("Get batch stats IPC error:", error);
+        return {
+          success: false,
+          message: error.message || "Failed to get batch stats",
+        };
+      }
+    }
+  );
+
   ipcMain.handle(
     "batches:getActiveBatches",
     async (event, productId, rotationMethod) => {
@@ -344,6 +368,30 @@ export function registerBatchHandlers() {
         return {
           success: false,
           message: "Failed to get batch",
+        };
+      }
+    }
+  );
+
+  // Optimized dashboard batches (only expired + expiring soon, with limit)
+  ipcMain.handle(
+    "batches:getForDashboard",
+    async (event, businessId, options) => {
+      try {
+        const db = await getDatabase();
+        const result = await db.batches.getBatchesForDashboard(
+          businessId,
+          options
+        );
+        return {
+          success: true,
+          data: JSON.parse(JSON.stringify(result)),
+        };
+      } catch (error: any) {
+        logger.error("Get dashboard batches IPC error:", error);
+        return {
+          success: false,
+          message: error.message || "Failed to get dashboard batches",
         };
       }
     }

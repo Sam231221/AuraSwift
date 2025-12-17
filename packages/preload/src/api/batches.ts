@@ -56,6 +56,15 @@ export const batchesAPI = {
   ) =>
     ipcRenderer.invoke("batches:getPaginated", businessId, pagination, filters),
 
+  getStats: (
+    businessId: string,
+    expirySettings?: {
+      criticalAlertDays: number;
+      warningAlertDays: number;
+      infoAlertDays: number;
+    }
+  ) => ipcRenderer.invoke("batches:getStats", businessId, expirySettings),
+
   getActiveBatches: (
     productId: string,
     rotationMethod?: "FIFO" | "FEFO" | "NONE"
@@ -113,4 +122,14 @@ export const batchesAPI = {
       productId,
       businessId
     ),
+
+  // Optimized dashboard batches - only returns expired + expiring soon batches with limit
+  getForDashboard: (
+    businessId: string,
+    options?: {
+      expiringWithinDays?: number; // Default 30 days
+      limit?: number; // Default 100
+      includeExpired?: boolean; // Default true
+    }
+  ) => ipcRenderer.invoke("batches:getForDashboard", businessId, options),
 };

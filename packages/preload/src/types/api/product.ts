@@ -55,6 +55,19 @@ export interface ProductAPIPreload {
 
   getById: (id: string) => Promise<any>;
 
+  /**
+   * Get lightweight product lookup data (optimized for dropdowns)
+   * Only returns id, name, sku - much faster than loading full products
+   */
+  getLookup: (
+    businessId: string,
+    options?: { includeInactive?: boolean; productIds?: string[] }
+  ) => Promise<{
+    success: boolean;
+    products?: Array<{ id: string; name: string; sku: string | null }>;
+    message?: string;
+  }>;
+
   update: (
     id: string,
     updates: Partial<{
@@ -107,5 +120,7 @@ export interface ProductAPIPreload {
   getStockAdjustments: (productId: string) => Promise<any>;
 
   syncStock: (businessId: string) => Promise<any>;
+
+  getStats: (businessId: string) => Promise<any>;
 }
 

@@ -1,4 +1,4 @@
-import React, { startTransition } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,24 @@ import type { ProductBatch, ExpirySettings } from "../types/batch.types";
 import { useExpiryAlerts } from "@/features/inventory/hooks/use-expiry-alerts";
 import { formatExpiryDate } from "../utils/expiry-calculations";
 
+interface BatchStats {
+  totalBatches: number;
+  activeBatches: number;
+  expiredBatches: number;
+  soldOutBatches: number;
+  criticalBatches: number;
+  warningBatches: number;
+  expiringThisWeek: number;
+  expiringNext30Days: number;
+  valueAtRisk: number;
+  wasteValue: number;
+}
+
 interface ExpiryDashboardProps {
   batches: ProductBatch[];
   expirySettings: ExpirySettings | null;
   businessId: string;
+  batchStats?: BatchStats; // Optimized stats from server
   onViewBatches?: () => void;
   onReceiveBatch?: () => void;
   onGenerateReport?: () => void;
@@ -28,6 +42,7 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
   batches,
   expirySettings,
   businessId,
+  batchStats,
   onViewBatches,
   onReceiveBatch,
   onGenerateReport,
@@ -45,22 +60,33 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
     businessId,
   });
 
-  const totalBatches = batches.length;
-  const activeBatches = batches.filter((b) => b.status === "ACTIVE").length;
-  const expiredCount = expiredBatches.length;
-  const criticalCount = criticalBatches.length;
+  // Use server stats (fast aggregation query) instead of client-side calculation
+  // Server stats are more accurate as they cover ALL batches, not just the limited subset
+  const totalBatches = batchStats?.totalBatches ?? batches.length;
+  const activeBatches =
+    batchStats?.activeBatches ??
+    batches.filter((b) => b.status === "ACTIVE").length;
+  const expiredCount = batchStats?.expiredBatches ?? expiredBatches.length;
+  const criticalCount = batchStats?.criticalBatches ?? criticalBatches.length;
 
-  // Calculate total value at risk (batches expiring in next 7 days)
-  const valueAtRisk = expiringThisWeek.reduce((total, batch) => {
-    const cost = batch.costPrice || 0;
-    return total + cost * batch.currentQuantity;
-  }, 0);
+  // Use server stats for value calculations (fast aggregation, covers ALL batches)
+  const valueAtRisk =
+    batchStats?.valueAtRisk ??
+    expiringThisWeek.reduce((total, batch) => {
+      const cost = batch.costPrice || 0;
+      return total + cost * batch.currentQuantity;
+    }, 0);
 
-  // Calculate waste value (expired batches)
-  const wasteValue = expiredBatches.reduce((total, batch) => {
-    const cost = batch.costPrice || 0;
-    return total + cost * batch.currentQuantity;
-  }, 0);
+  const wasteValue =
+    batchStats?.wasteValue ??
+    expiredBatches.reduce((total, batch) => {
+      const cost = batch.costPrice || 0;
+      return total + cost * batch.currentQuantity;
+    }, 0);
+
+  // Use server stats for "expiring this week" count (accurate count from aggregation)
+  const expiringThisWeekCount =
+    batchStats?.expiringThisWeek ?? expiringThisWeek.length;
 
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
@@ -78,65 +104,14 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
           {onViewBatches && (
             <Button
               variant="outline"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const target = e.currentTarget;
-                target.blur();
-                target.disabled = true;
-                try {
-                  startTransition(() => {
-                    setTimeout(() => {
-                      try {
-                        onViewBatches();
-                      } catch (error) {
-                        console.error("Error in onViewBatches:", error);
-                      } finally {
-                        setTimeout(() => {
-                          target.disabled = false;
-                        }, 300);
-                      }
-                    }, 0);
-                  });
-                } catch (error) {
-                  console.error("Error setting up onViewBatches:", error);
-                  target.disabled = false;
-                }
-              }}
+              onClick={onViewBatches}
               className="w-full sm:w-auto"
             >
               View All Batches
             </Button>
           )}
           {onReceiveBatch && (
-            <Button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const target = e.currentTarget;
-                target.blur();
-                target.disabled = true;
-                try {
-                  startTransition(() => {
-                    setTimeout(() => {
-                      try {
-                        onReceiveBatch();
-                      } catch (error) {
-                        console.error("Error in onReceiveBatch:", error);
-                      } finally {
-                        setTimeout(() => {
-                          target.disabled = false;
-                        }, 300);
-                      }
-                    }, 0);
-                  });
-                } catch (error) {
-                  console.error("Error setting up onReceiveBatch:", error);
-                  target.disabled = false;
-                }
-              }}
-              className="w-full sm:w-auto"
-            >
+            <Button onClick={onReceiveBatch} className="w-full sm:w-auto">
               <Package className="w-4 h-4 mr-2" />
               Receive New Batch
             </Button>
@@ -223,11 +198,11 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
           </CardHeader>
           <CardContent>
             <div className="text-xl sm:text-2xl font-bold text-orange-600">
-              {expiringThisWeek.length}
+              {expiringThisWeekCount}
             </div>
             <p className="text-xs text-gray-500 mt-1">
               {expiringThisWeek.reduce((sum, b) => sum + b.currentQuantity, 0)}{" "}
-              units
+              units (from loaded batches)
             </p>
           </CardContent>
         </Card>
@@ -278,34 +253,7 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
               <Button
                 variant="outline"
                 className="w-full justify-start text-sm sm:text-base"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const target = e.currentTarget;
-                  target.blur();
-                  // Disable button temporarily to prevent multiple clicks
-                  target.disabled = true;
-                  try {
-                    // Use startTransition to mark as non-urgent and setTimeout as fallback
-                    startTransition(() => {
-                      setTimeout(() => {
-                        try {
-                          onReceiveBatch();
-                        } catch (error) {
-                          console.error("Error in onReceiveBatch:", error);
-                        } finally {
-                          // Re-enable button after a delay
-                          setTimeout(() => {
-                            target.disabled = false;
-                          }, 300);
-                        }
-                      }, 0);
-                    });
-                  } catch (error) {
-                    console.error("Error setting up onReceiveBatch:", error);
-                    target.disabled = false;
-                  }
-                }}
+                onClick={onReceiveBatch}
               >
                 <Package className="w-4 h-4 mr-2" />
                 Receive New Batch
@@ -315,34 +263,7 @@ const ExpiryDashboard: React.FC<ExpiryDashboardProps> = ({
               <Button
                 variant="outline"
                 className="w-full justify-start text-sm sm:text-base"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const target = e.currentTarget;
-                  target.blur();
-                  // Disable button temporarily to prevent multiple clicks
-                  target.disabled = true;
-                  try {
-                    // Use startTransition to mark as non-urgent and setTimeout as fallback
-                    startTransition(() => {
-                      setTimeout(() => {
-                        try {
-                          onViewBatches();
-                        } catch (error) {
-                          console.error("Error in onViewBatches:", error);
-                        } finally {
-                          // Re-enable button after a delay
-                          setTimeout(() => {
-                            target.disabled = false;
-                          }, 300);
-                        }
-                      }, 0);
-                    });
-                  } catch (error) {
-                    console.error("Error setting up onViewBatches:", error);
-                    target.disabled = false;
-                  }
-                }}
+                onClick={onViewBatches}
               >
                 <BarChart3 className="w-4 h-4 mr-2" />
                 View All Batches

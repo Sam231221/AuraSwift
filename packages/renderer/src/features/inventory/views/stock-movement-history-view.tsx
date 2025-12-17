@@ -82,7 +82,7 @@ const StockMovementHistoryView: React.FC<StockMovementHistoryViewProps> = ({
     try {
       // If filtering by specific product
       if (filterProduct !== "all") {
-        const response = await window.stockMovementAPI.getByProduct(
+        const response = await window.stockMovementsAPI.getByProduct(
           filterProduct
         );
         if (response.success && response.movements) {
@@ -90,7 +90,7 @@ const StockMovementHistoryView: React.FC<StockMovementHistoryViewProps> = ({
         }
       } else {
         // Load all movements for business
-        const response = await window.stockMovementAPI.getByBusiness(
+        const response = await window.stockMovementsAPI.getByBusiness(
           user.businessId
         );
         if (response.success && response.movements) {

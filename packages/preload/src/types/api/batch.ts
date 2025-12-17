@@ -1,8 +1,8 @@
 /**
  * Batch API Types - Preload
- * 
+ *
  * Type definitions for product batch management IPC APIs.
- * 
+ *
  * @module preload/types/api/batch
  */
 
@@ -38,9 +38,15 @@ export interface BatchAPIPreload {
 
   getById: (batchId: string) => Promise<any>;
 
-  getByProduct: (productId: string, options?: GetBatchesOptions) => Promise<any>;
+  getByProduct: (
+    productId: string,
+    options?: GetBatchesOptions
+  ) => Promise<any>;
 
-  getByBusiness: (businessId: string, options?: GetBatchesOptions) => Promise<any>;
+  getByBusiness: (
+    businessId: string,
+    options?: GetBatchesOptions
+  ) => Promise<any>;
 
   getPaginated: (
     businessId: string,
@@ -90,6 +96,28 @@ export interface BatchAPIPreload {
 
   remove: (batchId: string) => Promise<any>;
 
-  getByNumber: (batchNumber: string, productId: string, businessId: string) => Promise<any>;
-}
+  getByNumber: (
+    batchNumber: string,
+    productId: string,
+    businessId: string
+  ) => Promise<any>;
 
+  // Optimized dashboard batches - only returns expired + expiring soon batches with limit
+  getForDashboard: (
+    businessId: string,
+    options?: {
+      expiringWithinDays?: number; // Default 30 days
+      limit?: number; // Default 100
+      includeExpired?: boolean; // Default true
+    }
+  ) => Promise<any>;
+
+  getStats: (
+    businessId: string,
+    expirySettings?: {
+      criticalAlertDays: number;
+      warningAlertDays: number;
+      infoAlertDays: number;
+    }
+  ) => Promise<any>;
+}

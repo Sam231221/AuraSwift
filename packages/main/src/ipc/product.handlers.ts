@@ -108,6 +108,27 @@ export function registerProductHandlers() {
     }
   );
 
+  // Get lightweight product lookup (optimized for dropdowns - only id, name, sku)
+  ipcMain.handle(
+    "products:getLookup",
+    async (event, businessId, options?: { includeInactive?: boolean; productIds?: string[] }) => {
+      try {
+        const db = await getDatabase();
+        const products = await db.products.getProductLookup(businessId, options);
+        return {
+          success: true,
+          products,
+        };
+      } catch (error: any) {
+        logger.error("Get product lookup IPC error:", error);
+        return {
+          success: false,
+          message: error.message || "Failed to get product lookup",
+        };
+      }
+    }
+  );
+
   // Stock adjustment with audit trail
   ipcMain.handle("products:adjustStock", async (event, adjustmentData) => {
     try {

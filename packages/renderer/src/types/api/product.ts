@@ -8,7 +8,7 @@
 
 export interface ProductAPI {
   create: (productData: Record<string, any>) => Promise<any>;
-  getByBusiness: (businessId: string) => Promise<any>;
+  getByBusiness: (businessId: string, includeInactive?: boolean) => Promise<any>;
   getPaginated: (
     businessId: string,
     pagination: {
@@ -24,10 +24,23 @@ export interface ProductAPI {
       isActive?: boolean;
     }
   ) => Promise<any>;
+  /**
+   * Get lightweight product lookup data (optimized for dropdowns)
+   * Only returns id, name, sku - much faster than loading full products
+   */
+  getLookup: (
+    businessId: string,
+    options?: { includeInactive?: boolean; productIds?: string[] }
+  ) => Promise<{
+    success: boolean;
+    products?: Array<{ id: string; name: string; sku: string | null }>;
+    message?: string;
+  }>;
   getById: (id: string) => Promise<any>;
   update: (id: string, updates: Record<string, any>) => Promise<any>;
   delete: (id: string) => Promise<any>;
   adjustStock: (adjustmentData: Record<string, any>) => Promise<any>;
   getStockAdjustments: (productId: string) => Promise<any>;
   syncStock: (businessId: string) => Promise<any>;
+  getStats: (businessId: string) => Promise<any>;
 }

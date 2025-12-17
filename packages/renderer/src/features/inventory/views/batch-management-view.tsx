@@ -112,7 +112,9 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
   const [adjustmentReason, setAdjustmentReason] = useState("");
 
   // Data state
+  // Full products only loaded when batch form drawer opens (lazy loading)
   const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoaded, setProductsLoaded] = useState(false);
   const [batches, setBatches] = useState<ProductBatch[]>([]);
   const [allBatches, setAllBatches] = useState<ProductBatch[]>([]); // For dashboard/alerts
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -121,41 +123,84 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
   );
   const [loading, setLoading] = useState(false);
 
+  // Batch stats for dashboard (optimized - loaded via aggregation query)
+  const [batchStats, setBatchStats] = useState<{
+    totalBatches: number;
+    activeBatches: number;
+    expiredBatches: number;
+    soldOutBatches: number;
+    criticalBatches: number;
+    warningBatches: number;
+    expiringThisWeek: number;
+    expiringNext30Days: number;
+    valueAtRisk: number;
+    wasteValue: number;
+  }>({
+    totalBatches: 0,
+    activeBatches: 0,
+    expiredBatches: 0,
+    soldOutBatches: 0,
+    criticalBatches: 0,
+    warningBatches: 0,
+    expiringThisWeek: 0,
+    expiringNext30Days: 0,
+    valueAtRisk: 0,
+    wasteValue: 0,
+  });
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  // Load products for dropdown (including inactive products to show names for orphaned batches)
-  useEffect(() => {
-    const loadProducts = async () => {
-      if (!user?.businessId) return;
-      try {
-        // Pass true to include inactive/deleted products so we can display their names for orphaned batches
-        const response = await window.productAPI.getByBusiness(user.businessId);
-        if (response.success && response.products) {
-          setProducts(response.products);
-        }
-      } catch (error) {
-        logger.error("Error loading products:", error);
+  // Load lightweight product lookup for dropdown (only id, name, sku - NOT full products)
+  // OPTIMIZED: Only load when needed (list view or when filtering by product)
+  const [productLookup, setProductLookup] = useState<
+    Array<{ id: string; name: string; sku: string | null }>
+  >([]);
+  const [productLookupLoaded, setProductLookupLoaded] = useState(false);
+
+  // Lazy load product lookup - only when list view is active or when we have effectiveProductId
+  const loadProductLookup = useCallback(async () => {
+    if (!user?.businessId || productLookupLoaded) return;
+    try {
+      const response = await window.productAPI.getLookup(user.businessId, {
+        includeInactive: true,
+      });
+      if (response.success && response.products) {
+        setProductLookup(response.products);
+        setProductLookupLoaded(true);
       }
-    };
-    loadProducts();
-  }, [user?.businessId]);
+    } catch (error) {
+      logger.error("Error loading product lookup:", error);
+    }
+  }, [user?.businessId, productLookupLoaded]);
+
+  // Load product lookup only when entering list view OR when we need to resolve effectiveProductId
+  useEffect(() => {
+    if (currentView === "list" || effectiveProductId) {
+      loadProductLookup();
+    }
+  }, [currentView, effectiveProductId, loadProductLookup]);
 
   // Auto-select product from initialProductId or params
   useEffect(() => {
     const productId = effectiveProductId;
-    if (productId && products.length > 0) {
-      const product = products.find((p) => p.id === productId);
+    if (productId && productLookup.length > 0) {
+      const product = productLookup.find((p) => p.id === productId);
       if (product) {
-        setSelectedProduct(product);
+        // Create a minimal Product object for selectedProduct state
+        setSelectedProduct({
+          id: product.id,
+          name: product.name,
+          sku: product.sku || "",
+        } as Product);
       }
     }
-  }, [effectiveProductId, products]);
+  }, [effectiveProductId, productLookup]);
 
-  // Load paginated batches
+  // Load paginated batches (product info is now included via backend JOIN)
   const loadBatches = useCallback(async () => {
     if (!user?.businessId) return;
 
@@ -178,23 +223,9 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
       );
 
       if (response.success && response.data) {
-        // Enrich batches with product data
-        const enrichedItems = response.data.items.map((batch: ProductBatch) => {
-          const product = products.find((p) => p.id === batch.productId);
-          return {
-            ...batch,
-            product: product
-              ? {
-                  id: product.id,
-                  name: product.name,
-                  sku: product.sku,
-                  image: product.image,
-                }
-              : batch.product,
-          };
-        });
-
-        setBatches(enrichedItems);
+        // Batches now come pre-enriched with product info from backend JOIN
+        // No need to iterate through 30k products client-side
+        setBatches(response.data.items);
         setTotalItems(response.data.pagination.totalItems);
         setTotalPages(response.data.pagination.totalPages);
       } else {
@@ -211,61 +242,87 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     currentPage,
     pageSize,
     selectedProduct,
-    initialProductId,
+    effectiveProductId,
     statusFilter,
     expiryFilter,
-    products,
+    // REMOVED: products - no longer needed as backend includes product info
   ]);
 
   // Load all batches for dashboard and alerts (without pagination)
+  // OPTIMIZED: Only load expired + expiring batches with limit instead of ALL batches
   const loadAllBatches = useCallback(async () => {
     if (!user?.businessId) return;
 
     try {
-      const response = await window.batchesAPI.getByBusiness(user.businessId, {
-        productId: selectedProduct?.id || initialProductId,
-      });
+      // Use optimized dashboard API that only returns relevant batches
+      const response = await window.batchesAPI.getForDashboard(
+        user.businessId,
+        {
+          expiringWithinDays: 30, // Only batches expiring in next 30 days
+          limit: 100, // Limit to prevent loading massive datasets
+          includeExpired: true, // Include expired for alerts display
+        }
+      );
 
-      if (response.success && response.batches) {
-        // Enrich with product data
-        const enriched = response.batches.map((batch: ProductBatch) => {
-          const product = products.find((p) => p.id === batch.productId);
-          return {
-            ...batch,
-            product: product
-              ? {
-                  id: product.id,
-                  name: product.name,
-                  sku: product.sku,
-                  image: product.image,
-                }
-              : batch.product,
-          };
-        });
-        setAllBatches(enriched);
+      if (response.success && response.data) {
+        // Combine expired and expiring batches for dashboard display
+        const combinedBatches = [
+          ...response.data.expiredBatches,
+          ...response.data.expiringBatches,
+        ];
+        setAllBatches(combinedBatches);
       }
     } catch (error) {
-      logger.error("Error loading all batches:", error);
+      logger.error("Error loading dashboard batches:", error);
     }
-  }, [user?.businessId, selectedProduct, initialProductId, products]);
-
-  // Load suppliers
-  useEffect(() => {
-    const loadSuppliers = async () => {
-      if (!user?.businessId) return;
-      try {
-        const response = await window.supplierAPI.getByBusiness(
-          user.businessId
-        );
-        if (response.success && response.suppliers) {
-          setSuppliers(response.suppliers);
-        }
-      } catch (error) {
-        logger.error("Error loading suppliers:", error);
-      }
-    };
-    loadSuppliers();
   }, [user?.businessId]);
+  // REMOVED: products dependency - not needed for alerts
+
+  // Load batch stats (optimized - uses aggregation query)
+  const loadBatchStats = useCallback(async () => {
+    if (!user?.businessId) return;
+
+    try {
+      const response = await window.batchesAPI.getStats(
+        user.businessId,
+        expirySettings
+          ? {
+              criticalAlertDays: expirySettings.criticalAlertDays,
+              warningAlertDays: expirySettings.warningAlertDays,
+              infoAlertDays: expirySettings.infoAlertDays,
+            }
+          : undefined
+      );
+
+      if (response.success && response.data) {
+        setBatchStats(response.data);
+      }
+    } catch (error) {
+      logger.error("Error loading batch stats:", error);
+    }
+  }, [user?.businessId, expirySettings]);
+
+  // Load suppliers - LAZY: only when batch form is opened
+  const [suppliersLoaded, setSuppliersLoaded] = useState(false);
+  const loadSuppliers = useCallback(async () => {
+    if (!user?.businessId || suppliersLoaded) return;
+    try {
+      const response = await window.suppliersAPI.getByBusiness(user.businessId);
+      if (response.success && response.suppliers) {
+        setSuppliers(response.suppliers);
+        setSuppliersLoaded(true);
+      }
+    } catch (error) {
+      logger.error("Error loading suppliers:", error);
+    }
+  }, [user?.businessId, suppliersLoaded]);
+
+  // Load suppliers when batch form is opened
+  useEffect(() => {
+    if (isBatchFormOpen) {
+      loadSuppliers();
+    }
+  }, [isBatchFormOpen, loadSuppliers]);
 
   // Load expiry settings
   useEffect(() => {
@@ -320,10 +377,17 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     loadExpirySettings();
   }, [user?.businessId]);
 
-  // Load batches when dependencies change
+  // Load batch stats immediately (fast query)
   useEffect(() => {
-    loadBatches();
-  }, [loadBatches]);
+    loadBatchStats();
+  }, [loadBatchStats]);
+
+  // Load batches only when in list view (paginated, fast)
+  useEffect(() => {
+    if (currentView === "list") {
+      loadBatches();
+    }
+  }, [currentView, loadBatches]);
 
   // Load all batches for dashboard when view changes
   useEffect(() => {
@@ -332,11 +396,9 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     }
   }, [currentView, loadAllBatches]);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (but NOT when page changes)
   useEffect(() => {
-    if (currentPage !== 1) {
-      setCurrentPage(1);
-    }
+    setCurrentPage(1);
   }, [searchTerm, statusFilter, expiryFilter, selectedProduct]);
 
   // Clear product filter
@@ -351,15 +413,45 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
     businessId: user?.businessId,
   });
 
+  // Lazy load full products only when batch form is opened (for costPrice, image, etc.)
+  const loadProductsForForm = useCallback(async () => {
+    if (productsLoaded || !user?.businessId) return;
+    try {
+      const response = await window.productAPI.getByBusiness(
+        user.businessId,
+        true
+      );
+      if (response.success && response.products) {
+        setProducts(response.products);
+        setProductsLoaded(true);
+      }
+    } catch (error) {
+      logger.error("Error loading products for form:", error);
+    }
+  }, [user?.businessId, productsLoaded]);
+
   const handleCreateBatch = useCallback(() => {
+    // Open drawer immediately - products will load in the background
     setEditingBatch(null);
     setIsBatchFormOpen(true);
-  }, []);
+    // Trigger product loading in background (will show loading state in drawer)
+    if (!productsLoaded) {
+      loadProductsForForm();
+    }
+  }, [productsLoaded, loadProductsForForm]);
 
-  const handleEditBatch = useCallback((batch: ProductBatch) => {
-    setEditingBatch(batch);
-    setIsBatchFormOpen(true);
-  }, []);
+  const handleEditBatch = useCallback(
+    (batch: ProductBatch) => {
+      // Open drawer immediately - products will load in the background
+      setEditingBatch(batch);
+      setIsBatchFormOpen(true);
+      // Trigger product loading in background (will show loading state in drawer)
+      if (!productsLoaded) {
+        loadProductsForForm();
+      }
+    },
+    [productsLoaded, loadProductsForForm]
+  );
 
   const handleDeleteBatch = useCallback(
     async (batch: ProductBatch) => {
@@ -494,27 +586,12 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
           batches={allBatches}
           expirySettings={expirySettings}
           businessId={user.businessId}
+          batchStats={batchStats}
           onViewBatches={() => {
-            try {
-              navigateTo(INVENTORY_ROUTES.BATCH_LIST);
-            } catch (error) {
-              console.error("Navigation error:", error);
-              // Fallback: try again after a short delay
-              setTimeout(() => {
-                try {
-                  navigateTo(INVENTORY_ROUTES.BATCH_LIST);
-                } catch (retryError) {
-                  console.error("Navigation retry failed:", retryError);
-                }
-              }, 100);
-            }
+            navigateTo(INVENTORY_ROUTES.BATCH_LIST);
           }}
           onReceiveBatch={() => {
-            try {
-              handleCreateBatch();
-            } catch (error) {
-              console.error("Error opening batch form:", error);
-            }
+            handleCreateBatch();
           }}
           onGenerateReport={() => {
             toast.info("Report generation coming soon");
@@ -667,21 +744,42 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
                     if (value === "all") {
                       setSelectedProduct(null);
                     } else {
-                      const product = products.find((p) => p.id === value);
-                      setSelectedProduct(product || null);
+                      const product = productLookup.find((p) => p.id === value);
+                      if (product) {
+                        setSelectedProduct({
+                          id: product.id,
+                          name: product.name,
+                          sku: product.sku || "",
+                        } as Product);
+                      } else {
+                        setSelectedProduct(null);
+                      }
                     }
                   }}
+                  disabled={!productLookupLoaded}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All Products" />
+                    <SelectValue
+                      placeholder={
+                        productLookupLoaded
+                          ? "All Products"
+                          : "Loading products..."
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Products</SelectItem>
-                    {products.map((product) => (
+                    {/* Show first 100 products for performance - use search for more */}
+                    {productLookup.slice(0, 100).map((product) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.name}
                       </SelectItem>
                     ))}
+                    {productLookup.length > 100 && (
+                      <div className="px-2 py-1.5 text-xs text-gray-500 text-center border-t">
+                        Showing first 100 of {productLookup.length} products
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -767,6 +865,7 @@ const BatchManagementView: React.FC<BatchManagementViewProps> = ({
             null
           }
           products={products}
+          loadingProducts={isBatchFormOpen && !productsLoaded}
           suppliers={suppliers}
           businessId={user.businessId}
           onClose={() => {

@@ -444,15 +444,8 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
         />
       ),
       categoryManagement: <ManageCategoriesView onBack={goToDashboard} />,
-      batchManagement: (
-        <BatchManagementView
-          onBack={() => {
-            setBatchFilterProductId(undefined);
-            goToDashboard();
-          }}
-          initialProductId={batchFilterProductId}
-        />
-      ),
+      // NOTE: BatchManagementView is rendered directly in JSX to ensure it re-renders
+      // when navigation state changes (not through memoized viewComponents)
       stockMovementHistory: <StockMovementHistoryView onBack={goToDashboard} />,
     };
   }, [
@@ -485,8 +478,6 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     setPageSize,
     loadProducts,
     loadProductStats,
-    batchFilterProductId,
-    setBatchFilterProductId,
   ]);
 
   if (!user) {
@@ -503,8 +494,16 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
           viewComponents.productList}
         {currentView === INVENTORY_ROUTES.CATEGORY_MANAGEMENT &&
           viewComponents.categoryManagement}
-        {currentView === INVENTORY_ROUTES.BATCH_MANAGEMENT &&
-          viewComponents.batchManagement}
+        {/* Render BatchManagementView directly to ensure it re-renders when navigation state changes */}
+        {currentView === INVENTORY_ROUTES.BATCH_MANAGEMENT && (
+          <BatchManagementView
+            onBack={() => {
+              setBatchFilterProductId(undefined);
+              goToDashboard();
+            }}
+            initialProductId={batchFilterProductId}
+          />
+        )}
         {currentView === INVENTORY_ROUTES.STOCK_MOVEMENT_HISTORY &&
           viewComponents.stockMovementHistory}
       </div>
