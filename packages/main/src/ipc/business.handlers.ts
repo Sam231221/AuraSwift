@@ -83,10 +83,11 @@ export function registerBusinessHandlers() {
           await db.audit.createAuditLog({
             userId: sessionValidation.user!.id,
             action: "update",
-            entityType: "business",
-            entityId: businessId,
+            entityType: "user", // Use "user" as business is not in allowed entity types
+            entityId: sessionValidation.user!.id,
             details: {
               updates,
+              businessId,
               timestamp: Date.now(),
             },
           });

@@ -3,7 +3,6 @@
  */
 
 import { motion } from "framer-motion";
-import { ChevronRight } from "lucide-react";
 import type { Category } from "@/types/domain/category";
 
 interface CategoryNavigationProps {
@@ -19,7 +18,7 @@ interface CategoryNavigationProps {
 }
 
 export function CategoryNavigation({
-  categories,
+  categories: _categories,
   currentCategories,
   searchQuery,
   lastClickTime,
@@ -33,10 +32,6 @@ export function CategoryNavigation({
     <div className="shrink-0 max-h-[344px] sm:max-h-[312px] lg:max-h-[236px] overflow-y-auto">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
         {currentCategories.map((category) => {
-          const childCount = categories.filter(
-            (c) => c.parentId === category.id
-          ).length;
-
           return (
             <motion.button
               key={category.id}

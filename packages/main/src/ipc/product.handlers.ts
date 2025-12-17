@@ -232,7 +232,7 @@ export function registerProductHandlers() {
       const db = await getDatabase();
 
       // Get all products for the business
-      const products = await db.products.getByBusiness(businessId);
+      const products = await db.products.getProductsByBusiness(businessId);
 
       let syncedCount = 0;
       let fixedCount = 0;
@@ -249,7 +249,9 @@ export function registerProductHandlers() {
         );
 
         if (currentStock !== calculatedStock) {
-          await db.products.updateStock(product.id, calculatedStock);
+          await db.products.updateProduct(product.id, {
+            stockLevel: calculatedStock,
+          });
           fixes.push({
             productName: product.name,
             oldStock: currentStock,

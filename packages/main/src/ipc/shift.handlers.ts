@@ -210,81 +210,55 @@ export function registerShiftHandlers() {
       ) => {
         if (closedShifts.length === 0) return;
 
-        // Group closed shifts by timeShiftId to check if we need to clock out
-        const timeShiftGroups = new Map<
-          string,
-          Array<{ id: string; cashierId: string }>
-        >();
-
+        // For each closed shift, check if we need to clock out the time shift
+        // Note: The shifts table is the unified time shift table, so timeShiftId is the shift id itself
         for (const closedShift of closedShifts) {
-          if (
-            closedShift.timeShiftId &&
-            closedShift.timeShiftId.trim() !== ""
-          ) {
-            if (!timeShiftGroups.has(closedShift.timeShiftId)) {
-              timeShiftGroups.set(closedShift.timeShiftId, []);
-            }
-            timeShiftGroups.get(closedShift.timeShiftId)!.push({
-              id: closedShift.id,
-              cashierId: closedShift.cashierId,
-            });
-          }
-        }
+          if (!closedShift.timeShiftId) continue;
 
-        // For each TimeShift, check if all POS shifts are now closed
-        for (const [
-          timeShiftId,
-          closedPosShifts,
-        ] of timeShiftGroups.entries()) {
-          if (!db) continue;
-          const remainingActiveShifts =
-            db.shifts.getActiveShiftsByTimeShift(timeShiftId);
-
-          if (remainingActiveShifts.length === 0) {
-            // All POS shifts for this TimeShift are closed, clock out TimeShift
-            const timeShift = db.timeTracking.getShiftById(timeShiftId);
-            if (timeShift && timeShift.status === "active") {
-              // Validate cashierId before clock-out
-              const cashierId = closedPosShifts[0]?.cashierId;
-              if (!cashierId) {
-                logger.error(
-                  `Cannot clock out TimeShift ${timeShiftId}: closed shifts have no cashierId`
+          // Get the time shift (which is the same as the shift)
+          const timeShift = db.timeTracking.getShiftById(
+            closedShift.timeShiftId
+          );
+          if (timeShift && timeShift.status === "active") {
+            // Validate cashierId before clock-out
+            if (!closedShift.cashierId) {
+              logger.error(
+                `Cannot clock out TimeShift ${closedShift.timeShiftId}: closed shift has no cashierId`
+              );
+            } else {
+              try {
+                // End any active breaks
+                const activeBreak = db.timeTracking.getActiveBreak(
+                  closedShift.timeShiftId
                 );
-              } else {
-                try {
-                  if (!db) continue;
-                  // End any active breaks
-                  const activeBreak =
-                    db.timeTracking.getActiveBreak(timeShiftId);
-                  if (activeBreak) {
-                    await db.timeTracking.endBreak(activeBreak.id);
-                  }
-
-                  // Create clock-out event
-                  const clockOutEvent = await db.timeTracking.createClockEvent({
-                    userId: cashierId,
-                    businessId: timeShift.businessId, // ✅ REQUIRED: Get from shift
-                    terminalId: "system",
-                    type: "out",
-                    method: "auto",
-                    notes: "Auto clock-out: All POS shifts auto-closed",
-                  });
-
-                  // Complete the TimeShift
-                  await db.timeTracking.completeShift(
-                    timeShiftId,
-                    clockOutEvent.id
-                  );
-
-                  logger.info(
-                    `Auto clocked out TimeShift ${timeShiftId} after all POS shifts were auto-closed`
-                  );
-                } catch (error) {
-                  logger.error(
-                    `Failed to clock out TimeShift ${timeShiftId} after auto-closing shifts:`,
-                    error
-                  );
+                if (activeBreak) {
+                  await db.timeTracking.endBreak(activeBreak.id);
                 }
+
+                // Create clock-out event
+                const clockOutEvent = await db.timeTracking.createClockEvent({
+                  userId: closedShift.cashierId,
+                  businessId: timeShift.business_id, // ✅ REQUIRED: Get from shift
+                  terminalId: "system",
+                  type: "out",
+                  method: "auto",
+                  notes: "Auto clock-out: All POS shifts auto-closed",
+                });
+
+                // Complete the TimeShift
+                await db.timeTracking.completeShift(
+                  closedShift.timeShiftId,
+                  clockOutEvent.id
+                );
+
+                logger.info(
+                  `Auto clocked out TimeShift ${closedShift.timeShiftId} after all POS shifts were auto-closed`
+                );
+              } catch (error) {
+                logger.error(
+                  `Failed to clock out TimeShift ${closedShift.timeShiftId} after auto-closing shifts:`,
+                  error
+                );
               }
             }
           }
@@ -303,10 +277,8 @@ export function registerShiftHandlers() {
       const existingShift = db.shifts.getTodaysActiveShift(shiftData.cashierId);
       if (existingShift) {
         // Check if shift is on different device
-        const isDifferentDevice =
-          shiftData.deviceId &&
-          existingShift.deviceId &&
-          shiftData.deviceId !== existingShift.deviceId;
+        // Note: deviceId is not a field in the shifts table, so we skip this check
+        const isDifferentDevice = false;
 
         // Convert to plain object to ensure serialization works
         const serializedExistingShift = JSON.parse(
@@ -403,24 +375,15 @@ export function registerShiftHandlers() {
       let shift;
       try {
         shift = db.shifts.createShift({
-          scheduleId: validatedScheduleId,
-          timeShiftId: activeTimeShift.id, // Link to time shift
-          cashierId: shiftData.cashierId,
-          businessId: shiftData.businessId,
-          deviceId: shiftData.deviceId ?? null, // Device/terminal identifier
-          startTime: new Date().toISOString(),
-          endTime: null,
+          schedule_id: validatedScheduleId,
+          user_id: shiftData.cashierId,
+          business_id: shiftData.businessId,
+          clock_in_id: activeTimeShift.clock_in_id, // Link to clock in event
+          terminal_id: shiftData.deviceId ?? null, // Device/terminal identifier
           status: "active",
-          startingCash: shiftData.startingCash,
-          finalCashDrawer: null,
-          expectedCashDrawer: null,
-          cashVariance: null,
-          totalSales: 0,
-          totalTransactions: 0,
-          totalRefunds: 0,
-          totalVoids: 0,
+          starting_cash: shiftData.startingCash,
           notes: shiftData.notes ?? null,
-        } as any);
+        });
       } catch (error) {
         logger.error("Failed to create shift:", error);
         return {
@@ -463,74 +426,59 @@ export function registerShiftHandlers() {
     try {
       const db = await getDatabase();
 
-      // Get the shift being ended to check its timeShiftId
+      // Get the shift being ended
       const shift = db.shifts.getShiftById(shiftId);
-      const timeShiftId = shift.timeShiftId;
+      // Note: timeShiftId is not a field in the shifts table
+      // The shifts table is the unified time shift table itself
 
       // End the POS shift
       db.shifts.endShift(shiftId, {
-        endTime: new Date().toISOString(),
-        finalCashDrawer: endData.finalCashDrawer,
-        expectedCashDrawer: endData.expectedCashDrawer,
-        totalSales: endData.totalSales,
-        totalTransactions: endData.totalTransactions,
-        totalRefunds: endData.totalRefunds,
-        totalVoids: endData.totalVoids,
+        total_sales: endData.totalSales,
+        total_transactions: endData.totalTransactions,
+        total_refunds: endData.totalRefunds,
+        total_voids: endData.totalVoids,
         notes: endData.notes,
       });
 
-      // Check if this was the last active POS shift for this TimeShift
-      // If so, automatically clock out the TimeShift
-      if (timeShiftId && timeShiftId.trim() !== "") {
-        // Check for remaining active shifts (current shift is already ended)
-        const remainingActiveShifts =
-          db.shifts.getActiveShiftsByTimeShift(timeShiftId);
-
-        if (remainingActiveShifts.length === 0) {
-          // This is the last active POS shift for this TimeShift
-          // Check if TimeShift is still active
-          const timeShift = db.timeTracking.getShiftById(timeShiftId);
-          if (timeShift && timeShift.status === "active") {
-            // Validate cashierId before clock-out
-            if (!shift.cashierId) {
-              logger.error(
-                `Cannot clock out TimeShift ${timeShiftId}: shift ${shiftId} has no cashierId`
-              );
-            } else {
-              try {
-                // End any active breaks first
-                const activeBreak = db.timeTracking.getActiveBreak(timeShiftId);
-                if (activeBreak) {
-                  await db.timeTracking.endBreak(activeBreak.id);
-                }
-
-                // Create clock-out event
-                const clockOutEvent = await db.timeTracking.createClockEvent({
-                  userId: shift.cashierId,
-                  businessId: timeShift.businessId, // ✅ REQUIRED: Get from shift
-                  terminalId: "system",
-                  type: "out",
-                  method: "auto",
-                  notes: "Auto clock-out: Last POS shift ended",
-                });
-
-                // Complete the TimeShift
-                await db.timeTracking.completeShift(
-                  timeShiftId,
-                  clockOutEvent.id
-                );
-
-                logger.info(
-                  `Auto clocked out TimeShift ${timeShiftId} after last POS shift ended`
-                );
-              } catch (error) {
-                // Log error but don't fail shift end
-                logger.error(
-                  "Failed to auto clock-out TimeShift after shift end:",
-                  error
-                );
-              }
+      // Note: The shifts table is the unified time shift table
+      // If this shift is still active in time tracking, we should clock it out
+      const timeShift = db.timeTracking.getShiftById(shiftId);
+      if (timeShift && timeShift.status === "active") {
+        // Validate user_id before clock-out
+        if (!shift.user_id) {
+          logger.error(
+            `Cannot clock out TimeShift ${shiftId}: shift has no user_id`
+          );
+        } else {
+          try {
+            // End any active breaks first
+            const activeBreak = db.timeTracking.getActiveBreak(shiftId);
+            if (activeBreak) {
+              await db.timeTracking.endBreak(activeBreak.id);
             }
+
+            // Create clock-out event
+            const clockOutEvent = await db.timeTracking.createClockEvent({
+              userId: shift.user_id,
+              businessId: shift.business_id, // ✅ REQUIRED: Get from shift
+              terminalId: "system",
+              type: "out",
+              method: "auto",
+              notes: "Auto clock-out: Last POS shift ended",
+            });
+
+            // Complete the TimeShift
+            await db.timeTracking.completeShift(shiftId, clockOutEvent.id);
+
+            logger.info(
+              `Auto clocked out TimeShift ${shiftId} after last POS shift ended`
+            );
+          } catch (error) {
+            // Log error but don't fail shift end
+            logger.error(
+              "Failed to auto clock-out TimeShift after shift end:",
+              error
+            );
           }
         }
       }
@@ -695,21 +643,23 @@ export function registerShiftHandlers() {
 
       if (activeSchedules.length > 0) {
         // Return the one with the latest start time among active schedules
-        const mostRecentActive = activeSchedules.reduce((latest: any, current: any) => {
-          const latestStart =
-            typeof latest.startTime === "number"
-              ? latest.startTime
-              : latest.startTime instanceof Date
-              ? latest.startTime.getTime()
-              : new Date(latest.startTime as string).getTime();
-          const currentStart =
-            typeof current.startTime === "number"
-              ? current.startTime
-              : current.startTime instanceof Date
-              ? current.startTime.getTime()
-              : new Date(current.startTime as string).getTime();
-          return currentStart > latestStart ? current : latest;
-        });
+        const mostRecentActive = activeSchedules.reduce(
+          (latest: any, current: any) => {
+            const latestStart =
+              typeof latest.startTime === "number"
+                ? latest.startTime
+                : latest.startTime instanceof Date
+                ? latest.startTime.getTime()
+                : new Date(latest.startTime as string).getTime();
+            const currentStart =
+              typeof current.startTime === "number"
+                ? current.startTime
+                : current.startTime instanceof Date
+                ? current.startTime.getTime()
+                : new Date(current.startTime as string).getTime();
+            return currentStart > latestStart ? current : latest;
+          }
+        );
         return {
           success: true,
           data: mostRecentActive,
@@ -755,8 +705,9 @@ export function registerShiftHandlers() {
       );
 
       const stats = {
-        totalTransactions: transactions.filter((t: any) => t.status === "completed")
-          .length,
+        totalTransactions: transactions.filter(
+          (t: any) => t.status === "completed"
+        ).length,
         totalSales: transactions
           .filter((t: any) => t.type === "sale" && t.status === "completed")
           .reduce((sum: number, t: any) => sum + t.total, 0),
@@ -765,7 +716,8 @@ export function registerShiftHandlers() {
             .filter((t: any) => t.type === "refund" && t.status === "completed")
             .reduce((sum: number, t: any) => sum + t.total, 0)
         ),
-        totalVoids: transactions.filter((t: any) => t.status === "voided").length,
+        totalVoids: transactions.filter((t: any) => t.status === "voided")
+          .length,
       };
 
       return {

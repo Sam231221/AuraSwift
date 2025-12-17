@@ -11,7 +11,6 @@ import {
   Tag,
   PackageCheck,
 } from "lucide-react";
-import type { Product } from "@/types/domain";
 import type { Category } from "../hooks/use-product-data";
 
 interface ProductDashboardViewProps {

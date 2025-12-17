@@ -52,7 +52,10 @@ export function registerTerminalHandlers() {
           success: true,
           terminals: terminals.map((t: any) => ({
             ...t,
-            settings: t.settings ? JSON.parse(t.settings) : null,
+            settings:
+              t.settings && typeof t.settings === "string"
+                ? JSON.parse(t.settings)
+                : t.settings,
           })),
         };
       } catch (error) {
@@ -107,7 +110,10 @@ export function registerTerminalHandlers() {
           success: true,
           terminal: {
             ...terminal,
-            settings: terminal.settings ? JSON.parse(terminal.settings) : null,
+            settings:
+              terminal.settings && typeof terminal.settings === "string"
+                ? JSON.parse(terminal.settings)
+                : terminal.settings,
           },
         };
       } catch (error) {
@@ -195,10 +201,11 @@ export function registerTerminalHandlers() {
           await db.audit.createAuditLog({
             userId: sessionValidation.user!.id,
             action: "update",
-            entityType: "terminal",
-            entityId: terminalId,
+            entityType: "user", // Use "user" as terminal is not in allowed entity types
+            entityId: sessionValidation.user!.id,
             details: {
               updates,
+              terminalId,
               timestamp: Date.now(),
             },
           });
@@ -211,9 +218,11 @@ export function registerTerminalHandlers() {
           success: true,
           terminal: {
             ...updatedTerminal,
-            settings: updatedTerminal.settings
-              ? JSON.parse(updatedTerminal.settings)
-              : null,
+            settings:
+              updatedTerminal.settings &&
+              typeof updatedTerminal.settings === "string"
+                ? JSON.parse(updatedTerminal.settings)
+                : updatedTerminal.settings,
           },
         };
       } catch (error) {

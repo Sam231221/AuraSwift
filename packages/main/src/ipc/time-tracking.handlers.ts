@@ -210,9 +210,9 @@ export function registerTimeTrackingHandlers() {
       }
 
       // 3. Validate user owns the shift
-      if (activeShift.userId !== userId) {
+      if (activeShift.user_id !== userId) {
         logger.warn(
-          `[ClockOut] User ${userId} attempted to clock out shift ${activeShift.id} owned by ${activeShift.userId}`
+          `[ClockOut] User ${userId} attempted to clock out shift ${activeShift.id} owned by ${activeShift.user_id}`
         );
         return {
           success: false,
@@ -222,7 +222,7 @@ export function registerTimeTrackingHandlers() {
       }
 
       // 4. Check if shift is actually active (not already completed)
-      if (activeShift.endTime) {
+      if (activeShift.clock_out_id) {
         return {
           success: false,
           message: "Shift is already completed",
@@ -232,15 +232,15 @@ export function registerTimeTrackingHandlers() {
 
       // 5. Check for duplicate clock-out events
       // Get the clock-in event for this shift
-      if (activeShift.clockInId) {
+      if (activeShift.clock_in_id) {
         const clockInEvent = db.timeTracking.getClockEventById(
-          activeShift.clockInId
+          activeShift.clock_in_id
         );
         if (clockInEvent) {
-          // Check if shift already has a clock-out event (via clockOutId)
-          if (activeShift.clockOutId) {
+          // Check if shift already has a clock-out event (via clock_out_id)
+          if (activeShift.clock_out_id) {
             const existingClockOut = db.timeTracking.getClockEventById(
-              activeShift.clockOutId
+              activeShift.clock_out_id
             );
             if (existingClockOut && existingClockOut.type === "out") {
               return {
@@ -254,9 +254,9 @@ export function registerTimeTrackingHandlers() {
       }
 
       // 6. Validate minimum shift duration (optional - can be configured)
-      if (activeShift.clockInId) {
+      if (activeShift.clock_in_id) {
         const clockInEvent = db.timeTracking.getClockEventById(
-          activeShift.clockInId
+          activeShift.clock_in_id
         );
         if (clockInEvent) {
           const shiftDuration =
@@ -335,8 +335,8 @@ export function registerTimeTrackingHandlers() {
 
       // Get clock-in event for timestamp
       let clockInEvent = null;
-      if (shift.clockInId) {
-        clockInEvent = db.timeTracking.getClockEventById(shift.clockInId);
+      if (shift.clock_in_id) {
+        clockInEvent = db.timeTracking.getClockEventById(shift.clock_in_id);
       }
 
       return {
@@ -372,7 +372,7 @@ export function registerTimeTrackingHandlers() {
 
       const breakRecord = await db.timeTracking.startBreak({
         ...data,
-        businessId: shift.businessId,
+        businessId: shift.business_id,
       });
       return {
         success: true,

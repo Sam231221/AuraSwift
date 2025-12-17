@@ -379,11 +379,14 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     loadProductStats(); // Update dashboard stats
   }, [user, loadProducts, loadProductStats]);
 
+  // Helper function to navigate to dashboard (defined outside useMemo for reuse)
+  const goToDashboard = useCallback(() => {
+    navigateTo(INVENTORY_ROUTES.PRODUCT_DASHBOARD);
+  }, [navigateTo]);
+
   // Create view components with proper props (must be before conditional return)
   const viewComponents = useMemo(() => {
     if (!user) return {};
-
-    const goToDashboard = () => navigateTo(INVENTORY_ROUTES.PRODUCT_DASHBOARD);
 
     // Navigate to main dashboard (the one with stat cards and feature cards)
     const goToMainDashboard = () => {
@@ -452,6 +455,7 @@ const ProductManagementView: React.FC<ProductManagementViewProps> = ({
     user,
     navigateTo,
     navigateToMainView,
+    goToDashboard,
     productStats,
     categories,
     products,

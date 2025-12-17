@@ -41,15 +41,16 @@ export function registerCashDrawerHandlers() {
 
       // Create the cash drawer count
       const cashDrawerCount = db.cashDrawers.createCashDrawerCount({
-        shiftId: countData.shiftId,
-        businessId: shift.businessId,
-        countType: countData.countType,
-        expectedAmount: countData.expectedAmount,
-        countedAmount: countData.countedAmount,
+        shift_id: countData.shiftId,
+        business_id: shift.business_id,
+        count_type: countData.countType,
+        expected_amount: countData.expectedAmount,
+        counted_amount: countData.countedAmount,
         variance: countData.variance,
         notes: countData.notes,
-        countedBy: countData.countedBy,
-        timestamp: new Date().toISOString(),
+        counted_by: countData.countedBy,
+        timestamp: new Date(),
+        terminal_id: null,
         updatedAt: null,
       });
 

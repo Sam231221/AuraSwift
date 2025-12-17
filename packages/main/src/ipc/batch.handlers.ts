@@ -204,12 +204,8 @@ export function registerBatchHandlers() {
         // NOTE: We pass null as batchManager to StockMovementManager to avoid double-updating
         if (userId && batch) {
           try {
-            // Create stock movement record directly (without triggering batch update again)
-            const movementId = db.uuid.v4();
-            const now = new Date();
-
-            await db.drizzle.insert(db.schema.stockMovements).values({
-              id: movementId,
+            // Create stock movement record using the stockMovements manager
+            await db.stockMovements.createStockMovement({
               productId: batch.productId,
               batchId: batch.id,
               movementType: movementType as
@@ -219,14 +215,8 @@ export function registerBatchHandlers() {
               quantity,
               reason:
                 reason || `Batch ${movementType.toLowerCase()} adjustment`,
-              reference: null,
-              fromBatchId: null,
-              toBatchId: null,
               userId,
               businessId: batch.businessId,
-              timestamp: now,
-              createdAt: now,
-              updatedAt: now,
             });
           } catch (movementError) {
             logger.error("Failed to record stock movement:", movementError);
