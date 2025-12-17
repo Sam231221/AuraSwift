@@ -139,10 +139,10 @@ export class UserRoleManager {
    */
   getActiveRolesByUser(userId: string, includeExpired = false): UserRole[] {
     logger.info(
-      "[getActiveRolesByUser] Fetching roles for userId:",
-      userId,
-      "includeExpired:",
-      includeExpired
+      "[getActiveRolesByUser] Fetching roles for userId: " +
+        userId +
+        ", includeExpired: " +
+        String(includeExpired)
     );
 
     // First, let's check ALL user_roles entries for this user (for debugging)
@@ -153,24 +153,19 @@ export class UserRoleManager {
       .all();
 
     logger.info(
-      "[getActiveRolesByUser] All user_roles entries (including inactive):",
-      allUserRoles.length
+      "[getActiveRolesByUser] All user_roles entries (including inactive): " +
+        allUserRoles.length
     );
     if (allUserRoles.length > 0) {
-      logger.info(
-        "[getActiveRolesByUser] All entries details:",
-        JSON.stringify(
-          allUserRoles.map((r) => ({
-            id: r.id,
-            userId: r.userId,
-            roleId: r.roleId,
-            isActive: r.isActive,
-            expiresAt: r.expiresAt,
-          })),
-          null,
-          2
-        )
-      );
+      logger.info("[getActiveRolesByUser] All entries details:", {
+        entries: allUserRoles.map((r) => ({
+          id: r.id,
+          userId: r.userId,
+          roleId: r.roleId,
+          isActive: r.isActive,
+          expiresAt: r.expiresAt,
+        })),
+      });
     }
 
     const conditions = [
@@ -194,11 +189,12 @@ export class UserRoleManager {
       .orderBy(desc(schema.userRoles.assignedAt))
       .all();
 
-    logger.info("[getActiveRolesByUser] Found", results.length, "active roles");
     logger.info(
-      "[getActiveRolesByUser] Active roles results:",
-      JSON.stringify(results, null, 2)
+      "[getActiveRolesByUser] Found " + results.length + " active roles"
     );
+    logger.info("[getActiveRolesByUser] Active roles results:", {
+      results,
+    });
 
     return results;
   }

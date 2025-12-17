@@ -263,7 +263,7 @@ export class OfficePrinterService {
       logger.info(`Found ${printers.length} printers`);
       return { success: true, printers };
     } catch (error) {
-      logger.error("Failed to get available printers", error);
+      logger.error(`Failed to get available printers`, { error });
       return {
         success: false,
         printers: [],

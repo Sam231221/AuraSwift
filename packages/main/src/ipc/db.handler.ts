@@ -35,16 +35,21 @@ export function registerDbHandlers() {
       const db = await getDatabase();
       const info = db.getDatabaseInfo();
 
-      // Generate default filename with timestamp
-      const timestamp = new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")
-        .split("T")[0];
-      const timeStr = new Date()
-        .toTimeString()
-        .split(" ")[0]
-        .replace(/:/g, "-");
-      const defaultFilename = `auraswift-backup-${timestamp}-${timeStr}.db`;
+      // Generate default filename with timestamp: YYYYMMDD-HHMMSS format
+      const now = new Date();
+      const timestamp =
+        [
+          now.getFullYear(),
+          String(now.getMonth() + 1).padStart(2, "0"),
+          String(now.getDate()).padStart(2, "0"),
+        ].join("") +
+        "-" +
+        [
+          String(now.getHours()).padStart(2, "0"),
+          String(now.getMinutes()).padStart(2, "0"),
+          String(now.getSeconds()).padStart(2, "0"),
+        ].join("");
+      const defaultFilename = `auraswift-backup-${timestamp}.db`;
 
       // Show save dialog
       const focusedWindow = BrowserWindow.getFocusedWindow();

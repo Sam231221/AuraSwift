@@ -166,7 +166,7 @@ export class DBManager {
         }
 
         const dbPath = this.getDatabasePath();
-        logger.info("Database path:", dbPath);
+        logger.info(`Database path: ${dbPath}`);
 
         // ========================================
         // LAYER 1: Pre-Connection Health Assessment
@@ -637,7 +637,7 @@ export class DBManager {
     // Allow override via environment variable for testing
     const customDbPath = process.env.POS_DB_PATH;
     if (customDbPath) {
-      logger.info("Using custom database path:", customDbPath);
+      logger.info(`Using custom database path: ${customDbPath}`);
       // Validate custom path doesn't contain invalid characters
       if (customDbPath.includes("\0") || customDbPath.includes("\x00")) {
         throw new Error(`Invalid database path: ${customDbPath}`);
@@ -680,7 +680,7 @@ export class DBManager {
       throw new Error(`Invalid database path: ${finalPath}`);
     }
 
-    logger.info("Database at:", finalPath);
+    logger.info(`Database at: ${finalPath}`);
     return finalPath;
   }
 

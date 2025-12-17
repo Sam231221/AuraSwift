@@ -140,7 +140,10 @@ export async function hasPermission(
   requiredPermission: string
 ): Promise<PermissionCheckResult> {
   logger.info(
-    `[hasPermission] Checking permission "${requiredPermission}" for user ${user.id}`
+    '[hasPermission] Checking permission "' +
+      requiredPermission +
+      '" for user ' +
+      user.id
   );
 
   if (!user) {
@@ -152,33 +155,35 @@ export async function hasPermission(
 
   // Get aggregated permissions from RBAC system
   const userPermissions = await getUserPermissions(db, user.id);
-  logger.info(
-    `[hasPermission] User ${user.id} has ${userPermissions.length} permissions:`,
-    userPermissions
-  );
+  logger.info("[hasPermission] User " + user.id + " has permissions", {
+    count: userPermissions.length,
+    permissions: userPermissions,
+  });
 
   // Check for exact match
   if (userPermissions.includes(requiredPermission)) {
-    logger.info(`[hasPermission] ✅ Exact match found: ${requiredPermission}`);
+    logger.info("[hasPermission] ✅ Exact match found: " + requiredPermission);
     return { granted: true };
   }
 
   // Check for wildcard permission (admin has all)
   if (userPermissions.includes("*:*")) {
-    logger.info(`[hasPermission] ✅ Wildcard *:* found - granting access`);
+    logger.info("[hasPermission] ✅ Wildcard *:* found - granting access");
     return { granted: true };
   }
 
   // Check for action wildcard (e.g., "manage:*" covers "manage:users")
   const [action, resource] = requiredPermission.split(":");
-  if (userPermissions.includes(`${action}:*`)) {
-    logger.info(`[hasPermission] ✅ Action wildcard ${action}:* found`);
+  if (userPermissions.includes(action + ":*")) {
+    logger.info("[hasPermission] ✅ Action wildcard " + action + ":* found");
     return { granted: true };
   }
 
   // Check for resource wildcard (e.g., "*:users" covers "manage:users")
-  if (userPermissions.includes(`*:${resource}`)) {
-    logger.info(`[hasPermission] ✅ Resource wildcard *:${resource} found`);
+  if (userPermissions.includes("*:" + resource)) {
+    logger.info(
+      "[hasPermission] ✅ Resource wildcard *:" + resource + " found"
+    );
     return { granted: true };
   }
 
@@ -187,11 +192,14 @@ export async function hasPermission(
   // This ensures proper RBAC enforcement and auditability.
 
   logger.info(
-    `[hasPermission] ❌ Permission denied: ${requiredPermission} for user ${user.id}`
+    "[hasPermission] ❌ Permission denied: " +
+      requiredPermission +
+      " for user " +
+      user.id
   );
   return {
     granted: false,
-    reason: `User lacks required permission: ${requiredPermission}`,
+    reason: "User lacks required permission: " + requiredPermission,
   };
 }
 

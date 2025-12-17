@@ -47,17 +47,15 @@ export async function getUserPermissions(
   userId: string,
   useCache = true
 ): Promise<string[]> {
-  logger.info(`[getUserPermissions] Starting for userId: ${userId}`);
+  logger.info("[getUserPermissions] Starting for userId: " + userId);
 
   // Check cache first
   if (useCache) {
     const cached = permissionCache.get(userId);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      logger.info(
-        `[getUserPermissions] Returning cached permissions: ${JSON.stringify(
-          cached.permissions
-        )}`
-      );
+      logger.info("[getUserPermissions] Returning cached permissions", {
+        permissions: cached.permissions,
+      });
       return cached.permissions;
     }
 
@@ -65,7 +63,8 @@ export async function getUserPermissions(
     const existingLoad = cacheLocks.get(userId);
     if (existingLoad) {
       logger.info(
-        `[getUserPermissions] Waiting for existing load to complete for userId: ${userId}`
+        "[getUserPermissions] Waiting for existing load to complete for userId: " +
+          userId
       );
       return await existingLoad;
     }
@@ -79,9 +78,9 @@ export async function getUserPermissions(
       // 1. Get permissions from all assigned roles
       const userRoles = db.userRoles.getActiveRolesByUser(userId);
       logger.info(
-        "[getUserPermissions] Found",
-        userRoles.length,
-        "active roles for user"
+        "[getUserPermissions] Found " +
+          userRoles.length +
+          " active roles for user"
       );
 
       // If no roles in user_roles table, fall back to primaryRoleId
@@ -92,14 +91,12 @@ export async function getUserPermissions(
         const user = db.users.getUserById(userId);
         if (user?.primaryRoleId) {
           logger.info(
-            "[getUserPermissions] Found primaryRoleId:",
-            user.primaryRoleId
+            "[getUserPermissions] Found primaryRoleId: " + user.primaryRoleId
           );
           const primaryRole = db.roles.getRoleById(user.primaryRoleId);
           if (primaryRole) {
             logger.info(
-              "[getUserPermissions] Using primary role:",
-              primaryRole.name
+              "[getUserPermissions] Using primary role: " + primaryRole.name
             );
             // Process primary role permissions
             if (primaryRole.isActive && primaryRole.permissions) {
@@ -120,30 +117,26 @@ export async function getUserPermissions(
                   rolePermissions = parsed;
                 } catch (e) {
                   logger.error(
-                    "[getUserPermissions] Failed to parse primary role permissions:",
-                    e
+                    "[getUserPermissions] Failed to parse primary role permissions",
+                    { error: e }
                   );
                   // Fail safe: don't grant permissions if parsing fails
                   rolePermissions = [];
                   logger.warn(
-                    `[getUserPermissions] Skipping invalid permissions for primary role ${primaryRole.id}. ` +
-                      `Please fix the permissions format in the database.`
+                    "[getUserPermissions] Skipping invalid permissions for primary role " +
+                      primaryRole.id +
+                      ". Please fix the permissions format in the database."
                   );
                 }
               } else if (Array.isArray(primaryRole.permissions)) {
                 rolePermissions = primaryRole.permissions as string[];
               }
 
-              logger.info(
-                "[getUserPermissions] Primary role permissions:",
-                rolePermissions
-              );
+              logger.debug("[getUserPermissions] Primary role permissions", {
+                rolePermissions,
+              });
 
               for (const permission of rolePermissions) {
-                logger.info(
-                  "[getUserPermissions] Adding permission from primary role:",
-                  permission
-                );
                 permissions.add(permission);
               }
             }
@@ -154,18 +147,10 @@ export async function getUserPermissions(
         for (const userRole of userRoles) {
           try {
             const role = db.roles.getRoleById(userRole.roleId);
-            logger.info(
-              "[getUserPermissions] Processing role:",
-              role?.name,
-              "isActive:",
-              role?.isActive
-            );
-            logger.info(
-              "[getUserPermissions] Role permissions type:",
-              typeof role?.permissions,
-              "value:",
-              role?.permissions
-            );
+            logger.debug("[getUserPermissions] Processing role", {
+              name: role?.name,
+              isActive: role?.isActive,
+            });
 
             if (role && role.isActive && role.permissions) {
               // Handle permissions - could be array or JSON string
@@ -186,39 +171,36 @@ export async function getUserPermissions(
                   rolePermissions = parsed;
                 } catch (e) {
                   logger.error(
-                    "[getUserPermissions] Failed to parse role permissions:",
-                    e
+                    "[getUserPermissions] Failed to parse role permissions",
+                    { error: e }
                   );
                   // Fail safe: don't grant permissions if parsing fails
                   rolePermissions = [];
                   logger.warn(
-                    `[getUserPermissions] Skipping invalid permissions for role ${role.id} (${role.name}). ` +
-                      `Please fix the permissions format in the database.`
+                    "[getUserPermissions] Skipping invalid permissions for role " +
+                      role.id +
+                      " (" +
+                      role.name +
+                      "). Please fix the permissions format in the database."
                   );
                 }
               } else if (Array.isArray(role.permissions)) {
                 rolePermissions = role.permissions as string[];
               }
 
-              logger.info(
-                "[getUserPermissions] Parsed permissions:",
-                rolePermissions
-              );
+              logger.debug("[getUserPermissions] Parsed permissions", {
+                rolePermissions,
+              });
 
               // Add all role permissions
               for (const permission of rolePermissions) {
-                logger.info(
-                  "[getUserPermissions] Adding permission from role:",
-                  permission
-                );
                 permissions.add(permission);
               }
             }
           } catch (error) {
             logger.error(
-              "[getUserPermissions] Error processing role:",
-              userRole.roleId,
-              error
+              "[getUserPermissions] Error processing role: " + userRole.roleId,
+              { error }
             );
           }
         }
@@ -228,31 +210,24 @@ export async function getUserPermissions(
       const directPermissions =
         db.userPermissions.getActivePermissionsByUser(userId);
       logger.info(
-        "[getUserPermissions] Found",
-        directPermissions.length,
-        "direct permissions"
+        "[getUserPermissions] Found " +
+          directPermissions.length +
+          " direct permissions"
       );
 
       for (const perm of directPermissions) {
-        logger.info(
-          "[getUserPermissions] Adding direct permission:",
-          perm.permission
-        );
         permissions.add(perm.permission);
       }
     } catch (error) {
-      logger.error(
-        "[getUserPermissions] Error aggregating permissions:",
-        error
-      );
+      logger.error("[getUserPermissions] Error aggregating permissions", {
+        error,
+      });
     }
 
     const permissionArray = Array.from(permissions);
-    logger.info(
-      `[getUserPermissions] Final aggregated permissions: ${JSON.stringify(
-        permissionArray
-      )}`
-    );
+    logger.info("[getUserPermissions] Final aggregated permissions", {
+      permissions: permissionArray,
+    });
 
     // Update cache
     permissionCache.set(userId, {

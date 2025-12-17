@@ -39,8 +39,8 @@ import Database from "better-sqlite3";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema.js";
 
-import { getLogger } from '../utils/logger.js';
-const logger = getLogger('drizzle-migrator');
+import { getLogger } from "../utils/logger.js";
+const logger = getLogger("drizzle-migrator");
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -217,9 +217,41 @@ function checkDatabaseIntegrity(
 }
 
 /**
- * Cleanup old backups, keeping only the most recent N backups
+ * Backup retention configuration
+ * Different backup types have different retention policies
+ */
+interface BackupRetentionConfig {
+  /** Regular migration backups - created on every migration */
+  migration: number;
+  /** Repair backups - created before repair attempts */
+  repair: number;
+  /** Fresh start backups - created when starting fresh */
+  freshStart: number;
+  /** Path migration backups - created during path migration */
+  pathMigration: number;
+}
+
+/**
+ * All backup prefixes used by the system
+ */
+const BACKUP_PREFIXES = {
+  migration: "auraswift-backup-",
+  repair: "auraswift-repair-backup-",
+  freshStart: "auraswift-fresh-start-backup-",
+  pathMigration: "auraswift-path-migration-backup-",
+} as const;
+
+/**
+ * Cleanup old backups, keeping only the most recent N backups for each type
+ * This handles ALL backup types created by the system:
+ * - auraswift-backup-* (migration backups)
+ * - auraswift-repair-backup-* (repair backups)
+ * - auraswift-fresh-start-backup-* (fresh start backups)
+ * - auraswift-path-migration-backup-* (path migration backups)
+ *
  * @param backupDir - Directory containing backups
- * @param maxBackups - Maximum number of backups to keep (default: 10)
+ * @param maxBackups - Maximum number of migration backups to keep (default: 10)
+ *                     Repair/fresh-start backups keep 3x this value
  */
 function cleanupOldBackups(backupDir: string, maxBackups: number = 10): void {
   try {
@@ -227,41 +259,190 @@ function cleanupOldBackups(backupDir: string, maxBackups: number = 10): void {
       return;
     }
 
+    // Configure retention per backup type
+    // Repair and path migration backups are more important - keep more
+    const retention: BackupRetentionConfig = {
+      migration: maxBackups,
+      repair: Math.max(3, Math.floor(maxBackups / 2)),
+      freshStart: Math.max(3, Math.floor(maxBackups / 2)),
+      pathMigration: Math.max(3, Math.floor(maxBackups / 2)),
+    };
+
+    let totalFreed = 0;
+    const allFiles = readdirSync(backupDir);
+
+    // Process each backup type
+    for (const [type, prefix] of Object.entries(BACKUP_PREFIXES)) {
+      const typeRetention = retention[type as keyof BackupRetentionConfig];
+
+      const backups = allFiles
+        .filter((f) => f.startsWith(prefix) && f.endsWith(".db"))
+        .map((f) => {
+          const filePath = join(backupDir, f);
+          try {
+            const stats = statSync(filePath);
+            return {
+              name: f,
+              path: filePath,
+              mtime: stats.mtime,
+              size: stats.size,
+            };
+          } catch {
+            return null;
+          }
+        })
+        .filter((f): f is NonNullable<typeof f> => f !== null)
+        .sort((a, b) => b.mtime.getTime() - a.mtime.getTime()); // Newest first
+
+      if (backups.length > typeRetention) {
+        const toDelete = backups.slice(typeRetention);
+
+        for (const backup of toDelete) {
+          try {
+            totalFreed += backup.size;
+            unlinkSync(backup.path);
+            logger.info(`   🗑️  Removed old backup: ${backup.name}`);
+          } catch (error) {
+            logger.warn(`   ⚠️  Failed to remove backup ${backup.name}:`, {
+              error,
+            });
+          }
+        }
+      }
+    }
+
+    // Also clean up any .old files that accumulate from failed operations
+    const oldFiles = allFiles.filter(
+      (f) => f.includes(".old.") && f.endsWith(".db")
+    );
+    for (const oldFile of oldFiles) {
+      try {
+        const filePath = join(backupDir, oldFile);
+        const stats = statSync(filePath);
+        // Only remove .old files older than 7 days
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        if (stats.mtimeMs < sevenDaysAgo) {
+          totalFreed += stats.size;
+          unlinkSync(filePath);
+          logger.info(`   🗑️  Removed old file: ${oldFile}`);
+        }
+      } catch {
+        // Ignore errors for individual .old files
+      }
+    }
+
+    if (totalFreed > 0) {
+      const freedMB = (totalFreed / (1024 * 1024)).toFixed(2);
+      logger.info(`   💾 Freed ${freedMB} MB by cleaning up old backups`);
+    }
+  } catch (error) {
+    logger.warn(`   ⚠️  Failed to cleanup old backups`, { error });
+    // Don't throw - backup cleanup failure shouldn't block migrations
+  }
+}
+
+/**
+ * Check if any migrations are pending
+ * Reads the migrations folder and compares with __drizzle_migrations table
+ *
+ * @param rawDb - Raw database instance
+ * @param migrationsFolder - Path to migrations folder
+ * @returns Object with hasPending and count of pending migrations
+ */
+function checkPendingMigrations(
+  rawDb: Database.Database,
+  migrationsFolder: string
+): { hasPending: boolean; pendingCount: number; appliedCount: number } {
+  try {
+    // Get list of migration files
+    const migrationFiles = readdirSync(migrationsFolder)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+
+    // Check if __drizzle_migrations table exists
+    const tableExists = rawDb
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='__drizzle_migrations'"
+      )
+      .get();
+
+    if (!tableExists) {
+      // No migrations table = all migrations are pending
+      return {
+        hasPending: migrationFiles.length > 0,
+        pendingCount: migrationFiles.length,
+        appliedCount: 0,
+      };
+    }
+
+    // Get applied migrations
+    const appliedMigrations = rawDb
+      .prepare("SELECT hash FROM __drizzle_migrations")
+      .all() as Array<{ hash: string }>;
+
+    const appliedCount = appliedMigrations.length;
+    const pendingCount = Math.max(0, migrationFiles.length - appliedCount);
+
+    return {
+      hasPending: pendingCount > 0,
+      pendingCount,
+      appliedCount,
+    };
+  } catch (error) {
+    // On error, assume migrations might be pending (safer)
+    logger.warn(`   ⚠️  Could not check pending migrations, assuming pending`, {
+      error,
+    });
+    return { hasPending: true, pendingCount: -1, appliedCount: -1 };
+  }
+}
+
+/**
+ * Check if backup should be skipped based on throttling rules
+ *
+ * Rules:
+ * - In development: Skip if backup was created within last 5 minutes
+ * - In production: Always create backup before migrations
+ *
+ * @param backupDir - Directory containing backups
+ * @param isProduction - Whether app is in production mode
+ * @returns Whether to skip backup creation
+ */
+function shouldSkipBackup(backupDir: string, isProduction: boolean): boolean {
+  // Never skip in production
+  if (isProduction) {
+    return false;
+  }
+
+  // In development, check for recent backups
+  const minIntervalMs = 5 * 60 * 1000; // 5 minutes
+
+  try {
+    if (!existsSync(backupDir)) {
+      return false;
+    }
+
     const backups = readdirSync(backupDir)
       .filter((f) => f.startsWith("auraswift-backup-") && f.endsWith(".db"))
       .map((f) => {
-        const filePath = join(backupDir, f);
-        return {
-          name: f,
-          path: filePath,
-          mtime: statSync(filePath).mtime,
-          size: statSync(filePath).size,
-        };
-      })
-      .sort((a, b) => b.mtime.getTime() - a.mtime.getTime()); // Newest first
-
-    if (backups.length > maxBackups) {
-      const toDelete = backups.slice(maxBackups);
-      let totalFreed = 0;
-
-      for (const backup of toDelete) {
         try {
-          totalFreed += backup.size;
-          unlinkSync(backup.path);
-          logger.info(`   🗑️  Removed old backup: ${backup.name}`);
-        } catch (error) {
-          logger.warn(`   ⚠️  Failed to remove backup ${backup.name}:`, error);
+          return statSync(join(backupDir, f)).mtimeMs;
+        } catch {
+          return 0;
         }
-      }
+      })
+      .filter((t) => t > 0);
 
-      if (totalFreed > 0) {
-        const freedMB = (totalFreed / (1024 * 1024)).toFixed(2);
-        logger.info(`   💾 Freed ${freedMB} MB by cleaning up old backups`);
-      }
+    if (backups.length === 0) {
+      return false;
     }
-  } catch (error) {
-    logger.warn("   ⚠️  Failed to cleanup old backups:", error);
-    // Don't throw - backup cleanup failure shouldn't block migrations
+
+    const mostRecentBackup = Math.max(...backups);
+    const timeSinceLastBackup = Date.now() - mostRecentBackup;
+
+    return timeSinceLastBackup < minIntervalMs;
+  } catch {
+    return false;
   }
 }
 
@@ -361,9 +542,7 @@ export async function runDrizzleMigrations(
           }
         } catch (e) {
           const errorMessage = e instanceof Error ? e.message : String(e);
-          logger.error(
-            `   ⚠️  Could not read dist directory: ${errorMessage}`
-          );
+          logger.error(`   ⚠️  Could not read dist directory: ${errorMessage}`);
         }
       }
 
@@ -405,16 +584,42 @@ export async function runDrizzleMigrations(
       throw new Error("Database integrity check failed - aborting migration");
     }
 
-    // Create backup before migrations
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backupDir = join(dirname(dbPath), "backups");
+    // Setup backup directory
+    // Generate clean timestamp: YYYYMMDD-HHMMSS format (readable, sortable, no milliseconds)
+    const now = new Date();
+    const timestamp =
+      [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("") +
+      "-" +
+      [
+        String(now.getHours()).padStart(2, "0"),
+        String(now.getMinutes()).padStart(2, "0"),
+        String(now.getSeconds()).padStart(2, "0"),
+      ].join("");
+    cleanupOldBackups(backupDir, isProduction ? 10 : 5);
 
-    if (!existsSync(backupDir)) {
-      mkdirSync(backupDir, { recursive: true });
+    // Smart backup strategy: Check if backup is really needed
+    const pendingStatus = checkPendingMigrations(rawDb, migrationsFolder);
+    const recentBackupExists = shouldSkipBackup(backupDir, isProduction);
+    const skipBackup = !pendingStatus.hasPending && recentBackupExists;
+
+    if (pendingStatus.pendingCount === 0) {
+      logger.info(
+        `   ℹ️  No pending migrations (${pendingStatus.appliedCount} already applied)`
+      );
+      if (!isProduction) {
+        logger.info(
+          `   📊 Backup decision: skipBackup=${skipBackup}, recentBackupExists=${recentBackupExists}`
+        );
+      }
+    } else if (pendingStatus.pendingCount > 0) {
+      logger.info(
+        `   📋 ${pendingStatus.pendingCount} pending migration(s) to apply`
+      );
     }
-
-    // Cleanup old backups before creating new one
-    cleanupOldBackups(backupDir, isProduction ? 10 : 5); // Keep more backups in production
 
     backupPath = join(backupDir, `auraswift-backup-${timestamp}.db`);
 
@@ -423,6 +628,12 @@ export async function runDrizzleMigrations(
       logger.info(
         "   ℹ️  Database file doesn't exist yet - creating new database"
       );
+    } else if (skipBackup) {
+      // Skip backup creation in development when no migrations pending and recent backup exists
+      logger.info(
+        "   ⏭️  Skipping backup - no pending migrations and recent backup exists"
+      );
+      backupPath = ""; // Clear backup path since we didn't create one
     } else {
       // Checkpoint WAL to ensure all data is in the main database file
       // This is important because SQLite uses WAL mode by default, which creates
@@ -431,7 +642,7 @@ export async function runDrizzleMigrations(
         rawDb.prepare("PRAGMA wal_checkpoint(TRUNCATE)").run();
         logger.info("   ✅ WAL checkpoint completed - all data in main file");
       } catch (walError) {
-        logger.warn("   ⚠️  WAL checkpoint failed (non-fatal):", walError);
+        logger.warn(`   ⚠️  WAL checkpoint failed (non-fatal)`, { walError });
         // Continue with backup even if checkpoint fails
       }
 
@@ -461,8 +672,8 @@ export async function runDrizzleMigrations(
 
     // Production-specific safety checks
     if (isProduction) {
-      // Verify backup was created successfully
-      if (existsSync(dbPath) && !existsSync(backupPath)) {
+      // Verify backup was created successfully (only if we tried to create one)
+      if (existsSync(dbPath) && backupPath && !existsSync(backupPath)) {
         throw new Error(
           "Backup creation failed - aborting migration for safety"
         );

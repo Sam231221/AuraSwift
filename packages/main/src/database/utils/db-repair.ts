@@ -10,8 +10,8 @@ import fs from "fs";
 import path from "path";
 import { copyFileSync } from "fs";
 
-import { getLogger } from '../../utils/logger.js';
-const logger = getLogger('db-repair');
+import { getLogger } from "../../utils/logger.js";
+const logger = getLogger("db-repair");
 
 export interface RepairResult {
   success: boolean;
@@ -42,13 +42,29 @@ export async function repairDatabase(
     // Always create backup before repair attempts
     const dbDir = path.dirname(dbPath);
     const backupDir = path.join(dbDir, "backups");
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    // Generate clean timestamp: YYYYMMDD-HHMMSS format
+    const now = new Date();
+    const timestamp =
+      [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("") +
+      "-" +
+      [
+        String(now.getHours()).padStart(2, "0"),
+        String(now.getMinutes()).padStart(2, "0"),
+        String(now.getSeconds()).padStart(2, "0"),
+      ].join("");
 
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
     }
 
-    backupPath = path.join(backupDir, `auraswift-repair-backup-${timestamp}.db`);
+    backupPath = path.join(
+      backupDir,
+      `auraswift-repair-backup-${timestamp}.db`
+    );
 
     // Checkpoint WAL to ensure all data is in main file before backup
     try {
@@ -148,7 +164,9 @@ export async function repairDatabase(
       return {
         success: false,
         repaired: false,
-        reason: `Error during final integrity check: ${error instanceof Error ? error.message : String(error)}`,
+        reason: `Error during final integrity check: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
         backupCreated: backupPath,
       };
     }
@@ -156,7 +174,9 @@ export async function repairDatabase(
     return {
       success: false,
       repaired: false,
-      reason: `Repair failed: ${error instanceof Error ? error.message : String(error)}`,
+      reason: `Repair failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
       backupCreated: backupPath,
     };
   }
@@ -200,7 +220,20 @@ export async function createFreshDatabase(
   // Backup old database
   const dbDir = path.dirname(oldDbPath);
   const backupDir = path.join(dbDir, "backups");
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  // Generate clean timestamp: YYYYMMDD-HHMMSS format
+  const now = new Date();
+  const timestamp =
+    [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("") +
+    "-" +
+    [
+      String(now.getHours()).padStart(2, "0"),
+      String(now.getMinutes()).padStart(2, "0"),
+      String(now.getSeconds()).padStart(2, "0"),
+    ].join("");
 
   if (!fs.existsSync(backupDir)) {
     fs.mkdirSync(backupDir, { recursive: true });
@@ -226,4 +259,3 @@ export async function createFreshDatabase(
   // New database will be created by DBManager on next initialization
   return oldDbPath; // Return same path - new file will be created here
 }
-
