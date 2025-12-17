@@ -6,9 +6,10 @@
 
 import { ipcMain } from "electron";
 import PDFDocument from "pdfkit";
-import { getLogger } from '../utils/logger.js';
+import { getLogger } from "../utils/logger.js";
+import { getDatabase } from "../database/index.js";
 
-const logger = getLogger('pdfReceiptService');
+const logger = getLogger("pdfReceiptService");
 
 interface ReceiptItem {
   name: string;
@@ -21,10 +22,13 @@ interface ReceiptItem {
 }
 
 interface ReceiptData {
-  // Store Information
-  storeName: string;
-  storeAddress: string;
-  storePhone: string;
+  // Business ID (required to fetch business details)
+  businessId: string;
+
+  // Store Information (optional - will be fetched from database if not provided)
+  storeName?: string;
+  storeAddress?: string;
+  storePhone?: string;
   vatNumber?: string;
 
   // Transaction Details
@@ -55,11 +59,61 @@ interface ReceiptData {
 }
 
 /**
+ * Fetch business details from database
+ */
+async function fetchBusinessDetails(businessId: string): Promise<{
+  storeName: string;
+  storeAddress: string;
+  storePhone: string;
+  vatNumber?: string;
+}> {
+  try {
+    const db = await getDatabase();
+    const business = db.businesses.getBusinessById(businessId);
+
+    if (!business) {
+      logger.warn(
+        `Business not found for ID: ${businessId}, using fallback values`
+      );
+      return {
+        storeName: "Business",
+        storeAddress: "",
+        storePhone: "",
+        vatNumber: undefined,
+      };
+    }
+
+    return {
+      storeName: business.businessName || "Business",
+      storeAddress: business.address || "",
+      storePhone: business.phone || "",
+      vatNumber: business.vatNumber || undefined,
+    };
+  } catch (error) {
+    logger.error("Error fetching business details:", error);
+    return {
+      storeName: "Business",
+      storeAddress: "",
+      storePhone: "",
+      vatNumber: undefined,
+    };
+  }
+}
+
+/**
  * Generate PDF receipt buffer
  */
 async function generatePDFReceipt(data: ReceiptData): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
+      // Fetch business details from database
+      const businessDetails = await fetchBusinessDetails(data.businessId);
+
+      // Use provided store info or fallback to database values
+      const storeName = data.storeName || businessDetails.storeName;
+      const storeAddress = data.storeAddress || businessDetails.storeAddress;
+      const storePhone = data.storePhone || businessDetails.storePhone;
+      const vatNumber = data.vatNumber || businessDetails.vatNumber;
       const doc = new PDFDocument({
         size: "LETTER",
         margins: {
@@ -87,27 +141,33 @@ async function generatePDFReceipt(data: ReceiptData): Promise<Buffer> {
       // HEADER SECTION
       // ========================================
       doc.font("Helvetica-Bold").fontSize(24);
-      doc.text(data.storeName, leftMargin, y, {
+      doc.text(storeName, leftMargin, y, {
         width: pageWidth,
         align: "center",
       });
       y += 35;
 
-      doc.font("Helvetica").fontSize(10);
-      doc.text(data.storeAddress, leftMargin, y, {
-        width: pageWidth,
-        align: "center",
-      });
-      y += 15;
+      if (storeAddress) {
+        doc.font("Helvetica").fontSize(10);
+        doc.text(storeAddress, leftMargin, y, {
+          width: pageWidth,
+          align: "center",
+        });
+        y += 15;
+      }
 
-      doc.text(data.storePhone, leftMargin, y, {
-        width: pageWidth,
-        align: "center",
-      });
-      y += 15;
+      if (storePhone) {
+        doc.font("Helvetica").fontSize(10);
+        doc.text(storePhone, leftMargin, y, {
+          width: pageWidth,
+          align: "center",
+        });
+        y += 15;
+      }
 
-      if (data.vatNumber) {
-        doc.text(`VAT: ${data.vatNumber}`, leftMargin, y, {
+      if (vatNumber) {
+        doc.font("Helvetica").fontSize(10);
+        doc.text(`VAT: ${vatNumber}`, leftMargin, y, {
           width: pageWidth,
           align: "center",
         });
@@ -316,12 +376,15 @@ async function generatePDFReceipt(data: ReceiptData): Promise<Buffer> {
         .stroke("#000000");
       y += 20;
 
-      doc.font("Helvetica-Bold").fontSize(13);
-      doc.text("Thank you for your business!", leftMargin, y, {
-        width: pageWidth,
-        align: "center",
-      });
-      y += 25;
+      // Only show footer message if provided
+      if (data.footerMessage) {
+        doc.font("Helvetica-Bold").fontSize(13);
+        doc.text(data.footerMessage, leftMargin, y, {
+          width: pageWidth,
+          align: "center",
+        });
+        y += 25;
+      }
 
       if (data.returnPolicy) {
         doc.fontSize(8).font("Helvetica").fillColor("#666666");
@@ -355,6 +418,14 @@ export function initializePDFReceiptService() {
     "receipt:generate-pdf",
     async (_event, receiptData: ReceiptData) => {
       try {
+        if (!receiptData.businessId) {
+          logger.error("❌ Business ID is required for PDF receipt generation");
+          return {
+            success: false,
+            error: "Business ID is required",
+          };
+        }
+
         logger.info("📄 Generating PDF receipt:", receiptData.receiptNumber);
 
         const pdfBuffer = await generatePDFReceipt(receiptData);

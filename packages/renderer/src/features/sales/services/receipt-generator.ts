@@ -385,8 +385,8 @@ export class ReceiptGenerator {
         : undefined,
 
       // Additional
-      returnPolicy:
-        "Items can be returned within 30 days with receipt. Perishable items excluded.",
+      // Return policy is optional - only include if provided
+      returnPolicy: undefined,
     };
   }
 }

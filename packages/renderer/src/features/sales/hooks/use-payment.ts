@@ -39,15 +39,6 @@ interface UsePaymentProps {
 }
 
 /**
- * Default business details constants
- */
-const DEFAULT_BUSINESS_DETAILS = {
-  address: "123 Main Street, London, W1A 1AA",
-  phone: "+44 20 1234 5678",
-  vatNumber: "GB123456789",
-} as const;
-
-/**
  * Helper: Calculate payment amounts based on payment method
  */
 const calculatePaymentAmounts = (
@@ -762,54 +753,14 @@ export function usePayment({
     const loadingToast = toast.loading("Generating PDF receipt...");
 
     try {
-      // Fetch business details
-      let businessDetails = {
-        name: completedTransactionData.businessName || "AuraSwift POS",
-        address: "",
-        phone: "",
-        vatNumber: "",
-      };
-
-      if (businessId) {
-        try {
-          // Get session token for authentication
-          const sessionToken = await window.authStore.get("token");
-          if (!sessionToken) {
-            throw new Error("Not authenticated");
-          }
-
-          const businessResponse = await window.authAPI.getBusinessById(
-            sessionToken,
-            businessId
-          );
-          if (businessResponse.success && businessResponse.business) {
-            businessDetails = {
-              name: businessResponse.business.businessName,
-              address:
-                businessResponse.business.address ||
-                DEFAULT_BUSINESS_DETAILS.address,
-              phone:
-                businessResponse.business.phone ||
-                DEFAULT_BUSINESS_DETAILS.phone,
-              vatNumber:
-                businessResponse.business.vatNumber ||
-                DEFAULT_BUSINESS_DETAILS.vatNumber,
-            };
-          }
-        } catch (error) {
-          logger.warn(
-            "Failed to fetch business details, using defaults:",
-            error
-          );
-        }
+      if (!businessId) {
+        throw new Error("Business ID is required to generate receipt");
       }
 
       // Prepare receipt data for PDF
+      // Business details will be fetched from database in the PDF service
       const receiptData = {
-        storeName: businessDetails.name,
-        storeAddress: businessDetails.address,
-        storePhone: businessDetails.phone,
-        vatNumber: businessDetails.vatNumber,
+        businessId: businessId,
         receiptNumber: completedTransactionData.receiptNumber,
         transactionId:
           completedTransactionData.id || completedTransactionData.receiptNumber,

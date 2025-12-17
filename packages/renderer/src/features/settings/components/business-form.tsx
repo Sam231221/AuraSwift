@@ -366,7 +366,7 @@ export function BusinessForm({ onCancel }: BusinessFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <AdaptiveFormField
-                    label="Phone"
+                    label="Contact Number"
                     id="phone"
                     type="tel"
                     {...field}
