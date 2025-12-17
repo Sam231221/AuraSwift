@@ -3,8 +3,6 @@ import { TrendingUp, Users, CreditCard, BarChart3 } from "lucide-react";
 export function AuthHeroSection() {
   return (
     <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('/modern-retail-store-interior-with-sleek-pos-system.jpg')] bg-cover bg-center opacity-10" />
-
       <div className="relative z-10 flex flex-col justify-center px-8 xl:px-12 py-12 xl:py-16">
         <div>
           <h2 className="text-2xl xl:text-3xl 2xl:text-4xl font-bold text-balance leading-tight mb-4 xl:mb-6">
