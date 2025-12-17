@@ -16,6 +16,10 @@ import { registerBookerImportHandlers } from "./ipc/bookerImportHandlers.js";
 import { registerLoggerHandlers } from "./ipc/loggerHandlers.js";
 import { registerAllIpcHandlers } from "./ipc/index.js";
 import { getLogger } from "./utils/logger.js";
+import {
+  shouldMigrateLogPath,
+  migrateLogsFromOldPath,
+} from "./utils/log-path-migration.js";
 
 const logger = getLogger("app-init");
 
@@ -41,6 +45,34 @@ export async function initApp(initConfig: AppInitConfig) {
   registerLoggerHandlers();
   registerVatCategoryIpc();
   registerBookerImportHandlers();
+
+  // ========================================
+  // LOG PATH MIGRATION: Move logs from Roaming to Local
+  // ========================================
+  // This should be done early, before logger is used extensively
+  // But after IPC handlers are registered so logger can be used
+  if (shouldMigrateLogPath()) {
+    logger.info("📦 Detected logs in old location (Roaming profile)");
+    logger.info("🔧 Attempting to migrate logs to Local profile...");
+
+    const migrationResult = await migrateLogsFromOldPath(false); // Don't remove old yet
+
+    if (migrationResult.migrated) {
+      logger.info("✅ Logs migrated successfully!");
+      logger.info(`   Old location: ${migrationResult.oldPath}`);
+      logger.info(`   New location: ${migrationResult.newPath}`);
+      logger.info(`   Files moved: ${migrationResult.filesMoved || 0}`);
+    } else {
+      const errorMessage =
+        migrationResult.reason || "Unknown error during log migration";
+      logger.warn("⚠️  Log migration failed:", errorMessage);
+      logger.warn(
+        "   Old logs preserved at:",
+        migrationResult.oldPath || "unknown location"
+      );
+      // Don't fail app initialization for log migration - logs are not critical
+    }
+  }
 
   // Initialize database
   const db = await getDatabase();
