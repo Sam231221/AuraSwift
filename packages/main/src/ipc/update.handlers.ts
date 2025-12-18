@@ -347,10 +347,7 @@ export function registerUpdateHandlers(): void {
         return { success: false };
       }
 
-      const isDownloading =
-        updaterInstance.isDownloading !== undefined
-          ? updaterInstance.isDownloading
-          : false;
+      const isDownloading = updaterInstance.getIsDownloading();
       const isPaused = updaterInstance.isDownloadPaused();
       const progress = updaterInstance.getDownloadProgress();
 

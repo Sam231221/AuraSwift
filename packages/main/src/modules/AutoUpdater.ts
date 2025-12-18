@@ -127,7 +127,7 @@ export class AutoUpdater implements AppModule {
     this.#notification = downloadNotification;
 
     // Initialize persistent store for download state
-    this.#store = new Store({
+    this.#store = new Store<{ downloadState: PersistedDownloadState | null }>({
       name: "autoupdater-state",
       defaults: {
         downloadState: null,
@@ -712,6 +712,14 @@ export class AutoUpdater implements AppModule {
   }
 
   /**
+   * Get current download status
+   * @returns Whether a download is currently in progress
+   */
+  getIsDownloading(): boolean {
+    return this.#isDownloading;
+  }
+
+  /**
    * Get pending update info (if available but not downloaded)
    */
   getPendingUpdateInfo(): UpdateInfo | null {
@@ -769,7 +777,7 @@ export class AutoUpdater implements AppModule {
       }
     } catch (error) {
       if (this.#logger) {
-        this.#logger.error("Failed to save download state:", error);
+        this.#logger.error(`Failed to save download state: ${error}`);
       }
     }
   }
@@ -807,7 +815,7 @@ export class AutoUpdater implements AppModule {
       }
     } catch (error) {
       if (this.#logger) {
-        this.#logger.error("Failed to load download state:", error);
+        this.#logger.error(`Failed to load download state: ${error}`);
       }
     }
   }
