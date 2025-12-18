@@ -7,6 +7,7 @@ import electronUpdater, {
   CancellationToken,
 } from "electron-updater";
 import { app, dialog, Notification, shell, BrowserWindow } from "electron";
+import Store from "electron-store";
 
 import { getLogger } from "../utils/logger.js";
 const logger = getLogger("AutoUpdater");
@@ -15,9 +16,19 @@ type DownloadNotification = Parameters<
   AppUpdater["checkForUpdatesAndNotify"]
 >[0];
 
+// Type for persisted download state
+type PersistedDownloadState = {
+  url: string;
+  downloadedBytes: number;
+  totalBytes: number;
+  version: string;
+  timestamp: number;
+};
+
 export class AutoUpdater implements AppModule {
   readonly #logger: Logger | null;
   readonly #notification: DownloadNotification;
+  readonly #store: Store<{ downloadState: PersistedDownloadState | null }>;
   #updateCheckInterval: NodeJS.Timeout | null = null;
   #postponedUpdateInfo: UpdateInfo | null = null;
   #remindLaterTimeout: NodeJS.Timeout | null = null;
@@ -26,6 +37,18 @@ export class AutoUpdater implements AppModule {
   #lastError: { message: string; timestamp: Date; type: string } | null = null;
   #downloadCancellationToken: CancellationToken | null = null;
   #lastErrorNotification: number | null = null;
+  #lastErrorNotifications: Map<string, number> = new Map();
+  #pendingCheckPromises: Array<{
+    resolve: (value: any) => void;
+    reject: (error: any) => void;
+  }> = [];
+  #isDownloadPaused = false;
+  #pausedDownloadState: {
+    url: string;
+    downloadedBytes: number;
+    totalBytes: number;
+    version: string;
+  } | null = null;
 
   readonly #REMIND_LATER_INTERVAL = 2 * 60 * 60 * 1000;
   readonly #MAX_POSTPONE_COUNT = 3;
@@ -102,6 +125,17 @@ export class AutoUpdater implements AppModule {
   } = {}) {
     this.#logger = logger;
     this.#notification = downloadNotification;
+
+    // Initialize persistent store for download state
+    this.#store = new Store({
+      name: "autoupdater-state",
+      defaults: {
+        downloadState: null,
+      },
+    });
+
+    // Load persisted download state on initialization
+    this.loadDownloadState();
   }
 
   /**
@@ -528,9 +562,12 @@ export class AutoUpdater implements AppModule {
 
       // Update state
       this.setDownloading(false);
+      this.#isDownloadPaused = false;
+      this.#pausedDownloadState = null;
 
       // Clear download state (user cancelled, don't preserve for resume)
       this.#downloadState = null;
+      this.saveDownloadState(null);
 
       // Broadcast cancellation to renderer
       this.broadcastToAllWindows("update:download-cancelled", {
@@ -545,6 +582,126 @@ export class AutoUpdater implements AppModule {
       }
       return false;
     }
+  }
+
+  /**
+   * Pause ongoing download
+   * @returns true if pause was successful, false if no download in progress or already paused
+   */
+  pauseDownload(): boolean {
+    if (!this.#isDownloading || this.#isDownloadPaused) {
+      return false;
+    }
+
+    try {
+      // Cancel current download to pause it
+      if (this.#downloadCancellationToken) {
+        this.#downloadCancellationToken.cancel();
+      }
+
+      // Save current state for resume
+      if (this.#downloadState) {
+        this.#pausedDownloadState = { ...this.#downloadState };
+      }
+
+      this.#isDownloadPaused = true;
+      this.setDownloading(false);
+
+      if (this.#logger) {
+        this.#logger.info("Download paused by user");
+      }
+
+      this.broadcastToAllWindows("update:download-paused", {
+        state: this.#pausedDownloadState,
+        timestamp: new Date(),
+      });
+
+      return true;
+    } catch (error) {
+      const errorMessage = this.formatErrorMessage(error);
+      if (this.#logger) {
+        this.#logger.error(`Failed to pause download: ${errorMessage}`);
+      }
+      return false;
+    }
+  }
+
+  /**
+   * Resume paused download
+   * @returns true if resume was successful, false if no paused download
+   */
+  resumeDownload(): boolean {
+    if (!this.#isDownloadPaused || !this.#pausedDownloadState) {
+      return false;
+    }
+
+    try {
+      const updater = this.getAutoUpdater();
+
+      // Restore download state
+      this.#downloadState = this.#pausedDownloadState;
+      this.#isDownloadPaused = false;
+      this.#pausedDownloadState = null;
+      this.setDownloading(true);
+
+      if (this.#logger) {
+        this.#logger.info("Resuming paused download");
+      }
+
+      // Resume download (electron-updater handles partial downloads automatically)
+      this.downloadWithResume(updater, this.#downloadState.version);
+
+      this.broadcastToAllWindows("update:download-resumed", {
+        timestamp: new Date(),
+      });
+
+      return true;
+    } catch (error) {
+      const errorMessage = this.formatErrorMessage(error);
+      if (this.#logger) {
+        this.#logger.error(`Failed to resume download: ${errorMessage}`);
+      }
+      this.#isDownloadPaused = false;
+      this.#pausedDownloadState = null;
+      return false;
+    }
+  }
+
+  /**
+   * Check if download is paused
+   * @returns true if download is paused
+   */
+  isDownloadPaused(): boolean {
+    return this.#isDownloadPaused;
+  }
+
+  /**
+   * Get current download progress
+   * @returns Download progress information or null if not downloading
+   */
+  getDownloadProgress(): {
+    percent: number;
+    transferred: number;
+    total: number;
+    bytesPerSecond: number;
+  } | null {
+    if (
+      !this.#downloadState ||
+      (!this.#isDownloading && !this.#isDownloadPaused)
+    ) {
+      return null;
+    }
+    return {
+      percent:
+        this.#downloadState.totalBytes > 0
+          ? (this.#downloadState.downloadedBytes /
+              this.#downloadState.totalBytes) *
+            100
+          : 0,
+      transferred: this.#downloadState.downloadedBytes,
+      total: this.#downloadState.totalBytes,
+      bytesPerSecond: 0, // Would need separate tracking for accurate speed
+    };
   }
 
   /**
@@ -580,6 +737,79 @@ export class AutoUpdater implements AppModule {
    */
   postponeUpdate(updateInfo: UpdateInfo): void {
     this.scheduleReminder(updateInfo);
+  }
+
+  /**
+   * Save download state to disk for persistence
+   * @param state Download state to persist or null to clear
+   */
+  private saveDownloadState(
+    state: {
+      url: string;
+      downloadedBytes: number;
+      totalBytes: number;
+      version: string;
+    } | null
+  ): void {
+    try {
+      if (state) {
+        const persistedState: PersistedDownloadState = {
+          ...state,
+          timestamp: Date.now(),
+        };
+        this.#store.set("downloadState", persistedState);
+        if (this.#logger) {
+          this.#logger.info("Download state persisted to disk");
+        }
+      } else {
+        this.#store.delete("downloadState");
+        if (this.#logger) {
+          this.#logger.info("Download state cleared from disk");
+        }
+      }
+    } catch (error) {
+      if (this.#logger) {
+        this.#logger.error("Failed to save download state:", error);
+      }
+    }
+  }
+
+  /**
+   * Load download state from disk on startup
+   * Only loads if download is recent (within 24 hours)
+   */
+  private loadDownloadState(): void {
+    try {
+      const saved = this.#store.get("downloadState");
+      if (saved) {
+        const age = Date.now() - saved.timestamp;
+        const MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+
+        if (age < MAX_AGE) {
+          this.#downloadState = {
+            url: saved.url,
+            downloadedBytes: saved.downloadedBytes,
+            totalBytes: saved.totalBytes,
+            version: saved.version,
+          };
+          if (this.#logger) {
+            this.#logger.info(
+              `Loaded persisted download state: ${saved.version} (${saved.downloadedBytes}/${saved.totalBytes} bytes)`
+            );
+          }
+        } else {
+          // Clear old state
+          this.#store.delete("downloadState");
+          if (this.#logger) {
+            this.#logger.info("Cleared expired download state");
+          }
+        }
+      }
+    } catch (error) {
+      if (this.#logger) {
+        this.#logger.error("Failed to load download state:", error);
+      }
+    }
   }
 
   /**
@@ -770,20 +1000,27 @@ export class AutoUpdater implements AppModule {
    * @returns Update check result or null if no update available or check skipped
    */
   async runAutoUpdater() {
-    // Phase 4.3: Debounce rapid checks
+    // Phase 4.3: Debounce rapid checks with pending promise tracking
     if (this.#checkDebounceTimer) {
       clearTimeout(this.#checkDebounceTimer);
       this.#checkDebounceTimer = null;
     }
 
     return new Promise((resolve, reject) => {
+      // Track this promise to resolve/reject all pending calls together
+      this.#pendingCheckPromises.push({ resolve, reject });
+
       this.#checkDebounceTimer = setTimeout(async () => {
         try {
           const result = await this.performUpdateCheck();
-          resolve(result);
+          // Resolve all pending promises with the same result
+          this.#pendingCheckPromises.forEach((p) => p.resolve(result));
         } catch (error) {
-          reject(error);
+          // Reject all pending promises with the same error
+          this.#pendingCheckPromises.forEach((p) => p.reject(error));
         } finally {
+          // Clear pending promises and timer
+          this.#pendingCheckPromises = [];
           this.#checkDebounceTimer = null;
         }
       }, this.#DEBOUNCE_DELAY);
@@ -852,8 +1089,27 @@ export class AutoUpdater implements AppModule {
 
           // Cache successful result (Performance: Phase 1.2)
           if (result?.updateInfo) {
+            const currentVersion = app.getVersion();
+            const newVersion = result.updateInfo.version;
+
+            // Invalidate cache if version changed from last check
+            if (
+              this.#lastCheckResult?.version &&
+              this.#lastCheckResult.version !== newVersion
+            ) {
+              if (this.#logger) {
+                this.#logger.info(
+                  `Version changed from ${
+                    this.#lastCheckResult.version
+                  } to ${newVersion}, invalidating cache`
+                );
+              }
+              this.#lastCheckTime = null;
+              this.#lastCheckResult = null;
+            }
+
             this.#lastCheckResult = {
-              version: result.updateInfo.version,
+              version: newVersion,
               timestamp: Date.now(),
             };
             this.#lastCheckTime = Date.now();
@@ -951,32 +1207,25 @@ export class AutoUpdater implements AppModule {
    */
   private trackCheckMetrics(duration: number, cached: boolean): void {
     this.#metrics.checkCount++;
-    this.#metrics.checkDuration.push(duration);
 
-    // Keep only last N measurements to prevent memory growth
-    if (this.#metrics.checkDuration.length > this.#METRICS_ROLLING_WINDOW) {
-      this.#metrics.checkDuration.shift();
+    if (!cached) {
+      // Only track duration for actual network checks
+      this.#metrics.checkDuration.push(duration);
+      // Keep only last N measurements to prevent unbounded growth
+      if (this.#metrics.checkDuration.length > this.#METRICS_ROLLING_WINDOW) {
+        this.#metrics.checkDuration.shift();
+      }
     }
 
-    // Update cache hit rate using rolling window approach
-    // This prevents overflow and maintains accuracy over time
-    const windowSize = Math.min(
+    // Simple cache hit rate: (total checks - network requests) / total checks
+    const totalChecks = Math.min(
       this.#metrics.checkCount,
       this.#CACHE_HIT_RATE_WINDOW
     );
-    const recentChecks = this.#metrics.checkDuration.length;
-    const cacheHits = cached ? 1 : 0;
-
-    // Calculate rolling average: (old_rate * (window - 1) + new_value) / window
-    if (windowSize === 1) {
-      this.#metrics.cacheHitRate = cacheHits;
-    } else {
-      // Use a simple moving average for the rolling window
-      // This is more accurate than the previous approach for large numbers
-      const previousRate = this.#metrics.cacheHitRate;
-      this.#metrics.cacheHitRate =
-        (previousRate * (windowSize - 1) + cacheHits) / windowSize;
-    }
+    const networkRequests = this.#metrics.checkDuration.length;
+    const cacheHits = totalChecks - networkRequests;
+    this.#metrics.cacheHitRate =
+      totalChecks > 0 ? (cacheHits / totalChecks) * 100 : 0;
   }
 
   private removeUpdateListeners(updater: AppUpdater): void {
@@ -1096,7 +1345,7 @@ export class AutoUpdater implements AppModule {
       }
 
       // Phase 4.1: Save download state for resume capability
-      // Track download progress for potential resume
+      // Track download progress for potential resume and persist to disk
       // Note: electron-updater handles resume automatically, we track for logging
       if (progressInfo.total && progressInfo.transferred) {
         // Store state with current version from update info if available
@@ -1116,6 +1365,9 @@ export class AutoUpdater implements AppModule {
           // Update existing state
           this.#downloadState.downloadedBytes = progressInfo.transferred;
         }
+
+        // Persist state to disk for crash recovery
+        this.saveDownloadState(this.#downloadState);
       }
 
       // Broadcast progress to renderer for toast notification
@@ -1190,6 +1442,7 @@ export class AutoUpdater implements AppModule {
 
       // Phase 4.1: Clear download state after successful download
       this.#downloadState = null;
+      this.saveDownloadState(null);
 
       // Store downloaded update info
       this.#downloadedUpdateInfo = info;
@@ -1316,24 +1569,25 @@ export class AutoUpdater implements AppModule {
         process.env.NODE_ENV !== "production";
 
       if (!shouldSkipDialog) {
-        // Debounce error notifications (UI Spam Prevention)
+        // Per-error-type cooldown for better error notification management
         const now = Date.now();
-        const timeSinceLastError = this.#lastErrorNotification
-          ? now - this.#lastErrorNotification
-          : Infinity;
         const ERROR_NOTIFICATION_COOLDOWN = 60 * 1000; // 1 minute
+        const errorType = isDownloadError ? "download" : "check";
+        const lastNotification =
+          this.#lastErrorNotifications.get(errorType) || 0;
+        const timeSinceLastError = now - lastNotification;
 
         if (timeSinceLastError < ERROR_NOTIFICATION_COOLDOWN) {
           if (this.#logger) {
             this.#logger.info(
-              `Skipping error UI (cooldown active: ${Math.floor(
+              `Skipping ${errorType} error UI (cooldown active: ${Math.floor(
                 timeSinceLastError / 1000
               )}s)`
             );
           }
           return;
         }
-        this.#lastErrorNotification = now;
+        this.#lastErrorNotifications.set(errorType, now);
 
         const isNetworkError =
           errorMessage.includes("ENOTFOUND") ||
@@ -1463,8 +1717,15 @@ export class AutoUpdater implements AppModule {
         }
       }
 
-      // Start/resume download with cancellation token
-      updater.downloadUpdate(this.#downloadCancellationToken);
+      // Start/resume download with cancellation token - wrap in try-catch for synchronous errors
+      try {
+        updater.downloadUpdate(this.#downloadCancellationToken);
+      } catch (downloadError) {
+        // Clear cancellation token on synchronous error
+        this.#downloadCancellationToken = null;
+        this.setDownloading(false);
+        throw downloadError;
+      }
     } catch (error) {
       const errorMessage = this.formatErrorMessage(error);
       this.#isDownloading = false;

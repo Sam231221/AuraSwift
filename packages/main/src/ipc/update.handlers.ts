@@ -277,5 +277,97 @@ export function registerUpdateHandlers(): void {
     }
   });
 
+  /**
+   * Handle pause download request
+   */
+  ipcMain.handle("update:pause-download", async () => {
+    try {
+      const updaterInstance = getAutoUpdaterInstance();
+      if (!updaterInstance) {
+        return { success: false, error: "Auto-updater not available" };
+      }
+
+      const paused = updaterInstance.pauseDownload();
+
+      if (paused) {
+        logger.info("Download paused successfully");
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: "No download in progress to pause or already paused",
+        };
+      }
+    } catch (error) {
+      logger.error("Error pausing download:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  /**
+   * Handle resume download request
+   */
+  ipcMain.handle("update:resume-download", async () => {
+    try {
+      const updaterInstance = getAutoUpdaterInstance();
+      if (!updaterInstance) {
+        return { success: false, error: "Auto-updater not available" };
+      }
+
+      const resumed = updaterInstance.resumeDownload();
+
+      if (resumed) {
+        logger.info("Download resumed successfully");
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: "No paused download to resume",
+        };
+      }
+    } catch (error) {
+      logger.error("Error resuming download:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  /**
+   * Get download state including progress and paused status
+   */
+  ipcMain.handle("update:get-download-state", async () => {
+    try {
+      const updaterInstance = getAutoUpdaterInstance();
+      if (!updaterInstance) {
+        return { success: false };
+      }
+
+      const isDownloading =
+        updaterInstance.isDownloading !== undefined
+          ? updaterInstance.isDownloading
+          : false;
+      const isPaused = updaterInstance.isDownloadPaused();
+      const progress = updaterInstance.getDownloadProgress();
+
+      return {
+        success: true,
+        isDownloading,
+        isPaused,
+        progress,
+      };
+    } catch (error) {
+      logger.error("Error getting download state:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
   logger.info("Update IPC handlers registered");
 }
