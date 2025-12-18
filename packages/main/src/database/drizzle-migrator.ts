@@ -585,6 +585,11 @@ export async function runDrizzleMigrations(
     }
 
     // Setup backup directory
+    const backupDir = join(dirname(dbPath), "backups");
+    if (!existsSync(backupDir)) {
+      mkdirSync(backupDir, { recursive: true });
+    }
+
     // Generate clean timestamp: YYYYMMDD-HHMMSS format (readable, sortable, no milliseconds)
     const now = new Date();
     const timestamp =
